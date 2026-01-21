@@ -14,6 +14,20 @@ Non-custodial stablecoin treasury management for Web3 teams.
 ### Prerequisites
 
 - [Bun](https://bun.sh/) v1.0 or higher
+- A [Convex](https://convex.dev) account
+- A [WalletConnect](https://cloud.walletconnect.com/) project ID
+
+### Environment Variables
+
+Create a `.env.local` file:
+
+```bash
+# Convex deployment URL (get from `bunx convex dev`)
+VITE_CONVEX_URL=https://your-project.convex.cloud
+
+# WalletConnect Project ID (get from cloud.walletconnect.com)
+VITE_WALLETCONNECT_PROJECT_ID=your_project_id
+```
 
 ### Installation
 

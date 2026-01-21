@@ -1,8 +1,64 @@
-import { Link } from 'react-router-dom'
-import { Button } from '@/components/ui/button'
-import { ArrowLeft, Wallet } from 'lucide-react'
+import { useEffect } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import { ConnectButton } from '@rainbow-me/rainbowkit';
+import { useAccount, useSignMessage } from 'wagmi';
+import { useMutation, useQuery } from 'convex/react';
+import { api } from '../../convex/_generated/api';
+import { Button } from '@/components/ui/button';
+import { ArrowLeft } from 'lucide-react';
 
 export default function Login() {
+  const navigate = useNavigate();
+  const { address, isConnected } = useAccount();
+  const { signMessageAsync } = useSignMessage();
+  
+  const generateNonce = useMutation(api.auth.generateNonce);
+  const verifySignature = useMutation(api.auth.verifySignature);
+  const session = useQuery(
+    api.auth.getSession, 
+    address ? { walletAddress: address } : 'skip'
+  );
+
+  // If already authenticated, redirect to select-org
+  useEffect(() => {
+    if (session) {
+      navigate('/select-org');
+    }
+  }, [session, navigate]);
+
+  // When wallet connects, start SIWE flow
+  useEffect(() => {
+    if (isConnected && address && !session) {
+      handleSignIn();
+    }
+  }, [isConnected, address]);
+
+  const handleSignIn = async () => {
+    if (!address) return;
+
+    try {
+      // Generate nonce
+      const { nonce } = await generateNonce({ walletAddress: address });
+
+      // Create SIWE message
+      const message = `Sign in to Disburse\n\nThis request will not trigger a blockchain transaction or cost any gas fees.\n\nWallet: ${address}\nNonce: ${nonce}`;
+
+      // Sign message
+      const signature = await signMessageAsync({ message });
+
+      // Verify with backend
+      await verifySignature({
+        walletAddress: address,
+        signature,
+        message,
+      });
+
+      // Session query will update and trigger redirect
+    } catch (error) {
+      console.error('Sign in failed:', error);
+    }
+  };
+
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-navy-950 px-6">
       {/* Background */}
@@ -48,11 +104,64 @@ export default function Login() {
             Connect your wallet to get started
           </p>
 
-          {/* Connect button - placeholder for now */}
-          <Button className="w-full" size="lg">
-            <Wallet className="h-5 w-5" />
-            Connect Wallet
-          </Button>
+          {/* RainbowKit Connect Button */}
+          <div className="flex justify-center">
+            <ConnectButton.Custom>
+              {({
+                account,
+                chain,
+                openAccountModal,
+                openChainModal,
+                openConnectModal,
+                mounted,
+              }) => {
+                const ready = mounted;
+                const connected = ready && account && chain;
+
+                return (
+                  <div
+                    {...(!ready && {
+                      'aria-hidden': true,
+                      style: {
+                        opacity: 0,
+                        pointerEvents: 'none',
+                        userSelect: 'none',
+                      },
+                    })}
+                  >
+                    {(() => {
+                      if (!connected) {
+                        return (
+                          <Button onClick={openConnectModal} size="lg" className="w-full">
+                            Connect Wallet
+                          </Button>
+                        );
+                      }
+
+                      if (chain.unsupported) {
+                        return (
+                          <Button onClick={openChainModal} variant="secondary" size="lg">
+                            Wrong network
+                          </Button>
+                        );
+                      }
+
+                      return (
+                        <div className="flex flex-col gap-3">
+                          <Button onClick={openAccountModal} variant="secondary" size="lg">
+                            {account.displayName}
+                          </Button>
+                          <p className="text-center text-sm text-slate-400">
+                            Signing you in...
+                          </p>
+                        </div>
+                      );
+                    })()}
+                  </div>
+                );
+              }}
+            </ConnectButton.Custom>
+          </div>
 
           <p className="mt-6 text-center text-xs text-slate-500">
             By connecting, you agree to our{' '}
@@ -75,5 +184,5 @@ export default function Login() {
         </p>
       </div>
     </div>
-  )
+  );
 }
