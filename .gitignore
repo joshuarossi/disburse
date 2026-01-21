@@ -23,8 +23,8 @@ dist-ssr
 *.sln
 *.sw?
 
-# Bun
-bun.lockb
+# Bun (lockfile should be committed for CI/CD)
+# bun.lockb
 
 # Environment
 .env
