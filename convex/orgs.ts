@@ -198,7 +198,7 @@ export const listMembers = query({
               membershipId: m._id,
               userId: m.userId,
               walletAddress: memberUser.walletAddress,
-              email: memberUser.email,
+              email: m.email, // Use membership email (org-specific)
               name: m.name, // Optional display name
               role: m.role,
               status: m.status,
@@ -219,6 +219,7 @@ export const inviteMember = mutation({
     walletAddress: v.string(),
     memberWalletAddress: v.string(),
     memberName: v.optional(v.string()), // Optional display name
+    memberEmail: v.optional(v.string()), // Optional email
     role: v.union(
       v.literal("admin"),
       v.literal("approver"),
@@ -301,6 +302,7 @@ export const inviteMember = mutation({
         role: args.role,
         status: "active",
         name: args.memberName,
+        email: args.memberEmail,
       });
       
       // Audit log
@@ -310,7 +312,7 @@ export const inviteMember = mutation({
         action: "member.reactivated",
         objectType: "orgMembership",
         objectId: existingMembership._id,
-        metadata: { memberWalletAddress, role: args.role, name: args.memberName },
+        metadata: { memberWalletAddress, role: args.role, name: args.memberName, email: args.memberEmail },
         timestamp: now,
       });
 
@@ -322,6 +324,7 @@ export const inviteMember = mutation({
       orgId: args.orgId,
       userId: memberUser._id,
       name: args.memberName,
+      email: args.memberEmail,
       role: args.role,
       status: "active",
       createdAt: now,
@@ -334,7 +337,7 @@ export const inviteMember = mutation({
       action: "member.invited",
       objectType: "orgMembership",
       objectId: membershipId,
-      metadata: { memberWalletAddress, role: args.role, name: args.memberName },
+      metadata: { memberWalletAddress, role: args.role, name: args.memberName, email: args.memberEmail },
       timestamp: now,
     });
 
@@ -478,6 +481,71 @@ export const updateMemberName = mutation({
       objectType: "orgMembership",
       objectId: args.membershipId,
       metadata: { oldName, newName: args.name },
+      timestamp: now,
+    });
+
+    return { success: true };
+  },
+});
+
+// Update a member's email
+export const updateMemberEmail = mutation({
+  args: {
+    orgId: v.id("orgs"),
+    membershipId: v.id("orgMemberships"),
+    walletAddress: v.string(),
+    email: v.optional(v.string()), // Can clear email by passing undefined
+  },
+  handler: async (ctx, args) => {
+    const walletAddress = args.walletAddress.toLowerCase();
+    const now = Date.now();
+
+    // Verify user is a member (any member can update their own email, admins can update anyone's)
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_wallet", (q) => q.eq("walletAddress", walletAddress))
+      .first();
+
+    if (!user) {
+      throw new Error("User not found");
+    }
+
+    const userMembership = await ctx.db
+      .query("orgMemberships")
+      .withIndex("by_org_and_user", (q) =>
+        q.eq("orgId", args.orgId).eq("userId", user._id)
+      )
+      .first();
+
+    if (!userMembership || userMembership.status !== "active") {
+      throw new Error("Not a member of this organization");
+    }
+
+    // Get target membership
+    const membership = await ctx.db.get(args.membershipId);
+    if (!membership || membership.orgId !== args.orgId) {
+      throw new Error("Membership not found");
+    }
+
+    // Check permissions: admin can update anyone, users can update themselves
+    const isAdmin = userMembership.role === "admin";
+    const isOwnMembership = membership._id === userMembership._id;
+    
+    if (!isAdmin && !isOwnMembership) {
+      throw new Error("You can only update your own email");
+    }
+
+    const oldEmail = membership.email;
+    await ctx.db.patch(args.membershipId, { email: args.email });
+
+    // Audit log
+    await ctx.db.insert("auditLog", {
+      orgId: args.orgId,
+      actorUserId: user._id,
+      action: "member.emailUpdated",
+      objectType: "orgMembership",
+      objectId: args.membershipId,
+      metadata: { oldEmail, newEmail: args.email },
       timestamp: now,
     });
 

@@ -33,6 +33,7 @@ export default defineSchema({
     orgId: v.id("orgs"),
     userId: v.id("users"),
     name: v.optional(v.string()), // Optional display name for the member
+    email: v.optional(v.string()), // Optional email for the member
     role: v.union(
       v.literal("admin"),
       v.literal("approver"),
