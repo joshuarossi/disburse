@@ -110,14 +110,20 @@ export default function Settings() {
 
   const handleLinkSafe = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!orgId || !address || !safeAddress.trim()) return;
+    console.log('[Settings] handleLinkSafe called', { orgId, address, safeAddress: safeAddress.trim() });
+    if (!orgId || !address || !safeAddress.trim()) {
+      console.log('[Settings] Early return - missing data', { orgId, address, safeAddress });
+      return;
+    }
 
     setIsValidating(true);
     setLinkingError(null);
 
     try {
       // Validate the Safe address
+      console.log('[Settings] Calling validateSafeAddress...');
       const isValid = await validateSafeAddress(safeAddress.trim());
+      console.log('[Settings] validateSafeAddress returned:', isValid);
       if (!isValid) {
         setLinkingError('Invalid Safe address. Please check the address and network.');
         setIsValidating(false);

@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { ConnectButton } from '@rainbow-me/rainbowkit';
 import { useAccount, useSignMessage } from 'wagmi';
@@ -11,6 +11,8 @@ export default function Login() {
   const navigate = useNavigate();
   const { address, isConnected } = useAccount();
   const { signMessageAsync } = useSignMessage();
+  const [isSigningIn, setIsSigningIn] = useState(false);
+  const signInAttemptedRef = useRef(false);
   
   const generateNonce = useMutation(api.auth.generateNonce);
   const verifySignature = useMutation(api.auth.verifySignature);
@@ -26,15 +28,24 @@ export default function Login() {
     }
   }, [session, navigate]);
 
-  // When wallet connects, start SIWE flow
+  // When wallet connects, start SIWE flow (with guard against double-execution)
   useEffect(() => {
-    if (isConnected && address && !session) {
+    if (isConnected && address && !session && !isSigningIn && !signInAttemptedRef.current) {
+      signInAttemptedRef.current = true;
       handleSignIn();
     }
-  }, [isConnected, address]);
+  }, [isConnected, address, session, isSigningIn]);
+
+  // Reset the sign-in attempt flag when wallet disconnects
+  useEffect(() => {
+    if (!isConnected) {
+      signInAttemptedRef.current = false;
+    }
+  }, [isConnected]);
 
   const handleSignIn = async () => {
-    if (!address) return;
+    if (!address || isSigningIn) return;
+    setIsSigningIn(true);
 
     try {
       // Generate nonce
@@ -56,6 +67,10 @@ export default function Login() {
       // Session query will update and trigger redirect
     } catch (error) {
       console.error('Sign in failed:', error);
+      // Reset the attempt flag so user can retry
+      signInAttemptedRef.current = false;
+    } finally {
+      setIsSigningIn(false);
     }
   };
 

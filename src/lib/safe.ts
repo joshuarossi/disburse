@@ -18,7 +18,10 @@ interface MetaTransactionData {
 }
 
 // Sepolia chain ID
-const CHAIN_ID = 11155111n;
+const CHAIN_ID = BigInt(11155111);
+
+// Safe Transaction Service URL for Sepolia (SDK appends /v1/... paths)
+const SAFE_TX_SERVICE_URL = 'https://safe-transaction-sepolia.safe.global/api';
 
 // ERC20 ABI for transfer function
 const ERC20_ABI = [
@@ -37,9 +40,18 @@ const ERC20_ABI = [
  * Initialize Safe API Kit for Sepolia
  */
 export function getSafeApiKit(): SafeApiKit {
-  return new SafeApiKit({
-    chainId: CHAIN_ID,
-  });
+  console.log('[Safe] Initializing SafeApiKit with txServiceUrl:', SAFE_TX_SERVICE_URL);
+  try {
+    const apiKit = new SafeApiKit({
+      chainId: CHAIN_ID,
+      txServiceUrl: SAFE_TX_SERVICE_URL,
+    });
+    console.log('[Safe] SafeApiKit initialized successfully');
+    return apiKit;
+  } catch (error) {
+    console.error('[Safe] Failed to initialize SafeApiKit:', error);
+    throw error;
+  }
 }
 
 /**
@@ -61,9 +73,12 @@ export async function getSafeProtocolKit(
  * Get Safe info including owners and threshold
  */
 export async function getSafeInfo(safeAddress: string) {
+  console.log('[Safe] getSafeInfo called with address:', safeAddress);
   const apiKit = getSafeApiKit();
+  console.log('[Safe] Calling apiKit.getSafeInfo...');
   try {
     const safeInfo = await apiKit.getSafeInfo(safeAddress);
+    console.log('[Safe] Got Safe info:', safeInfo);
     return {
       address: safeInfo.address,
       nonce: safeInfo.nonce,
@@ -72,7 +87,7 @@ export async function getSafeInfo(safeAddress: string) {
       version: safeInfo.version,
     };
   } catch (error) {
-    console.error('Failed to get Safe info:', error);
+    console.error('[Safe] Failed to get Safe info:', error);
     throw error;
   }
 }
@@ -213,36 +228,49 @@ export async function executeTransaction(
   const safeTx = await protocolKit.createTransaction({
     transactions: [safeTransactionData],
     options: {
-      nonce: updatedTx.nonce,
+      nonce: Number(updatedTx.nonce),
     },
   });
 
   // Add all confirmations/signatures
   for (const confirmation of updatedTx.confirmations || []) {
-    safeTx.addSignature({
+    // Create a signature object compatible with the Safe SDK
+    const sig = {
       signer: confirmation.owner,
       data: confirmation.signature,
       isContractSignature: false,
-    });
+      staticPart: () => confirmation.signature.slice(0, 132),
+      dynamicPart: () => confirmation.signature.slice(132),
+    };
+    safeTx.addSignature(sig);
   }
 
   // Execute the transaction
   const executeTxResponse = await protocolKit.executeTransaction(safeTx);
   
-  // Wait for the transaction to be mined
-  const receipt = await executeTxResponse.transactionResponse?.wait();
+  // Wait for the transaction to be mined and get the hash
+  const txResponse = executeTxResponse.transactionResponse;
+  if (txResponse && typeof txResponse === 'object' && 'wait' in txResponse) {
+    const waitFn = txResponse.wait as () => Promise<{ hash?: string }>;
+    const receipt = await waitFn();
+    return receipt?.hash || executeTxResponse.hash;
+  }
   
-  return receipt?.hash || executeTxResponse.hash;
+  return executeTxResponse.hash;
 }
 
 /**
  * Validate that an address is a valid Safe contract
  */
 export async function validateSafeAddress(safeAddress: string): Promise<boolean> {
+  console.log('[Safe] validateSafeAddress called with:', safeAddress);
   try {
     const safeInfo = await getSafeInfo(safeAddress);
-    return !!safeInfo && !!safeInfo.address;
-  } catch {
+    const isValid = !!safeInfo && !!safeInfo.address;
+    console.log('[Safe] validateSafeAddress result:', isValid, safeInfo);
+    return isValid;
+  } catch (error) {
+    console.error('[Safe] validateSafeAddress caught error:', error);
     return false;
   }
 }
