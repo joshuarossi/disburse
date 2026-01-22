@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef } from 'react';
 import { useParams } from 'react-router-dom';
 import { useAccount } from 'wagmi';
 import { useQuery, useMutation } from 'convex/react';
@@ -8,7 +8,7 @@ import { AppLayout } from '@/components/layout/AppLayout';
 import { Button } from '@/components/ui/button';
 import { 
   Plus, Send, ArrowUpRight, Loader2, Play, CheckCircle, X, Rocket,
-  Search, Filter, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Calendar
+  Search, Filter, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Calendar, RefreshCw
 } from 'lucide-react';
 import {
   createTransferTx,
@@ -84,6 +84,14 @@ export default function Disbursements() {
     queryArgs ?? 'skip'
   );
 
+  // Keep previous data while loading to prevent flicker during sort/filter changes
+  const lastValidResultRef = useRef(disbursementsResult);
+  if (disbursementsResult !== undefined) {
+    lastValidResultRef.current = disbursementsResult;
+  }
+  const displayedResult = disbursementsResult ?? lastValidResultRef.current;
+  const isRefreshing = disbursementsResult === undefined && lastValidResultRef.current !== undefined;
+
   const beneficiaries = useQuery(
     api.beneficiaries.list,
     orgId && address
@@ -153,8 +161,8 @@ export default function Disbursements() {
 
   // Pagination handlers
   const goToNextPage = () => {
-    if (disbursementsResult?.nextCursor) {
-      setCursors(prev => [...prev.slice(0, currentPage + 1), disbursementsResult.nextCursor]);
+    if (displayedResult?.nextCursor) {
+      setCursors(prev => [...prev.slice(0, currentPage + 1), displayedResult.nextCursor]);
       setCurrentPage(prev => prev + 1);
     }
   };
@@ -405,9 +413,12 @@ export default function Disbursements() {
             <h1 className="text-2xl font-bold text-white">Disbursements</h1>
             <p className="mt-1 text-slate-400">
               Manage and track stablecoin payments
-              {disbursementsResult && (
+              {displayedResult && (
                 <span className="ml-2 text-slate-500">
-                  ({disbursementsResult.totalCount} total)
+                  ({displayedResult.totalCount} total)
+                  {isRefreshing && (
+                    <RefreshCw className="ml-2 inline h-3 w-3 animate-spin" />
+                  )}
                 </span>
               )}
             </p>
@@ -628,7 +639,7 @@ export default function Disbursements() {
         )}
 
         {/* Disbursements List */}
-        {disbursementsResult?.items.length === 0 && !hasActiveFilters ? (
+        {displayedResult?.items.length === 0 && !hasActiveFilters ? (
           <div className="rounded-2xl border border-dashed border-white/20 bg-navy-900/30 p-8 text-center">
             <Send className="mx-auto h-12 w-12 text-slate-500" />
             <h3 className="mt-4 text-lg font-medium text-white">
@@ -638,7 +649,7 @@ export default function Disbursements() {
               Create your first disbursement to send stablecoins
             </p>
           </div>
-        ) : disbursementsResult?.items.length === 0 && hasActiveFilters ? (
+        ) : displayedResult?.items.length === 0 && hasActiveFilters ? (
           <div className="rounded-2xl border border-dashed border-white/20 bg-navy-900/30 p-8 text-center">
             <Search className="mx-auto h-12 w-12 text-slate-500" />
             <h3 className="mt-4 text-lg font-medium text-white">
@@ -652,7 +663,7 @@ export default function Disbursements() {
             </Button>
           </div>
         ) : (
-          <div className="rounded-2xl border border-white/10 bg-navy-900/50 overflow-hidden">
+          <div className={`rounded-2xl border border-white/10 bg-navy-900/50 overflow-hidden transition-opacity ${isRefreshing ? 'opacity-70' : ''}`}>
             <table className="w-full">
               <thead>
                 <tr className="border-b border-white/10 bg-navy-800/50">
@@ -701,7 +712,7 @@ export default function Disbursements() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-white/5">
-                {disbursementsResult?.items.map((disbursement) => (
+                {displayedResult?.items.map((disbursement) => (
                   <tr key={disbursement._id} className="hover:bg-navy-800/30">
                     <td className="px-6 py-4">
                       <p className="font-medium text-white">
@@ -749,12 +760,12 @@ export default function Disbursements() {
             </table>
 
             {/* Pagination */}
-            {disbursementsResult && disbursementsResult.totalCount > PAGE_SIZE && (
+            {displayedResult && displayedResult.totalCount > PAGE_SIZE && (
               <div className="flex items-center justify-between border-t border-white/10 bg-navy-800/30 px-6 py-4">
                 <div className="text-sm text-slate-400">
                   Showing {currentPage * PAGE_SIZE + 1} to{' '}
-                  {Math.min((currentPage + 1) * PAGE_SIZE, disbursementsResult.totalCount)} of{' '}
-                  {disbursementsResult.totalCount} results
+                  {Math.min((currentPage + 1) * PAGE_SIZE, displayedResult.totalCount)} of{' '}
+                  {displayedResult.totalCount} results
                 </div>
                 <div className="flex items-center gap-2">
                   <Button
@@ -767,13 +778,13 @@ export default function Disbursements() {
                     Previous
                   </Button>
                   <span className="px-3 py-1 text-sm text-slate-400">
-                    Page {currentPage + 1} of {Math.ceil(disbursementsResult.totalCount / PAGE_SIZE)}
+                    Page {currentPage + 1} of {Math.ceil(displayedResult.totalCount / PAGE_SIZE)}
                   </span>
                   <Button
                     variant="secondary"
                     size="sm"
                     onClick={goToNextPage}
-                    disabled={!disbursementsResult.hasMore}
+                    disabled={!displayedResult.hasMore}
                   >
                     Next
                     <ChevronRight className="h-4 w-4" />
