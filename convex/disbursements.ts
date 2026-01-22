@@ -2,41 +2,48 @@ import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import { requireOrgAccess } from "./lib/rbac";
 
-// List disbursements for an org
+// List disbursements for an org with filtering, searching, sorting, and pagination
 export const list = query({
   args: {
     orgId: v.id("orgs"),
     walletAddress: v.string(),
-    status: v.optional(v.string()),
+    // Filtering
+    status: v.optional(v.array(v.string())), // Now supports multiple statuses
+    token: v.optional(v.string()),
+    // Date range
+    dateFrom: v.optional(v.number()), // timestamp
+    dateTo: v.optional(v.number()), // timestamp
+    // Search
+    search: v.optional(v.string()),
+    // Sorting
+    sortBy: v.optional(v.union(
+      v.literal("createdAt"),
+      v.literal("amount"),
+      v.literal("status")
+    )),
+    sortOrder: v.optional(v.union(v.literal("asc"), v.literal("desc"))),
+    // Pagination
+    cursor: v.optional(v.string()), // Last item ID from previous page
     limit: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
     const walletAddress = args.walletAddress.toLowerCase();
+    const limit = args.limit ?? 20;
+    const sortBy = args.sortBy ?? "createdAt";
+    const sortOrder = args.sortOrder ?? "desc";
 
     // Any member can view
     await requireOrgAccess(ctx, args.orgId, walletAddress, ["admin", "approver", "initiator", "clerk", "viewer"]);
 
-    let query = ctx.db
+    // Fetch all disbursements for the org (we need to filter in memory for search)
+    const allDisbursements = await ctx.db
       .query("disbursements")
       .withIndex("by_org", (q) => q.eq("orgId", args.orgId))
-      .order("desc");
+      .collect();
 
-    const disbursements = await query.collect();
-
-    // Filter by status if provided
-    let filtered = disbursements;
-    if (args.status) {
-      filtered = disbursements.filter((d) => d.status === args.status);
-    }
-
-    // Apply limit
-    if (args.limit) {
-      filtered = filtered.slice(0, args.limit);
-    }
-
-    // Enrich with beneficiary data
+    // Enrich with beneficiary data first (needed for search)
     const enriched = await Promise.all(
-      filtered.map(async (d) => {
+      allDisbursements.map(async (d) => {
         const beneficiary = await ctx.db.get(d.beneficiaryId);
         return {
           ...d,
@@ -47,7 +54,80 @@ export const list = query({
       })
     );
 
-    return enriched;
+    // Apply filters
+    let filtered = enriched;
+
+    // Status filter (supports multiple statuses)
+    if (args.status && args.status.length > 0) {
+      filtered = filtered.filter((d) => args.status!.includes(d.status));
+    }
+
+    // Token filter
+    if (args.token) {
+      filtered = filtered.filter((d) => d.token === args.token);
+    }
+
+    // Date range filter
+    if (args.dateFrom) {
+      filtered = filtered.filter((d) => d.createdAt >= args.dateFrom!);
+    }
+    if (args.dateTo) {
+      // Add one day to include the end date fully
+      const endOfDay = args.dateTo + 24 * 60 * 60 * 1000;
+      filtered = filtered.filter((d) => d.createdAt <= endOfDay);
+    }
+
+    // Search filter (beneficiary name or memo)
+    if (args.search && args.search.trim()) {
+      const searchLower = args.search.toLowerCase().trim();
+      filtered = filtered.filter((d) => {
+        const beneficiaryMatch = d.beneficiary?.name?.toLowerCase().includes(searchLower);
+        const memoMatch = d.memo?.toLowerCase().includes(searchLower);
+        const amountMatch = d.amount.includes(searchLower);
+        return beneficiaryMatch || memoMatch || amountMatch;
+      });
+    }
+
+    // Sorting
+    filtered.sort((a, b) => {
+      let comparison = 0;
+      switch (sortBy) {
+        case "createdAt":
+          comparison = a.createdAt - b.createdAt;
+          break;
+        case "amount":
+          comparison = parseFloat(a.amount) - parseFloat(b.amount);
+          break;
+        case "status":
+          comparison = a.status.localeCompare(b.status);
+          break;
+      }
+      return sortOrder === "desc" ? -comparison : comparison;
+    });
+
+    // Get total count before pagination
+    const totalCount = filtered.length;
+
+    // Cursor-based pagination
+    let startIndex = 0;
+    if (args.cursor) {
+      const cursorIndex = filtered.findIndex((d) => d._id === args.cursor);
+      if (cursorIndex !== -1) {
+        startIndex = cursorIndex + 1;
+      }
+    }
+
+    // Slice for current page
+    const page = filtered.slice(startIndex, startIndex + limit);
+    const hasMore = startIndex + limit < totalCount;
+    const nextCursor = hasMore && page.length > 0 ? page[page.length - 1]._id : null;
+
+    return {
+      items: page,
+      totalCount,
+      hasMore,
+      nextCursor,
+    };
   },
 });
 

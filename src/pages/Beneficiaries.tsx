@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useParams } from 'react-router-dom';
 import { useAccount } from 'wagmi';
 import { useQuery, useMutation } from 'convex/react';
@@ -16,9 +16,26 @@ import {
   X,
   AlertCircle,
   RefreshCw,
+  Search,
+  ChevronDown,
+  ChevronUp,
+  Filter,
 } from 'lucide-react';
 
 type BeneficiaryType = 'individual' | 'business';
+type SortField = 'name' | 'createdAt' | 'walletAddress';
+type SortOrder = 'asc' | 'desc';
+type StatusFilter = 'all' | 'active' | 'inactive';
+
+interface Beneficiary {
+  _id: Id<'beneficiaries'>;
+  type?: BeneficiaryType;
+  name: string;
+  walletAddress: string;
+  notes?: string;
+  isActive: boolean;
+  createdAt: number;
+}
 
 interface EditingBeneficiary {
   id: Id<'beneficiaries'>;
@@ -26,6 +43,310 @@ interface EditingBeneficiary {
   name: string;
   walletAddress: string;
   notes: string;
+}
+
+// Section state for search, sort, filter
+interface SectionState {
+  search: string;
+  sortField: SortField;
+  sortOrder: SortOrder;
+  statusFilter: StatusFilter;
+  showFilters: boolean;
+}
+
+// Reusable section component for each beneficiary type
+function BeneficiarySection({
+  title,
+  icon: Icon,
+  iconColor,
+  beneficiaries,
+  onEdit,
+  onToggleActive,
+}: {
+  title: string;
+  icon: typeof User;
+  iconColor: string;
+  beneficiaries: Beneficiary[];
+  onEdit: (b: Beneficiary) => void;
+  onToggleActive: (id: Id<'beneficiaries'>, isActive: boolean) => void;
+}) {
+  const [state, setState] = useState<SectionState>({
+    search: '',
+    sortField: 'name',
+    sortOrder: 'asc',
+    statusFilter: 'all',
+    showFilters: false,
+  });
+
+  // Filter and sort beneficiaries
+  const filteredAndSorted = useMemo(() => {
+    let result = [...beneficiaries];
+
+    // Search filter
+    if (state.search.trim()) {
+      const searchLower = state.search.toLowerCase().trim();
+      result = result.filter(
+        (b) =>
+          b.name.toLowerCase().includes(searchLower) ||
+          b.walletAddress.toLowerCase().includes(searchLower) ||
+          b.notes?.toLowerCase().includes(searchLower)
+      );
+    }
+
+    // Status filter
+    if (state.statusFilter === 'active') {
+      result = result.filter((b) => b.isActive);
+    } else if (state.statusFilter === 'inactive') {
+      result = result.filter((b) => !b.isActive);
+    }
+
+    // Sort
+    result.sort((a, b) => {
+      let comparison = 0;
+      switch (state.sortField) {
+        case 'name':
+          comparison = a.name.localeCompare(b.name);
+          break;
+        case 'createdAt':
+          comparison = a.createdAt - b.createdAt;
+          break;
+        case 'walletAddress':
+          comparison = a.walletAddress.localeCompare(b.walletAddress);
+          break;
+      }
+      return state.sortOrder === 'asc' ? comparison : -comparison;
+    });
+
+    return result;
+  }, [beneficiaries, state.search, state.sortField, state.sortOrder, state.statusFilter]);
+
+  const handleSort = (field: SortField) => {
+    if (state.sortField === field) {
+      setState((s) => ({ ...s, sortOrder: s.sortOrder === 'asc' ? 'desc' : 'asc' }));
+    } else {
+      setState((s) => ({ ...s, sortField: field, sortOrder: 'asc' }));
+    }
+  };
+
+  const hasActiveFilters = state.search || state.statusFilter !== 'all';
+
+  const clearFilters = () => {
+    setState((s) => ({ ...s, search: '', statusFilter: 'all' }));
+  };
+
+  const activeCount = beneficiaries.filter((b) => b.isActive).length;
+  const inactiveCount = beneficiaries.filter((b) => !b.isActive).length;
+
+  return (
+    <div className="rounded-2xl border border-white/10 bg-navy-900/50 overflow-hidden">
+      {/* Section Header */}
+      <div className="border-b border-white/10 bg-navy-800/50 px-6 py-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className={`flex h-10 w-10 items-center justify-center rounded-lg ${iconColor}`}>
+              <Icon className="h-5 w-5" />
+            </div>
+            <div>
+              <h2 className="text-lg font-semibold text-white">{title}</h2>
+              <p className="text-sm text-slate-400">
+                {beneficiaries.length} total · {activeCount} active · {inactiveCount} inactive
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Search & Filter Bar */}
+      <div className="border-b border-white/5 bg-navy-800/30 px-6 py-3">
+        <div className="flex items-center gap-3">
+          {/* Search */}
+          <div className="relative flex-1 max-w-sm">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+            <input
+              type="text"
+              value={state.search}
+              onChange={(e) => setState((s) => ({ ...s, search: e.target.value }))}
+              placeholder="Search by name, address, or notes..."
+              className="w-full rounded-lg border border-white/10 bg-navy-800 pl-10 pr-4 py-2 text-sm text-white placeholder-slate-500 focus:border-accent-500 focus:outline-none focus:ring-1 focus:ring-accent-500"
+            />
+          </div>
+
+          {/* Filter Toggle */}
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => setState((s) => ({ ...s, showFilters: !s.showFilters }))}
+            className={hasActiveFilters ? 'border-accent-500' : ''}
+          >
+            <Filter className="h-4 w-4" />
+            Filters
+            {hasActiveFilters && (
+              <span className="ml-1 rounded-full bg-accent-500 px-1.5 py-0.5 text-xs text-white">
+                {(state.statusFilter !== 'all' ? 1 : 0)}
+              </span>
+            )}
+          </Button>
+
+          {/* Clear Filters */}
+          {hasActiveFilters && (
+            <Button variant="ghost" size="sm" onClick={clearFilters} className="text-slate-400 hover:text-white">
+              Clear
+            </Button>
+          )}
+        </div>
+
+        {/* Expanded Filters */}
+        {state.showFilters && (
+          <div className="mt-3 pt-3 border-t border-white/5">
+            <div className="flex items-center gap-4">
+              <span className="text-sm text-slate-400">Status:</span>
+              <div className="flex gap-2">
+                {(['all', 'active', 'inactive'] as StatusFilter[]).map((status) => (
+                  <button
+                    key={status}
+                    onClick={() => setState((s) => ({ ...s, statusFilter: status }))}
+                    className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
+                      state.statusFilter === status
+                        ? 'bg-accent-500 text-white'
+                        : 'bg-navy-800 text-slate-400 hover:bg-navy-700 hover:text-white'
+                    }`}
+                  >
+                    {status.charAt(0).toUpperCase() + status.slice(1)}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Table */}
+      {filteredAndSorted.length === 0 ? (
+        <div className="p-8 text-center">
+          {beneficiaries.length === 0 ? (
+            <>
+              <Icon className="mx-auto h-10 w-10 text-slate-500" />
+              <p className="mt-2 text-slate-400">No {title.toLowerCase()} added yet</p>
+            </>
+          ) : (
+            <>
+              <Search className="mx-auto h-10 w-10 text-slate-500" />
+              <p className="mt-2 text-slate-400">No results match your search</p>
+              <Button variant="secondary" size="sm" onClick={clearFilters} className="mt-3">
+                Clear Filters
+              </Button>
+            </>
+          )}
+        </div>
+      ) : (
+        <table className="w-full">
+          <thead>
+            <tr className="border-b border-white/5 bg-navy-800/20">
+              <th
+                className="px-6 py-3 text-left text-xs font-medium text-slate-400 cursor-pointer hover:text-white transition-colors"
+                onClick={() => handleSort('name')}
+              >
+                <span className="flex items-center gap-1">
+                  Name
+                  {state.sortField === 'name' && (
+                    state.sortOrder === 'asc' ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />
+                  )}
+                </span>
+              </th>
+              <th
+                className="px-6 py-3 text-left text-xs font-medium text-slate-400 cursor-pointer hover:text-white transition-colors"
+                onClick={() => handleSort('walletAddress')}
+              >
+                <span className="flex items-center gap-1">
+                  Wallet Address
+                  {state.sortField === 'walletAddress' && (
+                    state.sortOrder === 'asc' ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />
+                  )}
+                </span>
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-slate-400">
+                Status
+              </th>
+              <th
+                className="px-6 py-3 text-left text-xs font-medium text-slate-400 cursor-pointer hover:text-white transition-colors"
+                onClick={() => handleSort('createdAt')}
+              >
+                <span className="flex items-center gap-1">
+                  Added
+                  {state.sortField === 'createdAt' && (
+                    state.sortOrder === 'asc' ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />
+                  )}
+                </span>
+              </th>
+              <th className="px-6 py-3 text-right text-xs font-medium text-slate-400">
+                Actions
+              </th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-white/5">
+            {filteredAndSorted.map((beneficiary) => (
+              <tr key={beneficiary._id} className="hover:bg-navy-800/30">
+                <td className="px-6 py-4">
+                  <div>
+                    <p className="font-medium text-white">{beneficiary.name}</p>
+                    {beneficiary.notes && (
+                      <p className="text-sm text-slate-500 truncate max-w-xs" title={beneficiary.notes}>
+                        {beneficiary.notes}
+                      </p>
+                    )}
+                  </div>
+                </td>
+                <td className="px-6 py-4">
+                  <code className="text-sm text-slate-400">
+                    {beneficiary.walletAddress.slice(0, 6)}...
+                    {beneficiary.walletAddress.slice(-4)}
+                  </code>
+                </td>
+                <td className="px-6 py-4">
+                  <span
+                    className={`inline-flex rounded-full px-3 py-1 text-xs font-medium ${
+                      beneficiary.isActive
+                        ? 'bg-green-500/10 text-green-400'
+                        : 'bg-slate-500/10 text-slate-400'
+                    }`}
+                  >
+                    {beneficiary.isActive ? 'Active' : 'Inactive'}
+                  </span>
+                </td>
+                <td className="px-6 py-4 text-sm text-slate-400">
+                  {new Date(beneficiary.createdAt).toLocaleDateString()}
+                </td>
+                <td className="px-6 py-4 text-right">
+                  <div className="flex items-center justify-end gap-2">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => onEdit(beneficiary)}
+                      title="Edit beneficiary"
+                    >
+                      <Edit className="h-4 w-4 text-slate-400" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => onToggleActive(beneficiary._id, beneficiary.isActive)}
+                      title={beneficiary.isActive ? 'Deactivate' : 'Reactivate'}
+                    >
+                      {beneficiary.isActive ? (
+                        <Trash2 className="h-4 w-4 text-red-400" />
+                      ) : (
+                        <RefreshCw className="h-4 w-4 text-green-400" />
+                      )}
+                    </Button>
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+    </div>
+  );
 }
 
 export default function Beneficiaries() {
@@ -54,6 +375,17 @@ export default function Beneficiaries() {
   const createBeneficiary = useMutation(api.beneficiaries.create);
   const updateBeneficiary = useMutation(api.beneficiaries.update);
 
+  // Split beneficiaries by type
+  const individuals = useMemo(
+    () => beneficiaries?.filter((b) => !b.type || b.type === 'individual') ?? [],
+    [beneficiaries]
+  );
+  
+  const businesses = useMemo(
+    () => beneficiaries?.filter((b) => b.type === 'business') ?? [],
+    [beneficiaries]
+  );
+
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!orgId || !address || !newName.trim() || !newAddress.trim()) return;
@@ -80,13 +412,7 @@ export default function Beneficiaries() {
     }
   };
 
-  const handleOpenEdit = (beneficiary: {
-    _id: Id<'beneficiaries'>;
-    type?: BeneficiaryType;
-    name: string;
-    walletAddress: string;
-    notes?: string;
-  }) => {
+  const handleOpenEdit = (beneficiary: Beneficiary) => {
     setEditingBeneficiary({
       id: beneficiary._id,
       type: beneficiary.type || 'individual',
@@ -137,6 +463,8 @@ export default function Beneficiaries() {
     }
   };
 
+  const totalCount = (beneficiaries?.length ?? 0);
+
   return (
     <AppLayout>
       <div className="space-y-8">
@@ -146,6 +474,9 @@ export default function Beneficiaries() {
             <h1 className="text-2xl font-bold text-white">Beneficiaries</h1>
             <p className="mt-1 text-slate-400">
               Manage your payment recipients
+              {totalCount > 0 && (
+                <span className="ml-2 text-slate-500">({totalCount} total)</span>
+              )}
             </p>
           </div>
           <Button onClick={() => setIsCreating(true)}>
@@ -261,8 +592,8 @@ export default function Beneficiaries() {
           </div>
         )}
 
-        {/* Beneficiaries List */}
-        {beneficiaries?.length === 0 ? (
+        {/* Empty State */}
+        {beneficiaries?.length === 0 && (
           <div className="rounded-2xl border border-dashed border-white/20 bg-navy-900/30 p-8 text-center">
             <Users className="mx-auto h-12 w-12 text-slate-500" />
             <h3 className="mt-4 text-lg font-medium text-white">
@@ -272,101 +603,30 @@ export default function Beneficiaries() {
               Add your first beneficiary to start making disbursements
             </p>
           </div>
-        ) : (
-          <div className="rounded-2xl border border-white/10 bg-navy-900/50 overflow-hidden">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-white/10 bg-navy-800/50">
-                  <th className="px-6 py-4 text-left text-sm font-medium text-slate-400">
-                    Type
-                  </th>
-                  <th className="px-6 py-4 text-left text-sm font-medium text-slate-400">
-                    Name
-                  </th>
-                  <th className="px-6 py-4 text-left text-sm font-medium text-slate-400">
-                    Wallet Address
-                  </th>
-                  <th className="px-6 py-4 text-left text-sm font-medium text-slate-400">
-                    Status
-                  </th>
-                  <th className="px-6 py-4 text-right text-sm font-medium text-slate-400">
-                    Actions
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-white/5">
-                {beneficiaries?.map((beneficiary) => (
-                  <tr key={beneficiary._id} className="hover:bg-navy-800/30">
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-2">
-                        {beneficiary.type === 'business' ? (
-                          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-500/10 text-blue-400">
-                            <Building2 className="h-4 w-4" />
-                          </div>
-                        ) : (
-                          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-purple-500/10 text-purple-400">
-                            <User className="h-4 w-4" />
-                          </div>
-                        )}
-                        <span className="text-sm text-slate-400 capitalize">
-                          {beneficiary.type || 'Individual'}
-                        </span>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div>
-                        <p className="font-medium text-white">{beneficiary.name}</p>
-                        {beneficiary.notes && (
-                          <p className="text-sm text-slate-500">{beneficiary.notes}</p>
-                        )}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <code className="text-sm text-slate-400">
-                        {beneficiary.walletAddress.slice(0, 6)}...
-                        {beneficiary.walletAddress.slice(-4)}
-                      </code>
-                    </td>
-                    <td className="px-6 py-4">
-                      <span
-                        className={`inline-flex rounded-full px-3 py-1 text-xs font-medium ${
-                          beneficiary.isActive
-                            ? 'bg-green-500/10 text-green-400'
-                            : 'bg-slate-500/10 text-slate-400'
-                        }`}
-                      >
-                        {beneficiary.isActive ? 'Active' : 'Inactive'}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 text-right">
-                      <div className="flex items-center justify-end gap-2">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handleOpenEdit(beneficiary)}
-                          title="Edit beneficiary"
-                        >
-                          <Edit className="h-4 w-4 text-slate-400" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handleToggleActive(beneficiary._id, beneficiary.isActive)}
-                          title={beneficiary.isActive ? 'Deactivate' : 'Reactivate'}
-                        >
-                          {beneficiary.isActive ? (
-                            <Trash2 className="h-4 w-4 text-red-400" />
-                          ) : (
-                            <RefreshCw className="h-4 w-4 text-green-400" />
-                          )}
-                        </Button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+        )}
+
+        {/* Individuals Section */}
+        {(beneficiaries?.length ?? 0) > 0 && (
+          <BeneficiarySection
+            title="Individuals"
+            icon={User}
+            iconColor="bg-purple-500/10 text-purple-400"
+            beneficiaries={individuals as Beneficiary[]}
+            onEdit={handleOpenEdit}
+            onToggleActive={handleToggleActive}
+          />
+        )}
+
+        {/* Businesses Section */}
+        {(beneficiaries?.length ?? 0) > 0 && (
+          <BeneficiarySection
+            title="Businesses"
+            icon={Building2}
+            iconColor="bg-blue-500/10 text-blue-400"
+            beneficiaries={businesses as Beneficiary[]}
+            onEdit={handleOpenEdit}
+            onToggleActive={handleToggleActive}
+          />
         )}
       </div>
 

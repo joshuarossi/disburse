@@ -296,7 +296,7 @@ export default function Dashboard() {
               <div>
                 <p className="text-sm text-slate-400">Pending Disbursements</p>
                 <p className="text-2xl font-bold text-white">
-                  {recentDisbursements?.filter((d) => d.status === 'pending' || d.status === 'draft' || d.status === 'proposed').length ?? '--'}
+                  {recentDisbursements?.items.filter((d) => d.status === 'pending' || d.status === 'draft' || d.status === 'proposed').length ?? '--'}
                 </p>
               </div>
             </div>
@@ -331,13 +331,13 @@ export default function Dashboard() {
         <div className="rounded-2xl border border-white/10 bg-navy-900/50 p-6">
           <h2 className="text-lg font-semibold text-white">Recent Disbursements</h2>
           
-          {recentDisbursements?.length === 0 ? (
+          {recentDisbursements?.items.length === 0 ? (
             <p className="mt-4 text-center text-slate-500 py-8">
               No disbursements yet
             </p>
           ) : (
             <div className="mt-4 space-y-3">
-              {recentDisbursements?.map((disbursement) => (
+              {recentDisbursements?.items.map((disbursement) => (
                 <div
                   key={disbursement._id}
                   className="flex items-center justify-between rounded-lg bg-navy-800/50 p-4"

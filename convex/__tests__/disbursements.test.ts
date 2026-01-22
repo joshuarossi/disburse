@@ -497,9 +497,9 @@ describe("Disbursements", () => {
         walletAddress: TEST_WALLETS.admin,
       });
 
-      expect(result.length).toBe(1);
-      expect(result[0].beneficiary).not.toBeNull();
-      expect(result[0].beneficiary?.name).toBe("Test Recipient");
+      expect(result.items.length).toBe(1);
+      expect(result.items[0].beneficiary).not.toBeNull();
+      expect(result.items[0].beneficiary?.name).toBe("Test Recipient");
     });
 
     it("filters by status", async () => {
@@ -521,11 +521,11 @@ describe("Disbursements", () => {
       const drafts = await t.query(api.disbursements.list, {
         orgId: orgId! as any,
         walletAddress: TEST_WALLETS.admin,
-        status: "draft",
+        status: ["draft"],
       });
 
-      expect(drafts.length).toBe(1);
-      expect(drafts[0].status).toBe("draft");
+      expect(drafts.items.length).toBe(1);
+      expect(drafts.items[0].status).toBe("draft");
     });
 
     it("respects limit", async () => {
@@ -556,7 +556,9 @@ describe("Disbursements", () => {
         limit: 5,
       });
 
-      expect(result.length).toBe(5);
+      expect(result.items.length).toBe(5);
+      expect(result.totalCount).toBe(10);
+      expect(result.hasMore).toBe(true);
     });
 
     it("allows viewer to list", async () => {
@@ -581,7 +583,7 @@ describe("Disbursements", () => {
         walletAddress: TEST_WALLETS.viewer,
       });
 
-      expect(result.length).toBe(1);
+      expect(result.items.length).toBe(1);
     });
   });
 

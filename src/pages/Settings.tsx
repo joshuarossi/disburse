@@ -49,9 +49,12 @@ export default function Settings() {
   // Team member state
   const [isAddingMember, setIsAddingMember] = useState(false);
   const [newMemberAddress, setNewMemberAddress] = useState('');
+  const [newMemberName, setNewMemberName] = useState('');
   const [newMemberRole, setNewMemberRole] = useState<Role>('viewer');
   const [memberError, setMemberError] = useState<string | null>(null);
   const [processingMemberId, setProcessingMemberId] = useState<string | null>(null);
+  const [editingNameId, setEditingNameId] = useState<string | null>(null);
+  const [editingNameValue, setEditingNameValue] = useState('');
 
   const org = useQuery(
     api.orgs.get,
@@ -83,6 +86,7 @@ export default function Settings() {
   const unlinkSafe = useMutation(api.safes.unlink);
   const inviteMember = useMutation(api.orgs.inviteMember);
   const updateMemberRole = useMutation(api.orgs.updateMemberRole);
+  const updateMemberName = useMutation(api.orgs.updateMemberName);
   const removeMember = useMutation(api.orgs.removeMember);
 
   // Initialize org name when loaded
@@ -180,15 +184,48 @@ export default function Settings() {
         orgId: orgId as Id<'orgs'>,
         walletAddress: address,
         memberWalletAddress: newMemberAddress.trim(),
+        memberName: newMemberName.trim() || undefined,
         role: newMemberRole,
       });
       setNewMemberAddress('');
+      setNewMemberName('');
       setNewMemberRole('viewer');
       setIsAddingMember(false);
     } catch (error) {
       console.error('Failed to invite member:', error);
       setMemberError(error instanceof Error ? error.message : 'Failed to invite member');
     }
+  };
+
+  const handleStartEditName = (membershipId: string, currentName?: string) => {
+    setEditingNameId(membershipId);
+    setEditingNameValue(currentName || '');
+  };
+
+  const handleSaveName = async (membershipId: string) => {
+    if (!orgId || !address) return;
+
+    setProcessingMemberId(membershipId);
+    try {
+      await updateMemberName({
+        orgId: orgId as Id<'orgs'>,
+        membershipId: membershipId as Id<'orgMemberships'>,
+        walletAddress: address,
+        name: editingNameValue.trim() || undefined,
+      });
+      setEditingNameId(null);
+      setEditingNameValue('');
+    } catch (error) {
+      console.error('Failed to update name:', error);
+      setMemberError(error instanceof Error ? error.message : 'Failed to update name');
+    } finally {
+      setProcessingMemberId(null);
+    }
+  };
+
+  const handleCancelEditName = () => {
+    setEditingNameId(null);
+    setEditingNameValue('');
   };
 
   const handleUpdateRole = async (membershipId: string, newRole: Role) => {
@@ -460,6 +497,18 @@ export default function Settings() {
                 </div>
                 <div>
                   <label className="mb-2 block text-sm font-medium text-slate-300">
+                    Display Name <span className="text-slate-500">(optional)</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={newMemberName}
+                    onChange={(e) => setNewMemberName(e.target.value)}
+                    placeholder="e.g., John Doe"
+                    className="w-full rounded-lg border border-white/10 bg-navy-800 px-4 py-2 text-white placeholder-slate-500 focus:border-accent-500 focus:outline-none focus:ring-1 focus:ring-accent-500"
+                  />
+                </div>
+                <div>
+                  <label className="mb-2 block text-sm font-medium text-slate-300">
                     Role
                   </label>
                   <select
@@ -482,6 +531,7 @@ export default function Settings() {
                     onClick={() => {
                       setIsAddingMember(false);
                       setNewMemberAddress('');
+                      setNewMemberName('');
                       setNewMemberRole('viewer');
                     }}
                   >
@@ -523,17 +573,82 @@ export default function Settings() {
                     if (!member) return null;
                     const isCurrentUser = member.walletAddress.toLowerCase() === address?.toLowerCase();
                     const isProcessing = processingMemberId === member.membershipId;
+                    const isEditingName = editingNameId === member.membershipId;
+                    const canEditName = isAdmin || isCurrentUser;
 
                     return (
                       <tr key={member.membershipId} className="hover:bg-navy-800/30">
                         <td className="px-4 py-3">
                           <div>
-                            <p className="font-mono text-sm text-white">
-                              {member.walletAddress.slice(0, 6)}...{member.walletAddress.slice(-4)}
-                              {isCurrentUser && (
-                                <span className="ml-2 text-xs text-accent-400">(you)</span>
-                              )}
-                            </p>
+                            {isEditingName ? (
+                              <div className="flex items-center gap-2">
+                                <input
+                                  type="text"
+                                  value={editingNameValue}
+                                  onChange={(e) => setEditingNameValue(e.target.value)}
+                                  placeholder="Display name..."
+                                  className="rounded border border-white/10 bg-navy-800 px-2 py-1 text-sm text-white placeholder-slate-500 focus:border-accent-500 focus:outline-none w-32"
+                                  autoFocus
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter') {
+                                      handleSaveName(member.membershipId);
+                                    } else if (e.key === 'Escape') {
+                                      handleCancelEditName();
+                                    }
+                                  }}
+                                />
+                                <button
+                                  onClick={() => handleSaveName(member.membershipId)}
+                                  disabled={isProcessing}
+                                  className="text-green-400 hover:text-green-300 text-xs"
+                                >
+                                  {isProcessing ? '...' : 'Save'}
+                                </button>
+                                <button
+                                  onClick={handleCancelEditName}
+                                  className="text-slate-400 hover:text-white text-xs"
+                                >
+                                  Cancel
+                                </button>
+                              </div>
+                            ) : (
+                              <>
+                                {member.name ? (
+                                  <p className="font-medium text-white">
+                                    {member.name}
+                                    {isCurrentUser && (
+                                      <span className="ml-2 text-xs text-accent-400">(you)</span>
+                                    )}
+                                    {canEditName && (
+                                      <button
+                                        onClick={() => handleStartEditName(member.membershipId, member.name)}
+                                        className="ml-2 text-xs text-slate-500 hover:text-accent-400"
+                                      >
+                                        edit
+                                      </button>
+                                    )}
+                                  </p>
+                                ) : (
+                                  <p className="text-sm text-slate-500 italic">
+                                    No name
+                                    {canEditName && (
+                                      <button
+                                        onClick={() => handleStartEditName(member.membershipId, '')}
+                                        className="ml-2 text-xs text-slate-400 hover:text-accent-400 not-italic"
+                                      >
+                                        + add
+                                      </button>
+                                    )}
+                                    {isCurrentUser && (
+                                      <span className="ml-1 text-xs text-accent-400 not-italic">(you)</span>
+                                    )}
+                                  </p>
+                                )}
+                                <p className="font-mono text-xs text-slate-500">
+                                  {member.walletAddress.slice(0, 6)}...{member.walletAddress.slice(-4)}
+                                </p>
+                              </>
+                            )}
                             {member.email && (
                               <p className="text-sm text-slate-500">{member.email}</p>
                             )}

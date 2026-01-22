@@ -229,25 +229,26 @@ describe("Integration: Disbursement Flow", () => {
     const drafts = await t.query(api.disbursements.list, {
       orgId: orgId! as any,
       walletAddress: TEST_WALLETS.admin,
-      status: "draft",
+      status: ["draft"],
     });
-    expect(drafts.length).toBe(1);
+    expect(drafts.items.length).toBe(1);
 
     // Filter by executed
     const executed = await t.query(api.disbursements.list, {
       orgId: orgId! as any,
       walletAddress: TEST_WALLETS.admin,
-      status: "executed",
+      status: ["executed"],
     });
-    expect(executed.length).toBe(1);
-    expect(executed[0].amount).toBe("100");
+    expect(executed.items.length).toBe(1);
+    expect(executed.items[0].amount).toBe("100");
 
     // All disbursements
     const all = await t.query(api.disbursements.list, {
       orgId: orgId! as any,
       walletAddress: TEST_WALLETS.admin,
     });
-    expect(all.length).toBe(2);
+    expect(all.items.length).toBe(2);
+    expect(all.totalCount).toBe(2);
   });
 
   it("disbursement includes beneficiary details", async () => {
