@@ -63,6 +63,8 @@ export default defineSchema({
   // Beneficiaries (payment recipients)
   beneficiaries: defineTable({
     orgId: v.id("orgs"),
+    // Optional for backwards compatibility with existing records (defaults to "individual")
+    type: v.optional(v.union(v.literal("individual"), v.literal("business"))),
     name: v.string(),
     walletAddress: v.string(),
     notes: v.optional(v.string()),
@@ -102,7 +104,12 @@ export default defineSchema({
   // Billing records
   billing: defineTable({
     orgId: v.id("orgs"),
-    plan: v.union(v.literal("trial"), v.literal("pro")),
+    plan: v.union(
+      v.literal("trial"),
+      v.literal("starter"),
+      v.literal("team"),
+      v.literal("pro")
+    ),
     trialEndsAt: v.optional(v.number()),
     paidThroughAt: v.optional(v.number()),
     status: v.union(

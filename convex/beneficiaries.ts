@@ -1,6 +1,7 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import { requireOrgAccess } from "./lib/rbac";
+import { getOrgLimits } from "./billing";
 
 // List beneficiaries for an org
 export const list = query({
@@ -35,8 +36,9 @@ export const list = query({
 export const create = mutation({
   args: {
     orgId: v.id("orgs"),
-    name: v.string(),
     walletAddress: v.string(),
+    type: v.union(v.literal("individual"), v.literal("business")),
+    name: v.string(),
     beneficiaryAddress: v.string(),
     notes: v.optional(v.string()),
   },
@@ -47,8 +49,20 @@ export const create = mutation({
     // Verify access (admin, initiator, or clerk can create)
     const { user } = await requireOrgAccess(ctx, args.orgId, walletAddress, ["admin", "initiator", "clerk"]);
 
+    // Check tier limits for beneficiaries
+    const limits = await getOrgLimits(ctx, args.orgId);
+    const beneficiaryCount = await ctx.db
+      .query("beneficiaries")
+      .withIndex("by_org", (q) => q.eq("orgId", args.orgId))
+      .collect();
+
+    if (beneficiaryCount.length >= limits.maxBeneficiaries) {
+      throw new Error(`Your plan allows a maximum of ${limits.maxBeneficiaries} beneficiaries. Please upgrade to add more.`);
+    }
+
     const beneficiaryId = await ctx.db.insert("beneficiaries", {
       orgId: args.orgId,
+      type: args.type,
       name: args.name,
       walletAddress: args.beneficiaryAddress.toLowerCase(),
       notes: args.notes,
@@ -64,7 +78,7 @@ export const create = mutation({
       action: "beneficiary.created",
       objectType: "beneficiary",
       objectId: beneficiaryId,
-      metadata: { name: args.name, walletAddress: args.beneficiaryAddress },
+      metadata: { type: args.type, name: args.name, walletAddress: args.beneficiaryAddress },
       timestamp: now,
     });
 
@@ -77,6 +91,7 @@ export const update = mutation({
   args: {
     beneficiaryId: v.id("beneficiaries"),
     walletAddress: v.string(),
+    type: v.optional(v.union(v.literal("individual"), v.literal("business"))),
     name: v.optional(v.string()),
     beneficiaryAddress: v.optional(v.string()),
     notes: v.optional(v.string()),
@@ -95,6 +110,7 @@ export const update = mutation({
     const { user } = await requireOrgAccess(ctx, beneficiary.orgId, walletAddress, ["admin", "initiator", "clerk"]);
 
     const updates: Record<string, unknown> = { updatedAt: now };
+    if (args.type !== undefined) updates.type = args.type;
     if (args.name !== undefined) updates.name = args.name;
     if (args.beneficiaryAddress !== undefined) updates.walletAddress = args.beneficiaryAddress.toLowerCase();
     if (args.notes !== undefined) updates.notes = args.notes;

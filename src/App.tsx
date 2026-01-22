@@ -7,6 +7,7 @@ import Beneficiaries from './pages/Beneficiaries'
 import Disbursements from './pages/Disbursements'
 import Billing from './pages/Billing'
 import Settings from './pages/Settings'
+import { AuthRequired, OrgRequired } from './components/ProtectedRoute'
 
 function App() {
   return (
@@ -15,13 +16,57 @@ function App() {
       <Route path="/" element={<Landing />} />
       <Route path="/login" element={<Login />} />
       
-      {/* Protected routes */}
-      <Route path="/select-org" element={<SelectOrg />} />
-      <Route path="/org/:orgId/dashboard" element={<Dashboard />} />
-      <Route path="/org/:orgId/beneficiaries" element={<Beneficiaries />} />
-      <Route path="/org/:orgId/disbursements" element={<Disbursements />} />
-      <Route path="/org/:orgId/billing" element={<Billing />} />
-      <Route path="/org/:orgId/settings" element={<Settings />} />
+      {/* Protected routes - require authentication */}
+      <Route
+        path="/select-org"
+        element={
+          <AuthRequired>
+            <SelectOrg />
+          </AuthRequired>
+        }
+      />
+      
+      {/* Org routes - require authentication and org membership */}
+      <Route
+        path="/org/:orgId/dashboard"
+        element={
+          <OrgRequired>
+            <Dashboard />
+          </OrgRequired>
+        }
+      />
+      <Route
+        path="/org/:orgId/beneficiaries"
+        element={
+          <OrgRequired>
+            <Beneficiaries />
+          </OrgRequired>
+        }
+      />
+      <Route
+        path="/org/:orgId/disbursements"
+        element={
+          <OrgRequired>
+            <Disbursements />
+          </OrgRequired>
+        }
+      />
+      <Route
+        path="/org/:orgId/billing"
+        element={
+          <OrgRequired>
+            <Billing />
+          </OrgRequired>
+        }
+      />
+      <Route
+        path="/org/:orgId/settings"
+        element={
+          <OrgRequired>
+            <Settings />
+          </OrgRequired>
+        }
+      />
     </Routes>
   )
 }

@@ -6,7 +6,12 @@ import { api } from '../../convex/_generated/api';
 import { Id } from '../../convex/_generated/dataModel';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { Button } from '@/components/ui/button';
-import { Plus, Send, ArrowUpRight } from 'lucide-react';
+import { Plus, Send, ArrowUpRight, Loader2, Play, CheckCircle } from 'lucide-react';
+import {
+  createTransferTx,
+  proposeTransaction,
+  executeTransaction,
+} from '@/lib/safe';
 
 export default function Disbursements() {
   const { orgId } = useParams<{ orgId: string }>();
@@ -16,6 +21,8 @@ export default function Disbursements() {
   const [amount, setAmount] = useState('');
   const [token, setToken] = useState('USDC');
   const [memo, setMemo] = useState('');
+  const [processingId, setProcessingId] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   const disbursements = useQuery(
     api.disbursements.list,
@@ -39,6 +46,7 @@ export default function Disbursements() {
   );
 
   const createDisbursement = useMutation(api.disbursements.create);
+  const updateStatus = useMutation(api.disbursements.updateStatus);
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -63,6 +71,100 @@ export default function Disbursements() {
     }
   };
 
+  const handlePropose = async (disbursement: {
+    _id: Id<'disbursements'>;
+    beneficiary: { walletAddress: string } | null;
+    token: string;
+    amount: string;
+  }) => {
+    if (!safe || !address || !disbursement.beneficiary) return;
+
+    setProcessingId(disbursement._id);
+    setError(null);
+
+    try {
+      // Update status to pending
+      await updateStatus({
+        disbursementId: disbursement._id,
+        walletAddress: address,
+        status: 'pending',
+      });
+
+      // Create the transfer transaction
+      const transferTx = createTransferTx(
+        disbursement.token as 'USDC' | 'USDT',
+        disbursement.beneficiary.walletAddress,
+        disbursement.amount
+      );
+
+      // Propose to Safe
+      const safeTxHash = await proposeTransaction(
+        safe.safeAddress,
+        address,
+        [transferTx]
+      );
+
+      // Update status to proposed with safeTxHash
+      await updateStatus({
+        disbursementId: disbursement._id,
+        walletAddress: address,
+        status: 'proposed',
+        safeTxHash,
+      });
+    } catch (err) {
+      console.error('Failed to propose transaction:', err);
+      setError(err instanceof Error ? err.message : 'Failed to propose transaction');
+      
+      // Revert status to draft on failure
+      await updateStatus({
+        disbursementId: disbursement._id,
+        walletAddress: address,
+        status: 'draft',
+      });
+    } finally {
+      setProcessingId(null);
+    }
+  };
+
+  const handleExecute = async (disbursement: {
+    _id: Id<'disbursements'>;
+    safeTxHash?: string;
+  }) => {
+    if (!safe || !address || !disbursement.safeTxHash) return;
+
+    setProcessingId(disbursement._id);
+    setError(null);
+
+    try {
+      // Execute the transaction
+      const txHash = await executeTransaction(
+        safe.safeAddress,
+        address,
+        disbursement.safeTxHash
+      );
+
+      // Update status to executed with txHash
+      await updateStatus({
+        disbursementId: disbursement._id,
+        walletAddress: address,
+        status: 'executed',
+        txHash,
+      });
+    } catch (err) {
+      console.error('Failed to execute transaction:', err);
+      setError(err instanceof Error ? err.message : 'Failed to execute transaction');
+      
+      // Mark as failed
+      await updateStatus({
+        disbursementId: disbursement._id,
+        walletAddress: address,
+        status: 'failed',
+      });
+    } finally {
+      setProcessingId(null);
+    }
+  };
+
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'executed':
@@ -75,6 +177,45 @@ export default function Disbursements() {
         return 'bg-yellow-500/10 text-yellow-400';
       default:
         return 'bg-slate-500/10 text-slate-400';
+    }
+  };
+
+  const renderActionButton = (disbursement: typeof disbursements extends (infer T)[] | undefined ? T : never) => {
+    const isProcessing = processingId === disbursement._id;
+
+    if (isProcessing) {
+      return (
+        <Button variant="ghost" size="sm" disabled>
+          <Loader2 className="h-4 w-4 animate-spin" />
+        </Button>
+      );
+    }
+
+    switch (disbursement.status) {
+      case 'draft':
+        return (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => handlePropose(disbursement)}
+            title="Propose to Safe"
+          >
+            <Play className="h-4 w-4 text-accent-400" />
+          </Button>
+        );
+      case 'proposed':
+        return (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => handleExecute(disbursement)}
+            title="Execute Transaction"
+          >
+            <CheckCircle className="h-4 w-4 text-green-400" />
+          </Button>
+        );
+      default:
+        return null;
     }
   };
 
@@ -98,6 +239,19 @@ export default function Disbursements() {
         {!safe && (
           <div className="rounded-lg border border-yellow-500/30 bg-yellow-500/10 p-4 text-yellow-400">
             You need to link a Safe before creating disbursements. Go to Settings to link your Safe.
+          </div>
+        )}
+
+        {/* Error Message */}
+        {error && (
+          <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-4 text-red-400">
+            {error}
+            <button
+              onClick={() => setError(null)}
+              className="ml-4 text-red-300 hover:text-white"
+            >
+              Dismiss
+            </button>
           </div>
         )}
 
@@ -213,8 +367,8 @@ export default function Disbursements() {
                   <th className="px-6 py-4 text-left text-sm font-medium text-slate-400">
                     Date
                   </th>
-                  <th className="px-6 py-4 text-right text-sm font-medium text-slate-400">
-                    Tx
+                  <th className="px-6 py-4 text-center text-sm font-medium text-slate-400">
+                    Actions
                   </th>
                 </tr>
               </thead>
@@ -246,18 +400,20 @@ export default function Disbursements() {
                     <td className="px-6 py-4 text-slate-400">
                       {new Date(disbursement.createdAt).toLocaleDateString()}
                     </td>
-                    <td className="px-6 py-4 text-right">
-                      {disbursement.txHash && (
-                        <a
-                          href={`https://sepolia.etherscan.io/tx/${disbursement.txHash}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="inline-flex items-center gap-1 text-sm text-accent-400 hover:underline"
-                        >
-                          View
-                          <ArrowUpRight className="h-3 w-3" />
-                        </a>
-                      )}
+                    <td className="px-6 py-4">
+                      <div className="flex items-center justify-center gap-2">
+                        {renderActionButton(disbursement)}
+                        {disbursement.txHash && (
+                          <a
+                            href={`https://sepolia.etherscan.io/tx/${disbursement.txHash}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1 text-sm text-accent-400 hover:underline"
+                          >
+                            <ArrowUpRight className="h-4 w-4" />
+                          </a>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))}

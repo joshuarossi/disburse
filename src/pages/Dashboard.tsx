@@ -1,5 +1,5 @@
 import { useParams } from 'react-router-dom';
-import { useAccount } from 'wagmi';
+import { useAccount, useReadContracts } from 'wagmi';
 import { useQuery } from 'convex/react';
 import { api } from '../../convex/_generated/api';
 import { Id } from '../../convex/_generated/dataModel';
@@ -13,7 +13,21 @@ import {
   Clock,
   ArrowUpRight,
   Plus,
+  RefreshCw,
 } from 'lucide-react';
+import { TOKENS } from '@/lib/wagmi';
+import { formatUnits } from 'viem';
+
+// ERC20 ABI for balanceOf
+const erc20Abi = [
+  {
+    name: 'balanceOf',
+    type: 'function',
+    stateMutability: 'view',
+    inputs: [{ name: 'account', type: 'address' }],
+    outputs: [{ name: '', type: 'uint256' }],
+  },
+] as const;
 
 export default function Dashboard() {
   const { orgId } = useParams<{ orgId: string }>();
@@ -39,6 +53,48 @@ export default function Dashboard() {
       ? { orgId: orgId as Id<'orgs'>, walletAddress: address, limit: 5 }
       : 'skip'
   );
+
+  // Fetch token balances for the Safe
+  const { data: balances, isLoading: balancesLoading, refetch: refetchBalances } = useReadContracts({
+    contracts: safe?.safeAddress
+      ? [
+          {
+            address: TOKENS.USDC.address,
+            abi: erc20Abi,
+            functionName: 'balanceOf',
+            args: [safe.safeAddress as `0x${string}`],
+          },
+          {
+            address: TOKENS.USDT.address,
+            abi: erc20Abi,
+            functionName: 'balanceOf',
+            args: [safe.safeAddress as `0x${string}`],
+          },
+        ]
+      : undefined,
+    query: {
+      enabled: !!safe?.safeAddress,
+      refetchInterval: 30000, // Refresh every 30 seconds
+    },
+  });
+
+  // Format balances
+  const usdcBalance = balances?.[0]?.result
+    ? formatUnits(balances[0].result as bigint, TOKENS.USDC.decimals)
+    : null;
+  const usdtBalance = balances?.[1]?.result
+    ? formatUnits(balances[1].result as bigint, TOKENS.USDT.decimals)
+    : null;
+
+  // Format display value with commas
+  const formatBalance = (balance: string | null) => {
+    if (balance === null) return '--';
+    const num = parseFloat(balance);
+    return num.toLocaleString('en-US', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    });
+  };
 
   return (
     <AppLayout>
@@ -82,26 +138,47 @@ export default function Dashboard() {
                   </p>
                 </div>
               </div>
-              <a
-                href={`https://app.safe.global/sep:${safe.safeAddress}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-1 text-sm text-accent-400 hover:underline"
-              >
-                View on Safe
-                <ArrowUpRight className="h-4 w-4" />
-              </a>
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => refetchBalances()}
+                  className="flex items-center gap-1 text-sm text-slate-400 hover:text-white transition-colors"
+                  title="Refresh balances"
+                >
+                  <RefreshCw className={`h-4 w-4 ${balancesLoading ? 'animate-spin' : ''}`} />
+                </button>
+                <a
+                  href={`https://app.safe.global/sep:${safe.safeAddress}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-1 text-sm text-accent-400 hover:underline"
+                >
+                  View on Safe
+                  <ArrowUpRight className="h-4 w-4" />
+                </a>
+              </div>
             </div>
 
-            {/* Placeholder for balances - would need on-chain query */}
+            {/* Token Balances */}
             <div className="mt-6 grid grid-cols-2 gap-4">
               <div className="rounded-xl bg-navy-800/50 p-4">
                 <p className="text-sm text-slate-400">USDC Balance</p>
-                <p className="mt-1 text-2xl font-bold text-white">--</p>
+                <p className="mt-1 text-2xl font-bold text-white">
+                  {balancesLoading ? (
+                    <span className="inline-block h-8 w-24 animate-pulse rounded bg-navy-700" />
+                  ) : (
+                    `$${formatBalance(usdcBalance)}`
+                  )}
+                </p>
               </div>
               <div className="rounded-xl bg-navy-800/50 p-4">
                 <p className="text-sm text-slate-400">USDT Balance</p>
-                <p className="mt-1 text-2xl font-bold text-white">--</p>
+                <p className="mt-1 text-2xl font-bold text-white">
+                  {balancesLoading ? (
+                    <span className="inline-block h-8 w-24 animate-pulse rounded bg-navy-700" />
+                  ) : (
+                    `$${formatBalance(usdtBalance)}`
+                  )}
+                </p>
               </div>
             </div>
           </div>
@@ -138,7 +215,7 @@ export default function Dashboard() {
               <div>
                 <p className="text-sm text-slate-400">Pending Disbursements</p>
                 <p className="text-2xl font-bold text-white">
-                  {recentDisbursements?.filter((d) => d.status === 'pending' || d.status === 'draft').length ?? '--'}
+                  {recentDisbursements?.filter((d) => d.status === 'pending' || d.status === 'draft' || d.status === 'proposed').length ?? '--'}
                 </p>
               </div>
             </div>
