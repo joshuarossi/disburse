@@ -1,6 +1,6 @@
 import Safe from '@safe-global/protocol-kit';
 import SafeApiKit from '@safe-global/api-kit';
-import { encodeFunctionData, parseUnits } from 'viem';
+import { encodeFunctionData, parseUnits, getAddress } from 'viem';
 import { TOKENS } from './wagmi';
 
 // Operation types for Safe transactions
@@ -61,23 +61,33 @@ export async function getSafeProtocolKit(
   safeAddress: string,
   signer: string
 ): Promise<Safe> {
-  const protocolKit = await Safe.init({
-    provider: window.ethereum,
-    signer,
-    safeAddress,
-  });
-  return protocolKit;
+  const checksummedSafeAddress = getAddress(safeAddress);
+  const checksummedSigner = getAddress(signer);
+  console.log('[Safe] getSafeProtocolKit called', { safeAddress: checksummedSafeAddress, signer: checksummedSigner });
+  try {
+    const protocolKit = await Safe.init({
+      provider: window.ethereum,
+      signer: checksummedSigner,
+      safeAddress: checksummedSafeAddress,
+    });
+    console.log('[Safe] Protocol Kit created successfully');
+    return protocolKit;
+  } catch (error) {
+    console.error('[Safe] Failed to create Protocol Kit:', error);
+    throw error;
+  }
 }
 
 /**
  * Get Safe info including owners and threshold
  */
 export async function getSafeInfo(safeAddress: string) {
-  console.log('[Safe] getSafeInfo called with address:', safeAddress);
+  const checksummedAddress = getAddress(safeAddress);
+  console.log('[Safe] getSafeInfo called with address:', checksummedAddress);
   const apiKit = getSafeApiKit();
   console.log('[Safe] Calling apiKit.getSafeInfo...');
   try {
-    const safeInfo = await apiKit.getSafeInfo(safeAddress);
+    const safeInfo = await apiKit.getSafeInfo(checksummedAddress);
     console.log('[Safe] Got Safe info:', safeInfo);
     return {
       address: safeInfo.address,
@@ -97,9 +107,10 @@ export async function getSafeInfo(safeAddress: string) {
  */
 export async function isOwner(safeAddress: string, address: string): Promise<boolean> {
   try {
+    const checksummedAddress = getAddress(address);
     const safeInfo = await getSafeInfo(safeAddress);
     return safeInfo.owners.some(
-      (owner) => owner.toLowerCase() === address.toLowerCase()
+      (owner) => getAddress(owner) === checksummedAddress
     );
   } catch {
     return false;
@@ -139,29 +150,52 @@ export async function proposeTransaction(
   signerAddress: string,
   transactions: MetaTransactionData[]
 ): Promise<string> {
+  // Ensure addresses are checksummed (Safe API requires this)
+  const checksummedSafeAddress = getAddress(safeAddress);
+  const checksummedSignerAddress = getAddress(signerAddress);
+  
+  console.log('[Safe] proposeTransaction called', { 
+    safeAddress: checksummedSafeAddress, 
+    signerAddress: checksummedSignerAddress, 
+    transactions 
+  });
+  
   // Initialize Protocol Kit
-  const protocolKit = await getSafeProtocolKit(safeAddress, signerAddress);
+  console.log('[Safe] Initializing Protocol Kit...');
+  const protocolKit = await getSafeProtocolKit(checksummedSafeAddress, checksummedSignerAddress);
+  console.log('[Safe] Protocol Kit initialized');
+  
+  console.log('[Safe] Getting API Kit...');
   const apiKit = getSafeApiKit();
+  console.log('[Safe] API Kit ready');
 
   // Create the transaction
+  console.log('[Safe] Creating transaction...');
   const safeTransaction = await protocolKit.createTransaction({
     transactions,
   });
+  console.log('[Safe] Transaction created');
 
   // Get the transaction hash
+  console.log('[Safe] Getting transaction hash...');
   const safeTxHash = await protocolKit.getTransactionHash(safeTransaction);
+  console.log('[Safe] Transaction hash:', safeTxHash);
 
   // Sign the transaction
+  console.log('[Safe] Signing transaction...');
   const signature = await protocolKit.signHash(safeTxHash);
+  console.log('[Safe] Transaction signed');
 
   // Propose the transaction to the Safe Transaction Service
+  console.log('[Safe] Proposing transaction to service...');
   await apiKit.proposeTransaction({
-    safeAddress,
+    safeAddress: checksummedSafeAddress,
     safeTransactionData: safeTransaction.data,
     safeTxHash,
-    senderAddress: signerAddress,
+    senderAddress: checksummedSignerAddress,
     senderSignature: signature.data,
   });
+  console.log('[Safe] Transaction proposed successfully');
 
   return safeTxHash;
 }
@@ -170,9 +204,10 @@ export async function proposeTransaction(
  * Get pending transactions for a Safe
  */
 export async function getPendingTransactions(safeAddress: string) {
+  const checksummedAddress = getAddress(safeAddress);
   const apiKit = getSafeApiKit();
   try {
-    const pendingTxs = await apiKit.getPendingTransactions(safeAddress);
+    const pendingTxs = await apiKit.getPendingTransactions(checksummedAddress);
     return pendingTxs.results;
   } catch (error) {
     console.error('Failed to get pending transactions:', error);
@@ -265,7 +300,11 @@ export async function executeTransaction(
 export async function validateSafeAddress(safeAddress: string): Promise<boolean> {
   console.log('[Safe] validateSafeAddress called with:', safeAddress);
   try {
-    const safeInfo = await getSafeInfo(safeAddress);
+    // First validate it's a valid Ethereum address
+    const checksummedAddress = getAddress(safeAddress);
+    console.log('[Safe] Checksummed address:', checksummedAddress);
+    
+    const safeInfo = await getSafeInfo(checksummedAddress);
     const isValid = !!safeInfo && !!safeInfo.address;
     console.log('[Safe] validateSafeAddress result:', isValid, safeInfo);
     return isValid;

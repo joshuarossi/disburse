@@ -6,7 +6,7 @@ import { api } from '../../convex/_generated/api';
 import { Id } from '../../convex/_generated/dataModel';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { Button } from '@/components/ui/button';
-import { Plus, Send, ArrowUpRight, Loader2, Play, CheckCircle } from 'lucide-react';
+import { Plus, Send, ArrowUpRight, Loader2, Play, CheckCircle, X, Rocket } from 'lucide-react';
 import {
   createTransferTx,
   proposeTransaction,
@@ -165,6 +165,23 @@ export default function Disbursements() {
     }
   };
 
+  const handleCancel = async (disbursementId: Id<'disbursements'>) => {
+    if (!address) return;
+    
+    if (!confirm('Are you sure you want to cancel this disbursement?')) return;
+
+    try {
+      await updateStatus({
+        disbursementId,
+        walletAddress: address,
+        status: 'cancelled',
+      });
+    } catch (err) {
+      console.error('Failed to cancel disbursement:', err);
+      setError(err instanceof Error ? err.message : 'Failed to cancel disbursement');
+    }
+  };
+
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'executed':
@@ -194,14 +211,38 @@ export default function Disbursements() {
     switch (disbursement.status) {
       case 'draft':
         return (
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => handlePropose(disbursement)}
-            title="Propose to Safe"
-          >
-            <Play className="h-4 w-4 text-accent-400" />
-          </Button>
+          <div className="flex items-center gap-1">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => handlePropose(disbursement)}
+              title="Propose to Safe"
+            >
+              <Play className="h-4 w-4 text-accent-400" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => handleCancel(disbursement._id)}
+              title="Cancel"
+            >
+              <X className="h-4 w-4 text-slate-400 hover:text-red-400" />
+            </Button>
+          </div>
+        );
+      case 'pending':
+        return (
+          <div className="flex items-center gap-1">
+            <Loader2 className="h-4 w-4 animate-spin text-yellow-400" />
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => handleCancel(disbursement._id)}
+              title="Cancel"
+            >
+              <X className="h-4 w-4 text-slate-400 hover:text-red-400" />
+            </Button>
+          </div>
         );
       case 'proposed':
         return (
@@ -211,9 +252,16 @@ export default function Disbursements() {
             onClick={() => handleExecute(disbursement)}
             title="Execute Transaction"
           >
-            <CheckCircle className="h-4 w-4 text-green-400" />
+            <Rocket className="h-4 w-4 text-yellow-400" />
           </Button>
         );
+      case 'executed':
+        return (
+          <CheckCircle className="h-4 w-4 text-green-400" />
+        );
+      case 'failed':
+      case 'cancelled':
+        return null;
       default:
         return null;
     }

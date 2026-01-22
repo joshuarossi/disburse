@@ -122,6 +122,7 @@ export const updateStatus = mutation({
     disbursementId: v.id("disbursements"),
     walletAddress: v.string(),
     status: v.union(
+      v.literal("draft"),
       v.literal("pending"),
       v.literal("proposed"),
       v.literal("executed"),
