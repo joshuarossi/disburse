@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useParams } from 'react-router-dom';
-import { useAccount, useReadContracts } from 'wagmi';
+import { useAccount, useReadContracts, useWatchContractEvent } from 'wagmi';
 import { useQuery } from 'convex/react';
 import { api } from '../../convex/_generated/api';
 import { Id } from '../../convex/_generated/dataModel';
@@ -21,7 +21,7 @@ import {
 import { TOKENS } from '@/lib/wagmi';
 import { formatUnits } from 'viem';
 
-// ERC20 ABI for balanceOf
+// ERC20 ABI for balanceOf and Transfer event
 const erc20Abi = [
   {
     name: 'balanceOf',
@@ -29,6 +29,15 @@ const erc20Abi = [
     stateMutability: 'view',
     inputs: [{ name: 'account', type: 'address' }],
     outputs: [{ name: '', type: 'uint256' }],
+  },
+  {
+    name: 'Transfer',
+    type: 'event',
+    inputs: [
+      { name: 'from', type: 'address', indexed: true },
+      { name: 'to', type: 'address', indexed: true },
+      { name: 'value', type: 'uint256', indexed: false },
+    ],
   },
 ] as const;
 
@@ -84,8 +93,46 @@ export default function Dashboard() {
       : undefined,
     query: {
       enabled: !!safe?.safeAddress,
-      refetchInterval: 30000, // Refresh every 30 seconds
+      refetchInterval: 30000, // Refresh every 30 seconds as fallback
     },
+  });
+
+  // Watch for USDC transfers to/from the Safe for real-time balance updates
+  useWatchContractEvent({
+    address: TOKENS.USDC.address,
+    abi: erc20Abi,
+    eventName: 'Transfer',
+    args: { to: safe?.safeAddress as `0x${string}` },
+    enabled: !!safe?.safeAddress,
+    onLogs: () => refetchBalances(),
+  });
+
+  useWatchContractEvent({
+    address: TOKENS.USDC.address,
+    abi: erc20Abi,
+    eventName: 'Transfer',
+    args: { from: safe?.safeAddress as `0x${string}` },
+    enabled: !!safe?.safeAddress,
+    onLogs: () => refetchBalances(),
+  });
+
+  // Watch for USDT transfers to/from the Safe
+  useWatchContractEvent({
+    address: TOKENS.USDT.address,
+    abi: erc20Abi,
+    eventName: 'Transfer',
+    args: { to: safe?.safeAddress as `0x${string}` },
+    enabled: !!safe?.safeAddress,
+    onLogs: () => refetchBalances(),
+  });
+
+  useWatchContractEvent({
+    address: TOKENS.USDT.address,
+    abi: erc20Abi,
+    eventName: 'Transfer',
+    args: { from: safe?.safeAddress as `0x${string}` },
+    enabled: !!safe?.safeAddress,
+    onLogs: () => refetchBalances(),
   });
 
   // Format balances
