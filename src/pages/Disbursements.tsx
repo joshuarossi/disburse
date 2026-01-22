@@ -284,7 +284,7 @@ export default function Disbursements() {
           </Button>
         </div>
 
-        {!safe && (
+        {safe === null && (
           <div className="rounded-lg border border-yellow-500/30 bg-yellow-500/10 p-4 text-yellow-400">
             You need to link a Safe before creating disbursements. Go to Settings to link your Safe.
           </div>

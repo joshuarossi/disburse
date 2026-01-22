@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { useAccount, useReadContracts } from 'wagmi';
 import { useQuery } from 'convex/react';
@@ -14,6 +15,8 @@ import {
   ArrowUpRight,
   Plus,
   RefreshCw,
+  Copy,
+  Check,
 } from 'lucide-react';
 import { TOKENS } from '@/lib/wagmi';
 import { formatUnits } from 'viem';
@@ -32,6 +35,13 @@ const erc20Abi = [
 export default function Dashboard() {
   const { orgId } = useParams<{ orgId: string }>();
   const { address } = useAccount();
+  const [copied, setCopied] = useState(false);
+
+  const handleCopyAddress = async (addr: string) => {
+    await navigator.clipboard.writeText(addr);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
 
   const safe = useQuery(
     api.safes.getForOrg,
@@ -179,6 +189,30 @@ export default function Dashboard() {
                     `$${formatBalance(usdtBalance)}`
                   )}
                 </p>
+              </div>
+            </div>
+
+            {/* Deposit Address */}
+            <div className="mt-6 rounded-xl border border-accent-500/20 bg-accent-500/5 p-4">
+              <p className="text-sm font-medium text-accent-400">Deposit Address</p>
+              <p className="mt-1 text-xs text-slate-400">
+                Send USDC or USDT to this address to fund your treasury
+              </p>
+              <div className="mt-3 flex items-center gap-2">
+                <code className="flex-1 rounded-lg bg-navy-800 px-3 py-2 font-mono text-sm text-white break-all">
+                  {safe.safeAddress}
+                </code>
+                <button
+                  onClick={() => handleCopyAddress(safe.safeAddress)}
+                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-navy-800 text-slate-400 transition-colors hover:bg-navy-700 hover:text-white"
+                  title="Copy address"
+                >
+                  {copied ? (
+                    <Check className="h-4 w-4 text-green-400" />
+                  ) : (
+                    <Copy className="h-4 w-4" />
+                  )}
+                </button>
               </div>
             </div>
           </div>
