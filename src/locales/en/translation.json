@@ -361,6 +361,12 @@
         "viewerDesc": "Read-only access"
       }
     },
+    "language": {
+      "title": "Language Preferences",
+      "subtitle": "Choose your preferred language",
+      "selectLanguage": "Select Language",
+      "description": "Your language preference will be saved and applied across all pages."
+    },
     "billing": {
       "title": "Billing & Subscription",
       "subtitle": "Manage your subscription and payment",

@@ -361,6 +361,12 @@
         "viewerDesc": "Somente leitura"
       }
     },
+    "language": {
+      "title": "Preferências de Idioma",
+      "subtitle": "Escolha seu idioma preferido",
+      "selectLanguage": "Selecionar Idioma",
+      "description": "Sua preferência de idioma será salva e aplicada em todas as páginas."
+    },
     "billing": {
       "title": "Cobrança e Assinatura",
       "subtitle": "Gerencie sua assinatura e pagamento",

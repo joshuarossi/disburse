@@ -361,6 +361,12 @@
         "viewerDesc": "Solo lectura"
       }
     },
+    "language": {
+      "title": "Preferencias de Idioma",
+      "subtitle": "Elige tu idioma preferido",
+      "selectLanguage": "Seleccionar Idioma",
+      "description": "Tu preferencia de idioma se guardará y se aplicará en todas las páginas."
+    },
     "billing": {
       "title": "Facturación y Suscripción",
       "subtitle": "Gestiona tu suscripción y pago",

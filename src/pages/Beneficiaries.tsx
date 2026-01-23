@@ -7,6 +7,7 @@ import { api } from '../../convex/_generated/api';
 import { Id } from '../../convex/_generated/dataModel';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
 import { 
   Plus, 
   Users, 
@@ -159,42 +160,44 @@ function BeneficiarySection({
       </div>
 
       {/* Search & Filter Bar */}
-      <div className="border-b border-white/5 bg-navy-800/30 px-6 py-3">
-        <div className="flex items-center gap-3">
+      <div className="border-b border-white/5 bg-navy-800/30 px-4 sm:px-6 py-3">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
           {/* Search */}
-          <div className="relative flex-1 max-w-sm">
+          <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
             <input
               type="text"
               value={state.search}
               onChange={(e) => setState((s) => ({ ...s, search: e.target.value }))}
               placeholder={t('beneficiaries.searchPlaceholder')}
-              className="w-full rounded-lg border border-white/10 bg-navy-800 pl-10 pr-4 py-2 text-sm text-white placeholder-slate-500 focus:border-accent-500 focus:outline-none focus:ring-1 focus:ring-accent-500"
+              className="w-full rounded-lg border border-white/10 bg-navy-800 pl-10 pr-4 py-2.5 text-sm text-white placeholder-slate-500 focus:border-accent-500 focus:outline-none focus:ring-1 focus:ring-accent-500"
             />
           </div>
 
-          {/* Filter Toggle */}
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={() => setState((s) => ({ ...s, showFilters: !s.showFilters }))}
-            className={hasActiveFilters ? 'border-accent-500' : ''}
-          >
-            <Filter className="h-4 w-4" />
-            {t('common.filters')}
-            {hasActiveFilters && (
-              <span className="ml-1 rounded-full bg-accent-500 px-1.5 py-0.5 text-xs text-white">
-                {(state.statusFilter !== 'all' ? 1 : 0)}
-              </span>
-            )}
-          </Button>
-
-          {/* Clear Filters */}
-          {hasActiveFilters && (
-            <Button variant="ghost" size="sm" onClick={clearFilters} className="text-slate-400 hover:text-white">
-              {t('common.clear')}
+          <div className="flex items-center gap-2">
+            {/* Filter Toggle */}
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => setState((s) => ({ ...s, showFilters: !s.showFilters }))}
+              className={cn("h-11", hasActiveFilters ? 'border-accent-500' : '')}
+            >
+              <Filter className="h-4 w-4" />
+              <span className="hidden sm:inline">{t('common.filters')}</span>
+              {hasActiveFilters && (
+                <span className="ml-1 rounded-full bg-accent-500 px-1.5 py-0.5 text-xs text-white">
+                  {(state.statusFilter !== 'all' ? 1 : 0)}
+                </span>
+              )}
             </Button>
-          )}
+
+            {/* Clear Filters */}
+            {hasActiveFilters && (
+              <Button variant="ghost" size="sm" onClick={clearFilters} className="h-11 text-slate-400 hover:text-white">
+                {t('common.clear')}
+              </Button>
+            )}
+          </div>
         </div>
 
         {/* Expanded Filters */}
@@ -241,72 +244,134 @@ function BeneficiarySection({
           )}
         </div>
       ) : (
-        <table className="w-full">
-          <thead>
-            <tr className="border-b border-white/5 bg-navy-800/20">
-              <th
-                className="px-6 py-3 text-left text-xs font-medium text-slate-400 cursor-pointer hover:text-white transition-colors"
-                onClick={() => handleSort('name')}
-              >
-                <span className="flex items-center gap-1">
-                  {t('common.name')}
-                  {state.sortField === 'name' && (
-                    state.sortOrder === 'asc' ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />
-                  )}
-                </span>
-              </th>
-              <th
-                className="px-6 py-3 text-left text-xs font-medium text-slate-400 cursor-pointer hover:text-white transition-colors"
-                onClick={() => handleSort('walletAddress')}
-              >
-                <span className="flex items-center gap-1">
-                  Wallet Address
-                  {state.sortField === 'walletAddress' && (
-                    state.sortOrder === 'asc' ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />
-                  )}
-                </span>
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-slate-400">
-                  {t('common.status')}
-              </th>
-              <th
-                className="px-6 py-3 text-left text-xs font-medium text-slate-400 cursor-pointer hover:text-white transition-colors"
-                onClick={() => handleSort('createdAt')}
-              >
-                <span className="flex items-center gap-1">
-                  {t('beneficiaries.table.added')}
-                  {state.sortField === 'createdAt' && (
-                    state.sortOrder === 'asc' ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />
-                  )}
-                </span>
-              </th>
-              <th className="px-6 py-3 text-right text-xs font-medium text-slate-400">
-                  {t('common.actions')}
-              </th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-white/5">
+        <>
+          {/* Desktop Table */}
+          <div className="hidden lg:block overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr className="border-b border-white/5 bg-navy-800/20">
+                  <th
+                    className="px-6 py-3 text-left text-xs font-medium text-slate-400 cursor-pointer hover:text-white transition-colors"
+                    onClick={() => handleSort('name')}
+                  >
+                    <span className="flex items-center gap-1">
+                      {t('common.name')}
+                      {state.sortField === 'name' && (
+                        state.sortOrder === 'asc' ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />
+                      )}
+                    </span>
+                  </th>
+                  <th
+                    className="px-6 py-3 text-left text-xs font-medium text-slate-400 cursor-pointer hover:text-white transition-colors"
+                    onClick={() => handleSort('walletAddress')}
+                  >
+                    <span className="flex items-center gap-1">
+                      Wallet Address
+                      {state.sortField === 'walletAddress' && (
+                        state.sortOrder === 'asc' ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />
+                      )}
+                    </span>
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-slate-400">
+                      {t('common.status')}
+                  </th>
+                  <th
+                    className="px-6 py-3 text-left text-xs font-medium text-slate-400 cursor-pointer hover:text-white transition-colors"
+                    onClick={() => handleSort('createdAt')}
+                  >
+                    <span className="flex items-center gap-1">
+                      {t('beneficiaries.table.added')}
+                      {state.sortField === 'createdAt' && (
+                        state.sortOrder === 'asc' ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />
+                      )}
+                    </span>
+                  </th>
+                  <th className="px-6 py-3 text-right text-xs font-medium text-slate-400">
+                      {t('common.actions')}
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-white/5">
+                {filteredAndSorted.map((beneficiary) => (
+                  <tr key={beneficiary._id} className="hover:bg-navy-800/30">
+                    <td className="px-6 py-4">
+                      <div>
+                        <p className="font-medium text-white">{beneficiary.name}</p>
+                        {beneficiary.notes && (
+                          <p className="text-sm text-slate-500 truncate max-w-xs" title={beneficiary.notes}>
+                            {beneficiary.notes}
+                          </p>
+                        )}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <code className="text-sm text-slate-400">
+                        {beneficiary.walletAddress.slice(0, 6)}...
+                        {beneficiary.walletAddress.slice(-4)}
+                      </code>
+                    </td>
+                    <td className="px-6 py-4">
+                      <span
+                        className={`inline-flex rounded-full px-3 py-1 text-xs font-medium ${
+                          beneficiary.isActive
+                            ? 'bg-green-500/10 text-green-400'
+                            : 'bg-slate-500/10 text-slate-400'
+                        }`}
+                      >
+                        {beneficiary.isActive ? t('common.active') : t('common.inactive')}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 text-sm text-slate-400">
+                      {new Date(beneficiary.createdAt).toLocaleDateString()}
+                    </td>
+                    <td className="px-6 py-4 text-right">
+                      <div className="flex items-center justify-end gap-2">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => onEdit(beneficiary)}
+                          title={t('beneficiaries.table.edit')}
+                        >
+                          <Edit className="h-4 w-4 text-slate-400" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => onToggleActive(beneficiary._id, beneficiary.isActive)}
+                          title={beneficiary.isActive ? t('beneficiaries.table.deactivate') : t('beneficiaries.table.reactivate')}
+                        >
+                          {beneficiary.isActive ? (
+                            <Trash2 className="h-4 w-4 text-red-400" />
+                          ) : (
+                            <RefreshCw className="h-4 w-4 text-green-400" />
+                          )}
+                        </Button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Mobile Cards */}
+          <div className="lg:hidden space-y-3">
             {filteredAndSorted.map((beneficiary) => (
-              <tr key={beneficiary._id} className="hover:bg-navy-800/30">
-                <td className="px-6 py-4">
-                  <div>
-                    <p className="font-medium text-white">{beneficiary.name}</p>
+              <div
+                key={beneficiary._id}
+                className="rounded-lg border border-white/10 bg-navy-800/50 p-4 space-y-3"
+              >
+                <div className="flex items-start justify-between">
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium text-white truncate">{beneficiary.name}</p>
                     {beneficiary.notes && (
-                      <p className="text-sm text-slate-500 truncate max-w-xs" title={beneficiary.notes}>
+                      <p className="text-sm text-slate-500 mt-1 line-clamp-2" title={beneficiary.notes}>
                         {beneficiary.notes}
                       </p>
                     )}
                   </div>
-                </td>
-                <td className="px-6 py-4">
-                  <code className="text-sm text-slate-400">
-                    {beneficiary.walletAddress.slice(0, 6)}...
-                    {beneficiary.walletAddress.slice(-4)}
-                  </code>
-                </td>
-                <td className="px-6 py-4">
                   <span
-                    className={`inline-flex rounded-full px-3 py-1 text-xs font-medium ${
+                    className={`ml-2 inline-flex rounded-full px-2.5 py-1 text-xs font-medium shrink-0 ${
                       beneficiary.isActive
                         ? 'bg-green-500/10 text-green-400'
                         : 'bg-slate-500/10 text-slate-400'
@@ -314,38 +379,55 @@ function BeneficiarySection({
                   >
                     {beneficiary.isActive ? t('common.active') : t('common.inactive')}
                   </span>
-                </td>
-                <td className="px-6 py-4 text-sm text-slate-400">
-                  {new Date(beneficiary.createdAt).toLocaleDateString()}
-                </td>
-                <td className="px-6 py-4 text-right">
-                  <div className="flex items-center justify-end gap-2">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => onEdit(beneficiary)}
-                      title={t('beneficiaries.table.edit')}
-                    >
-                      <Edit className="h-4 w-4 text-slate-400" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => onToggleActive(beneficiary._id, beneficiary.isActive)}
-                      title={beneficiary.isActive ? t('beneficiaries.table.deactivate') : t('beneficiaries.table.reactivate')}
-                    >
-                      {beneficiary.isActive ? (
-                        <Trash2 className="h-4 w-4 text-red-400" />
-                      ) : (
-                        <RefreshCw className="h-4 w-4 text-green-400" />
-                      )}
-                    </Button>
+                </div>
+                
+                <div className="space-y-2 text-sm">
+                  <div>
+                    <p className="text-xs text-slate-500 mb-1">Wallet Address</p>
+                    <code className="text-slate-400 break-all">{beneficiary.walletAddress}</code>
                   </div>
-                </td>
-              </tr>
+                  <div>
+                    <p className="text-xs text-slate-500 mb-1">{t('beneficiaries.table.added')}</p>
+                    <p className="text-slate-400">{new Date(beneficiary.createdAt).toLocaleDateString()}</p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 pt-2 border-t border-white/5">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => onEdit(beneficiary)}
+                    className="flex-1 h-11"
+                  >
+                    <Edit className="h-4 w-4 mr-2" />
+                    {t('beneficiaries.table.edit')}
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => onToggleActive(beneficiary._id, beneficiary.isActive)}
+                    className={cn(
+                      "flex-1 h-11",
+                      beneficiary.isActive ? "text-red-400 hover:text-red-300" : "text-green-400 hover:text-green-300"
+                    )}
+                  >
+                    {beneficiary.isActive ? (
+                      <>
+                        <Trash2 className="h-4 w-4 mr-2" />
+                        {t('beneficiaries.table.deactivate')}
+                      </>
+                    ) : (
+                      <>
+                        <RefreshCw className="h-4 w-4 mr-2" />
+                        {t('beneficiaries.table.reactivate')}
+                      </>
+                    )}
+                  </Button>
+                </div>
+              </div>
             ))}
-          </tbody>
-        </table>
+          </div>
+        </>
       )}
     </div>
   );
@@ -472,17 +554,17 @@ export default function Beneficiaries() {
     <AppLayout>
       <div className="space-y-8">
         {/* Header */}
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pt-4 lg:pt-6">
           <div>
-            <h1 className="text-2xl font-bold text-white">{t('beneficiaries.title')}</h1>
-            <p className="mt-1 text-slate-400">
+            <h1 className="text-xl sm:text-2xl font-bold text-white">{t('beneficiaries.title')}</h1>
+            <p className="mt-1 text-sm sm:text-base text-slate-400">
               {t('beneficiaries.subtitle')}
               {totalCount > 0 && (
                 <span className="ml-2 text-slate-500">({t('beneficiaries.total', { count: totalCount })})</span>
               )}
             </p>
           </div>
-          <Button onClick={() => setIsCreating(true)}>
+          <Button onClick={() => setIsCreating(true)} className="w-full sm:w-auto h-11">
             <Plus className="h-4 w-4" />
             {t('beneficiaries.addBeneficiary')}
           </Button>
@@ -490,8 +572,8 @@ export default function Beneficiaries() {
 
         {/* Create Form */}
         {isCreating && (
-          <div className="rounded-2xl border border-accent-500/30 bg-navy-900/50 p-6">
-            <h2 className="mb-4 text-lg font-semibold text-white">
+          <div className="rounded-2xl border border-accent-500/30 bg-navy-900/50 p-4 sm:p-6">
+            <h2 className="mb-4 text-base sm:text-lg font-semibold text-white">
               {t('beneficiaries.newBeneficiary')}
             </h2>
             
@@ -502,7 +584,7 @@ export default function Beneficiaries() {
               </div>
             )}
             
-            <form onSubmit={handleCreate} className="space-y-4">
+            <form onSubmit={handleCreate} className="space-y-4 sm:space-y-6">
               {/* Type Selector */}
               <div>
                 <label className="mb-2 block text-sm font-medium text-slate-300">
@@ -512,26 +594,26 @@ export default function Beneficiaries() {
                   <button
                     type="button"
                     onClick={() => setNewType('individual')}
-                    className={`flex flex-1 items-center justify-center gap-2 rounded-lg border p-4 transition-colors ${
+                    className={`flex flex-1 items-center justify-center gap-2 rounded-lg border p-3 sm:p-4 transition-colors h-11 sm:h-auto ${
                       newType === 'individual'
                         ? 'border-accent-500 bg-accent-500/10 text-white'
                         : 'border-white/10 text-slate-400 hover:border-white/30'
                     }`}
                   >
-                    <User className="h-5 w-5" />
-                    <span className="font-medium">{t('beneficiaries.individual')}</span>
+                    <User className="h-4 w-4 sm:h-5 sm:w-5" />
+                    <span className="text-sm sm:text-base font-medium">{t('beneficiaries.individual')}</span>
                   </button>
                   <button
                     type="button"
                     onClick={() => setNewType('business')}
-                    className={`flex flex-1 items-center justify-center gap-2 rounded-lg border p-4 transition-colors ${
+                    className={`flex flex-1 items-center justify-center gap-2 rounded-lg border p-3 sm:p-4 transition-colors h-11 sm:h-auto ${
                       newType === 'business'
                         ? 'border-accent-500 bg-accent-500/10 text-white'
                         : 'border-white/10 text-slate-400 hover:border-white/30'
                     }`}
                   >
-                    <Building2 className="h-5 w-5" />
-                    <span className="font-medium">{t('beneficiaries.business')}</span>
+                    <Building2 className="h-4 w-4 sm:h-5 sm:w-5" />
+                    <span className="text-sm sm:text-base font-medium">{t('beneficiaries.business')}</span>
                   </button>
                 </div>
               </div>
@@ -545,7 +627,7 @@ export default function Beneficiaries() {
                   value={newName}
                   onChange={(e) => setNewName(e.target.value)}
                   placeholder={newType === 'individual' ? t('beneficiaries.namePlaceholder.individual') : t('beneficiaries.namePlaceholder.business')}
-                  className="w-full rounded-lg border border-white/10 bg-navy-800 px-4 py-2 text-white placeholder-slate-500 focus:border-accent-500 focus:outline-none focus:ring-1 focus:ring-accent-500"
+                  className="w-full rounded-lg border border-white/10 bg-navy-800 px-4 py-3 text-base text-white placeholder-slate-500 focus:border-accent-500 focus:outline-none focus:ring-1 focus:ring-accent-500"
                   required
                 />
               </div>
@@ -558,7 +640,7 @@ export default function Beneficiaries() {
                   value={newAddress}
                   onChange={(e) => setNewAddress(e.target.value)}
                   placeholder="0x..."
-                  className="w-full rounded-lg border border-white/10 bg-navy-800 px-4 py-2 font-mono text-white placeholder-slate-500 focus:border-accent-500 focus:outline-none focus:ring-1 focus:ring-accent-500"
+                  className="w-full rounded-lg border border-white/10 bg-navy-800 px-4 py-3 font-mono text-base text-white placeholder-slate-500 focus:border-accent-500 focus:outline-none focus:ring-1 focus:ring-accent-500"
                   required
                 />
               </div>
@@ -570,12 +652,12 @@ export default function Beneficiaries() {
                   value={newNotes}
                   onChange={(e) => setNewNotes(e.target.value)}
                   placeholder={t('beneficiaries.notesPlaceholder')}
-                  rows={2}
-                  className="w-full rounded-lg border border-white/10 bg-navy-800 px-4 py-2 text-white placeholder-slate-500 focus:border-accent-500 focus:outline-none focus:ring-1 focus:ring-accent-500"
+                  rows={3}
+                  className="w-full rounded-lg border border-white/10 bg-navy-800 px-4 py-3 text-base text-white placeholder-slate-500 focus:border-accent-500 focus:outline-none focus:ring-1 focus:ring-accent-500"
                 />
               </div>
-              <div className="flex gap-3">
-                <Button type="submit">{t('beneficiaries.createBeneficiary')}</Button>
+              <div className="flex flex-col sm:flex-row gap-3">
+                <Button type="submit" className="w-full sm:w-auto h-11">{t('beneficiaries.createBeneficiary')}</Button>
                 <Button
                   type="button"
                   variant="secondary"
@@ -587,6 +669,7 @@ export default function Beneficiaries() {
                     setNewNotes('');
                     setCreateError(null);
                   }}
+                  className="w-full sm:w-auto h-11"
                 >
                   {t('common.cancel')}
                 </Button>
@@ -635,13 +718,14 @@ export default function Beneficiaries() {
 
       {/* Edit Modal */}
       {editingBeneficiary && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="w-full max-w-md rounded-2xl border border-white/10 bg-navy-900 p-6">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-xl font-bold text-white">{t('beneficiaries.editBeneficiary')}</h2>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 overflow-y-auto">
+          <div className="w-full max-w-md rounded-2xl border border-white/10 bg-navy-900 p-4 sm:p-6 my-auto">
+            <div className="flex items-center justify-between mb-4 sm:mb-6">
+              <h2 className="text-lg sm:text-xl font-bold text-white">{t('beneficiaries.editBeneficiary')}</h2>
               <button
                 onClick={handleCloseEdit}
-                className="text-slate-400 hover:text-white"
+                className="text-slate-400 hover:text-white h-11 w-11 flex items-center justify-center"
+                aria-label="Close"
               >
                 <X className="h-5 w-5" />
               </button>
@@ -654,7 +738,7 @@ export default function Beneficiaries() {
               </div>
             )}
 
-            <form onSubmit={handleSaveEdit} className="space-y-4">
+            <form onSubmit={handleSaveEdit} className="space-y-4 sm:space-y-6">
               {/* Type Selector */}
               <div>
                 <label className="mb-2 block text-sm font-medium text-slate-300">
@@ -664,7 +748,7 @@ export default function Beneficiaries() {
                   <button
                     type="button"
                     onClick={() => setEditingBeneficiary({ ...editingBeneficiary, type: 'individual' })}
-                    className={`flex flex-1 items-center justify-center gap-2 rounded-lg border p-3 transition-colors ${
+                    className={`flex flex-1 items-center justify-center gap-2 rounded-lg border p-3 transition-colors h-11 ${
                       editingBeneficiary.type === 'individual'
                         ? 'border-accent-500 bg-accent-500/10 text-white'
                         : 'border-white/10 text-slate-400 hover:border-white/30'
@@ -676,7 +760,7 @@ export default function Beneficiaries() {
                   <button
                     type="button"
                     onClick={() => setEditingBeneficiary({ ...editingBeneficiary, type: 'business' })}
-                    className={`flex flex-1 items-center justify-center gap-2 rounded-lg border p-3 transition-colors ${
+                    className={`flex flex-1 items-center justify-center gap-2 rounded-lg border p-3 transition-colors h-11 ${
                       editingBeneficiary.type === 'business'
                         ? 'border-accent-500 bg-accent-500/10 text-white'
                         : 'border-white/10 text-slate-400 hover:border-white/30'
@@ -696,7 +780,7 @@ export default function Beneficiaries() {
                   type="text"
                   value={editingBeneficiary.name}
                   onChange={(e) => setEditingBeneficiary({ ...editingBeneficiary, name: e.target.value })}
-                  className="w-full rounded-lg border border-white/10 bg-navy-800 px-4 py-2 text-white focus:border-accent-500 focus:outline-none focus:ring-1 focus:ring-accent-500"
+                  className="w-full rounded-lg border border-white/10 bg-navy-800 px-4 py-3 text-base text-white focus:border-accent-500 focus:outline-none focus:ring-1 focus:ring-accent-500"
                   required
                 />
               </div>
@@ -709,7 +793,7 @@ export default function Beneficiaries() {
                   type="text"
                   value={editingBeneficiary.walletAddress}
                   onChange={(e) => setEditingBeneficiary({ ...editingBeneficiary, walletAddress: e.target.value })}
-                  className="w-full rounded-lg border border-white/10 bg-navy-800 px-4 py-2 font-mono text-white focus:border-accent-500 focus:outline-none focus:ring-1 focus:ring-accent-500"
+                  className="w-full rounded-lg border border-white/10 bg-navy-800 px-4 py-3 font-mono text-base text-white focus:border-accent-500 focus:outline-none focus:ring-1 focus:ring-accent-500"
                   required
                 />
               </div>
@@ -721,16 +805,16 @@ export default function Beneficiaries() {
                 <textarea
                   value={editingBeneficiary.notes}
                   onChange={(e) => setEditingBeneficiary({ ...editingBeneficiary, notes: e.target.value })}
-                  rows={2}
-                  className="w-full rounded-lg border border-white/10 bg-navy-800 px-4 py-2 text-white focus:border-accent-500 focus:outline-none focus:ring-1 focus:ring-accent-500"
+                  rows={3}
+                  className="w-full rounded-lg border border-white/10 bg-navy-800 px-4 py-3 text-base text-white focus:border-accent-500 focus:outline-none focus:ring-1 focus:ring-accent-500"
                 />
               </div>
 
-              <div className="flex gap-3 pt-2">
-                <Button type="submit" className="flex-1">
+              <div className="flex flex-col sm:flex-row gap-3 pt-2">
+                <Button type="submit" className="flex-1 h-11">
                   {t('beneficiaries.saveChanges')}
                 </Button>
-                <Button type="button" variant="secondary" onClick={handleCloseEdit}>
+                <Button type="button" variant="secondary" onClick={handleCloseEdit} className="h-11">
                   {t('common.cancel')}
                 </Button>
               </div>

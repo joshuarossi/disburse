@@ -26,6 +26,7 @@ import {
   ExternalLink,
   CheckCircle,
   User,
+  Languages,
 } from 'lucide-react';
 import { validateSafeAddress, isOwner } from '@/lib/safe';
 import { TOKENS } from '@/lib/wagmi';
@@ -509,27 +510,24 @@ export default function Settings() {
 
   return (
     <AppLayout>
-      <div className="space-y-8">
+      <div className="space-y-4 sm:space-y-6 lg:space-y-8 w-full max-w-full overflow-x-hidden">
         {/* Header */}
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold text-white">{t('settings.title')}</h1>
-            <p className="mt-1 text-slate-400">
-              {t('settings.subtitle')}
-            </p>
-          </div>
-          <LanguageSwitcher />
+        <div className="pt-4 lg:pt-6">
+          <h1 className="text-xl sm:text-2xl font-bold text-white">{t('settings.title')}</h1>
+          <p className="mt-1 text-sm sm:text-base text-slate-400">
+            {t('settings.subtitle')}
+          </p>
         </div>
 
         {/* Organization Info */}
-        <div className="rounded-2xl border border-white/10 bg-navy-900/50 p-6">
-          <div className="flex items-center gap-3 mb-6">
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-navy-800 text-slate-400">
+        <div className="rounded-2xl border border-white/10 bg-navy-900/50 p-4 sm:p-6">
+          <div className="flex items-center gap-3 mb-4 sm:mb-6">
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-navy-800 text-slate-400 shrink-0">
               <Building2 className="h-5 w-5" />
             </div>
-            <div>
-              <h2 className="text-lg font-semibold text-white">{t('settings.organization.title')}</h2>
-              <p className="text-sm text-slate-400">{t('settings.organization.subtitle')}</p>
+            <div className="min-w-0">
+              <h2 className="text-base sm:text-lg font-semibold text-white">{t('settings.organization.title')}</h2>
+              <p className="text-xs sm:text-sm text-slate-400">{t('settings.organization.subtitle')}</p>
             </div>
           </div>
 
@@ -538,7 +536,7 @@ export default function Settings() {
                 <label className="mb-2 block text-sm font-medium text-slate-300">
                   {t('settings.organization.orgName')}
                 </label>
-              <div className="flex gap-3">
+              <div className="flex flex-col sm:flex-row gap-3">
                 <input
                   type="text"
                   value={orgName}
@@ -547,10 +545,10 @@ export default function Settings() {
                     setIsEditingName(true);
                   }}
                   disabled={!isAdmin}
-                  className="flex-1 rounded-lg border border-white/10 bg-navy-800 px-4 py-2 text-white disabled:opacity-50"
+                  className="flex-1 rounded-lg border border-white/10 bg-navy-800 px-4 py-3 text-base text-white disabled:opacity-50"
                 />
                 {isAdmin && isEditingName && (
-                  <Button onClick={handleSaveOrgName} disabled={savingName}>
+                  <Button onClick={handleSaveOrgName} disabled={savingName} className="w-full sm:w-auto h-11">
                     {savingName ? (
                       <Loader2 className="h-4 w-4 animate-spin" />
                     ) : (
@@ -570,49 +568,49 @@ export default function Settings() {
         </div>
 
         {/* Safe Configuration */}
-        <div className="rounded-2xl border border-white/10 bg-navy-900/50 p-6">
-          <div className="flex items-center gap-3 mb-6">
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-navy-800 text-slate-400">
+        <div className="rounded-2xl border border-white/10 bg-navy-900/50 p-4 sm:p-6">
+          <div className="flex items-center gap-3 mb-4 sm:mb-6">
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-navy-800 text-slate-400 shrink-0">
               <Wallet className="h-5 w-5" />
             </div>
-            <div>
-              <h2 className="text-lg font-semibold text-white">{t('settings.safe.title')}</h2>
-              <p className="text-sm text-slate-400">{t('settings.safe.subtitle')}</p>
+            <div className="min-w-0">
+              <h2 className="text-base sm:text-lg font-semibold text-white">{t('settings.safe.title')}</h2>
+              <p className="text-xs sm:text-sm text-slate-400">{t('settings.safe.subtitle')}</p>
             </div>
           </div>
 
           {safe ? (
             <div className="space-y-4">
-              <div className="rounded-xl border border-white/10 bg-navy-800/50 p-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-slate-400">{t('settings.safe.connected')}</p>
-                    <p className="mt-1 font-mono text-white">{safe.safeAddress}</p>
+              <div className="rounded-xl border border-white/10 bg-navy-800/50 p-3 sm:p-4">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                  <div className="min-w-0 flex-1">
+                    <p className="text-xs sm:text-sm text-slate-400">{t('settings.safe.connected')}</p>
+                    <p className="mt-1 font-mono text-sm sm:text-base text-white break-all">{safe.safeAddress}</p>
                   </div>
                   <a
                     href={`https://app.safe.global/sep:${safe.safeAddress}`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="flex items-center gap-1 text-sm text-accent-400 hover:underline"
+                    className="flex items-center gap-1 text-sm text-accent-400 hover:underline shrink-0"
                   >
-                    {t('settings.safe.openSafe')}
+                    <span className="hidden sm:inline">{t('settings.safe.openSafe')}</span>
                     <ArrowUpRight className="h-4 w-4" />
                   </a>
                 </div>
                 <div className="mt-3 flex items-center gap-2">
-                  <span className="rounded-full bg-green-500/10 px-3 py-1 text-xs font-medium text-green-400">
+                  <span className="rounded-full bg-green-500/10 px-2.5 sm:px-3 py-1 text-xs font-medium text-green-400">
                     {t('settings.safe.network')}
                   </span>
                 </div>
               </div>
               {isAdmin && (
-                <Button variant="secondary" onClick={handleUnlinkSafe}>
+                <Button variant="secondary" onClick={handleUnlinkSafe} className="w-full sm:w-auto h-11">
                   {t('settings.safe.unlinkSafe')}
                 </Button>
               )}
             </div>
           ) : isLinking ? (
-            <form onSubmit={handleLinkSafe} className="space-y-4">
+            <form onSubmit={handleLinkSafe} className="space-y-4 sm:space-y-6">
               <div>
                 <label className="mb-2 block text-sm font-medium text-slate-300">
                   {t('settings.safe.safeAddress')}
@@ -625,10 +623,10 @@ export default function Settings() {
                     setLinkingError(null);
                   }}
                   placeholder={t('settings.safe.safeAddressPlaceholder')}
-                  className="w-full rounded-lg border border-white/10 bg-navy-800 px-4 py-2 font-mono text-white placeholder-slate-500 focus:border-accent-500 focus:outline-none focus:ring-1 focus:ring-accent-500"
+                  className="w-full rounded-lg border border-white/10 bg-navy-800 px-4 py-3 font-mono text-base text-white placeholder-slate-500 focus:border-accent-500 focus:outline-none focus:ring-1 focus:ring-accent-500"
                   required
                 />
-                <p className="mt-2 text-sm text-slate-500">
+                <p className="mt-2 text-xs sm:text-sm text-slate-500">
                   {t('settings.safe.safeAddressDescription')}
                 </p>
               </div>
@@ -640,8 +638,8 @@ export default function Settings() {
                 </div>
               )}
               
-              <div className="flex gap-3">
-                <Button type="submit" disabled={isValidating}>
+              <div className="flex flex-col sm:flex-row gap-3">
+                <Button type="submit" disabled={isValidating} className="w-full sm:w-auto h-11">
                   {isValidating ? (
                     <>
                       <Loader2 className="h-4 w-4 animate-spin" />
@@ -658,6 +656,7 @@ export default function Settings() {
                     setIsLinking(false);
                     setLinkingError(null);
                   }}
+                  className="w-full sm:w-auto h-11"
                 >
                   {t('common.cancel')}
                 </Button>
@@ -666,13 +665,13 @@ export default function Settings() {
           ) : (
             <div className="text-center py-6">
               <Wallet className="mx-auto h-12 w-12 text-slate-500" />
-              <p className="mt-4 text-slate-400">{t('settings.safe.noSafe')}</p>
+              <p className="mt-4 text-sm sm:text-base text-slate-400">{t('settings.safe.noSafe')}</p>
               {isAdmin && (
-                <Button className="mt-4" onClick={() => setIsLinking(true)}>
+                <Button className="mt-4 w-full sm:w-auto h-11" onClick={() => setIsLinking(true)}>
                   {t('settings.safe.linkExisting')}
                 </Button>
               )}
-              <p className="mt-4 text-sm text-slate-500">
+              <p className="mt-4 text-xs sm:text-sm text-slate-500">
                 {t('settings.safe.createSafe')}{' '}
                 <a
                   href="https://app.safe.global/new-safe/create"
@@ -688,19 +687,19 @@ export default function Settings() {
         </div>
 
         {/* Team Members */}
-        <div className="rounded-2xl border border-white/10 bg-navy-900/50 p-6">
-          <div className="flex items-center justify-between mb-6">
+        <div className="rounded-2xl border border-white/10 bg-navy-900/50 p-4 sm:p-6">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4 sm:mb-6">
             <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-navy-800 text-slate-400">
+              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-navy-800 text-slate-400 shrink-0">
                 <Users className="h-5 w-5" />
               </div>
-              <div>
-                <h2 className="text-lg font-semibold text-white">{t('settings.team.title')}</h2>
-                <p className="text-sm text-slate-400">{t('settings.team.subtitle')}</p>
+              <div className="min-w-0">
+                <h2 className="text-base sm:text-lg font-semibold text-white">{t('settings.team.title')}</h2>
+                <p className="text-xs sm:text-sm text-slate-400">{t('settings.team.subtitle')}</p>
               </div>
             </div>
             {isAdmin && (
-              <Button onClick={() => setIsAddingMember(true)}>
+              <Button onClick={() => setIsAddingMember(true)} className="w-full sm:w-auto h-11">
                 <Plus className="h-4 w-4" />
                 {t('settings.team.addMember')}
               </Button>
@@ -725,7 +724,7 @@ export default function Settings() {
           {isAddingMember && (
             <form onSubmit={handleInviteMember} className="mb-6 rounded-xl border border-accent-500/30 bg-navy-800/50 p-4">
               <h3 className="mb-4 font-medium text-white">{t('settings.team.addTeamMember')}</h3>
-              <div className="space-y-4">
+              <div className="space-y-4 sm:space-y-6">
                 <div>
                   <label className="mb-2 block text-sm font-medium text-slate-300">
                     {t('common.walletAddress')}
@@ -735,7 +734,7 @@ export default function Settings() {
                     value={newMemberAddress}
                     onChange={(e) => setNewMemberAddress(e.target.value)}
                     placeholder="0x..."
-                    className="w-full rounded-lg border border-white/10 bg-navy-800 px-4 py-2 font-mono text-white placeholder-slate-500 focus:border-accent-500 focus:outline-none focus:ring-1 focus:ring-accent-500"
+                    className="w-full rounded-lg border border-white/10 bg-navy-800 px-4 py-3 font-mono text-base text-white placeholder-slate-500 focus:border-accent-500 focus:outline-none focus:ring-1 focus:ring-accent-500"
                     required
                   />
                 </div>
@@ -748,7 +747,7 @@ export default function Settings() {
                     value={newMemberName}
                     onChange={(e) => setNewMemberName(e.target.value)}
                     placeholder={t('settings.team.displayNamePlaceholder')}
-                    className="w-full rounded-lg border border-white/10 bg-navy-800 px-4 py-2 text-white placeholder-slate-500 focus:border-accent-500 focus:outline-none focus:ring-1 focus:ring-accent-500"
+                    className="w-full rounded-lg border border-white/10 bg-navy-800 px-4 py-3 text-base text-white placeholder-slate-500 focus:border-accent-500 focus:outline-none focus:ring-1 focus:ring-accent-500"
                   />
                 </div>
                 <div>
@@ -760,7 +759,7 @@ export default function Settings() {
                     value={newMemberEmail}
                     onChange={(e) => setNewMemberEmail(e.target.value)}
                     placeholder={t('settings.team.emailPlaceholder')}
-                    className="w-full rounded-lg border border-white/10 bg-navy-800 px-4 py-2 text-white placeholder-slate-500 focus:border-accent-500 focus:outline-none focus:ring-1 focus:ring-accent-500"
+                    className="w-full rounded-lg border border-white/10 bg-navy-800 px-4 py-3 text-base text-white placeholder-slate-500 focus:border-accent-500 focus:outline-none focus:ring-1 focus:ring-accent-500"
                   />
                 </div>
                 <div>
@@ -770,7 +769,7 @@ export default function Settings() {
                   <select
                     value={newMemberRole}
                     onChange={(e) => setNewMemberRole(e.target.value as Role)}
-                    className="w-full rounded-lg border border-white/10 bg-navy-800 px-4 py-2 text-white focus:border-accent-500 focus:outline-none focus:ring-1 focus:ring-accent-500"
+                    className="w-full rounded-lg border border-white/10 bg-navy-800 px-4 py-3 text-base text-white focus:border-accent-500 focus:outline-none focus:ring-1 focus:ring-accent-500"
                   >
                     {ROLES.map((role) => (
                       <option key={role.value} value={role.value}>
@@ -779,8 +778,8 @@ export default function Settings() {
                     ))}
                   </select>
                 </div>
-                <div className="flex gap-3">
-                  <Button type="submit">{t('settings.team.addMember')}</Button>
+                <div className="flex flex-col sm:flex-row gap-3">
+                  <Button type="submit" className="w-full sm:w-auto h-11">{t('settings.team.addMember')}</Button>
                   <Button
                     type="button"
                     variant="secondary"
@@ -791,6 +790,7 @@ export default function Settings() {
                       setNewMemberEmail('');
                       setNewMemberRole('viewer');
                     }}
+                    className="w-full sm:w-auto h-11"
                   >
                     {t('common.cancel')}
                   </Button>
@@ -805,141 +805,262 @@ export default function Settings() {
               <p className="text-slate-400">{t('settings.team.noMembers')}</p>
             </div>
           ) : (
-            <div className="rounded-xl border border-white/10 overflow-hidden">
-              <table className="w-full">
-                <thead>
-                  <tr className="border-b border-white/10 bg-navy-800/50">
-                    <th className="px-4 py-3 text-left text-sm font-medium text-slate-400">
-                      {t('settings.team.member')}
-                    </th>
-                    <th className="px-4 py-3 text-left text-sm font-medium text-slate-400">
-                      {t('settings.team.role')}
-                    </th>
-                    <th className="px-4 py-3 text-left text-sm font-medium text-slate-400">
-                      {t('settings.team.status')}
-                    </th>
-                    <th className="px-4 py-3 text-right text-sm font-medium text-slate-400">
-                      {t('settings.team.actions')}
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-white/5">
-                  {members?.filter((m) => m?.status === 'active').map((member) => {
-                    if (!member) return null;
-                    const isCurrentUser = member.walletAddress.toLowerCase() === address?.toLowerCase();
-                    const isProcessing = processingMemberId === member.membershipId;
-                    const canEdit = isAdmin || isCurrentUser;
+            <>
+              {/* Desktop Table */}
+              <div className="hidden lg:block rounded-xl border border-white/10 overflow-hidden">
+                <table className="w-full">
+                  <thead>
+                    <tr className="border-b border-white/10 bg-navy-800/50">
+                      <th className="px-4 py-3 text-left text-sm font-medium text-slate-400">
+                        {t('settings.team.member')}
+                      </th>
+                      <th className="px-4 py-3 text-left text-sm font-medium text-slate-400">
+                        {t('settings.team.role')}
+                      </th>
+                      <th className="px-4 py-3 text-left text-sm font-medium text-slate-400">
+                        {t('settings.team.status')}
+                      </th>
+                      <th className="px-4 py-3 text-right text-sm font-medium text-slate-400">
+                        {t('settings.team.actions')}
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-white/5">
+                    {members?.filter((m) => m?.status === 'active').map((member) => {
+                      if (!member) return null;
+                      const isCurrentUser = member.walletAddress.toLowerCase() === address?.toLowerCase();
+                      const isProcessing = processingMemberId === member.membershipId;
+                      const canEdit = isAdmin || isCurrentUser;
 
-                    return (
-                      <tr key={member.membershipId} className="hover:bg-navy-800/30">
-                        <td className="px-4 py-3">
-                          <div>
-                            {member.name ? (
-                              <p className="font-medium text-white">
-                                {member.name}
-                                {isCurrentUser && (
-                                  <span className="ml-2 text-xs text-accent-400">({t('settings.team.you')})</span>
-                                )}
+                      return (
+                        <tr key={member.membershipId} className="hover:bg-navy-800/30">
+                          <td className="px-4 py-3">
+                            <div>
+                              {member.name ? (
+                                <p className="font-medium text-white">
+                                  {member.name}
+                                  {isCurrentUser && (
+                                    <span className="ml-2 text-xs text-accent-400">({t('settings.team.you')})</span>
+                                  )}
+                                </p>
+                              ) : (
+                                <p className="text-sm text-slate-500 italic">
+                                  {t('settings.team.noName')}
+                                  {isCurrentUser && (
+                                    <span className="ml-1 text-xs text-accent-400 not-italic">({t('settings.team.you')})</span>
+                                  )}
+                                </p>
+                              )}
+                              <p className="font-mono text-xs text-slate-500">
+                                {member.walletAddress.slice(0, 6)}...{member.walletAddress.slice(-4)}
                               </p>
-                            ) : (
-                              <p className="text-sm text-slate-500 italic">
-                                {t('settings.team.noName')}
-                                {isCurrentUser && (
-                                  <span className="ml-1 text-xs text-accent-400 not-italic">({t('settings.team.you')})</span>
-                                )}
-                              </p>
-                            )}
-                            <p className="font-mono text-xs text-slate-500">
-                              {member.walletAddress.slice(0, 6)}...{member.walletAddress.slice(-4)}
+                              {member.email && (
+                                <p className="text-sm text-slate-500">{member.email}</p>
+                              )}
+                            </div>
+                          </td>
+                          <td className="px-4 py-3">
+                            <span className="inline-flex rounded-full bg-navy-700 px-3 py-1 text-xs font-medium text-slate-300 capitalize">
+                              {member.role}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3">
+                            <span className="inline-flex rounded-full bg-green-500/10 px-3 py-1 text-xs font-medium text-green-400 capitalize">
+                              {member.status}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 text-right">
+                            <div className="flex items-center justify-end gap-2">
+                              {canEdit && (
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => handleOpenEditMember(member)}
+                                  title="Edit member"
+                                >
+                                  <Edit className="h-4 w-4 text-slate-400" />
+                                </Button>
+                              )}
+                              {isAdmin && !isCurrentUser && (
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => handleRemoveMember(member.membershipId)}
+                                  disabled={isProcessing}
+                                  title="Remove member"
+                                >
+                                  {isProcessing ? (
+                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                  ) : (
+                                    <Trash2 className="h-4 w-4 text-red-400" />
+                                  )}
+                                </Button>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Mobile Cards */}
+              <div className="lg:hidden space-y-3">
+                {members?.filter((m) => m?.status === 'active').map((member) => {
+                  if (!member) return null;
+                  const isCurrentUser = member.walletAddress.toLowerCase() === address?.toLowerCase();
+                  const isProcessing = processingMemberId === member.membershipId;
+                  const canEdit = isAdmin || isCurrentUser;
+
+                  return (
+                    <div
+                      key={member.membershipId}
+                      className="rounded-lg border border-white/10 bg-navy-800/50 p-4 space-y-3"
+                    >
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1 min-w-0">
+                          {member.name ? (
+                            <p className="font-medium text-white">
+                              {member.name}
+                              {isCurrentUser && (
+                                <span className="ml-2 text-xs text-accent-400">({t('settings.team.you')})</span>
+                              )}
                             </p>
-                            {member.email && (
-                              <p className="text-sm text-slate-500">{member.email}</p>
-                            )}
-                          </div>
-                        </td>
-                        <td className="px-4 py-3">
-                          <span className="inline-flex rounded-full bg-navy-700 px-3 py-1 text-xs font-medium text-slate-300 capitalize">
-                            {member.role}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3">
-                          <span className="inline-flex rounded-full bg-green-500/10 px-3 py-1 text-xs font-medium text-green-400 capitalize">
-                            {member.status}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3 text-right">
-                          <div className="flex items-center justify-end gap-2">
-                            {canEdit && (
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => handleOpenEditMember(member)}
-                                title="Edit member"
-                              >
-                                <Edit className="h-4 w-4 text-slate-400" />
-                              </Button>
-                            )}
-                            {isAdmin && !isCurrentUser && (
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => handleRemoveMember(member.membershipId)}
-                                disabled={isProcessing}
-                                title="Remove member"
-                              >
-                                {isProcessing ? (
-                                  <Loader2 className="h-4 w-4 animate-spin" />
-                                ) : (
-                                  <Trash2 className="h-4 w-4 text-red-400" />
-                                )}
-                              </Button>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
+                          ) : (
+                            <p className="text-sm text-slate-500 italic">
+                              {t('settings.team.noName')}
+                              {isCurrentUser && (
+                                <span className="ml-1 text-xs text-accent-400 not-italic">({t('settings.team.you')})</span>
+                              )}
+                            </p>
+                          )}
+                          <p className="font-mono text-xs text-slate-500 mt-1 break-all">
+                            {member.walletAddress}
+                          </p>
+                          {member.email && (
+                            <p className="text-sm text-slate-500 mt-1">{member.email}</p>
+                          )}
+                        </div>
+                      </div>
+                      
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="inline-flex rounded-full bg-navy-700 px-2.5 py-1 text-xs font-medium text-slate-300 capitalize">
+                          {member.role}
+                        </span>
+                        <span className="inline-flex rounded-full bg-green-500/10 px-2.5 py-1 text-xs font-medium text-green-400 capitalize">
+                          {member.status}
+                        </span>
+                      </div>
+
+                      {(canEdit || (isAdmin && !isCurrentUser)) && (
+                        <div className="flex items-center gap-2 pt-2 border-t border-white/5">
+                          {canEdit && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleOpenEditMember(member)}
+                              className="flex-1 h-11"
+                            >
+                              <Edit className="h-4 w-4 mr-2" />
+                              {t('settings.team.editMember')}
+                            </Button>
+                          )}
+                          {isAdmin && !isCurrentUser && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleRemoveMember(member.membershipId)}
+                              disabled={isProcessing}
+                              className="flex-1 h-11 text-red-400 hover:text-red-300"
+                            >
+                              {isProcessing ? (
+                                <>
+                                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                  {t('common.removing')}
+                                </>
+                              ) : (
+                                <>
+                                  <Trash2 className="h-4 w-4 mr-2" />
+                                  {t('settings.team.remove')}
+                                </>
+                              )}
+                            </Button>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </>
           )}
         </div>
 
+        {/* Language Preferences */}
+        <div className="rounded-2xl border border-white/10 bg-navy-900/50 p-4 sm:p-6">
+          <div className="flex items-center gap-3 mb-4 sm:mb-6">
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-navy-800 text-slate-400 shrink-0">
+              <Languages className="h-5 w-5" />
+            </div>
+            <div className="min-w-0">
+              <h2 className="text-base sm:text-lg font-semibold text-white">{t('settings.language.title')}</h2>
+              <p className="text-xs sm:text-sm text-slate-400">{t('settings.language.subtitle')}</p>
+            </div>
+          </div>
+
+          <div className="space-y-4">
+            <div>
+              <label className="mb-3 block text-sm font-medium text-slate-300">
+                {t('settings.language.selectLanguage')}
+              </label>
+              <div className="rounded-lg border border-white/10 bg-navy-800/50 p-2">
+                <LanguageSwitcher variant="secondary" size="default" />
+              </div>
+              <p className="mt-3 text-xs sm:text-sm text-slate-500">
+                {t('settings.language.description')}
+              </p>
+            </div>
+          </div>
+        </div>
+
         {/* Billing & Subscription */}
-        <div className="rounded-2xl border border-white/10 bg-navy-900/50 p-6">
-          <div className="flex items-center justify-between mb-6">
+        <div className="rounded-2xl border border-white/10 bg-navy-900/50 p-4 sm:p-6">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4 sm:mb-6">
             <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-navy-800 text-slate-400">
+              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-navy-800 text-slate-400 shrink-0">
                 <CreditCard className="h-5 w-5" />
               </div>
-              <div>
-                <h2 className="text-lg font-semibold text-white">{t('settings.billing.title')}</h2>
-                <p className="text-sm text-slate-400">{t('settings.billing.subtitle')}</p>
+              <div className="min-w-0">
+                <h2 className="text-base sm:text-lg font-semibold text-white">{t('settings.billing.title')}</h2>
+                <p className="text-xs sm:text-sm text-slate-400">{t('settings.billing.subtitle')}</p>
               </div>
             </div>
-            {billing?.status === 'trial' && (
-              <div className="rounded-full bg-yellow-500/10 px-4 py-2 text-sm font-medium text-yellow-400">
-                {t('settings.billing.trialDaysLeft', { days: billing.daysRemaining })}
-              </div>
-            )}
-            {billing?.status === 'active' && (
-              <div className="rounded-full bg-green-500/10 px-4 py-2 text-sm font-medium text-green-400">
-                {t('settings.billing.activeDaysRemaining', { days: billing.daysRemaining })}
-              </div>
-            )}
-            {billing?.status === 'expired' && (
-              <div className="rounded-full bg-red-500/10 px-4 py-2 text-sm font-medium text-red-400">
-                {t('settings.billing.expired')}
-              </div>
-            )}
+            <div className="flex flex-wrap gap-2">
+              {billing?.status === 'trial' && (
+                <div className="rounded-full bg-yellow-500/10 px-3 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm font-medium text-yellow-400">
+                  {t('settings.billing.trialDaysLeft', { days: billing.daysRemaining })}
+                </div>
+              )}
+              {billing?.status === 'active' && (
+                <div className="rounded-full bg-green-500/10 px-3 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm font-medium text-green-400">
+                  {t('settings.billing.activeDaysRemaining', { days: billing.daysRemaining })}
+                </div>
+              )}
+              {billing?.status === 'expired' && (
+                <div className="rounded-full bg-red-500/10 px-3 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm font-medium text-red-400">
+                  {t('settings.billing.expired')}
+                </div>
+              )}
+            </div>
           </div>
 
           {/* Current Plan Status */}
-          <div className="mb-6 rounded-xl border border-white/10 bg-navy-800/50 p-4">
-            <div className="flex items-center justify-between">
+          <div className="mb-4 sm:mb-6 rounded-xl border border-white/10 bg-navy-800/50 p-3 sm:p-4">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
               <div>
-                <p className="text-sm text-slate-400">{t('settings.billing.currentPlan')}</p>
-                <p className="text-xl font-bold text-white capitalize">
+                <p className="text-xs sm:text-sm text-slate-400">{t('settings.billing.currentPlan')}</p>
+                <p className="text-lg sm:text-xl font-bold text-white capitalize">
                   {billing?.plan || 'Loading...'}
                 </p>
               </div>
@@ -947,13 +1068,13 @@ export default function Settings() {
                 <div className="flex gap-4">
                   <div className="text-right">
                     <p className="text-xs text-slate-400">{t('settings.billing.users')}</p>
-                    <p className="font-semibold text-white">
+                    <p className="text-sm sm:text-base font-semibold text-white">
                       {billing.limits.maxUsers === Infinity ? t('settings.billing.unlimited') : billing.limits.maxUsers}
                     </p>
                   </div>
                   <div className="text-right">
                     <p className="text-xs text-slate-400">{t('settings.billing.beneficiaries')}</p>
-                    <p className="font-semibold text-white">
+                    <p className="text-sm sm:text-base font-semibold text-white">
                       {billing.limits.maxBeneficiaries === Infinity ? t('settings.billing.unlimited') : billing.limits.maxBeneficiaries}
                     </p>
                   </div>
@@ -963,7 +1084,7 @@ export default function Settings() {
           </div>
 
           {/* Available Plans */}
-          <div className="grid gap-4 md:grid-cols-3">
+          <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
             {(Object.entries(PLANS) as [PlanKey, typeof PLANS[PlanKey]][]).map(([key, plan]) => {
               const Icon = plan.icon;
               const isCurrent = isCurrentPlan(key);
@@ -1053,13 +1174,14 @@ export default function Settings() {
 
       {/* Edit Member Modal */}
       {editingMember && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="w-full max-w-md rounded-2xl border border-white/10 bg-navy-900 p-6">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-xl font-bold text-white">{t('settings.team.editMember')}</h2>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 overflow-y-auto">
+          <div className="w-full max-w-md rounded-2xl border border-white/10 bg-navy-900 p-4 sm:p-6 my-auto">
+            <div className="flex items-center justify-between mb-4 sm:mb-6">
+              <h2 className="text-lg sm:text-xl font-bold text-white">{t('settings.team.editMember')}</h2>
               <button
                 onClick={handleCloseEditMember}
-                className="text-slate-400 hover:text-white"
+                className="text-slate-400 hover:text-white h-11 w-11 flex items-center justify-center"
+                aria-label="Close"
               >
                 <X className="h-5 w-5" />
               </button>
@@ -1072,12 +1194,12 @@ export default function Settings() {
               </div>
             )}
 
-            <form onSubmit={handleSaveEditMember} className="space-y-4">
+            <form onSubmit={handleSaveEditMember} className="space-y-4 sm:space-y-6">
               <div>
                 <label className="mb-2 block text-sm font-medium text-slate-300">
                   {t('common.walletAddress')}
                 </label>
-                <p className="font-mono text-sm text-slate-400">
+                <p className="font-mono text-sm text-slate-400 break-all">
                   {editingMember.walletAddress}
                 </p>
               </div>
@@ -1091,7 +1213,7 @@ export default function Settings() {
                   value={editingMember.name}
                   onChange={(e) => setEditingMember({ ...editingMember, name: e.target.value })}
                   placeholder={t('settings.team.displayNamePlaceholder')}
-                  className="w-full rounded-lg border border-white/10 bg-navy-800 px-4 py-2 text-white placeholder-slate-500 focus:border-accent-500 focus:outline-none focus:ring-1 focus:ring-accent-500"
+                  className="w-full rounded-lg border border-white/10 bg-navy-800 px-4 py-3 text-base text-white placeholder-slate-500 focus:border-accent-500 focus:outline-none focus:ring-1 focus:ring-accent-500"
                 />
               </div>
 
@@ -1104,7 +1226,7 @@ export default function Settings() {
                   value={editingMember.email}
                   onChange={(e) => setEditingMember({ ...editingMember, email: e.target.value })}
                   placeholder={t('settings.team.emailPlaceholder')}
-                  className="w-full rounded-lg border border-white/10 bg-navy-800 px-4 py-2 text-white placeholder-slate-500 focus:border-accent-500 focus:outline-none focus:ring-1 focus:ring-accent-500"
+                  className="w-full rounded-lg border border-white/10 bg-navy-800 px-4 py-3 text-base text-white placeholder-slate-500 focus:border-accent-500 focus:outline-none focus:ring-1 focus:ring-accent-500"
                 />
               </div>
 
@@ -1116,7 +1238,7 @@ export default function Settings() {
                   <select
                     value={editingMember.role}
                     onChange={(e) => setEditingMember({ ...editingMember, role: e.target.value as Role })}
-                    className="w-full rounded-lg border border-white/10 bg-navy-800 px-4 py-2 text-white focus:border-accent-500 focus:outline-none focus:ring-1 focus:ring-accent-500"
+                    className="w-full rounded-lg border border-white/10 bg-navy-800 px-4 py-3 text-base text-white focus:border-accent-500 focus:outline-none focus:ring-1 focus:ring-accent-500"
                   >
                     {ROLES.map((role) => (
                       <option key={role.value} value={role.value}>
@@ -1134,10 +1256,10 @@ export default function Settings() {
                 )}
               </div>
 
-              <div className="flex gap-3 pt-2">
+              <div className="flex flex-col sm:flex-row gap-3 pt-2">
                 <Button 
                   type="submit" 
-                  className="flex-1"
+                  className="flex-1 h-11"
                   disabled={processingMemberId === editingMember.membershipId}
                 >
                   {processingMemberId === editingMember.membershipId ? (
@@ -1149,7 +1271,7 @@ export default function Settings() {
                     t('beneficiaries.saveChanges')
                   )}
                 </Button>
-                <Button type="button" variant="secondary" onClick={handleCloseEditMember}>
+                <Button type="button" variant="secondary" onClick={handleCloseEditMember} className="h-11">
                   {t('common.cancel')}
                 </Button>
               </div>
@@ -1160,17 +1282,18 @@ export default function Settings() {
 
       {/* Payment Modal */}
       {showPaymentModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="w-full max-w-md rounded-2xl border border-white/10 bg-navy-900 p-6">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-xl font-bold text-white">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 overflow-y-auto">
+          <div className="w-full max-w-md rounded-2xl border border-white/10 bg-navy-900 p-4 sm:p-6 my-auto">
+            <div className="flex items-center justify-between mb-4 sm:mb-6">
+              <h2 className="text-lg sm:text-xl font-bold text-white">
                 {paymentStep === 'success' 
                   ? 'Payment Successful' 
                   : `Subscribe to ${PLANS[selectedPlan].name}`}
               </h2>
               <button
                 onClick={handleClosePayment}
-                className="text-slate-400 hover:text-white"
+                className="text-slate-400 hover:text-white h-11 w-11 flex items-center justify-center"
+                aria-label="Close"
               >
                 <X className="h-5 w-5" />
               </button>

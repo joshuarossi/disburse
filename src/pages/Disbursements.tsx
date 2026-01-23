@@ -7,6 +7,7 @@ import { api } from '../../convex/_generated/api';
 import { Id } from '../../convex/_generated/dataModel';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
 import { 
   Plus, Send, ArrowUpRight, Loader2, Play, CheckCircle, X, Rocket,
   Search, Filter, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Calendar, RefreshCw
@@ -412,10 +413,10 @@ export default function Disbursements() {
     <AppLayout>
       <div className="space-y-8">
         {/* Header */}
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pt-4 lg:pt-6">
           <div>
-            <h1 className="text-2xl font-bold text-white">{t('disbursements.title')}</h1>
-            <p className="mt-1 text-slate-400">
+            <h1 className="text-xl sm:text-2xl font-bold text-white">{t('disbursements.title')}</h1>
+            <p className="mt-1 text-sm sm:text-base text-slate-400">
               {t('disbursements.subtitle')}
               {displayedResult && (
                 <span className="ml-2 text-slate-500">
@@ -427,7 +428,7 @@ export default function Disbursements() {
               )}
             </p>
           </div>
-          <Button onClick={() => setIsCreating(true)} disabled={!safe}>
+          <Button onClick={() => setIsCreating(true)} disabled={!safe} className="w-full sm:w-auto h-11">
             <Plus className="h-4 w-4" />
             {t('disbursements.newDisbursement')}
           </Button>
@@ -435,40 +436,42 @@ export default function Disbursements() {
 
         {/* Search & Filter Bar */}
         <div className="space-y-4">
-          <div className="flex items-center gap-4">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
             {/* Search Input */}
-            <div className="relative flex-1 max-w-md">
+            <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
               <input
                 type="text"
                 value={search}
                 onChange={(e) => handleSearchChange(e.target.value)}
                 placeholder={t('disbursements.searchPlaceholder')}
-                className="w-full rounded-lg border border-white/10 bg-navy-800 pl-10 pr-4 py-2 text-white placeholder-slate-500 focus:border-accent-500 focus:outline-none focus:ring-1 focus:ring-accent-500"
+                className="w-full rounded-lg border border-white/10 bg-navy-800 pl-10 pr-4 py-2.5 text-sm text-white placeholder-slate-500 focus:border-accent-500 focus:outline-none focus:ring-1 focus:ring-accent-500"
               />
             </div>
 
-            {/* Filter Toggle */}
-            <Button
-              variant="secondary"
-              onClick={() => setShowFilters(!showFilters)}
-              className={hasActiveFilters ? 'border-accent-500' : ''}
-            >
-              <Filter className="h-4 w-4" />
-              {t('common.filters')}
-              {hasActiveFilters && (
-                <span className="ml-1 rounded-full bg-accent-500 px-1.5 py-0.5 text-xs text-white">
-                  {(statusFilter.length > 0 ? 1 : 0) + (tokenFilter ? 1 : 0) + (dateFrom || dateTo ? 1 : 0)}
-                </span>
-              )}
-            </Button>
-
-            {/* Clear Filters */}
-            {hasActiveFilters && (
-              <Button variant="ghost" onClick={clearFilters} className="text-slate-400 hover:text-white">
-                {t('common.clearAll')}
+            <div className="flex items-center gap-2">
+              {/* Filter Toggle */}
+              <Button
+                variant="secondary"
+                onClick={() => setShowFilters(!showFilters)}
+                className={cn("h-11", hasActiveFilters ? 'border-accent-500' : '')}
+              >
+                <Filter className="h-4 w-4" />
+                <span className="hidden sm:inline">{t('common.filters')}</span>
+                {hasActiveFilters && (
+                  <span className="ml-1 rounded-full bg-accent-500 px-1.5 py-0.5 text-xs text-white">
+                    {(statusFilter.length > 0 ? 1 : 0) + (tokenFilter ? 1 : 0) + (dateFrom || dateTo ? 1 : 0)}
+                  </span>
+                )}
               </Button>
-            )}
+
+              {/* Clear Filters */}
+              {hasActiveFilters && (
+                <Button variant="ghost" onClick={clearFilters} className="h-11 text-slate-400 hover:text-white">
+                  {t('common.clearAll')}
+                </Button>
+              )}
+            </div>
           </div>
 
           {/* Expanded Filters */}
@@ -563,11 +566,11 @@ export default function Disbursements() {
 
         {/* Create Form */}
         {isCreating && (
-          <div className="rounded-2xl border border-accent-500/30 bg-navy-900/50 p-6">
-            <h2 className="mb-4 text-lg font-semibold text-white">
+          <div className="rounded-2xl border border-accent-500/30 bg-navy-900/50 p-4 sm:p-6">
+            <h2 className="mb-4 text-base sm:text-lg font-semibold text-white">
               {t('disbursements.createDisbursement')}
             </h2>
-            <form onSubmit={handleCreate} className="space-y-4">
+            <form onSubmit={handleCreate} className="space-y-4 sm:space-y-6">
               <div>
                 <label className="mb-2 block text-sm font-medium text-slate-300">
                   {t('disbursements.form.beneficiary')}
@@ -575,7 +578,7 @@ export default function Disbursements() {
                 <select
                   value={selectedBeneficiary}
                   onChange={(e) => setSelectedBeneficiary(e.target.value)}
-                  className="w-full rounded-lg border border-white/10 bg-navy-800 px-4 py-2 text-white focus:border-accent-500 focus:outline-none focus:ring-1 focus:ring-accent-500"
+                  className="w-full rounded-lg border border-white/10 bg-navy-800 px-4 py-3 text-base text-white focus:border-accent-500 focus:outline-none focus:ring-1 focus:ring-accent-500"
                   required
                 >
                   <option value="">{t('disbursements.form.selectBeneficiary')}</option>
@@ -586,7 +589,7 @@ export default function Disbursements() {
                   ))}
                 </select>
               </div>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="mb-2 block text-sm font-medium text-slate-300">
                     {t('disbursements.form.amount')}
@@ -598,7 +601,7 @@ export default function Disbursements() {
                     value={amount}
                     onChange={(e) => setAmount(e.target.value)}
                     placeholder="0.00"
-                    className="w-full rounded-lg border border-white/10 bg-navy-800 px-4 py-2 text-white placeholder-slate-500 focus:border-accent-500 focus:outline-none focus:ring-1 focus:ring-accent-500"
+                    className="w-full rounded-lg border border-white/10 bg-navy-800 px-4 py-3 text-base text-white placeholder-slate-500 focus:border-accent-500 focus:outline-none focus:ring-1 focus:ring-accent-500"
                     required
                   />
                 </div>
@@ -609,7 +612,7 @@ export default function Disbursements() {
                   <select
                     value={token}
                     onChange={(e) => setToken(e.target.value)}
-                    className="w-full rounded-lg border border-white/10 bg-navy-800 px-4 py-2 text-white focus:border-accent-500 focus:outline-none focus:ring-1 focus:ring-accent-500"
+                    className="w-full rounded-lg border border-white/10 bg-navy-800 px-4 py-3 text-base text-white focus:border-accent-500 focus:outline-none focus:ring-1 focus:ring-accent-500"
                   >
                     <option value="USDC">USDC</option>
                     <option value="USDT">USDT</option>
@@ -625,15 +628,16 @@ export default function Disbursements() {
                   value={memo}
                   onChange={(e) => setMemo(e.target.value)}
                   placeholder={t('disbursements.form.memoPlaceholder')}
-                  className="w-full rounded-lg border border-white/10 bg-navy-800 px-4 py-2 text-white placeholder-slate-500 focus:border-accent-500 focus:outline-none focus:ring-1 focus:ring-accent-500"
+                  className="w-full rounded-lg border border-white/10 bg-navy-800 px-4 py-3 text-base text-white placeholder-slate-500 focus:border-accent-500 focus:outline-none focus:ring-1 focus:ring-accent-500"
                 />
               </div>
-              <div className="flex gap-3">
-                <Button type="submit">{t('disbursements.createDisbursement')}</Button>
+              <div className="flex flex-col sm:flex-row gap-3">
+                <Button type="submit" className="w-full sm:w-auto h-11">{t('disbursements.createDisbursement')}</Button>
                 <Button
                   type="button"
                   variant="secondary"
                   onClick={() => setIsCreating(false)}
+                  className="w-full sm:w-auto h-11"
                 >
                   {t('common.cancel')}
                 </Button>
@@ -668,105 +672,159 @@ export default function Disbursements() {
           </div>
         ) : (
           <div className={`rounded-2xl border border-white/10 bg-navy-900/50 overflow-hidden transition-opacity ${isRefreshing ? 'opacity-70' : ''}`}>
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-white/10 bg-navy-800/50">
-                  <th className="px-6 py-4 text-left text-sm font-medium text-slate-400">
-                    {t('disbursements.table.beneficiary')}
-                  </th>
-                  <th 
-                    className="px-6 py-4 text-left text-sm font-medium text-slate-400 cursor-pointer hover:text-white transition-colors"
-                    onClick={() => handleSort('amount')}
-                  >
-                    <span className="flex items-center gap-1">
-                      {t('disbursements.table.amount')}
-                      {sortBy === 'amount' && (
-                        sortOrder === 'desc' ? <ChevronDown className="h-4 w-4" /> : <ChevronUp className="h-4 w-4" />
-                      )}
-                    </span>
-                  </th>
-                  <th className="px-6 py-4 text-left text-sm font-medium text-slate-400">
-                    {t('disbursements.table.memo')}
-                  </th>
-                  <th 
-                    className="px-6 py-4 text-left text-sm font-medium text-slate-400 cursor-pointer hover:text-white transition-colors"
-                    onClick={() => handleSort('status')}
-                  >
-                    <span className="flex items-center gap-1">
-                      {t('disbursements.table.status')}
-                      {sortBy === 'status' && (
-                        sortOrder === 'desc' ? <ChevronDown className="h-4 w-4" /> : <ChevronUp className="h-4 w-4" />
-                      )}
-                    </span>
-                  </th>
-                  <th 
-                    className="px-6 py-4 text-left text-sm font-medium text-slate-400 cursor-pointer hover:text-white transition-colors"
-                    onClick={() => handleSort('createdAt')}
-                  >
-                    <span className="flex items-center gap-1">
-                      {t('disbursements.table.date')}
-                      {sortBy === 'createdAt' && (
-                        sortOrder === 'desc' ? <ChevronDown className="h-4 w-4" /> : <ChevronUp className="h-4 w-4" />
-                      )}
-                    </span>
-                  </th>
-                  <th className="px-6 py-4 text-center text-sm font-medium text-slate-400">
-                    {t('disbursements.table.actions')}
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-white/5">
-                {displayedResult?.items.map((disbursement) => (
-                  <tr key={disbursement._id} className="hover:bg-navy-800/30">
-                    <td className="px-6 py-4">
+            {/* Desktop Table */}
+            <div className="hidden lg:block overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b border-white/10 bg-navy-800/50">
+                    <th className="px-6 py-4 text-left text-sm font-medium text-slate-400">
+                      {t('disbursements.table.beneficiary')}
+                    </th>
+                    <th 
+                      className="px-6 py-4 text-left text-sm font-medium text-slate-400 cursor-pointer hover:text-white transition-colors"
+                      onClick={() => handleSort('amount')}
+                    >
+                      <span className="flex items-center gap-1">
+                        {t('disbursements.table.amount')}
+                        {sortBy === 'amount' && (
+                          sortOrder === 'desc' ? <ChevronDown className="h-4 w-4" /> : <ChevronUp className="h-4 w-4" />
+                        )}
+                      </span>
+                    </th>
+                    <th className="px-6 py-4 text-left text-sm font-medium text-slate-400">
+                      {t('disbursements.table.memo')}
+                    </th>
+                    <th 
+                      className="px-6 py-4 text-left text-sm font-medium text-slate-400 cursor-pointer hover:text-white transition-colors"
+                      onClick={() => handleSort('status')}
+                    >
+                      <span className="flex items-center gap-1">
+                        {t('disbursements.table.status')}
+                        {sortBy === 'status' && (
+                          sortOrder === 'desc' ? <ChevronDown className="h-4 w-4" /> : <ChevronUp className="h-4 w-4" />
+                        )}
+                      </span>
+                    </th>
+                    <th 
+                      className="px-6 py-4 text-left text-sm font-medium text-slate-400 cursor-pointer hover:text-white transition-colors"
+                      onClick={() => handleSort('createdAt')}
+                    >
+                      <span className="flex items-center gap-1">
+                        {t('disbursements.table.date')}
+                        {sortBy === 'createdAt' && (
+                          sortOrder === 'desc' ? <ChevronDown className="h-4 w-4" /> : <ChevronUp className="h-4 w-4" />
+                        )}
+                      </span>
+                    </th>
+                    <th className="px-6 py-4 text-center text-sm font-medium text-slate-400">
+                      {t('disbursements.table.actions')}
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-white/5">
+                  {displayedResult?.items.map((disbursement) => (
+                    <tr key={disbursement._id} className="hover:bg-navy-800/30">
+                      <td className="px-6 py-4">
+                        <p className="font-medium text-white">
+                          {disbursement.beneficiary?.name || 'Unknown'}
+                        </p>
+                      </td>
+                      <td className="px-6 py-4">
+                        <span className="font-mono text-white">
+                          {disbursement.amount} {disbursement.token}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 text-slate-400 max-w-xs truncate" title={disbursement.memo || undefined}>
+                        {disbursement.memo || '-'}
+                      </td>
+                      <td className="px-6 py-4">
+                        <span
+                          className={`inline-flex rounded-full px-3 py-1 text-xs font-medium capitalize ${getStatusColor(
+                            disbursement.status
+                          )}`}
+                        >
+                          {t(`status.${disbursement.status}`)}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 text-slate-400">
+                        {new Date(disbursement.createdAt).toLocaleDateString()}
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="flex items-center justify-center gap-2">
+                          {renderActionButton(disbursement)}
+                          {disbursement.txHash && (
+                            <a
+                              href={`https://sepolia.etherscan.io/tx/${disbursement.txHash}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1 text-sm text-accent-400 hover:underline"
+                            >
+                              <ArrowUpRight className="h-4 w-4" />
+                            </a>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Mobile Cards */}
+            <div className="lg:hidden divide-y divide-white/5">
+              {displayedResult?.items.map((disbursement) => (
+                <div key={disbursement._id} className="p-4 space-y-3">
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1 min-w-0">
                       <p className="font-medium text-white">
                         {disbursement.beneficiary?.name || 'Unknown'}
                       </p>
-                    </td>
-                    <td className="px-6 py-4">
-                      <span className="font-mono text-white">
+                      <span className="font-mono text-sm text-slate-400 mt-1 block">
                         {disbursement.amount} {disbursement.token}
                       </span>
-                    </td>
-                    <td className="px-6 py-4 text-slate-400 max-w-xs truncate" title={disbursement.memo || undefined}>
-                      {disbursement.memo || '-'}
-                    </td>
-                    <td className="px-6 py-4">
-                      <span
-                        className={`inline-flex rounded-full px-3 py-1 text-xs font-medium capitalize ${getStatusColor(
-                          disbursement.status
-                        )}`}
-                      >
-                        {t(`status.${disbursement.status}`)}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 text-slate-400">
+                    </div>
+                    <span
+                      className={`ml-2 inline-flex rounded-full px-2.5 py-1 text-xs font-medium capitalize shrink-0 ${getStatusColor(
+                        disbursement.status
+                      )}`}
+                    >
+                      {t(`status.${disbursement.status}`)}
+                    </span>
+                  </div>
+                  
+                  {disbursement.memo && (
+                    <div>
+                      <p className="text-xs text-slate-500 mb-1">{t('disbursements.table.memo')}</p>
+                      <p className="text-sm text-slate-400">{disbursement.memo}</p>
+                    </div>
+                  )}
+                  
+                  <div className="flex items-center justify-between pt-2 border-t border-white/5">
+                    <div className="text-sm text-slate-400">
                       {new Date(disbursement.createdAt).toLocaleDateString()}
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="flex items-center justify-center gap-2">
-                        {renderActionButton(disbursement)}
-                        {disbursement.txHash && (
-                          <a
-                            href={`https://sepolia.etherscan.io/tx/${disbursement.txHash}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1 text-sm text-accent-400 hover:underline"
-                          >
-                            <ArrowUpRight className="h-4 w-4" />
-                          </a>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {renderActionButton(disbursement)}
+                      {disbursement.txHash && (
+                        <a
+                          href={`https://sepolia.etherscan.io/tx/${disbursement.txHash}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1 text-sm text-accent-400 hover:underline h-11 px-3"
+                        >
+                          <ArrowUpRight className="h-4 w-4" />
+                        </a>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
 
             {/* Pagination */}
             {displayedResult && displayedResult.totalCount > PAGE_SIZE && (
-              <div className="flex items-center justify-between border-t border-white/10 bg-navy-800/30 px-6 py-4">
-                <div className="text-sm text-slate-400">
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-4 border-t border-white/10 bg-navy-800/30 px-4 sm:px-6 py-4">
+                <div className="text-sm text-slate-400 text-center sm:text-left">
                   {t('disbursements.pagination.showing', {
                     from: currentPage * PAGE_SIZE + 1,
                     to: Math.min((currentPage + 1) * PAGE_SIZE, displayedResult.totalCount),
@@ -779,9 +837,10 @@ export default function Disbursements() {
                     size="sm"
                     onClick={goToPrevPage}
                     disabled={currentPage === 0}
+                    className="h-11"
                   >
                     <ChevronLeft className="h-4 w-4" />
-                    {t('common.previous')}
+                    <span className="hidden sm:inline">{t('common.previous')}</span>
                   </Button>
                   <span className="px-3 py-1 text-sm text-slate-400">
                     {t('disbursements.pagination.page', {
@@ -794,8 +853,9 @@ export default function Disbursements() {
                     size="sm"
                     onClick={goToNextPage}
                     disabled={!displayedResult.hasMore}
+                    className="h-11"
                   >
-                    {t('common.next')}
+                    <span className="hidden sm:inline">{t('common.next')}</span>
                     <ChevronRight className="h-4 w-4" />
                   </Button>
                 </div>

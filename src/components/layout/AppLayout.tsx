@@ -1,4 +1,4 @@
-import { ReactNode, useState } from 'react';
+import { ReactNode, useState, useEffect } from 'react';
 import { Link, useParams, useLocation } from 'react-router-dom';
 import { useQuery } from 'convex/react';
 import { useAccount, useDisconnect } from 'wagmi';
@@ -17,6 +17,8 @@ import {
   Check,
   ChevronUp,
   Languages,
+  Menu,
+  X,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { LanguageSwitcher } from '@/components/ui/LanguageSwitcher';
@@ -35,6 +37,14 @@ export function AppLayout({ children }: AppLayoutProps) {
   // User panel state
   const [showUserPanel, setShowUserPanel] = useState(false);
   const [copied, setCopied] = useState(false);
+  
+  // Mobile menu state
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  
+  // Close mobile menu on route change
+  useEffect(() => {
+    setIsMobileMenuOpen(false);
+  }, [location.pathname]);
 
   const navItems = [
     { href: 'dashboard', label: t('navigation.dashboard'), icon: LayoutDashboard },
@@ -86,9 +96,35 @@ export function AppLayout({ children }: AppLayoutProps) {
   };
 
   return (
-    <div className="flex min-h-screen bg-navy-950">
+    <div className="flex min-h-screen bg-navy-950 overflow-x-hidden">
+      {/* Mobile Menu Button */}
+      <button
+        onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+        className="fixed left-4 top-4 z-50 flex h-11 w-11 items-center justify-center rounded-lg bg-navy-900/90 border border-white/10 text-white lg:hidden"
+        aria-label="Toggle menu"
+      >
+        {isMobileMenuOpen ? (
+          <X className="h-5 w-5" />
+        ) : (
+          <Menu className="h-5 w-5" />
+        )}
+      </button>
+
+      {/* Mobile Menu Backdrop */}
+      {isMobileMenuOpen && (
+        <div
+          className="fixed inset-0 z-40 bg-black/50 lg:hidden"
+          onClick={() => setIsMobileMenuOpen(false)}
+        />
+      )}
+
       {/* Sidebar */}
-      <aside className="fixed left-0 top-0 z-40 flex h-screen w-64 flex-col border-r border-white/5 bg-navy-900/50">
+      <aside
+        className={cn(
+          'fixed left-0 top-0 z-40 flex h-screen w-64 flex-col border-r border-white/5 bg-navy-900/50 transition-transform duration-300 ease-in-out lg:translate-x-0',
+          isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
+        )}
+      >
         {/* Logo */}
         <div className="flex h-16 items-center gap-2 border-b border-white/5 px-6">
           <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-accent-500 to-accent-400">
@@ -107,6 +143,14 @@ export function AppLayout({ children }: AppLayoutProps) {
             </svg>
           </div>
           <span className="text-lg font-bold text-white">Disburse</span>
+          {/* Close button for mobile */}
+          <button
+            onClick={() => setIsMobileMenuOpen(false)}
+            className="ml-auto lg:hidden text-slate-400 hover:text-white"
+            aria-label="Close menu"
+          >
+            <X className="h-5 w-5" />
+          </button>
         </div>
 
         {/* Org Selector */}
@@ -144,6 +188,7 @@ export function AppLayout({ children }: AppLayoutProps) {
               <Link
                 key={item.href}
                 to={href}
+                onClick={() => setIsMobileMenuOpen(false)}
                 className={cn(
                   'flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
                   isActive
@@ -163,11 +208,12 @@ export function AppLayout({ children }: AppLayoutProps) {
           {/* Slide-up Panel */}
           <div
             className={cn(
-              'absolute bottom-full left-0 right-0 mb-2 mx-4 rounded-xl border border-white/10 bg-navy-800 shadow-xl transition-all duration-200 ease-out',
+              'absolute bottom-full left-0 right-0 mb-2 mx-4 rounded-xl border border-white/10 bg-navy-800 shadow-xl transition-all duration-200 ease-out z-50',
               showUserPanel
                 ? 'translate-y-0 opacity-100'
                 : 'translate-y-2 opacity-0 pointer-events-none'
             )}
+            onClick={(e) => e.stopPropagation()}
           >
             <div className="p-2 space-y-1">
               <div className="px-3 py-2 border-b border-white/5 mb-1">
@@ -232,14 +278,14 @@ export function AppLayout({ children }: AppLayoutProps) {
       {/* Click outside to close panel */}
       {showUserPanel && (
         <div 
-          className="fixed inset-0 z-30" 
+          className="fixed inset-0 z-[41] bg-transparent" 
           onClick={() => setShowUserPanel(false)}
         />
       )}
 
       {/* Main Content */}
-      <main className="ml-64 flex-1">
-        <div className="min-h-screen p-8">{children}</div>
+      <main className="ml-0 lg:ml-64 flex-1 min-w-0 overflow-x-hidden">
+        <div className="min-h-screen pt-20 lg:pt-8 p-4 sm:p-6 lg:p-8 max-w-full">{children}</div>
       </main>
     </div>
   );
