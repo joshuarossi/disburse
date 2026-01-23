@@ -240,9 +240,25 @@ export function BulkImportModal({ orgId, onClose, onSuccess }: BulkImportModalPr
                 <h3 className="text-sm font-medium text-white mb-1">
                   {t('beneficiaries.bulkImport.template.title')}
                 </h3>
-                <p className="text-sm text-slate-400 mb-3">
+                <p className="text-sm text-slate-400 mb-2">
                   {t('beneficiaries.bulkImport.template.description')}
                 </p>
+                <div className="text-sm text-slate-400 mb-3 space-y-1">
+                  <div>
+                    <span className="font-medium">{t('beneficiaries.bulkImport.template.requiredColumns')}</span>
+                    <ul className="list-disc list-inside ml-2 space-y-0.5 mt-1">
+                      <li>type (individual or business)</li>
+                      <li>name</li>
+                      <li>wallet_address</li>
+                    </ul>
+                  </div>
+                  <div>
+                    <span className="font-medium">{t('beneficiaries.bulkImport.template.optionalColumns')}</span>
+                    <ul className="list-disc list-inside ml-2 space-y-0.5 mt-1">
+                      <li>notes</li>
+                    </ul>
+                  </div>
+                </div>
                 <Button
                   variant="secondary"
                   size="sm"

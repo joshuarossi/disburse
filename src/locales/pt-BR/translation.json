@@ -259,7 +259,9 @@
       "title": "Importação em Massa de Beneficiários",
       "template": {
         "title": "Modelo CSV",
-        "description": "Baixe um arquivo CSV modelo com o formato correto. Colunas obrigatórias: type (individual ou business), name, wallet_address. Opcional: notes.",
+        "description": "Baixe um arquivo CSV modelo com o formato correto.",
+        "requiredColumns": "Colunas obrigatórias:",
+        "optionalColumns": "Colunas opcionais:",
         "download": "Baixar Modelo CSV"
       },
       "upload": {

@@ -259,7 +259,9 @@
       "title": "Importación Masiva de Beneficiarios",
       "template": {
         "title": "Plantilla CSV",
-        "description": "Descarga un archivo CSV de plantilla con el formato correcto. Columnas requeridas: type (individual o business), name, wallet_address. Opcional: notes.",
+        "description": "Descarga un archivo CSV de plantilla con el formato correcto.",
+        "requiredColumns": "Columnas requeridas:",
+        "optionalColumns": "Columnas opcionales:",
         "download": "Descargar Plantilla CSV"
       },
       "upload": {

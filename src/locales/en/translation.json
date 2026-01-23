@@ -259,7 +259,9 @@
       "title": "Bulk Import Beneficiaries",
       "template": {
         "title": "CSV Template",
-        "description": "Download a template CSV file with the correct format. Required columns: type (individual or business), name, wallet_address. Optional: notes.",
+        "description": "Download a template CSV file with the correct format.",
+        "requiredColumns": "Required columns:",
+        "optionalColumns": "Optional columns:",
         "download": "Download CSV Template"
       },
       "upload": {
