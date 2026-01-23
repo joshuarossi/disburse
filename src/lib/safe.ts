@@ -143,6 +143,16 @@ export function createTransferTx(
 }
 
 /**
+ * Create multiple ERC20 transfer transactions for batch disbursements
+ */
+export function createBatchTransferTxs(
+  token: 'USDC' | 'USDT',
+  recipients: Array<{ to: string; amount: string }>
+): MetaTransactionData[] {
+  return recipients.map((recipient) => createTransferTx(token, recipient.to, recipient.amount));
+}
+
+/**
  * Create and propose a Safe transaction
  */
 export async function proposeTransaction(

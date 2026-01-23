@@ -44,12 +44,24 @@ export const list = query({
     // Enrich with beneficiary data first (needed for search)
     const enriched = await Promise.all(
       allDisbursements.map(async (d) => {
-        const beneficiary = await ctx.db.get(d.beneficiaryId);
+        // For batch disbursements, show "Batch" as beneficiary name
+        if (d.type === "batch") {
+          return {
+            ...d,
+            beneficiary: { name: "Batch", walletAddress: "" },
+            // Use totalAmount for batch, amount for single
+            displayAmount: d.totalAmount || d.amount || "0",
+          };
+        }
+
+        // For single disbursements, get beneficiary
+        const beneficiary = d.beneficiaryId ? await ctx.db.get(d.beneficiaryId) : null;
         return {
           ...d,
           beneficiary: beneficiary
             ? { name: beneficiary.name, walletAddress: beneficiary.walletAddress }
             : null,
+          displayAmount: d.amount || "0",
         };
       })
     );
@@ -83,7 +95,7 @@ export const list = query({
       filtered = filtered.filter((d) => {
         const beneficiaryMatch = d.beneficiary?.name?.toLowerCase().includes(searchLower);
         const memoMatch = d.memo?.toLowerCase().includes(searchLower);
-        const amountMatch = d.amount.includes(searchLower);
+        const amountMatch = (d.displayAmount || d.amount || "").includes(searchLower);
         return beneficiaryMatch || memoMatch || amountMatch;
       });
     }
@@ -96,7 +108,9 @@ export const list = query({
           comparison = a.createdAt - b.createdAt;
           break;
         case "amount":
-          comparison = parseFloat(a.amount) - parseFloat(b.amount);
+          const aAmount = parseFloat(a.displayAmount || a.amount || "0");
+          const bAmount = parseFloat(b.displayAmount || b.amount || "0");
+          comparison = aAmount - bAmount;
           break;
         case "status":
           comparison = a.status.localeCompare(b.status);
@@ -175,6 +189,7 @@ export const create = mutation({
       token: args.token,
       amount: args.amount,
       memo: args.memo,
+      type: "single",
       status: "draft",
       createdBy: user._id,
       createdAt: now,
@@ -249,6 +264,127 @@ export const updateStatus = mutation({
   },
 });
 
+// Create a batch disbursement draft
+export const createBatch = mutation({
+  args: {
+    orgId: v.id("orgs"),
+    walletAddress: v.string(),
+    token: v.string(),
+    recipients: v.array(
+      v.object({
+        beneficiaryId: v.id("beneficiaries"),
+        amount: v.string(),
+      })
+    ),
+    memo: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const walletAddress = args.walletAddress.toLowerCase();
+    const now = Date.now();
+
+    // Initiator, admin can create
+    const { user } = await requireOrgAccess(ctx, args.orgId, walletAddress, ["admin", "initiator"]);
+
+    // Validate at least 1 recipient
+    if (args.recipients.length === 0) {
+      throw new Error("At least one recipient is required");
+    }
+
+    // Validate unique beneficiaries
+    const beneficiaryIds = args.recipients.map((r) => r.beneficiaryId);
+    const uniqueIds = new Set(beneficiaryIds);
+    if (uniqueIds.size !== beneficiaryIds.length) {
+      throw new Error("Duplicate beneficiaries are not allowed");
+    }
+
+    // Get safe for org
+    const safe = await ctx.db
+      .query("safes")
+      .withIndex("by_org", (q) => q.eq("orgId", args.orgId))
+      .first();
+
+    if (!safe) {
+      throw new Error("No Safe linked to this organization");
+    }
+
+    // Validate all beneficiaries and calculate total
+    let totalAmount = 0;
+    const recipientData: Array<{
+      beneficiaryId: string;
+      recipientAddress: string;
+      amount: string;
+    }> = [];
+
+    for (const recipient of args.recipients) {
+      // Verify beneficiary exists and belongs to org
+      const beneficiary = await ctx.db.get(recipient.beneficiaryId);
+      if (!beneficiary || beneficiary.orgId !== args.orgId) {
+        throw new Error(`Invalid beneficiary: ${recipient.beneficiaryId}`);
+      }
+
+      if (!beneficiary.isActive) {
+        throw new Error(`Beneficiary is not active: ${beneficiary.name}`);
+      }
+
+      // Validate amount is positive
+      const amountNum = parseFloat(recipient.amount);
+      if (isNaN(amountNum) || amountNum <= 0) {
+        throw new Error(`Invalid amount for beneficiary: ${beneficiary.name}`);
+      }
+
+      totalAmount += amountNum;
+      recipientData.push({
+        beneficiaryId: recipient.beneficiaryId,
+        recipientAddress: beneficiary.walletAddress,
+        amount: recipient.amount,
+      });
+    }
+
+    // Create disbursement record
+    const disbursementId = await ctx.db.insert("disbursements", {
+      orgId: args.orgId,
+      safeId: safe._id,
+      type: "batch",
+      token: args.token,
+      totalAmount: totalAmount.toString(),
+      memo: args.memo,
+      status: "draft",
+      createdBy: user._id,
+      createdAt: now,
+      updatedAt: now,
+    });
+
+    // Create recipient records
+    for (const recipient of recipientData) {
+      await ctx.db.insert("disbursementRecipients", {
+        disbursementId,
+        beneficiaryId: recipient.beneficiaryId as any,
+        recipientAddress: recipient.recipientAddress,
+        amount: recipient.amount,
+        createdAt: now,
+      });
+    }
+
+    // Audit log
+    await ctx.db.insert("auditLog", {
+      orgId: args.orgId,
+      actorUserId: user._id,
+      action: "disbursement.created",
+      objectType: "disbursement",
+      objectId: disbursementId,
+      metadata: {
+        type: "batch",
+        token: args.token,
+        totalAmount: totalAmount.toString(),
+        recipientCount: args.recipients.length,
+      },
+      timestamp: now,
+    });
+
+    return { disbursementId };
+  },
+});
+
 // Get single disbursement
 export const get = query({
   args: {
@@ -266,13 +402,69 @@ export const get = query({
     // Any member can view
     await requireOrgAccess(ctx, disbursement.orgId, walletAddress, ["admin", "approver", "initiator", "clerk", "viewer"]);
 
-    const beneficiary = await ctx.db.get(disbursement.beneficiaryId);
+    const beneficiary = disbursement.beneficiaryId
+      ? await ctx.db.get(disbursement.beneficiaryId)
+      : null;
 
     return {
       ...disbursement,
       beneficiary: beneficiary
         ? { name: beneficiary.name, walletAddress: beneficiary.walletAddress }
         : null,
+    };
+  },
+});
+
+// Get disbursement with recipients (for batch disbursements)
+export const getWithRecipients = query({
+  args: {
+    disbursementId: v.id("disbursements"),
+    walletAddress: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const walletAddress = args.walletAddress.toLowerCase();
+
+    const disbursement = await ctx.db.get(args.disbursementId);
+    if (!disbursement) {
+      return null;
+    }
+
+    // Any member can view
+    await requireOrgAccess(ctx, disbursement.orgId, walletAddress, ["admin", "approver", "initiator", "clerk", "viewer"]);
+
+    // Get single beneficiary if it's a single disbursement
+    const beneficiary = disbursement.beneficiaryId
+      ? await ctx.db.get(disbursement.beneficiaryId)
+      : null;
+
+    // Get recipients if it's a batch disbursement
+    const recipients =
+      disbursement.type === "batch"
+        ? await ctx.db
+            .query("disbursementRecipients")
+            .withIndex("by_disbursement", (q) => q.eq("disbursementId", args.disbursementId))
+            .collect()
+        : [];
+
+    // Enrich recipients with beneficiary data
+    const enrichedRecipients = await Promise.all(
+      recipients.map(async (r) => {
+        const beneficiary = await ctx.db.get(r.beneficiaryId);
+        return {
+          ...r,
+          beneficiary: beneficiary
+            ? { name: beneficiary.name, walletAddress: beneficiary.walletAddress }
+            : null,
+        };
+      })
+    );
+
+    return {
+      ...disbursement,
+      beneficiary: beneficiary
+        ? { name: beneficiary.name, walletAddress: beneficiary.walletAddress }
+        : null,
+      recipients: enrichedRecipients,
     };
   },
 });

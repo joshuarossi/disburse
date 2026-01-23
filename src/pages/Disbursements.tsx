@@ -4,9 +4,11 @@ import { useAccount } from 'wagmi';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useMutation } from 'convex/react';
 import { api } from '../../convex/_generated/api';
+import { convex } from '@/lib/convex';
 import { Id } from '../../convex/_generated/dataModel';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { Button } from '@/components/ui/button';
+import { BatchDetailModal } from '@/components/disbursements/BatchDetailModal';
 import { cn } from '@/lib/utils';
 import { 
   Plus, Send, ArrowUpRight, Loader2, Play, CheckCircle, X, Rocket,
@@ -14,6 +16,7 @@ import {
 } from 'lucide-react';
 import {
   createTransferTx,
+  createBatchTransferTxs,
   proposeTransaction,
   executeTransaction,
 } from '@/lib/safe';
@@ -48,6 +51,11 @@ export default function Disbursements() {
   const [memo, setMemo] = useState('');
   const [processingId, setProcessingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [selectedDisbursementId, setSelectedDisbursementId] = useState<Id<'disbursements'> | null>(null);
+  const [cancelDisbursementId, setCancelDisbursementId] = useState<Id<'disbursements'> | null>(null);
+  
+  // Batch disbursement state
+  const [recipients, setRecipients] = useState<Array<{ beneficiaryId: string; amount: string }>>([]);
 
   // Filter & search state
   const [search, setSearch] = useState('');
@@ -112,6 +120,7 @@ export default function Disbursements() {
   );
 
   const createDisbursement = useMutation(api.disbursements.create);
+  const createBatchDisbursement = useMutation(api.disbursements.createBatch);
   const updateStatus = useMutation(api.disbursements.updateStatus);
 
   // Helper to reset pagination when filters change
@@ -190,26 +199,150 @@ export default function Disbursements() {
 
   const hasActiveFilters = search || statusFilter.length > 0 || tokenFilter || dateFrom || dateTo;
 
+  // Calculate total for batch disbursements
+  const batchTotal = useMemo(() => {
+    let total = 0;
+    
+    // Include first recipient if filled
+    if (selectedBeneficiary && amount) {
+      const amt = parseFloat(amount || '0');
+      total += isNaN(amt) ? 0 : amt;
+    }
+    
+    // Add recipients
+    recipients.forEach(r => {
+      const amt = parseFloat(r.amount || '0');
+      total += isNaN(amt) ? 0 : amt;
+    });
+    
+    return total;
+  }, [recipients, selectedBeneficiary, amount]);
+
+  // Check if in batch mode (once we have at least one recipient)
+  const isBatchMode = recipients.length > 0;
+
+  // Get available beneficiaries (exclude already selected ones, but include currently selected one)
+  const availableBeneficiaries = useMemo(() => {
+    if (!beneficiaries) return [];
+    const selectedIds = new Set([
+      ...recipients.map(r => r.beneficiaryId)
+      // Don't exclude selectedBeneficiary so it shows in the dropdown
+    ]);
+    return beneficiaries.filter(b => !selectedIds.has(b._id));
+  }, [beneficiaries, recipients]);
+
+  // Add recipient row (adds current first row to recipients, keeps first row for next entry)
+  const addRecipient = () => {
+    if (!selectedBeneficiary || !amount) return;
+    
+    // Check for duplicate
+    if (recipients.some(r => r.beneficiaryId === selectedBeneficiary)) {
+      setError(t('disbursements.form.duplicateBeneficiary'));
+      return;
+    }
+    
+    // Validate amount
+    const amt = parseFloat(amount);
+    if (isNaN(amt) || amt <= 0) {
+      setError(t('disbursements.form.invalidAmount'));
+      return;
+    }
+    
+    setError(null);
+    setRecipients(prev => [...prev, { beneficiaryId: selectedBeneficiary, amount }]);
+    // Clear first row for next entry
+    setSelectedBeneficiary('');
+    setAmount('');
+  };
+
+  // Remove recipient row
+  const removeRecipient = (index: number) => {
+    setRecipients(prev => prev.filter((_, i) => i !== index));
+  };
+
+  // Update recipient amount
+  const updateRecipientAmount = (index: number, newAmount: string) => {
+    setRecipients(prev => prev.map((r, i) => i === index ? { ...r, amount: newAmount } : r));
+  };
+
+  // Update recipient beneficiary
+  const updateRecipientBeneficiary = (index: number, beneficiaryId: string) => {
+    setRecipients(prev => prev.map((r, i) => i === index ? { ...r, beneficiaryId } : r));
+  };
+
+  // Reset form
+  const resetForm = () => {
+    setSelectedBeneficiary('');
+    setAmount('');
+    setToken('USDC');
+    setMemo('');
+    setRecipients([]);
+    setIsCreating(false);
+  };
+
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!orgId || !address || !selectedBeneficiary || !amount) return;
+    if (!orgId || !address) return;
 
-    try {
-      await createDisbursement({
-        orgId: orgId as Id<'orgs'>,
-        walletAddress: address,
-        beneficiaryId: selectedBeneficiary as Id<'beneficiaries'>,
-        token,
-        amount,
-        memo: memo.trim() || undefined,
-      });
-      setSelectedBeneficiary('');
-      setAmount('');
-      setToken('USDC');
-      setMemo('');
-      setIsCreating(false);
-    } catch (error) {
-      console.error('Failed to create disbursement:', error);
+    // Validate batch mode
+    if (isBatchMode || (selectedBeneficiary && amount)) {
+      // Include first recipient if it's filled but not yet added to recipients
+      const allRecipients = selectedBeneficiary && amount && !recipients.some(r => r.beneficiaryId === selectedBeneficiary)
+        ? [...recipients, { beneficiaryId: selectedBeneficiary, amount }]
+        : recipients;
+
+      if (allRecipients.length === 0) {
+        setError('At least one recipient is required');
+        return;
+      }
+      
+      // Validate all recipients have beneficiary and amount
+      for (const recipient of allRecipients) {
+        if (!recipient.beneficiaryId || !recipient.amount) {
+          setError('All recipients must have a beneficiary and amount');
+          return;
+        }
+        const amt = parseFloat(recipient.amount);
+        if (isNaN(amt) || amt <= 0) {
+          setError('All amounts must be greater than 0');
+          return;
+        }
+      }
+
+      try {
+        await createBatchDisbursement({
+          orgId: orgId as Id<'orgs'>,
+          walletAddress: address,
+          token,
+          recipients: allRecipients.map(r => ({
+            beneficiaryId: r.beneficiaryId as Id<'beneficiaries'>,
+            amount: r.amount,
+          })),
+          memo: memo.trim() || undefined,
+        });
+        resetForm();
+      } catch (error) {
+        console.error('Failed to create batch disbursement:', error);
+        setError(error instanceof Error ? error.message : 'Failed to create batch disbursement');
+      }
+    } else {
+      // Single disbursement
+      if (!selectedBeneficiary || !amount) return;
+
+      try {
+        await createDisbursement({
+          orgId: orgId as Id<'orgs'>,
+          walletAddress: address,
+          beneficiaryId: selectedBeneficiary as Id<'beneficiaries'>,
+          token,
+          amount,
+          memo: memo.trim() || undefined,
+        });
+        resetForm();
+      } catch (error) {
+        console.error('Failed to create disbursement:', error);
+        setError(error instanceof Error ? error.message : 'Failed to create disbursement');
+      }
     }
   };
 
@@ -217,9 +350,11 @@ export default function Disbursements() {
     _id: Id<'disbursements'>;
     beneficiary: { walletAddress: string } | null;
     token: string;
-    amount: string;
+    amount?: string;
+    type?: 'single' | 'batch';
+    totalAmount?: string;
   }) => {
-    if (!safe || !address || !disbursement.beneficiary) return;
+    if (!safe || !address) return;
 
     setProcessingId(disbursement._id);
     setError(null);
@@ -232,18 +367,48 @@ export default function Disbursements() {
         status: 'pending',
       });
 
-      // Create the transfer transaction
-      const transferTx = createTransferTx(
-        disbursement.token as 'USDC' | 'USDT',
-        disbursement.beneficiary.walletAddress,
-        disbursement.amount
-      );
+      let transactions;
+
+      // Handle batch disbursements
+      if (disbursement.type === 'batch') {
+        // Fetch recipients for batch disbursement using Convex client
+        const batchData = await convex.query(api.disbursements.getWithRecipients, {
+          disbursementId: disbursement._id,
+          walletAddress: address,
+        });
+        
+        if (!batchData || !batchData.recipients || batchData.recipients.length === 0) {
+          throw new Error('No recipients found for batch disbursement');
+        }
+
+        // Create batch transfer transactions
+        transactions = createBatchTransferTxs(
+          disbursement.token as 'USDC' | 'USDT',
+          batchData.recipients.map((r: any) => ({
+            to: r.recipientAddress,
+            amount: r.amount,
+          }))
+        );
+      } else {
+        // Single disbursement
+        const singleAmount = disbursement.amount;
+        if (!disbursement.beneficiary || !singleAmount) {
+          throw new Error('Beneficiary or amount not found');
+        }
+
+        const transferTx = createTransferTx(
+          disbursement.token as 'USDC' | 'USDT',
+          disbursement.beneficiary.walletAddress,
+          singleAmount
+        );
+        transactions = [transferTx];
+      }
 
       // Propose to Safe
       const safeTxHash = await proposeTransaction(
         safe.safeAddress,
         address,
-        [transferTx]
+        transactions
       );
 
       // Update status to proposed with safeTxHash
@@ -310,17 +475,23 @@ export default function Disbursements() {
   const handleCancel = async (disbursementId: Id<'disbursements'>) => {
     if (!address) return;
     
-    if (!confirm(t('disbursements.actions.cancelConfirm'))) return;
+    setCancelDisbursementId(disbursementId);
+  };
+
+  const confirmCancel = async () => {
+    if (!address || !cancelDisbursementId) return;
 
     try {
       await updateStatus({
-        disbursementId,
+        disbursementId: cancelDisbursementId,
         walletAddress: address,
         status: 'cancelled',
       });
+      setCancelDisbursementId(null);
     } catch (err) {
       console.error('Failed to cancel disbursement:', err);
       setError(err instanceof Error ? err.message : 'Failed to cancel disbursement');
+      setCancelDisbursementId(null);
     }
   };
 
@@ -344,21 +515,22 @@ export default function Disbursements() {
 
     if (isProcessing) {
       return (
-        <Button variant="ghost" size="sm" disabled>
-          <Loader2 className="h-4 w-4 animate-spin" />
-        </Button>
+        <div className="flex items-center justify-center gap-2 h-8">
+          <Loader2 className="h-4 w-4 animate-spin text-slate-400" />
+        </div>
       );
     }
 
     switch (disbursement.status) {
       case 'draft':
         return (
-          <div className="flex items-center gap-1">
+          <div className="flex items-center justify-center gap-2 h-8">
             <Button
               variant="ghost"
               size="sm"
               onClick={() => handlePropose(disbursement)}
               title={t('disbursements.actions.propose')}
+              className="h-8 w-8 p-0"
             >
               <Play className="h-4 w-4 text-accent-400" />
             </Button>
@@ -367,6 +539,7 @@ export default function Disbursements() {
               size="sm"
               onClick={() => handleCancel(disbursement._id)}
               title="Cancel"
+              className="h-8 w-8 p-0"
             >
               <X className="h-4 w-4 text-slate-400 hover:text-red-400" />
             </Button>
@@ -374,13 +547,14 @@ export default function Disbursements() {
         );
       case 'pending':
         return (
-          <div className="flex items-center gap-1">
+          <div className="flex items-center justify-center gap-2 h-8">
             <Loader2 className="h-4 w-4 animate-spin text-yellow-400" />
             <Button
               variant="ghost"
               size="sm"
               onClick={() => handleCancel(disbursement._id)}
               title="Cancel"
+              className="h-8 w-8 p-0"
             >
               <X className="h-4 w-4 text-slate-400 hover:text-red-400" />
             </Button>
@@ -388,24 +562,48 @@ export default function Disbursements() {
         );
       case 'proposed':
         return (
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => handleExecute(disbursement)}
-            title={t('disbursements.actions.execute')}
-          >
-            <Rocket className="h-4 w-4 text-yellow-400" />
-          </Button>
+          <div className="flex items-center justify-center gap-2 h-8">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => handleExecute(disbursement)}
+              title={t('disbursements.actions.execute')}
+              className="h-8 w-8 p-0"
+            >
+              <Rocket className="h-4 w-4 text-yellow-400" />
+            </Button>
+          </div>
         );
       case 'executed':
         return (
-          <CheckCircle className="h-4 w-4 text-green-400" />
+          <div className="flex items-center justify-center gap-2 h-8">
+            <CheckCircle className="h-4 w-4 text-green-400" />
+            {disbursement.txHash && (
+              <a
+                href={`https://sepolia.etherscan.io/tx/${disbursement.txHash}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center justify-center h-8 w-8 text-accent-400 hover:text-accent-300 transition-colors"
+                title="View transaction"
+              >
+                <ArrowUpRight className="h-4 w-4" />
+              </a>
+            )}
+          </div>
         );
       case 'failed':
       case 'cancelled':
-        return null;
+        return (
+          <div className="flex items-center justify-center gap-2 h-8">
+            {/* Empty div to maintain consistent height */}
+          </div>
+        );
       default:
-        return null;
+        return (
+          <div className="flex items-center justify-center gap-2 h-8">
+            {/* Empty div to maintain consistent height */}
+          </div>
+        );
     }
   };
 
@@ -571,40 +769,8 @@ export default function Disbursements() {
               {t('disbursements.createDisbursement')}
             </h2>
             <form onSubmit={handleCreate} className="space-y-4 sm:space-y-6">
-              <div>
-                <label className="mb-2 block text-sm font-medium text-slate-300">
-                  {t('disbursements.form.beneficiary')}
-                </label>
-                <select
-                  value={selectedBeneficiary}
-                  onChange={(e) => setSelectedBeneficiary(e.target.value)}
-                  className="w-full rounded-lg border border-white/10 bg-navy-800 px-4 py-3 text-base text-white focus:border-accent-500 focus:outline-none focus:ring-1 focus:ring-accent-500"
-                  required
-                >
-                  <option value="">{t('disbursements.form.selectBeneficiary')}</option>
-                  {beneficiaries?.map((b) => (
-                    <option key={b._id} value={b._id}>
-                      {b.name} ({b.walletAddress.slice(0, 6)}...{b.walletAddress.slice(-4)})
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="mb-2 block text-sm font-medium text-slate-300">
-                    {t('disbursements.form.amount')}
-                  </label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    value={amount}
-                    onChange={(e) => setAmount(e.target.value)}
-                    placeholder="0.00"
-                    className="w-full rounded-lg border border-white/10 bg-navy-800 px-4 py-3 text-base text-white placeholder-slate-500 focus:border-accent-500 focus:outline-none focus:ring-1 focus:ring-accent-500"
-                    required
-                  />
-                </div>
+              {/* Token selector - shown once, applies to all recipients */}
+              {isBatchMode && (
                 <div>
                   <label className="mb-2 block text-sm font-medium text-slate-300">
                     Token
@@ -618,7 +784,123 @@ export default function Disbursements() {
                     <option value="USDT">USDT</option>
                   </select>
                 </div>
+              )}
+
+              {/* Locked recipient cards - show all added recipients ABOVE the input row */}
+              {recipients.map((recipient, index) => {
+                const recipientBeneficiary = beneficiaries?.find(b => b._id === recipient.beneficiaryId);
+                return (
+                  <div key={`recipient-${index}-${recipient.beneficiaryId}`} className="rounded-lg border border-white/10 bg-navy-800/50 p-4">
+                    <div className="flex items-center justify-between mb-3">
+                      <span className="text-sm font-medium text-slate-300">
+                        {t('disbursements.form.beneficiary')} {index + 1}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => removeRecipient(index)}
+                        className="text-slate-400 hover:text-red-400 transition-colors"
+                        title={t('disbursements.batch.remove')}
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+                    </div>
+                    <div className="space-y-2">
+                      <div>
+                        <p className="text-xs text-slate-400 mb-1">{t('disbursements.form.beneficiary')}</p>
+                        <p className="text-sm font-medium text-white">{recipientBeneficiary?.name || 'Unknown'}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-slate-400 mb-1">{t('disbursements.form.amount')}</p>
+                        <p className="text-sm font-mono text-white">
+                          {recipient.amount} {token}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+
+              {/* Input row (always at the bottom) - this is the "add new" row */}
+              <div className="space-y-4 rounded-lg border border-white/10 bg-navy-800/30 p-4">
+                <div>
+                  <label className="mb-2 block text-sm font-medium text-slate-300">
+                    {t('disbursements.form.beneficiary')}
+                  </label>
+                  <select
+                    value={selectedBeneficiary}
+                    onChange={(e) => setSelectedBeneficiary(e.target.value)}
+                    className="w-full rounded-lg border border-white/10 bg-navy-800 px-4 py-3 text-base text-white focus:border-accent-500 focus:outline-none focus:ring-1 focus:ring-accent-500"
+                    required={!isBatchMode}
+                  >
+                    <option value="">{t('disbursements.form.selectBeneficiary')}</option>
+                    {(() => {
+                      // In batch mode, show available beneficiaries + currently selected one
+                      if (isBatchMode) {
+                        const selectedBen = selectedBeneficiary ? beneficiaries?.find(b => b._id === selectedBeneficiary) : null;
+                        const allOptions = selectedBen && !availableBeneficiaries?.some(b => b._id === selectedBeneficiary)
+                          ? [selectedBen, ...(availableBeneficiaries || [])]
+                          : (availableBeneficiaries || []);
+                        return allOptions.map((b) => (
+                          <option key={b._id} value={b._id}>
+                            {b.name} ({b.walletAddress.slice(0, 6)}...{b.walletAddress.slice(-4)})
+                          </option>
+                        ));
+                      }
+                      // Single mode - show all beneficiaries
+                      return beneficiaries?.map((b) => (
+                        <option key={b._id} value={b._id}>
+                          {b.name} ({b.walletAddress.slice(0, 6)}...{b.walletAddress.slice(-4)})
+                        </option>
+                      ));
+                    })()}
+                  </select>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="mb-2 block text-sm font-medium text-slate-300">
+                      {t('disbursements.form.amount')}
+                    </label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      value={amount}
+                      onChange={(e) => setAmount(e.target.value)}
+                      placeholder="0.00"
+                      className="w-full rounded-lg border border-white/10 bg-navy-800 px-4 py-3 text-base text-white placeholder-slate-500 focus:border-accent-500 focus:outline-none focus:ring-1 focus:ring-accent-500"
+                      required={!isBatchMode}
+                    />
+                  </div>
+                  {!isBatchMode && (
+                    <div>
+                      <label className="mb-2 block text-sm font-medium text-slate-300">
+                        Token
+                      </label>
+                      <select
+                        value={token}
+                        onChange={(e) => setToken(e.target.value)}
+                        className="w-full rounded-lg border border-white/10 bg-navy-800 px-4 py-3 text-base text-white focus:border-accent-500 focus:outline-none focus:ring-1 focus:ring-accent-500"
+                      >
+                        <option value="USDC">USDC</option>
+                        <option value="USDT">USDT</option>
+                      </select>
+                    </div>
+                  )}
+                </div>
+                
+                {/* Add another beneficiary button - shown when beneficiary and amount are filled */}
+                {selectedBeneficiary && amount && parseFloat(amount) > 0 && (
+                  <button
+                    type="button"
+                    onClick={addRecipient}
+                    className="text-sm text-accent-400 hover:text-accent-300 underline"
+                  >
+                    {t('disbursements.batch.addAnother')}
+                  </button>
+                )}
               </div>
+
+              {/* Memo field - shown below all recipients */}
               <div>
                 <label className="mb-2 block text-sm font-medium text-slate-300">
                   {t('disbursements.form.memo')} ({t('common.optional')})
@@ -631,12 +913,51 @@ export default function Disbursements() {
                   className="w-full rounded-lg border border-white/10 bg-navy-800 px-4 py-3 text-base text-white placeholder-slate-500 focus:border-accent-500 focus:outline-none focus:ring-1 focus:ring-accent-500"
                 />
               </div>
+
+              {/* Total summary - show when we have at least one recipient (added or in first row) */}
+              {(isBatchMode || (selectedBeneficiary && amount && parseFloat(amount) > 0)) && (
+                <div className="rounded-lg border border-accent-500/30 bg-accent-500/10 p-4">
+                  <p className="text-sm font-medium text-white">
+                    {(() => {
+                      const count = recipients.length + (selectedBeneficiary && amount && parseFloat(amount) > 0 ? 1 : 0);
+                      const beneficiaryText = count === 1 ? 'beneficiary' : 'beneficiaries';
+                      return `Total: ${batchTotal.toFixed(2)} ${token} to ${count} ${beneficiaryText}`;
+                    })()}
+                  </p>
+                  {(recipients.length + (selectedBeneficiary && amount ? 1 : 0)) <= 10 && (
+                    <div className="mt-3 space-y-1.5">
+                      {recipients.map((r, idx) => {
+                        const b = beneficiaries?.find(b => b._id === r.beneficiaryId);
+                        return (
+                          <div key={`breakdown-${idx}-${r.beneficiaryId}`} className="flex items-center justify-between text-xs">
+                            <span className="text-slate-300">{b?.name || 'Unknown'}</span>
+                            <span className="text-slate-400 font-mono">{r.amount} {token}</span>
+                          </div>
+                        );
+                      })}
+                      {selectedBeneficiary && amount && parseFloat(amount) > 0 && (
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="text-slate-300">
+                            {beneficiaries?.find(b => b._id === selectedBeneficiary)?.name || 'Unknown'}
+                          </span>
+                          <span className="text-slate-400 font-mono">{amount} {token}</span>
+                        </div>
+                      )}
+                      <div className="pt-1.5 border-t border-white/10 flex items-center justify-between text-xs font-medium">
+                        <span className="text-white">Total</span>
+                        <span className="text-white font-mono">{batchTotal.toFixed(2)} {token}</span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
               <div className="flex flex-col sm:flex-row gap-3">
                 <Button type="submit" className="w-full sm:w-auto h-11">{t('disbursements.createDisbursement')}</Button>
                 <Button
                   type="button"
                   variant="secondary"
-                  onClick={() => setIsCreating(false)}
+                  onClick={resetForm}
                   className="w-full sm:w-auto h-11"
                 >
                   {t('common.cancel')}
@@ -722,103 +1043,95 @@ export default function Disbursements() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-white/5">
-                  {displayedResult?.items.map((disbursement) => (
-                    <tr key={disbursement._id} className="hover:bg-navy-800/30">
+                  {displayedResult?.items.map((disbursement) => {
+                    const isBatch = disbursement.type === 'batch';
+                    const displayAmount = isBatch ? (disbursement.totalAmount || disbursement.amount || '0') : (disbursement.amount || '0');
+                    return (
+                      <tr key={disbursement._id} className="hover:bg-navy-800/30">
                       <td className="px-6 py-4">
-                        <p className="font-medium text-white">
-                          {disbursement.beneficiary?.name || 'Unknown'}
-                        </p>
-                      </td>
-                      <td className="px-6 py-4">
-                        <span className="font-mono text-white">
-                          {disbursement.amount} {disbursement.token}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 text-slate-400 max-w-xs truncate" title={disbursement.memo || undefined}>
-                        {disbursement.memo || '-'}
-                      </td>
-                      <td className="px-6 py-4">
-                        <span
-                          className={`inline-flex rounded-full px-3 py-1 text-xs font-medium capitalize ${getStatusColor(
-                            disbursement.status
-                          )}`}
+                        <button
+                          onClick={() => setSelectedDisbursementId(disbursement._id)}
+                          className="font-medium text-white hover:text-accent-400 transition-colors text-left"
                         >
-                          {t(`status.${disbursement.status}`)}
-                        </span>
+                          {isBatch ? t('disbursements.batch.batchLabel') : (disbursement.beneficiary?.name || 'Unknown')}
+                        </button>
                       </td>
-                      <td className="px-6 py-4 text-slate-400">
-                        {new Date(disbursement.createdAt).toLocaleDateString()}
-                      </td>
+                        <td className="px-6 py-4">
+                          <span className="font-mono text-white">
+                            {displayAmount} {disbursement.token}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 text-slate-400 max-w-xs truncate" title={disbursement.memo || undefined}>
+                          {disbursement.memo || '-'}
+                        </td>
+                        <td className="px-6 py-4">
+                          <span
+                            className={`inline-flex rounded-full px-3 py-1 text-xs font-medium capitalize ${getStatusColor(
+                              disbursement.status
+                            )}`}
+                          >
+                            {t(`status.${disbursement.status}`)}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 text-slate-400">
+                          {new Date(disbursement.createdAt).toLocaleDateString()}
+                        </td>
                       <td className="px-6 py-4">
-                        <div className="flex items-center justify-center gap-2">
-                          {renderActionButton(disbursement)}
-                          {disbursement.txHash && (
-                            <a
-                              href={`https://sepolia.etherscan.io/tx/${disbursement.txHash}`}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="inline-flex items-center gap-1 text-sm text-accent-400 hover:underline"
-                            >
-                              <ArrowUpRight className="h-4 w-4" />
-                            </a>
-                          )}
-                        </div>
+                        {renderActionButton(disbursement)}
                       </td>
-                    </tr>
-                  ))}
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
 
             {/* Mobile Cards */}
             <div className="lg:hidden divide-y divide-white/5">
-              {displayedResult?.items.map((disbursement) => (
-                <div key={disbursement._id} className="p-4 space-y-3">
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1 min-w-0">
-                      <p className="font-medium text-white">
-                        {disbursement.beneficiary?.name || 'Unknown'}
-                      </p>
-                      <span className="font-mono text-sm text-slate-400 mt-1 block">
-                        {disbursement.amount} {disbursement.token}
+              {displayedResult?.items.map((disbursement) => {
+                const isBatch = disbursement.type === 'batch';
+                const displayAmount = isBatch ? (disbursement.totalAmount || disbursement.amount || '0') : (disbursement.amount || '0');
+                return (
+                  <div key={disbursement._id} className="p-4 space-y-3">
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1 min-w-0">
+                        <button
+                          onClick={() => setSelectedDisbursementId(disbursement._id)}
+                          className="font-medium text-white hover:text-accent-400 transition-colors text-left"
+                        >
+                          {isBatch ? t('disbursements.batch.batchLabel') : (disbursement.beneficiary?.name || 'Unknown')}
+                        </button>
+                        <span className="font-mono text-sm text-slate-400 mt-1 block">
+                          {displayAmount} {disbursement.token}
+                        </span>
+                      </div>
+                      <span
+                        className={`ml-2 inline-flex rounded-full px-2.5 py-1 text-xs font-medium capitalize shrink-0 ${getStatusColor(
+                          disbursement.status
+                        )}`}
+                      >
+                        {t(`status.${disbursement.status}`)}
                       </span>
                     </div>
-                    <span
-                      className={`ml-2 inline-flex rounded-full px-2.5 py-1 text-xs font-medium capitalize shrink-0 ${getStatusColor(
-                        disbursement.status
-                      )}`}
-                    >
-                      {t(`status.${disbursement.status}`)}
-                    </span>
-                  </div>
-                  
-                  {disbursement.memo && (
-                    <div>
-                      <p className="text-xs text-slate-500 mb-1">{t('disbursements.table.memo')}</p>
-                      <p className="text-sm text-slate-400">{disbursement.memo}</p>
-                    </div>
-                  )}
-                  
-                  <div className="flex items-center justify-between pt-2 border-t border-white/5">
-                    <div className="text-sm text-slate-400">
-                      {new Date(disbursement.createdAt).toLocaleDateString()}
-                    </div>
-                    <div className="flex items-center gap-2">
-                      {renderActionButton(disbursement)}
-                      {disbursement.txHash && (
-                        <a
-                          href={`https://sepolia.etherscan.io/tx/${disbursement.txHash}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="inline-flex items-center gap-1 text-sm text-accent-400 hover:underline h-11 px-3"
-                        >
-                          <ArrowUpRight className="h-4 w-4" />
-                        </a>
-                      )}
+                    
+                    {disbursement.memo && (
+                      <div>
+                        <p className="text-xs text-slate-500 mb-1">{t('disbursements.table.memo')}</p>
+                        <p className="text-sm text-slate-400">{disbursement.memo}</p>
+                      </div>
+                    )}
+                    
+                    <div className="flex items-center justify-between pt-2 border-t border-white/5">
+                      <div className="text-sm text-slate-400">
+                        {new Date(disbursement.createdAt).toLocaleDateString()}
+                      </div>
+                      <div>
+                        {renderActionButton(disbursement)}
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
 
             {/* Pagination */}
@@ -861,6 +1174,56 @@ export default function Disbursements() {
                 </div>
               </div>
             )}
+          </div>
+        )}
+
+        {/* Batch Detail Modal */}
+        {selectedDisbursementId && (
+          <BatchDetailModal
+            disbursementId={selectedDisbursementId}
+            onClose={() => setSelectedDisbursementId(null)}
+          />
+        )}
+
+        {/* Cancel Confirmation Modal */}
+        {cancelDisbursementId && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={() => setCancelDisbursementId(null)}>
+            <div
+              className="rounded-2xl border border-white/10 bg-navy-900 p-6 max-w-md w-full"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-lg font-semibold text-white">
+                  {t('disbursements.actions.cancel')} Disbursement
+                </h2>
+                <button
+                  onClick={() => setCancelDisbursementId(null)}
+                  className="text-slate-400 hover:text-white transition-colors"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+              
+              <p className="text-sm text-slate-300 mb-6">
+                {t('disbursements.actions.cancelConfirm')}
+              </p>
+
+              <div className="flex flex-col sm:flex-row gap-3 sm:justify-end">
+                <Button
+                  variant="secondary"
+                  onClick={() => setCancelDisbursementId(null)}
+                  className="w-full sm:w-auto"
+                >
+                  {t('common.cancel')}
+                </Button>
+                <Button
+                  onClick={confirmCancel}
+                  className="w-full sm:w-auto bg-red-500 hover:bg-red-600 text-white"
+                >
+                  Yes, Cancel Disbursement
+                </Button>
+              </div>
+            </div>
           </div>
         )}
       </div>

@@ -29,11 +29,22 @@ export const getTransactionReport = query({
     // Enrich with beneficiary data
     const enriched = await Promise.all(
       allDisbursements.map(async (d) => {
-        const beneficiary = await ctx.db.get(d.beneficiaryId);
+        // Handle batch disbursements (no beneficiaryId) vs single disbursements
+        if (d.type === "batch") {
+          return {
+            ...d,
+            beneficiaryName: "Batch",
+            beneficiaryWallet: "",
+            displayAmount: d.totalAmount || d.amount || "0",
+          };
+        }
+        
+        const beneficiary = d.beneficiaryId ? await ctx.db.get(d.beneficiaryId) : null;
         return {
           ...d,
           beneficiaryName: beneficiary?.name || "Unknown",
           beneficiaryWallet: beneficiary?.walletAddress || "",
+          displayAmount: d.amount || "0",
         };
       })
     );
@@ -56,7 +67,7 @@ export const getTransactionReport = query({
       filtered = filtered.filter((d) => args.status!.includes(d.status));
     }
 
-    // Beneficiary filter
+    // Beneficiary filter (only applies to single disbursements)
     if (args.beneficiaryId) {
       filtered = filtered.filter((d) => d.beneficiaryId === args.beneficiaryId);
     }
@@ -73,7 +84,8 @@ export const getTransactionReport = query({
     const totalsMap = new Map<string, number>();
     filtered.forEach((d) => {
       const current = totalsMap.get(d.token) || 0;
-      totalsMap.set(d.token, current + parseFloat(d.amount));
+      const amount = parseFloat(d.displayAmount || d.amount || "0");
+      totalsMap.set(d.token, current + (isNaN(amount) ? 0 : amount));
     });
 
     const totals = Array.from(totalsMap.entries()).map(([token, amount]) => ({
@@ -86,7 +98,7 @@ export const getTransactionReport = query({
       items: filtered.map((d) => ({
         _id: d._id,
         createdAt: d.createdAt,
-        amount: d.amount,
+        amount: d.displayAmount || d.amount || "0",
         token: d.token,
         status: d.status,
         memo: d.memo,
@@ -133,14 +145,17 @@ export const getSpendingByBeneficiary = query({
     }
 
     // Enrich with beneficiary data
+    // Note: This report only includes single disbursements (batch disbursements are handled separately)
     const enriched = await Promise.all(
-      executed.map(async (d) => {
-        const beneficiary = await ctx.db.get(d.beneficiaryId);
-        return {
-          ...d,
-          beneficiary: beneficiary || null,
-        };
-      })
+      executed
+        .filter((d) => d.beneficiaryId) // Only process single disbursements
+        .map(async (d) => {
+          const beneficiary = d.beneficiaryId ? await ctx.db.get(d.beneficiaryId) : null;
+          return {
+            ...d,
+            beneficiary: beneficiary || null,
+          };
+        })
     );
 
     // Filter by beneficiary type if specified
@@ -162,7 +177,7 @@ export const getSpendingByBeneficiary = query({
     }>();
 
     filtered.forEach((d) => {
-      if (!d.beneficiary) return; // Skip if no beneficiary
+      if (!d.beneficiary || !d.beneficiaryId) return; // Skip if no beneficiary
 
       const key = `${d.beneficiaryId}_${d.token}`;
       const existing = grouped.get(key);
@@ -186,7 +201,10 @@ export const getSpendingByBeneficiary = query({
         }
 
         const totalPaid = group.transactions.reduce(
-          (sum, d) => sum + parseFloat(d.amount),
+          (sum, d) => {
+            const amount = parseFloat(d.amount || "0");
+            return sum + (isNaN(amount) ? 0 : amount);
+          },
           0
         );
 

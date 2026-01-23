@@ -86,9 +86,11 @@ export default defineSchema({
   disbursements: defineTable({
     orgId: v.id("orgs"),
     safeId: v.id("safes"),
-    beneficiaryId: v.id("beneficiaries"),
+    beneficiaryId: v.optional(v.id("beneficiaries")), // Optional for batch disbursements
     token: v.string(), // "USDC" or "USDT"
-    amount: v.string(), // stored as string to preserve precision
+    amount: v.optional(v.string()), // Optional for batch disbursements (stored as string to preserve precision)
+    totalAmount: v.optional(v.string()), // For batch disbursements, sum of all recipient amounts
+    type: v.optional(v.union(v.literal("single"), v.literal("batch"))), // Defaults to "single" for backward compatibility
     memo: v.optional(v.string()),
     status: v.union(
       v.literal("draft"),
@@ -107,6 +109,17 @@ export default defineSchema({
     .index("by_org", ["orgId"])
     .index("by_org_status", ["orgId", "status"])
     .index("by_safe", ["safeId"]),
+
+  // Disbursement recipients (for batch disbursements)
+  disbursementRecipients: defineTable({
+    disbursementId: v.id("disbursements"),
+    beneficiaryId: v.id("beneficiaries"),
+    recipientAddress: v.string(), // Denormalized for performance
+    amount: v.string(), // Human-readable amount
+    createdAt: v.number(),
+  })
+    .index("by_disbursement", ["disbursementId"])
+    .index("by_beneficiary", ["beneficiaryId"]),
 
   // Billing records
   billing: defineTable({

@@ -275,7 +275,18 @@
       "amount": "Cantidad",
       "token": "Token",
       "memo": "Memo",
-      "memoPlaceholder": "Descripción del pago..."
+      "memoPlaceholder": "Descripción del pago...",
+      "duplicateBeneficiary": "Este beneficiario ya está agregado",
+      "invalidAmount": "La cantidad debe ser mayor que 0"
+    },
+    "batch": {
+      "addAnother": "+ Agregar otro beneficiario",
+      "remove": "Eliminar",
+      "total": "Total: {{total}} {{token}} a {{count}} {{count, plural, one {beneficiario} other {beneficiarios}}}",
+      "breakdown": "{{names}} = {{total}} {{token}}",
+      "batchLabel": "Lote",
+      "recipients": "Destinatarios",
+      "recipientCount": "{{count}} {{count, plural, one {destinatario} other {destinatarios}}}"
     },
     "filters": {
       "status": "Estado",

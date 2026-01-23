@@ -275,7 +275,18 @@
       "amount": "Amount",
       "token": "Token",
       "memo": "Memo",
-      "memoPlaceholder": "Payment description..."
+      "memoPlaceholder": "Payment description...",
+      "duplicateBeneficiary": "This beneficiary is already added",
+      "invalidAmount": "Amount must be greater than 0"
+    },
+    "batch": {
+      "addAnother": "+ Add another beneficiary",
+      "remove": "Remove",
+      "total": "Total: {{total}} {{token}} to {{count}} {{count, plural, one {beneficiary} other {beneficiaries}}}",
+      "breakdown": "{{names}} = {{total}} {{token}}",
+      "batchLabel": "Batch",
+      "recipients": "Recipients",
+      "recipientCount": "{{count}} {{count, plural, one {recipient} other {recipients}}}"
     },
     "filters": {
       "status": "Status",
