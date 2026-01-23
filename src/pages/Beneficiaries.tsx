@@ -71,6 +71,7 @@ function BeneficiarySection({
   onEdit: (b: Beneficiary) => void;
   onToggleActive: (id: Id<'beneficiaries'>, isActive: boolean) => void;
 }) {
+  const { t } = useTranslation();
   const [state, setState] = useState<SectionState>({
     search: '',
     sortField: 'name',
@@ -150,7 +151,7 @@ function BeneficiarySection({
             <div>
               <h2 className="text-lg font-semibold text-white">{title}</h2>
               <p className="text-sm text-slate-400">
-                {beneficiaries.length} total · {activeCount} active · {inactiveCount} inactive
+                {t('beneficiaries.section.total', { count: beneficiaries.length })} · {t('beneficiaries.section.active', { count: activeCount })} · {t('beneficiaries.section.inactive', { count: inactiveCount })}
               </p>
             </div>
           </div>
@@ -227,7 +228,7 @@ function BeneficiarySection({
           {beneficiaries.length === 0 ? (
             <>
               <Icon className="mx-auto h-10 w-10 text-slate-500" />
-              <p className="mt-2 text-slate-400">No {title.toLowerCase()} added yet</p>
+              <p className="mt-2 text-slate-400">{t('beneficiaries.section.noResults', { type: title.toLowerCase() })}</p>
             </>
           ) : (
             <>
