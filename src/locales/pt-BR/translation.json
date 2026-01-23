@@ -52,7 +52,8 @@
     "processing": "Processando...",
     "validating": "Validando...",
     "select": "Selecionar",
-    "all": "Todos"
+    "all": "Todos",
+    "valid": "Válido"
   },
   "landing": {
     "header": {
@@ -252,6 +253,44 @@
       "inactive": "{{count}} inativos",
       "noResults": "Ainda não foram adicionados {{type}}",
       "noSearchResults": "Nenhum resultado corresponde à sua busca"
+    },
+    "bulkImport": {
+      "button": "Importação em Massa",
+      "title": "Importação em Massa de Beneficiários",
+      "template": {
+        "title": "Modelo CSV",
+        "description": "Baixe um arquivo CSV modelo com o formato correto. Colunas obrigatórias: type (individual ou business), name, wallet_address. Opcional: notes.",
+        "download": "Baixar Modelo CSV"
+      },
+      "upload": {
+        "dropText": "Solte seu CSV aqui, ou escolha um arquivo.",
+        "hint": "Use o modelo acima para garantir o formato.",
+        "chooseFile": "Escolher arquivo",
+        "parsing": "Analisando CSV...",
+        "replace": "Substituir arquivo"
+      },
+      "preview": {
+        "title": "Visualização e Validação",
+        "selected": "{{count}} de {{total}} selecionados",
+        "type": "Tipo",
+        "name": "Nome",
+        "walletAddress": "Endereço da Carteira",
+        "notes": "Notas",
+        "status": "Status"
+      },
+      "addBeneficiaries_one": "Adicionar {{count}} beneficiário",
+      "addBeneficiaries_other": "Adicionar {{count}} beneficiários",
+      "importing": "Importando...",
+      "errors": {
+        "invalidFileType": "Por favor, envie um arquivo CSV (extensão .csv necessária)",
+        "fileTooLarge": "O tamanho do arquivo deve ser menor que 5MB",
+        "noData": "O arquivo CSV não contém linhas de dados",
+        "parseError": "Falha ao analisar o arquivo CSV. Por favor, verifique o formato.",
+        "noRowsSelected": "Por favor, selecione pelo menos uma linha válida para importar",
+        "invalidAddress": "Formato de endereço de carteira inválido",
+        "importError": "Falha ao importar beneficiários. Por favor, tente novamente."
+      },
+      "success": "{{count}} {{count, plural, one {beneficiário} other {beneficiários}}} adicionados com sucesso"
     }
   },
   "disbursements": {

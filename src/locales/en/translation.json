@@ -52,7 +52,8 @@
     "processing": "Processing...",
     "validating": "Validating...",
     "select": "Select",
-    "all": "All"
+    "all": "All",
+    "valid": "Valid"
   },
   "landing": {
     "header": {
@@ -252,6 +253,44 @@
       "inactive": "{{count}} inactive",
       "noResults": "No {{type}} added yet",
       "noSearchResults": "No results match your search"
+    },
+    "bulkImport": {
+      "button": "Bulk Import",
+      "title": "Bulk Import Beneficiaries",
+      "template": {
+        "title": "CSV Template",
+        "description": "Download a template CSV file with the correct format. Required columns: type (individual or business), name, wallet_address. Optional: notes.",
+        "download": "Download CSV Template"
+      },
+      "upload": {
+        "dropText": "Drop your CSV here, or choose a file.",
+        "hint": "Use the template above to ensure formatting.",
+        "chooseFile": "Choose file",
+        "parsing": "Parsing CSV...",
+        "replace": "Replace file"
+      },
+      "preview": {
+        "title": "Preview & Validation",
+        "selected": "{{count}} of {{total}} selected",
+        "type": "Type",
+        "name": "Name",
+        "walletAddress": "Wallet Address",
+        "notes": "Notes",
+        "status": "Status"
+      },
+      "addBeneficiaries_one": "Add {{count}} beneficiary",
+      "addBeneficiaries_other": "Add {{count}} beneficiaries",
+      "importing": "Importing...",
+      "errors": {
+        "invalidFileType": "Please upload a CSV file (.csv extension required)",
+        "fileTooLarge": "File size must be less than 5MB",
+        "noData": "CSV file contains no data rows",
+        "parseError": "Failed to parse CSV file. Please check the format.",
+        "noRowsSelected": "Please select at least one valid row to import",
+        "invalidAddress": "Invalid wallet address format",
+        "importError": "Failed to import beneficiaries. Please try again."
+      },
+      "success": "{{count}} {{count, plural, one {beneficiary} other {beneficiaries}}} added successfully"
     }
   },
   "disbursements": {

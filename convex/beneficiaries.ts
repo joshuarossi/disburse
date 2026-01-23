@@ -153,3 +153,161 @@ export const get = query({
     return beneficiary;
   },
 });
+
+// Check for duplicate wallet addresses
+export const checkDuplicateAddresses = query({
+  args: {
+    orgId: v.id("orgs"),
+    walletAddress: v.string(),
+    addresses: v.array(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const walletAddress = args.walletAddress.toLowerCase();
+
+    // Verify access (any role can check)
+    await requireOrgAccess(ctx, args.orgId, walletAddress, ["admin", "approver", "initiator", "clerk", "viewer"]);
+
+    // Get all existing beneficiaries for this org
+    const existingBeneficiaries = await ctx.db
+      .query("beneficiaries")
+      .withIndex("by_org", (q) => q.eq("orgId", args.orgId))
+      .collect();
+
+    // Create a set of existing addresses (lowercased)
+    const existingAddresses = new Set(
+      existingBeneficiaries.map((b) => b.walletAddress.toLowerCase())
+    );
+
+    // Check which addresses are duplicates
+    const duplicates = new Set<string>();
+    for (const address of args.addresses) {
+      const lowerAddress = address.toLowerCase();
+      if (existingAddresses.has(lowerAddress)) {
+        duplicates.add(lowerAddress);
+      }
+    }
+
+    return Array.from(duplicates);
+  },
+});
+
+// Bulk create beneficiaries
+export const createBulk = mutation({
+  args: {
+    orgId: v.id("orgs"),
+    walletAddress: v.string(),
+    beneficiaries: v.array(
+      v.object({
+        type: v.union(v.literal("individual"), v.literal("business")),
+        name: v.string(),
+        beneficiaryAddress: v.string(),
+        notes: v.optional(v.string()),
+      })
+    ),
+  },
+  handler: async (ctx, args) => {
+    const walletAddress = args.walletAddress.toLowerCase();
+    const now = Date.now();
+
+    // Verify access (admin, initiator, or clerk can create)
+    const { user } = await requireOrgAccess(ctx, args.orgId, walletAddress, ["admin", "initiator", "clerk"]);
+
+    if (args.beneficiaries.length === 0) {
+      throw new Error("No beneficiaries provided");
+    }
+
+    // Check tier limits for beneficiaries
+    const limits = await getOrgLimits(ctx, args.orgId);
+    const existingBeneficiaries = await ctx.db
+      .query("beneficiaries")
+      .withIndex("by_org", (q) => q.eq("orgId", args.orgId))
+      .collect();
+
+    const currentCount = existingBeneficiaries.length;
+    const newCount = args.beneficiaries.length;
+    const totalCount = currentCount + newCount;
+
+    if (limits.maxBeneficiaries !== Infinity && totalCount > limits.maxBeneficiaries) {
+      throw new Error(
+        `Your plan allows a maximum of ${limits.maxBeneficiaries} beneficiaries. ` +
+        `You currently have ${currentCount} and are trying to add ${newCount}. ` +
+        `Please upgrade to add more.`
+      );
+    }
+
+    // Check for duplicates within the batch
+    const batchAddresses = new Set<string>();
+    for (const beneficiary of args.beneficiaries) {
+      const lowerAddress = beneficiary.beneficiaryAddress.toLowerCase();
+      if (batchAddresses.has(lowerAddress)) {
+        throw new Error(`Duplicate wallet address in batch: ${beneficiary.beneficiaryAddress}`);
+      }
+      batchAddresses.add(lowerAddress);
+    }
+
+    // Check for duplicates against existing beneficiaries
+    const existingAddresses = new Set(
+      existingBeneficiaries.map((b) => b.walletAddress.toLowerCase())
+    );
+    for (const beneficiary of args.beneficiaries) {
+      const lowerAddress = beneficiary.beneficiaryAddress.toLowerCase();
+      if (existingAddresses.has(lowerAddress)) {
+        throw new Error(`Wallet address already exists: ${beneficiary.beneficiaryAddress}`);
+      }
+    }
+
+    // Validate all beneficiaries before creating
+    for (const beneficiary of args.beneficiaries) {
+      if (!beneficiary.name || !beneficiary.name.trim()) {
+        throw new Error("Beneficiary name is required");
+      }
+      if (!beneficiary.beneficiaryAddress || !beneficiary.beneficiaryAddress.trim()) {
+        throw new Error("Wallet address is required");
+      }
+      // Basic Ethereum address validation (42 chars, starts with 0x)
+      const address = beneficiary.beneficiaryAddress.trim();
+      if (!address.startsWith("0x") || address.length !== 42) {
+        throw new Error(`Invalid wallet address format: ${address}`);
+      }
+    }
+
+    // Create all beneficiaries
+    const createdIds: string[] = [];
+    for (const beneficiary of args.beneficiaries) {
+      const beneficiaryId = await ctx.db.insert("beneficiaries", {
+        orgId: args.orgId,
+        type: beneficiary.type,
+        name: beneficiary.name.trim(),
+        walletAddress: beneficiary.beneficiaryAddress.toLowerCase().trim(),
+        notes: beneficiary.notes?.trim() || undefined,
+        isActive: true,
+        createdAt: now,
+        updatedAt: now,
+      });
+
+      createdIds.push(beneficiaryId);
+
+      // Audit log for each beneficiary
+      await ctx.db.insert("auditLog", {
+        orgId: args.orgId,
+        actorUserId: user._id,
+        action: "beneficiary.created",
+        objectType: "beneficiary",
+        objectId: beneficiaryId,
+        metadata: {
+          type: beneficiary.type,
+          name: beneficiary.name.trim(),
+          walletAddress: beneficiary.beneficiaryAddress.toLowerCase().trim(),
+          bulkImport: true,
+        },
+        timestamp: now,
+      });
+    }
+
+    return {
+      success: true,
+      count: createdIds.length,
+      beneficiaryIds: createdIds,
+    };
+  },
+});

@@ -52,7 +52,8 @@
     "processing": "Procesando...",
     "validating": "Validando...",
     "select": "Seleccionar",
-    "all": "Todos"
+    "all": "Todos",
+    "valid": "Válido"
   },
   "landing": {
     "header": {
@@ -252,6 +253,44 @@
       "inactive": "{{count}} inactivos",
       "noResults": "Aún no se han agregado {{type}}",
       "noSearchResults": "No hay resultados que coincidan con tu búsqueda"
+    },
+    "bulkImport": {
+      "button": "Importación Masiva",
+      "title": "Importación Masiva de Beneficiarios",
+      "template": {
+        "title": "Plantilla CSV",
+        "description": "Descarga un archivo CSV de plantilla con el formato correcto. Columnas requeridas: type (individual o business), name, wallet_address. Opcional: notes.",
+        "download": "Descargar Plantilla CSV"
+      },
+      "upload": {
+        "dropText": "Arrastra tu CSV aquí, o elige un archivo.",
+        "hint": "Usa la plantilla de arriba para asegurar el formato.",
+        "chooseFile": "Elegir archivo",
+        "parsing": "Analizando CSV...",
+        "replace": "Reemplazar archivo"
+      },
+      "preview": {
+        "title": "Vista Previa y Validación",
+        "selected": "{{count}} de {{total}} seleccionados",
+        "type": "Tipo",
+        "name": "Nombre",
+        "walletAddress": "Dirección de Billetera",
+        "notes": "Notas",
+        "status": "Estado"
+      },
+      "addBeneficiaries_one": "Agregar {{count}} beneficiario",
+      "addBeneficiaries_other": "Agregar {{count}} beneficiarios",
+      "importing": "Importando...",
+      "errors": {
+        "invalidFileType": "Por favor sube un archivo CSV (extensión .csv requerida)",
+        "fileTooLarge": "El tamaño del archivo debe ser menor a 5MB",
+        "noData": "El archivo CSV no contiene filas de datos",
+        "parseError": "Error al analizar el archivo CSV. Por favor verifica el formato.",
+        "noRowsSelected": "Por favor selecciona al menos una fila válida para importar",
+        "invalidAddress": "Formato de dirección de billetera inválido",
+        "importError": "Error al importar beneficiarios. Por favor intenta de nuevo."
+      },
+      "success": "{{count}} {{count, plural, one {beneficiario} other {beneficiarios}}} agregados exitosamente"
     }
   },
   "disbursements": {

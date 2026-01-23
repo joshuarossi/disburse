@@ -7,6 +7,7 @@ import { api } from '../../convex/_generated/api';
 import { Id } from '../../convex/_generated/dataModel';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { Button } from '@/components/ui/button';
+import { BulkImportModal } from '@/components/beneficiaries/BulkImportModal';
 import { cn } from '@/lib/utils';
 import { 
   Plus, 
@@ -22,6 +23,7 @@ import {
   ChevronDown,
   ChevronUp,
   Filter,
+  Upload,
 } from 'lucide-react';
 
 type BeneficiaryType = 'individual' | 'business';
@@ -449,6 +451,9 @@ export default function Beneficiaries() {
   // Edit modal state
   const [editingBeneficiary, setEditingBeneficiary] = useState<EditingBeneficiary | null>(null);
   const [editError, setEditError] = useState<string | null>(null);
+  
+  // Bulk import modal state
+  const [isBulkImportOpen, setIsBulkImportOpen] = useState(false);
 
   const beneficiaries = useQuery(
     api.beneficiaries.list,
@@ -564,10 +569,20 @@ export default function Beneficiaries() {
               )}
             </p>
           </div>
-          <Button onClick={() => setIsCreating(true)} className="w-full sm:w-auto h-11">
-            <Plus className="h-4 w-4" />
-            {t('beneficiaries.addBeneficiary')}
-          </Button>
+          <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
+            <Button
+              variant="secondary"
+              onClick={() => setIsBulkImportOpen(true)}
+              className="w-full sm:w-auto h-11"
+            >
+              <Upload className="h-4 w-4 mr-2" />
+              {t('beneficiaries.bulkImport.button')}
+            </Button>
+            <Button onClick={() => setIsCreating(true)} className="w-full sm:w-auto h-11">
+              <Plus className="h-4 w-4" />
+              {t('beneficiaries.addBeneficiary')}
+            </Button>
+          </div>
         </div>
 
         {/* Create Form */}
@@ -821,6 +836,18 @@ export default function Beneficiaries() {
             </form>
           </div>
         </div>
+      )}
+
+      {/* Bulk Import Modal */}
+      {isBulkImportOpen && orgId && (
+        <BulkImportModal
+          orgId={orgId as Id<'orgs'>}
+          onClose={() => setIsBulkImportOpen(false)}
+          onSuccess={() => {
+            setIsBulkImportOpen(false);
+            // The beneficiaries list will automatically refresh via useQuery
+          }}
+        />
       )}
     </AppLayout>
   );
