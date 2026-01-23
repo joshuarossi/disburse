@@ -169,6 +169,7 @@
     "dashboard": "Panel",
     "beneficiaries": "Beneficiarios",
     "disbursements": "Desembolsos",
+    "reports": "Informes",
     "settings": "Configuración",
     "disconnect": "Desconectar",
     "language": "Idioma"
@@ -300,6 +301,89 @@
       "execute": "Ejecutar Transacción",
       "cancel": "Cancelar",
       "cancelConfirm": "¿Estás seguro de que quieres cancelar este desembolso?"
+    }
+  },
+  "reports": {
+    "title": "Informes",
+    "subtitle": "Exporta y analiza los datos de tu tesorería",
+    "tabs": {
+      "transactions": "Transacciones",
+      "spending": "Gastos por Beneficiario",
+      "audit": "Registro de Auditoría"
+    },
+    "filters": {
+      "dateRange": "Rango de Fechas",
+      "status": "Estado",
+      "token": "Token",
+      "beneficiary": "Beneficiario",
+      "allBeneficiaries": "Todos los Beneficiarios",
+      "type": "Tipo",
+      "user": "Usuario",
+      "allUsers": "Todos los Usuarios",
+      "actionType": "Tipo de Acción"
+    },
+    "table": {
+      "date": "Fecha",
+      "beneficiary": "Beneficiario",
+      "amount": "Cantidad",
+      "token": "Token",
+      "status": "Estado",
+      "memo": "Memo",
+      "tx": "Tx",
+      "view": "Ver",
+      "type": "Tipo",
+      "transactions": "Transacciones",
+      "totalPaid": "Total Pagado",
+      "timestamp": "Fecha y Hora",
+      "user": "Usuario",
+      "action": "Acción",
+      "details": "Detalles"
+    },
+    "export": {
+      "csv": "Exportar CSV",
+      "date": "Fecha",
+      "beneficiary": "Beneficiario",
+      "walletAddress": "Dirección de Billetera",
+      "amount": "Cantidad",
+      "token": "Token",
+      "status": "Estado",
+      "memo": "Memo",
+      "txHash": "Hash de Transacción",
+      "type": "Tipo",
+      "transactions": "Transacciones",
+      "totalPaid": "Total Pagado",
+      "timestamp": "Fecha y Hora",
+      "user": "Usuario",
+      "wallet": "Billetera",
+      "action": "Acción",
+      "details": "Detalles"
+    },
+    "summary": {
+      "showing": "Mostrando {{count}} transacción",
+      "total": "Total",
+      "beneficiaries": "{{count}} beneficiarios",
+      "events": "{{count}} eventos"
+    },
+    "empty": {
+      "transactions": {
+        "title": "No se encontraron transacciones",
+        "description": "Intenta ajustar tus filtros para ver más resultados"
+      },
+      "spending": {
+        "title": "No se encontraron datos de gastos",
+        "description": "Intenta ajustar tus filtros para ver más resultados"
+      },
+      "audit": {
+        "title": "No se encontraron eventos de auditoría",
+        "description": "Intenta ajustar tus filtros para ver más resultados"
+      }
+    },
+    "auditActions": {
+      "disbursement": "Desembolso",
+      "beneficiary": "Beneficiario",
+      "team": "Equipo",
+      "safe": "Safe",
+      "org": "Organización"
     }
   },
   "settings": {

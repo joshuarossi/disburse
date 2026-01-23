@@ -5,6 +5,7 @@ import SelectOrg from './pages/SelectOrg'
 import Dashboard from './pages/Dashboard'
 import Beneficiaries from './pages/Beneficiaries'
 import Disbursements from './pages/Disbursements'
+import Reports from './pages/Reports'
 import Settings from './pages/Settings'
 import { AuthRequired, OrgRequired } from './components/ProtectedRoute'
 
@@ -47,6 +48,14 @@ function App() {
         element={
           <OrgRequired>
             <Disbursements />
+          </OrgRequired>
+        }
+      />
+      <Route
+        path="/org/:orgId/reports"
+        element={
+          <OrgRequired>
+            <Reports />
           </OrgRequired>
         }
       />

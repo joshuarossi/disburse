@@ -9,6 +9,7 @@ import {
   LayoutDashboard,
   Users,
   Send,
+  FileText,
   Settings,
   Building2,
   User,
@@ -50,6 +51,7 @@ export function AppLayout({ children }: AppLayoutProps) {
     { href: 'dashboard', label: t('navigation.dashboard'), icon: LayoutDashboard },
     { href: 'beneficiaries', label: t('navigation.beneficiaries'), icon: Users },
     { href: 'disbursements', label: t('navigation.disbursements'), icon: Send },
+    { href: 'reports', label: t('navigation.reports'), icon: FileText },
     { href: 'settings', label: t('navigation.settings'), icon: Settings },
   ];
 
@@ -204,42 +206,40 @@ export function AppLayout({ children }: AppLayoutProps) {
         </nav>
 
         {/* User */}
-        <div className="relative border-t border-white/5 p-4">
+        <div className="relative border-t border-white/5 p-4 z-50">
           {/* Slide-up Panel */}
-          <div
-            className={cn(
-              'absolute bottom-full left-0 right-0 mb-2 mx-4 rounded-xl border border-white/10 bg-navy-800 shadow-xl transition-all duration-200 ease-out z-50',
-              showUserPanel
-                ? 'translate-y-0 opacity-100'
-                : 'translate-y-2 opacity-0 pointer-events-none'
-            )}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="p-2 space-y-1">
-              <div className="px-3 py-2 border-b border-white/5 mb-1">
-                <p className="text-xs text-slate-500 mb-2">{t('navigation.language')}</p>
-                <LanguageSwitcher variant="ghost" size="sm" />
+          {showUserPanel && (
+            <div
+              className="absolute bottom-full left-0 right-0 mb-2 mx-4 rounded-xl border border-white/10 bg-navy-800 shadow-xl z-[60]"
+              onClick={(e) => e.stopPropagation()}
+              onMouseDown={(e) => e.stopPropagation()}
+            >
+              <div className="p-2 space-y-1">
+                <div className="px-3 py-2 border-b border-white/5 mb-1">
+                  <p className="text-xs text-slate-500 mb-2">{t('navigation.language')}</p>
+                  <LanguageSwitcher variant="ghost" size="sm" />
+                </div>
+                <button
+                  onClick={handleCopyAddress}
+                  className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm text-slate-300 hover:bg-navy-700 hover:text-white transition-colors"
+                >
+                  {copied ? (
+                    <Check className="h-4 w-4 text-green-400" />
+                  ) : (
+                    <Copy className="h-4 w-4" />
+                  )}
+                  {copied ? t('common.copied') : t('common.copyAddress')}
+                </button>
+                <button
+                  onClick={handleDisconnect}
+                  className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm text-red-400 hover:bg-red-500/10 transition-colors"
+                >
+                  <LogOut className="h-4 w-4" />
+                  {t('navigation.disconnect')}
+                </button>
               </div>
-              <button
-                onClick={handleCopyAddress}
-                className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm text-slate-300 hover:bg-navy-700 hover:text-white transition-colors"
-              >
-                {copied ? (
-                  <Check className="h-4 w-4 text-green-400" />
-                ) : (
-                  <Copy className="h-4 w-4" />
-                )}
-                {copied ? t('common.copied') : t('common.copyAddress')}
-              </button>
-              <button
-                onClick={handleDisconnect}
-                className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm text-red-400 hover:bg-red-500/10 transition-colors"
-              >
-                <LogOut className="h-4 w-4" />
-                {t('navigation.disconnect')}
-              </button>
             </div>
-          </div>
+          )}
 
           {/* User Button */}
           <button
@@ -278,7 +278,7 @@ export function AppLayout({ children }: AppLayoutProps) {
       {/* Click outside to close panel */}
       {showUserPanel && (
         <div 
-          className="fixed inset-0 z-[41] bg-transparent" 
+          className="fixed inset-0 z-[35] bg-transparent" 
           onClick={() => setShowUserPanel(false)}
         />
       )}

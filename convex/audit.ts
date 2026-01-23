@@ -8,6 +8,10 @@ export const list = query({
     orgId: v.id("orgs"),
     walletAddress: v.string(),
     limit: v.optional(v.number()),
+    startDate: v.optional(v.number()),
+    endDate: v.optional(v.number()),
+    userId: v.optional(v.id("users")),
+    actionType: v.optional(v.array(v.string())),
   },
   handler: async (ctx, args) => {
     const walletAddress = args.walletAddress.toLowerCase();
@@ -22,8 +26,31 @@ export const list = query({
 
     const logs = await query.collect();
 
+    // Apply filters
+    let filtered = logs;
+
+    // Date range filter
+    if (args.startDate) {
+      filtered = filtered.filter((log) => log.timestamp >= args.startDate!);
+    }
+    if (args.endDate) {
+      // Add one day to include the end date fully
+      const endOfDay = args.endDate + 24 * 60 * 60 * 1000;
+      filtered = filtered.filter((log) => log.timestamp <= endOfDay);
+    }
+
+    // User filter
+    if (args.userId) {
+      filtered = filtered.filter((log) => log.actorUserId === args.userId);
+    }
+
+    // Action type filter
+    if (args.actionType && args.actionType.length > 0) {
+      filtered = filtered.filter((log) => args.actionType!.includes(log.action));
+    }
+
     // Apply limit
-    const limited = args.limit ? logs.slice(0, args.limit) : logs;
+    const limited = args.limit ? filtered.slice(0, args.limit) : filtered;
 
     // Enrich with user info
     const enriched = await Promise.all(

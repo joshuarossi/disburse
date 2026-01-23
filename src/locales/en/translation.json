@@ -169,6 +169,7 @@
     "dashboard": "Dashboard",
     "beneficiaries": "Beneficiaries",
     "disbursements": "Disbursements",
+    "reports": "Reports",
     "settings": "Settings",
     "disconnect": "Disconnect",
     "language": "Language"
@@ -300,6 +301,89 @@
       "execute": "Execute Transaction",
       "cancel": "Cancel",
       "cancelConfirm": "Are you sure you want to cancel this disbursement?"
+    }
+  },
+  "reports": {
+    "title": "Reports",
+    "subtitle": "Export and analyze your treasury data",
+    "tabs": {
+      "transactions": "Transactions",
+      "spending": "Spending by Beneficiary",
+      "audit": "Audit Log"
+    },
+    "filters": {
+      "dateRange": "Date Range",
+      "status": "Status",
+      "token": "Token",
+      "beneficiary": "Beneficiary",
+      "allBeneficiaries": "All Beneficiaries",
+      "type": "Type",
+      "user": "User",
+      "allUsers": "All Users",
+      "actionType": "Action Type"
+    },
+    "table": {
+      "date": "Date",
+      "beneficiary": "Beneficiary",
+      "amount": "Amount",
+      "token": "Token",
+      "status": "Status",
+      "memo": "Memo",
+      "tx": "Tx",
+      "view": "View",
+      "type": "Type",
+      "transactions": "Transactions",
+      "totalPaid": "Total Paid",
+      "timestamp": "Timestamp",
+      "user": "User",
+      "action": "Action",
+      "details": "Details"
+    },
+    "export": {
+      "csv": "Export CSV",
+      "date": "Date",
+      "beneficiary": "Beneficiary",
+      "walletAddress": "Wallet Address",
+      "amount": "Amount",
+      "token": "Token",
+      "status": "Status",
+      "memo": "Memo",
+      "txHash": "Transaction Hash",
+      "type": "Type",
+      "transactions": "Transactions",
+      "totalPaid": "Total Paid",
+      "timestamp": "Timestamp",
+      "user": "User",
+      "wallet": "Wallet",
+      "action": "Action",
+      "details": "Details"
+    },
+    "summary": {
+      "showing": "Showing {{count}} transaction",
+      "total": "Total",
+      "beneficiaries": "{{count}} beneficiaries",
+      "events": "{{count}} events"
+    },
+    "empty": {
+      "transactions": {
+        "title": "No transactions found",
+        "description": "Try adjusting your filters to see more results"
+      },
+      "spending": {
+        "title": "No spending data found",
+        "description": "Try adjusting your filters to see more results"
+      },
+      "audit": {
+        "title": "No audit events found",
+        "description": "Try adjusting your filters to see more results"
+      }
+    },
+    "auditActions": {
+      "disbursement": "Disbursement",
+      "beneficiary": "Beneficiary",
+      "team": "Team",
+      "safe": "Safe",
+      "org": "Organization"
     }
   },
   "settings": {

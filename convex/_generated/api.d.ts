@@ -17,6 +17,7 @@ import type * as disbursements from "../disbursements.js";
 import type * as lib_rbac from "../lib/rbac.js";
 import type * as migrations_backfillBeneficiaryType from "../migrations/backfillBeneficiaryType.js";
 import type * as orgs from "../orgs.js";
+import type * as reports from "../reports.js";
 import type * as safes from "../safes.js";
 import type * as users from "../users.js";
 
@@ -36,6 +37,7 @@ declare const fullApi: ApiFromModules<{
   "lib/rbac": typeof lib_rbac;
   "migrations/backfillBeneficiaryType": typeof migrations_backfillBeneficiaryType;
   orgs: typeof orgs;
+  reports: typeof reports;
   safes: typeof safes;
   users: typeof users;
 }>;

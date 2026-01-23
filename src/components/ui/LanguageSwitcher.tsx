@@ -52,10 +52,13 @@ export function LanguageSwitcher({ variant = 'ghost', size = 'sm' }: { variant?:
       {isOpen && (
         <>
           <div
-            className="fixed inset-0 z-40"
+            className="fixed inset-0 z-[46]"
             onClick={() => setIsOpen(false)}
           />
-          <div className="absolute right-0 top-full mt-2 z-50 w-48 rounded-lg border border-white/10 bg-navy-900 shadow-xl overflow-hidden">
+          <div 
+            className="absolute right-0 top-full mt-2 z-[60] w-48 rounded-lg border border-white/10 bg-navy-900 shadow-xl overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
             {languages.map((lang) => (
               <button
                 key={lang.code}
