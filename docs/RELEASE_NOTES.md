@@ -1,6 +1,60 @@
 # Release Notes
 
-## v0.2.0 (Current Release)
+## v0.3.0 (Current Release)
+
+### 🎉 Major Features
+
+#### Batch Disbursements
+- **Multi-Recipient Payments**: Added support for creating batch disbursements that pay multiple beneficiaries in a single Safe transaction
+- **Progressive UI**: Implemented intuitive progressive form that allows users to add recipients one at a time
+- **Single Transaction**: All recipients in a batch are paid atomically in one Safe transaction using MultiSend
+- **Batch Detail View**: Added detailed modal view showing all recipients in a batch disbursement with breakdown
+- **Smart Totals**: Real-time total calculation that includes both added recipients and the current input row
+- **Visual Breakdown**: Improved total summary with line-item breakdown showing each recipient and amount
+
+### 🔧 Improvements
+
+#### User Experience
+- **Better Form Flow**: Redesigned batch disbursement form with locked recipient cards appearing above the input row
+- **Improved Alignment**: Fixed action column alignment in disbursements table for consistent visual presentation
+- **Enhanced Modals**: Replaced browser alerts with styled confirmation modals for better UX
+- **Clear Button Labels**: Improved cancel confirmation modal with distinct "Cancel" (dismiss) and "Yes, Cancel Disbursement" (confirm) buttons
+
+#### Data Model
+- **Schema Updates**: Extended disbursements table with `type` (single/batch) and `totalAmount` fields
+- **Recipients Table**: Added new `disbursementRecipients` table to track individual recipients in batch disbursements
+- **Backward Compatibility**: Existing single disbursements continue to work seamlessly with new batch functionality
+
+#### Safe Integration
+- **Batch Transaction Support**: Added `createBatchTransferTxs` helper function for creating multiple ERC-20 transfers
+- **Atomic Execution**: Batch disbursements execute atomically - all transfers succeed or none do
+- **MultiSend Integration**: Leverages Safe's native MultiSend functionality for efficient batch transactions
+
+#### Reports
+- **Batch Support**: Updated reports to handle batch disbursements, showing "Batch" as beneficiary name
+- **Total Amount Display**: Reports now correctly display total amounts for batch disbursements
+
+### 🌐 Internationalization
+- Added batch-related translation keys to all supported locales (English, Spanish, Portuguese)
+- Improved translation strings for batch operations
+
+### 🐛 Bug Fixes
+- Fixed beneficiary dropdown not showing selected value in batch mode
+- Fixed total display showing extra characters in pluralization
+- Fixed alignment issues in Actions column
+- Fixed reports query to handle optional beneficiaryId for batch disbursements
+
+### 📝 Documentation
+- Added comprehensive PRD for batch disbursements feature (`PRD_Batch_Disbursements.md`)
+
+### 📊 Statistics
+- **15+ files changed**
+- **2,000+ additions**
+- **500+ deletions**
+
+---
+
+## v0.2.0
 
 ### 🎉 Major Features
 
