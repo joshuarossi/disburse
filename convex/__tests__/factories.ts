@@ -161,15 +161,18 @@ export async function createTestDisbursement(
     status?: "draft" | "pending" | "proposed" | "executed" | "failed" | "cancelled";
     safeTxHash?: string;
     txHash?: string;
+    type?: "single" | "batch";
   } = {}
 ): Promise<Id<"disbursements">> {
   const now = Date.now();
   return await ctx.db.insert("disbursements", {
     orgId,
     safeId,
-    beneficiaryId,
+    beneficiaryId: overrides.type === "batch" ? undefined : beneficiaryId,
     token: overrides.token || "USDC",
-    amount: overrides.amount || "100",
+    amount: overrides.type === "batch" ? undefined : (overrides.amount || "100"),
+    totalAmount: overrides.type === "batch" ? (overrides.amount || "100") : undefined,
+    type: overrides.type || "single",
     memo: overrides.memo,
     status: overrides.status || "draft",
     safeTxHash: overrides.safeTxHash,
@@ -178,6 +181,72 @@ export async function createTestDisbursement(
     createdAt: now,
     updatedAt: now,
   });
+}
+
+/**
+ * Create a test batch disbursement with recipients
+ */
+export async function createTestBatchDisbursement(
+  ctx: MutationCtx,
+  orgId: Id<"orgs">,
+  safeId: Id<"safes">,
+  recipientData: Array<{
+    beneficiaryId: Id<"beneficiaries">;
+    amount: string;
+  }>,
+  createdBy: Id<"users">,
+  overrides: {
+    token?: string;
+    memo?: string;
+    status?: "draft" | "pending" | "proposed" | "executed" | "failed" | "cancelled";
+    safeTxHash?: string;
+    txHash?: string;
+  } = {}
+): Promise<{
+  disbursementId: Id<"disbursements">;
+  recipientIds: Id<"disbursementRecipients">[];
+}> {
+  const now = Date.now();
+  
+  // Calculate total
+  const totalAmount = recipientData.reduce((sum, r) => sum + parseFloat(r.amount), 0).toString();
+  
+  // Create disbursement
+  const disbursementId = await ctx.db.insert("disbursements", {
+    orgId,
+    safeId,
+    type: "batch",
+    token: overrides.token || "USDC",
+    totalAmount,
+    memo: overrides.memo,
+    status: overrides.status || "draft",
+    safeTxHash: overrides.safeTxHash,
+    txHash: overrides.txHash,
+    createdBy,
+    createdAt: now,
+    updatedAt: now,
+  });
+
+  // Create recipients
+  const recipientIds: Id<"disbursementRecipients">[] = [];
+  for (const recipient of recipientData) {
+    // Get beneficiary to get wallet address
+    const beneficiary = await ctx.db.get(recipient.beneficiaryId);
+    if (!beneficiary) {
+      throw new Error(`Beneficiary ${recipient.beneficiaryId} not found`);
+    }
+    
+    const recipientId = await ctx.db.insert("disbursementRecipients", {
+      disbursementId,
+      beneficiaryId: recipient.beneficiaryId,
+      recipientAddress: beneficiary.walletAddress,
+      amount: recipient.amount,
+      createdAt: now,
+    });
+    recipientIds.push(recipientId);
+  }
+
+  return { disbursementId, recipientIds };
 }
 
 /**

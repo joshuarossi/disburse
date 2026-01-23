@@ -172,7 +172,8 @@
     "reports": "Reports",
     "settings": "Settings",
     "disconnect": "Disconnect",
-    "language": "Language"
+    "language": "Language",
+    "theme": "Theme"
   },
   "dashboard": {
     "title": "Dashboard",
@@ -461,6 +462,12 @@
       "subtitle": "Choose your preferred language",
       "selectLanguage": "Select Language",
       "description": "Your language preference will be saved and applied across all pages."
+    },
+    "appearance": {
+      "title": "Appearance",
+      "subtitle": "Customize the look and feel",
+      "selectTheme": "Select Theme",
+      "description": "Your theme preference will be saved and applied across all pages."
     },
     "billing": {
       "title": "Billing & Subscription",

@@ -23,6 +23,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { LanguageSwitcher } from '@/components/ui/LanguageSwitcher';
+import { ThemeSwitcher } from '@/components/ui/ThemeSwitcher';
 
 interface AppLayoutProps {
   children: ReactNode;
@@ -218,6 +219,10 @@ export function AppLayout({ children }: AppLayoutProps) {
                 <div className="px-3 py-2 border-b border-white/5 mb-1">
                   <p className="text-xs text-slate-500 mb-2">{t('navigation.language')}</p>
                   <LanguageSwitcher variant="ghost" size="sm" />
+                </div>
+                <div className="px-3 py-2 border-b border-white/5 mb-1">
+                  <p className="text-xs text-slate-500 mb-2">{t('navigation.theme')}</p>
+                  <ThemeSwitcher variant="ghost" size="sm" />
                 </div>
                 <button
                   onClick={handleCopyAddress}

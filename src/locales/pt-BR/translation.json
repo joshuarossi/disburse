@@ -172,7 +172,8 @@
     "reports": "Relatórios",
     "settings": "Configurações",
     "disconnect": "Desconectar",
-    "language": "Idioma"
+    "language": "Idioma",
+    "theme": "Tema"
   },
   "dashboard": {
     "title": "Painel",
@@ -461,6 +462,12 @@
       "subtitle": "Escolha seu idioma preferido",
       "selectLanguage": "Selecionar Idioma",
       "description": "Sua preferência de idioma será salva e aplicada em todas as páginas."
+    },
+    "appearance": {
+      "title": "Aparência",
+      "subtitle": "Personalize a aparência",
+      "selectTheme": "Selecionar Tema",
+      "description": "Sua preferência de tema será salva e aplicada em todas as páginas."
     },
     "billing": {
       "title": "Cobrança e Assinatura",

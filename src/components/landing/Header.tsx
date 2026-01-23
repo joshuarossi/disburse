@@ -2,11 +2,19 @@ import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/ui/button'
 import { LanguageSwitcher } from '@/components/ui/LanguageSwitcher'
+import { ThemeSwitcher } from '@/components/ui/ThemeSwitcher'
 
 export function Header() {
   const { t } = useTranslation();
   return (
-    <header className="fixed top-0 left-0 right-0 z-50 border-b border-white/5 bg-navy-950/80 backdrop-blur-xl">
+    <header 
+      className="fixed top-0 left-0 right-0 z-50 border-b backdrop-blur-xl"
+      style={{
+        borderColor: 'var(--color-border)',
+        backgroundColor: 'var(--color-bg-secondary)',
+        opacity: 0.95,
+      }}
+    >
       <div className="mx-auto max-w-7xl px-6 lg:px-8">
         <nav className="flex h-16 items-center justify-between">
           {/* Logo */}
@@ -26,13 +34,14 @@ export function Header() {
                 />
               </svg>
             </div>
-            <span className="text-xl font-bold tracking-tight text-white">
+            <span className="text-xl font-bold tracking-tight" style={{ color: 'var(--color-text-primary)' }}>
               Disburse
             </span>
           </Link>
 
           {/* Navigation */}
           <div className="flex items-center gap-3">
+            <ThemeSwitcher variant="ghost" size="sm" />
             <LanguageSwitcher variant="ghost" size="sm" />
             <Link to="/login">
               <Button variant="ghost" size="sm">

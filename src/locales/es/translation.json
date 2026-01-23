@@ -172,7 +172,8 @@
     "reports": "Informes",
     "settings": "Configuración",
     "disconnect": "Desconectar",
-    "language": "Idioma"
+    "language": "Idioma",
+    "theme": "Tema"
   },
   "dashboard": {
     "title": "Panel",
@@ -461,6 +462,12 @@
       "subtitle": "Elige tu idioma preferido",
       "selectLanguage": "Seleccionar Idioma",
       "description": "Tu preferencia de idioma se guardará y se aplicará en todas las páginas."
+    },
+    "appearance": {
+      "title": "Apariencia",
+      "subtitle": "Personaliza el aspecto",
+      "selectTheme": "Seleccionar Tema",
+      "description": "Tu preferencia de tema se guardará y se aplicará en todas las páginas."
     },
     "billing": {
       "title": "Facturación y Suscripción",

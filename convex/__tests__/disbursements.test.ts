@@ -10,6 +10,7 @@ import {
   createTestSafe,
   createTestBeneficiary,
   createTestDisbursement,
+  createTestBatchDisbursement,
   createFullOrgSetup,
   TEST_WALLETS,
 } from "./factories";
@@ -636,6 +637,404 @@ describe("Disbursements", () => {
       });
 
       expect(result).toBeNull();
+    });
+  });
+
+  describe("createBatch", () => {
+    it("creates batch disbursement with multiple recipients", async () => {
+      const t = convexTest(schema);
+
+      let orgId: string;
+      let beneficiaryIds: string[] = [];
+      await t.run(async (ctx) => {
+        const setup = await createFullOrgSetup(ctx, {
+          walletAddress: TEST_WALLETS.admin,
+        });
+        orgId = setup.orgId;
+        
+        // Create multiple beneficiaries
+        beneficiaryIds.push(await createTestBeneficiary(ctx, orgId as any, { name: "Beneficiary 1" }));
+        beneficiaryIds.push(await createTestBeneficiary(ctx, orgId as any, { name: "Beneficiary 2" }));
+        beneficiaryIds.push(await createTestBeneficiary(ctx, orgId as any, { name: "Beneficiary 3" }));
+      });
+
+      const result = await t.mutation(api.disbursements.createBatch, {
+        orgId: orgId! as any,
+        walletAddress: TEST_WALLETS.admin,
+        token: "USDC",
+        recipients: [
+          { beneficiaryId: beneficiaryIds[0] as any, amount: "100" },
+          { beneficiaryId: beneficiaryIds[1] as any, amount: "200" },
+          { beneficiaryId: beneficiaryIds[2] as any, amount: "300" },
+        ],
+        memo: "Batch payment",
+      });
+
+      expect(result.disbursementId).toBeDefined();
+
+      // Verify disbursement created
+      await t.run(async (ctx) => {
+        const disbursement = await ctx.db.get(result.disbursementId as any) as Doc<"disbursements"> | null;
+        expect(disbursement).not.toBeNull();
+        expect(disbursement?.type).toBe("batch");
+        expect(disbursement?.status).toBe("draft");
+        expect(disbursement?.token).toBe("USDC");
+        expect(disbursement?.totalAmount).toBe("600");
+        expect(disbursement?.memo).toBe("Batch payment");
+        expect(disbursement?.beneficiaryId).toBeUndefined();
+        expect(disbursement?.amount).toBeUndefined();
+
+        // Verify recipients created
+        const recipients = await ctx.db
+          .query("disbursementRecipients")
+          .withIndex("by_disbursement", (q) => q.eq("disbursementId", result.disbursementId as any))
+          .collect();
+        
+        expect(recipients.length).toBe(3);
+        expect(recipients[0].amount).toBe("100");
+        expect(recipients[1].amount).toBe("200");
+        expect(recipients[2].amount).toBe("300");
+      });
+    });
+
+    it("requires at least one recipient", async () => {
+      const t = convexTest(schema);
+
+      let orgId: string;
+      await t.run(async (ctx) => {
+        const setup = await createFullOrgSetup(ctx, {
+          walletAddress: TEST_WALLETS.admin,
+        });
+        orgId = setup.orgId;
+      });
+
+      await expect(
+        t.mutation(api.disbursements.createBatch, {
+          orgId: orgId! as any,
+          walletAddress: TEST_WALLETS.admin,
+          token: "USDC",
+          recipients: [],
+        })
+      ).rejects.toThrow("At least one recipient is required");
+    });
+
+    it("rejects duplicate beneficiaries", async () => {
+      const t = convexTest(schema);
+
+      let orgId: string;
+      let beneficiaryId: string;
+      await t.run(async (ctx) => {
+        const setup = await createFullOrgSetup(ctx, {
+          walletAddress: TEST_WALLETS.admin,
+        });
+        orgId = setup.orgId;
+        beneficiaryId = await createTestBeneficiary(ctx, orgId as any);
+      });
+
+      await expect(
+        t.mutation(api.disbursements.createBatch, {
+          orgId: orgId! as any,
+          walletAddress: TEST_WALLETS.admin,
+          token: "USDC",
+          recipients: [
+            { beneficiaryId: beneficiaryId! as any, amount: "100" },
+            { beneficiaryId: beneficiaryId! as any, amount: "200" }, // Duplicate!
+          ],
+        })
+      ).rejects.toThrow("Duplicate beneficiaries");
+    });
+
+    it("rejects invalid amounts", async () => {
+      const t = convexTest(schema);
+
+      let orgId: string;
+      let beneficiaryIds: string[] = [];
+      await t.run(async (ctx) => {
+        const setup = await createFullOrgSetup(ctx, {
+          walletAddress: TEST_WALLETS.admin,
+        });
+        orgId = setup.orgId;
+        beneficiaryIds.push(await createTestBeneficiary(ctx, orgId as any));
+        beneficiaryIds.push(await createTestBeneficiary(ctx, orgId as any));
+      });
+
+      // Test zero amount
+      await expect(
+        t.mutation(api.disbursements.createBatch, {
+          orgId: orgId! as any,
+          walletAddress: TEST_WALLETS.admin,
+          token: "USDC",
+          recipients: [
+            { beneficiaryId: beneficiaryIds[0] as any, amount: "0" },
+          ],
+        })
+      ).rejects.toThrow();
+
+      // Test negative amount
+      await expect(
+        t.mutation(api.disbursements.createBatch, {
+          orgId: orgId! as any,
+          walletAddress: TEST_WALLETS.admin,
+          token: "USDC",
+          recipients: [
+            { beneficiaryId: beneficiaryIds[0] as any, amount: "-10" },
+          ],
+        })
+      ).rejects.toThrow();
+    });
+
+    it("requires active beneficiaries", async () => {
+      const t = convexTest(schema);
+
+      let orgId: string;
+      let beneficiaryId: string;
+      await t.run(async (ctx) => {
+        const setup = await createFullOrgSetup(ctx, {
+          walletAddress: TEST_WALLETS.admin,
+        });
+        orgId = setup.orgId;
+        beneficiaryId = await createTestBeneficiary(ctx, orgId as any, {
+          isActive: false,
+        });
+      });
+
+      await expect(
+        t.mutation(api.disbursements.createBatch, {
+          orgId: orgId! as any,
+          walletAddress: TEST_WALLETS.admin,
+          token: "USDC",
+          recipients: [
+            { beneficiaryId: beneficiaryId! as any, amount: "100" },
+          ],
+        })
+      ).rejects.toThrow("Beneficiary is not active");
+    });
+
+    it("requires linked Safe", async () => {
+      const t = convexTest(schema);
+
+      let orgId: string;
+      let beneficiaryId: string;
+      await t.run(async (ctx) => {
+        const userId = await createTestUser(ctx, { walletAddress: TEST_WALLETS.admin });
+        const { orgId: id } = await createTestOrg(ctx, userId);
+        orgId = id;
+        beneficiaryId = await createTestBeneficiary(ctx, orgId as any);
+      });
+
+      await expect(
+        t.mutation(api.disbursements.createBatch, {
+          orgId: orgId! as any,
+          walletAddress: TEST_WALLETS.admin,
+          token: "USDC",
+          recipients: [
+            { beneficiaryId: beneficiaryId! as any, amount: "100" },
+          ],
+        })
+      ).rejects.toThrow("No Safe linked");
+    });
+
+    it("creates audit log", async () => {
+      const t = convexTest(schema);
+
+      let orgId: string;
+      let beneficiaryIds: string[] = [];
+      await t.run(async (ctx) => {
+        const setup = await createFullOrgSetup(ctx, {
+          walletAddress: TEST_WALLETS.admin,
+        });
+        orgId = setup.orgId;
+        beneficiaryIds.push(await createTestBeneficiary(ctx, orgId as any));
+        beneficiaryIds.push(await createTestBeneficiary(ctx, orgId as any));
+      });
+
+      await t.mutation(api.disbursements.createBatch, {
+        orgId: orgId! as any,
+        walletAddress: TEST_WALLETS.admin,
+        token: "USDC",
+        recipients: [
+          { beneficiaryId: beneficiaryIds[0] as any, amount: "100" },
+          { beneficiaryId: beneficiaryIds[1] as any, amount: "200" },
+        ],
+      });
+
+      await t.run(async (ctx) => {
+        const logs = await ctx.db
+          .query("auditLog")
+          .withIndex("by_org", (q) => q.eq("orgId", orgId as any))
+          .collect();
+
+        const createLog = logs.find((l) => l.action === "disbursement.created");
+        expect(createLog).toBeDefined();
+        expect(createLog?.metadata?.type).toBe("batch");
+        expect(createLog?.metadata?.token).toBe("USDC");
+        expect(createLog?.metadata?.totalAmount).toBe("300");
+        expect(createLog?.metadata?.recipientCount).toBe(2);
+      });
+    });
+  });
+
+  describe("getWithRecipients", () => {
+    it("returns batch disbursement with recipients", async () => {
+      const t = convexTest(schema);
+
+      let disbursementId: string;
+      await t.run(async (ctx) => {
+        const setup = await createFullOrgSetup(ctx, {
+          walletAddress: TEST_WALLETS.admin,
+        });
+        const beneficiary1 = await createTestBeneficiary(ctx, setup.orgId as any, { name: "Ben 1" });
+        const beneficiary2 = await createTestBeneficiary(ctx, setup.orgId as any, { name: "Ben 2" });
+        
+        const { disbursementId: id } = await createTestBatchDisbursement(
+          ctx,
+          setup.orgId as any,
+          setup.safeId as any,
+          [
+            { beneficiaryId: beneficiary1 as any, amount: "100" },
+            { beneficiaryId: beneficiary2 as any, amount: "200" },
+          ],
+          setup.userId
+        );
+        disbursementId = id;
+      });
+
+      const result = await t.query(api.disbursements.getWithRecipients, {
+        disbursementId: disbursementId! as any,
+        walletAddress: TEST_WALLETS.admin,
+      });
+
+      expect(result).not.toBeNull();
+      expect(result?.type).toBe("batch");
+      expect(result?.totalAmount).toBe("300");
+      expect(result?.recipients).toBeDefined();
+      expect(result?.recipients?.length).toBe(2);
+      expect(result?.recipients?.[0].amount).toBe("100");
+      expect(result?.recipients?.[1].amount).toBe("200");
+      expect(result?.recipients?.[0].beneficiary?.name).toBe("Ben 1");
+      expect(result?.recipients?.[1].beneficiary?.name).toBe("Ben 2");
+    });
+
+    it("returns single disbursement correctly", async () => {
+      const t = convexTest(schema);
+
+      let disbursementId: string;
+      await t.run(async (ctx) => {
+        const setup = await createFullOrgSetup(ctx, {
+          walletAddress: TEST_WALLETS.admin,
+        });
+        const beneficiaryId = await createTestBeneficiary(ctx, setup.orgId as any, {
+          name: "Single Beneficiary",
+        });
+        disbursementId = await createTestDisbursement(
+          ctx,
+          setup.orgId as any,
+          setup.safeId as any,
+          beneficiaryId as any,
+          setup.userId
+        );
+      });
+
+      const result = await t.query(api.disbursements.getWithRecipients, {
+        disbursementId: disbursementId! as any,
+        walletAddress: TEST_WALLETS.admin,
+      });
+
+      expect(result).not.toBeNull();
+      expect(result?.type).toBe("single");
+      expect(result?.amount).toBe("100");
+      expect(result?.beneficiary?.name).toBe("Single Beneficiary");
+      expect(result?.recipients).toEqual([]);
+    });
+  });
+
+  describe("list with batch disbursements", () => {
+    it("shows Batch label for batch disbursements", async () => {
+      const t = convexTest(schema);
+
+      let orgId: string;
+      await t.run(async (ctx) => {
+        const setup = await createFullOrgSetup(ctx, {
+          walletAddress: TEST_WALLETS.admin,
+        });
+        orgId = setup.orgId;
+
+        // Create single disbursement
+        const singleBeneficiary = await createTestBeneficiary(ctx, orgId as any, { name: "Single" });
+        await createTestDisbursement(
+          ctx,
+          orgId as any,
+          setup.safeId as any,
+          singleBeneficiary as any,
+          setup.userId
+        );
+
+        // Create batch disbursement
+        const batchBeneficiary1 = await createTestBeneficiary(ctx, orgId as any);
+        const batchBeneficiary2 = await createTestBeneficiary(ctx, orgId as any);
+        await createTestBatchDisbursement(
+          ctx,
+          orgId as any,
+          setup.safeId as any,
+          [
+            { beneficiaryId: batchBeneficiary1 as any, amount: "100" },
+            { beneficiaryId: batchBeneficiary2 as any, amount: "200" },
+          ],
+          setup.userId
+        );
+      });
+
+      const result = await t.query(api.disbursements.list, {
+        orgId: orgId! as any,
+        walletAddress: TEST_WALLETS.admin,
+      });
+
+      expect(result.items.length).toBe(2);
+      
+      const single = result.items.find((d) => d.beneficiary?.name === "Single");
+      const batch = result.items.find((d) => d.beneficiary?.name === "Batch");
+      
+      expect(single).toBeDefined();
+      expect(single?.type).toBe("single");
+      expect(single?.amount).toBe("100");
+      
+      expect(batch).toBeDefined();
+      expect(batch?.type).toBe("batch");
+      expect(batch?.displayAmount || batch?.totalAmount).toBe("300");
+    });
+
+    it("uses totalAmount for batch disbursements in list", async () => {
+      const t = convexTest(schema);
+
+      let orgId: string;
+      await t.run(async (ctx) => {
+        const setup = await createFullOrgSetup(ctx, {
+          walletAddress: TEST_WALLETS.admin,
+        });
+        orgId = setup.orgId;
+
+        const beneficiary1 = await createTestBeneficiary(ctx, orgId as any);
+        const beneficiary2 = await createTestBeneficiary(ctx, orgId as any);
+        await createTestBatchDisbursement(
+          ctx,
+          orgId as any,
+          setup.safeId as any,
+          [
+            { beneficiaryId: beneficiary1 as any, amount: "50.50" },
+            { beneficiaryId: beneficiary2 as any, amount: "75.25" },
+          ],
+          setup.userId
+        );
+      });
+
+      const result = await t.query(api.disbursements.list, {
+        orgId: orgId! as any,
+        walletAddress: TEST_WALLETS.admin,
+      });
+
+      expect(result.items.length).toBe(1);
+      expect(result.items[0].type).toBe("batch");
+      expect(result.items[0].displayAmount || result.items[0].totalAmount).toBe("125.75");
     });
   });
 });

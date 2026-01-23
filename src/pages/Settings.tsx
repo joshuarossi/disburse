@@ -8,6 +8,7 @@ import { Id } from '../../convex/_generated/dataModel';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { Button } from '@/components/ui/button';
 import { LanguageSwitcher } from '@/components/ui/LanguageSwitcher';
+import { ThemeSwitcher } from '@/components/ui/ThemeSwitcher';
 import { 
   Wallet, 
   Building2, 
@@ -27,6 +28,7 @@ import {
   CheckCircle,
   User,
   Languages,
+  Palette,
 } from 'lucide-react';
 import { validateSafeAddress, isOwner } from '@/lib/safe';
 import { TOKENS } from '@/lib/wagmi';
@@ -1019,6 +1021,33 @@ export default function Settings() {
               </div>
               <p className="mt-3 text-xs sm:text-sm text-slate-500">
                 {t('settings.language.description')}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Appearance Preferences */}
+        <div className="rounded-2xl border border-white/10 bg-navy-900/50 p-4 sm:p-6">
+          <div className="flex items-center gap-3 mb-4 sm:mb-6">
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-navy-800 text-slate-400 shrink-0">
+              <Palette className="h-5 w-5" />
+            </div>
+            <div className="min-w-0">
+              <h2 className="text-base sm:text-lg font-semibold text-white">{t('settings.appearance.title')}</h2>
+              <p className="text-xs sm:text-sm text-slate-400">{t('settings.appearance.subtitle')}</p>
+            </div>
+          </div>
+
+          <div className="space-y-4">
+            <div>
+              <label className="mb-3 block text-sm font-medium text-slate-300">
+                {t('settings.appearance.selectTheme')}
+              </label>
+              <div className="rounded-lg border border-white/10 bg-navy-800/50 p-2">
+                <ThemeSwitcher variant="secondary" size="default" />
+              </div>
+              <p className="mt-3 text-xs sm:text-sm text-slate-500">
+                {t('settings.appearance.description')}
               </p>
             </div>
           </div>

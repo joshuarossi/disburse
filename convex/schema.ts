@@ -11,6 +11,10 @@ export default defineSchema({
       v.literal("es"),
       v.literal("pt-BR")
     )),
+    preferredTheme: v.optional(v.union(
+      v.literal("dark"),
+      v.literal("light")
+    )),
     createdAt: v.number(),
   })
     .index("by_wallet", ["walletAddress"]),

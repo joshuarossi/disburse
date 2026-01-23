@@ -64,3 +64,30 @@ export const updatePreferredLanguage = mutation({
     return { success: true };
   },
 });
+
+// Update user preferred theme
+export const updatePreferredTheme = mutation({
+  args: {
+    walletAddress: v.string(),
+    preferredTheme: v.union(
+      v.literal("dark"),
+      v.literal("light")
+    ),
+  },
+  handler: async (ctx, args) => {
+    const walletAddress = args.walletAddress.toLowerCase();
+    
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_wallet", (q) => q.eq("walletAddress", walletAddress))
+      .first();
+
+    if (!user) {
+      throw new Error("User not found");
+    }
+
+    await ctx.db.patch(user._id, { preferredTheme: args.preferredTheme });
+
+    return { success: true };
+  },
+});
