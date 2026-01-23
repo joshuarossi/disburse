@@ -1,12 +1,14 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAccount } from 'wagmi';
+import { useTranslation } from 'react-i18next';
 import { useQuery, useMutation } from 'convex/react';
 import { api } from '../../convex/_generated/api';
 import { Button } from '@/components/ui/button';
 import { Plus, Building2, ChevronRight } from 'lucide-react';
 
 export default function SelectOrg() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const { address } = useAccount();
   const [isCreating, setIsCreating] = useState(false);
@@ -58,9 +60,9 @@ export default function SelectOrg() {
               <Building2 className="h-6 w-6 text-navy-950" />
             </div>
           </div>
-          <h1 className="text-2xl font-bold text-white">Select Organization</h1>
+          <h1 className="text-2xl font-bold text-white">{t('auth.selectOrg.title')}</h1>
           <p className="mt-2 text-slate-400">
-            Choose an organization or create a new one
+            {t('auth.selectOrg.subtitle')}
           </p>
         </div>
 
@@ -87,7 +89,7 @@ export default function SelectOrg() {
 
           {orgs?.length === 0 && !isCreating && (
             <p className="text-center text-slate-500 py-4">
-              You're not a member of any organizations yet.
+              {t('auth.selectOrg.noOrgs')}
             </p>
           )}
         </div>
@@ -97,19 +99,19 @@ export default function SelectOrg() {
           <form onSubmit={handleCreateOrg} className="mt-6">
             <div className="rounded-xl border border-accent-500/30 bg-navy-900/50 p-4">
               <label className="mb-2 block text-sm font-medium text-white">
-                Organization Name
+                {t('auth.selectOrg.orgName')}
               </label>
               <input
                 type="text"
                 value={newOrgName}
                 onChange={(e) => setNewOrgName(e.target.value)}
-                placeholder="Enter organization name"
+                placeholder={t('auth.selectOrg.orgNamePlaceholder')}
                 className="w-full rounded-lg border border-white/10 bg-navy-800 px-4 py-2 text-white placeholder-slate-500 focus:border-accent-500 focus:outline-none focus:ring-1 focus:ring-accent-500"
                 autoFocus
               />
               <div className="mt-4 flex gap-3">
                 <Button type="submit" className="flex-1">
-                  Create Organization
+                  {t('auth.selectOrg.createOrg')}
                 </Button>
                 <Button
                   type="button"
@@ -119,7 +121,7 @@ export default function SelectOrg() {
                     setNewOrgName('');
                   }}
                 >
-                  Cancel
+                  {t('common.cancel')}
                 </Button>
               </div>
             </div>
@@ -131,7 +133,7 @@ export default function SelectOrg() {
             className="mt-6 w-full"
           >
             <Plus className="h-4 w-4" />
-            Create New Organization
+            {t('auth.selectOrg.createNew')}
           </Button>
         )}
       </div>

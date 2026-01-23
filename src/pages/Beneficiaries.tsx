@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react';
 import { useParams } from 'react-router-dom';
 import { useAccount } from 'wagmi';
+import { useTranslation } from 'react-i18next';
 import { useQuery, useMutation } from 'convex/react';
 import { api } from '../../convex/_generated/api';
 import { Id } from '../../convex/_generated/dataModel';
@@ -166,7 +167,7 @@ function BeneficiarySection({
               type="text"
               value={state.search}
               onChange={(e) => setState((s) => ({ ...s, search: e.target.value }))}
-              placeholder="Search by name, address, or notes..."
+              placeholder={t('beneficiaries.searchPlaceholder')}
               className="w-full rounded-lg border border-white/10 bg-navy-800 pl-10 pr-4 py-2 text-sm text-white placeholder-slate-500 focus:border-accent-500 focus:outline-none focus:ring-1 focus:ring-accent-500"
             />
           </div>
@@ -179,7 +180,7 @@ function BeneficiarySection({
             className={hasActiveFilters ? 'border-accent-500' : ''}
           >
             <Filter className="h-4 w-4" />
-            Filters
+            {t('common.filters')}
             {hasActiveFilters && (
               <span className="ml-1 rounded-full bg-accent-500 px-1.5 py-0.5 text-xs text-white">
                 {(state.statusFilter !== 'all' ? 1 : 0)}
@@ -190,7 +191,7 @@ function BeneficiarySection({
           {/* Clear Filters */}
           {hasActiveFilters && (
             <Button variant="ghost" size="sm" onClick={clearFilters} className="text-slate-400 hover:text-white">
-              Clear
+              {t('common.clear')}
             </Button>
           )}
         </div>
@@ -211,7 +212,7 @@ function BeneficiarySection({
                         : 'bg-navy-800 text-slate-400 hover:bg-navy-700 hover:text-white'
                     }`}
                   >
-                    {status.charAt(0).toUpperCase() + status.slice(1)}
+                    {t(`beneficiaries.status.${status}`)}
                   </button>
                 ))}
               </div>
@@ -231,9 +232,9 @@ function BeneficiarySection({
           ) : (
             <>
               <Search className="mx-auto h-10 w-10 text-slate-500" />
-              <p className="mt-2 text-slate-400">No results match your search</p>
+              <p className="mt-2 text-slate-400">{t('common.noResults')}</p>
               <Button variant="secondary" size="sm" onClick={clearFilters} className="mt-3">
-                Clear Filters
+                {t('common.clearFilters')}
               </Button>
             </>
           )}
@@ -247,7 +248,7 @@ function BeneficiarySection({
                 onClick={() => handleSort('name')}
               >
                 <span className="flex items-center gap-1">
-                  Name
+                  {t('common.name')}
                   {state.sortField === 'name' && (
                     state.sortOrder === 'asc' ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />
                   )}
@@ -265,21 +266,21 @@ function BeneficiarySection({
                 </span>
               </th>
               <th className="px-6 py-3 text-left text-xs font-medium text-slate-400">
-                Status
+                  {t('common.status')}
               </th>
               <th
                 className="px-6 py-3 text-left text-xs font-medium text-slate-400 cursor-pointer hover:text-white transition-colors"
                 onClick={() => handleSort('createdAt')}
               >
                 <span className="flex items-center gap-1">
-                  Added
+                  {t('beneficiaries.table.added')}
                   {state.sortField === 'createdAt' && (
                     state.sortOrder === 'asc' ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />
                   )}
                 </span>
               </th>
               <th className="px-6 py-3 text-right text-xs font-medium text-slate-400">
-                Actions
+                  {t('common.actions')}
               </th>
             </tr>
           </thead>
@@ -310,7 +311,7 @@ function BeneficiarySection({
                         : 'bg-slate-500/10 text-slate-400'
                     }`}
                   >
-                    {beneficiary.isActive ? 'Active' : 'Inactive'}
+                    {beneficiary.isActive ? t('common.active') : t('common.inactive')}
                   </span>
                 </td>
                 <td className="px-6 py-4 text-sm text-slate-400">
@@ -322,7 +323,7 @@ function BeneficiarySection({
                       variant="ghost"
                       size="icon"
                       onClick={() => onEdit(beneficiary)}
-                      title="Edit beneficiary"
+                      title={t('beneficiaries.table.edit')}
                     >
                       <Edit className="h-4 w-4 text-slate-400" />
                     </Button>
@@ -330,7 +331,7 @@ function BeneficiarySection({
                       variant="ghost"
                       size="icon"
                       onClick={() => onToggleActive(beneficiary._id, beneficiary.isActive)}
-                      title={beneficiary.isActive ? 'Deactivate' : 'Reactivate'}
+                      title={beneficiary.isActive ? t('beneficiaries.table.deactivate') : t('beneficiaries.table.reactivate')}
                     >
                       {beneficiary.isActive ? (
                         <Trash2 className="h-4 w-4 text-red-400" />
@@ -352,6 +353,7 @@ function BeneficiarySection({
 export default function Beneficiaries() {
   const { orgId } = useParams<{ orgId: string }>();
   const { address } = useAccount();
+  const { t } = useTranslation();
   
   // Create form state
   const [isCreating, setIsCreating] = useState(false);
@@ -471,17 +473,17 @@ export default function Beneficiaries() {
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-white">Beneficiaries</h1>
+            <h1 className="text-2xl font-bold text-white">{t('beneficiaries.title')}</h1>
             <p className="mt-1 text-slate-400">
-              Manage your payment recipients
+              {t('beneficiaries.subtitle')}
               {totalCount > 0 && (
-                <span className="ml-2 text-slate-500">({totalCount} total)</span>
+                <span className="ml-2 text-slate-500">({t('beneficiaries.total', { count: totalCount })})</span>
               )}
             </p>
           </div>
           <Button onClick={() => setIsCreating(true)}>
             <Plus className="h-4 w-4" />
-            Add Beneficiary
+            {t('beneficiaries.addBeneficiary')}
           </Button>
         </div>
 
@@ -489,7 +491,7 @@ export default function Beneficiaries() {
         {isCreating && (
           <div className="rounded-2xl border border-accent-500/30 bg-navy-900/50 p-6">
             <h2 className="mb-4 text-lg font-semibold text-white">
-              New Beneficiary
+              {t('beneficiaries.newBeneficiary')}
             </h2>
             
             {createError && (
@@ -516,7 +518,7 @@ export default function Beneficiaries() {
                     }`}
                   >
                     <User className="h-5 w-5" />
-                    <span className="font-medium">Individual</span>
+                    <span className="font-medium">{t('beneficiaries.individual')}</span>
                   </button>
                   <button
                     type="button"
@@ -528,20 +530,20 @@ export default function Beneficiaries() {
                     }`}
                   >
                     <Building2 className="h-5 w-5" />
-                    <span className="font-medium">Business</span>
+                    <span className="font-medium">{t('beneficiaries.business')}</span>
                   </button>
                 </div>
               </div>
 
               <div>
                 <label className="mb-2 block text-sm font-medium text-slate-300">
-                  {newType === 'individual' ? 'Full Name' : 'Business Name'}
+                  {newType === 'individual' ? t('beneficiaries.fullName') : t('beneficiaries.businessName')}
                 </label>
                 <input
                   type="text"
                   value={newName}
                   onChange={(e) => setNewName(e.target.value)}
-                  placeholder={newType === 'individual' ? 'e.g., John Doe' : 'e.g., Acme Corporation'}
+                  placeholder={newType === 'individual' ? t('beneficiaries.namePlaceholder.individual') : t('beneficiaries.namePlaceholder.business')}
                   className="w-full rounded-lg border border-white/10 bg-navy-800 px-4 py-2 text-white placeholder-slate-500 focus:border-accent-500 focus:outline-none focus:ring-1 focus:ring-accent-500"
                   required
                 />
@@ -561,18 +563,18 @@ export default function Beneficiaries() {
               </div>
               <div>
                 <label className="mb-2 block text-sm font-medium text-slate-300">
-                  Notes (optional)
+                  {t('common.notes')} ({t('common.optional')})
                 </label>
                 <textarea
                   value={newNotes}
                   onChange={(e) => setNewNotes(e.target.value)}
-                  placeholder="Any additional notes..."
+                  placeholder={t('beneficiaries.notesPlaceholder')}
                   rows={2}
                   className="w-full rounded-lg border border-white/10 bg-navy-800 px-4 py-2 text-white placeholder-slate-500 focus:border-accent-500 focus:outline-none focus:ring-1 focus:ring-accent-500"
                 />
               </div>
               <div className="flex gap-3">
-                <Button type="submit">Create Beneficiary</Button>
+                <Button type="submit">{t('beneficiaries.createBeneficiary')}</Button>
                 <Button
                   type="button"
                   variant="secondary"
@@ -585,7 +587,7 @@ export default function Beneficiaries() {
                     setCreateError(null);
                   }}
                 >
-                  Cancel
+                  {t('common.cancel')}
                 </Button>
               </div>
             </form>
@@ -597,10 +599,10 @@ export default function Beneficiaries() {
           <div className="rounded-2xl border border-dashed border-white/20 bg-navy-900/30 p-8 text-center">
             <Users className="mx-auto h-12 w-12 text-slate-500" />
             <h3 className="mt-4 text-lg font-medium text-white">
-              No Beneficiaries Yet
+              {t('beneficiaries.noBeneficiaries.title')}
             </h3>
             <p className="mt-2 text-slate-400">
-              Add your first beneficiary to start making disbursements
+              {t('beneficiaries.noBeneficiaries.description')}
             </p>
           </div>
         )}
@@ -608,7 +610,7 @@ export default function Beneficiaries() {
         {/* Individuals Section */}
         {(beneficiaries?.length ?? 0) > 0 && (
           <BeneficiarySection
-            title="Individuals"
+            title={t('beneficiaries.individuals')}
             icon={User}
             iconColor="bg-purple-500/10 text-purple-400"
             beneficiaries={individuals as Beneficiary[]}
@@ -620,7 +622,7 @@ export default function Beneficiaries() {
         {/* Businesses Section */}
         {(beneficiaries?.length ?? 0) > 0 && (
           <BeneficiarySection
-            title="Businesses"
+            title={t('beneficiaries.businesses')}
             icon={Building2}
             iconColor="bg-blue-500/10 text-blue-400"
             beneficiaries={businesses as Beneficiary[]}
@@ -635,7 +637,7 @@ export default function Beneficiaries() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
           <div className="w-full max-w-md rounded-2xl border border-white/10 bg-navy-900 p-6">
             <div className="flex items-center justify-between mb-6">
-              <h2 className="text-xl font-bold text-white">Edit Beneficiary</h2>
+              <h2 className="text-xl font-bold text-white">{t('beneficiaries.editBeneficiary')}</h2>
               <button
                 onClick={handleCloseEdit}
                 className="text-slate-400 hover:text-white"
@@ -725,10 +727,10 @@ export default function Beneficiaries() {
 
               <div className="flex gap-3 pt-2">
                 <Button type="submit" className="flex-1">
-                  Save Changes
+                  {t('beneficiaries.saveChanges')}
                 </Button>
                 <Button type="button" variant="secondary" onClick={handleCloseEdit}>
-                  Cancel
+                  {t('common.cancel')}
                 </Button>
               </div>
             </form>

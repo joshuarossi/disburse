@@ -2,6 +2,7 @@ import { ReactNode, useState } from 'react';
 import { Link, useParams, useLocation } from 'react-router-dom';
 import { useQuery } from 'convex/react';
 import { useAccount, useDisconnect } from 'wagmi';
+import { useTranslation } from 'react-i18next';
 import { api } from '../../../convex/_generated/api';
 import { Id } from '../../../convex/_generated/dataModel';
 import {
@@ -15,29 +16,32 @@ import {
   Copy,
   Check,
   ChevronUp,
+  Languages,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { LanguageSwitcher } from '@/components/ui/LanguageSwitcher';
 
 interface AppLayoutProps {
   children: ReactNode;
 }
-
-const navItems = [
-  { href: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { href: 'beneficiaries', label: 'Beneficiaries', icon: Users },
-  { href: 'disbursements', label: 'Disbursements', icon: Send },
-  { href: 'settings', label: 'Settings', icon: Settings },
-];
 
 export function AppLayout({ children }: AppLayoutProps) {
   const { orgId } = useParams<{ orgId: string }>();
   const location = useLocation();
   const { address } = useAccount();
   const { disconnect } = useDisconnect();
+  const { t } = useTranslation();
   
   // User panel state
   const [showUserPanel, setShowUserPanel] = useState(false);
   const [copied, setCopied] = useState(false);
+
+  const navItems = [
+    { href: 'dashboard', label: t('navigation.dashboard'), icon: LayoutDashboard },
+    { href: 'beneficiaries', label: t('navigation.beneficiaries'), icon: Users },
+    { href: 'disbursements', label: t('navigation.disbursements'), icon: Send },
+    { href: 'settings', label: t('navigation.settings'), icon: Settings },
+  ];
 
   const org = useQuery(
     api.orgs.get,
@@ -116,13 +120,13 @@ export function AppLayout({ children }: AppLayoutProps) {
             </div>
             <div className="flex-1 overflow-hidden">
               <p className="truncate text-sm font-medium text-white">
-                {org?.name || 'Loading...'}
+                {org?.name || t('common.loading')}
               </p>
               {billing && (
                 <p className="text-xs text-slate-500">
                   {billing.status === 'trial'
-                    ? `Trial: ${billing.daysRemaining} days left`
-                    : 'Pro Plan'}
+                    ? t('settings.billing.trialDaysLeft', { days: billing.daysRemaining })
+                    : t('settings.billing.plans.pro.name') + ' ' + t('settings.billing.plans.pro.description')}
                 </p>
               )}
             </div>
@@ -166,6 +170,10 @@ export function AppLayout({ children }: AppLayoutProps) {
             )}
           >
             <div className="p-2 space-y-1">
+              <div className="px-3 py-2 border-b border-white/5 mb-1">
+                <p className="text-xs text-slate-500 mb-2">{t('navigation.language')}</p>
+                <LanguageSwitcher variant="ghost" size="sm" />
+              </div>
               <button
                 onClick={handleCopyAddress}
                 className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm text-slate-300 hover:bg-navy-700 hover:text-white transition-colors"
@@ -175,14 +183,14 @@ export function AppLayout({ children }: AppLayoutProps) {
                 ) : (
                   <Copy className="h-4 w-4" />
                 )}
-                {copied ? 'Copied!' : 'Copy Address'}
+                {copied ? t('common.copied') : t('common.copyAddress')}
               </button>
               <button
                 onClick={handleDisconnect}
                 className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm text-red-400 hover:bg-red-500/10 transition-colors"
               >
                 <LogOut className="h-4 w-4" />
-                Disconnect
+                {t('navigation.disconnect')}
               </button>
             </div>
           </div>
@@ -207,7 +215,7 @@ export function AppLayout({ children }: AppLayoutProps) {
                 </>
               ) : (
                 <p className="truncate text-sm font-medium text-white font-mono">
-                  {truncatedAddress || 'Not connected'}
+                  {truncatedAddress || t('common.loading')}
                 </p>
               )}
             </div>

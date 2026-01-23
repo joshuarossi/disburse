@@ -6,6 +6,11 @@ export default defineSchema({
   users: defineTable({
     walletAddress: v.string(),
     email: v.optional(v.string()),
+    preferredLanguage: v.optional(v.union(
+      v.literal("en"),
+      v.literal("es"),
+      v.literal("pt-BR")
+    )),
     createdAt: v.number(),
   })
     .index("by_wallet", ["walletAddress"]),

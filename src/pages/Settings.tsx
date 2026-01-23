@@ -1,11 +1,13 @@
 import { useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { useAccount, useSendTransaction, useWaitForTransactionReceipt } from 'wagmi';
+import { useTranslation } from 'react-i18next';
 import { useQuery, useMutation } from 'convex/react';
 import { api } from '../../convex/_generated/api';
 import { Id } from '../../convex/_generated/dataModel';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { Button } from '@/components/ui/button';
+import { LanguageSwitcher } from '@/components/ui/LanguageSwitcher';
 import { 
   Wallet, 
   Building2, 
@@ -31,13 +33,7 @@ import { encodeFunctionData, parseUnits } from 'viem';
 
 const SEPOLIA_CHAIN_ID = 11155111;
 
-const ROLES = [
-  { value: 'admin', label: 'Admin', description: 'Full access to all features' },
-  { value: 'approver', label: 'Approver', description: 'Can approve disbursements' },
-  { value: 'initiator', label: 'Initiator', description: 'Can create disbursements' },
-  { value: 'clerk', label: 'Clerk', description: 'Can manage beneficiaries' },
-  { value: 'viewer', label: 'Viewer', description: 'Read-only access' },
-] as const;
+// ROLES will be translated in component
 
 type Role = typeof ROLES[number]['value'];
 
@@ -130,6 +126,15 @@ interface EditingMember {
 export default function Settings() {
   const { orgId } = useParams<{ orgId: string }>();
   const { address } = useAccount();
+  const { t } = useTranslation();
+  
+  const ROLES = [
+    { value: 'admin', label: t('settings.team.roles.admin'), description: t('settings.team.roles.adminDesc') },
+    { value: 'approver', label: t('settings.team.roles.approver'), description: t('settings.team.roles.approverDesc') },
+    { value: 'initiator', label: t('settings.team.roles.initiator'), description: t('settings.team.roles.initiatorDesc') },
+    { value: 'clerk', label: t('settings.team.roles.clerk'), description: t('settings.team.roles.clerkDesc') },
+    { value: 'viewer', label: t('settings.team.roles.viewer'), description: t('settings.team.roles.viewerDesc') },
+  ] as const;
   
   // Organization state
   const [orgName, setOrgName] = useState('');
@@ -285,7 +290,7 @@ export default function Settings() {
 
   const handleUnlinkSafe = async () => {
     if (!safe || !address) return;
-    if (!confirm('Are you sure you want to unlink this Safe?')) return;
+    if (!confirm(t('settings.safe.unlinkConfirm'))) return;
 
     try {
       await unlinkSafe({
@@ -400,7 +405,7 @@ export default function Settings() {
 
   const handleRemoveMember = async (membershipId: string) => {
     if (!orgId || !address) return;
-    if (!confirm('Are you sure you want to remove this member?')) return;
+    if (!confirm(t('settings.team.removeConfirm'))) return;
 
     setProcessingMemberId(membershipId);
     try {
@@ -506,11 +511,14 @@ export default function Settings() {
     <AppLayout>
       <div className="space-y-8">
         {/* Header */}
-        <div>
-          <h1 className="text-2xl font-bold text-white">Settings</h1>
-          <p className="mt-1 text-slate-400">
-            Manage your organization settings
-          </p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-white">{t('settings.title')}</h1>
+            <p className="mt-1 text-slate-400">
+              {t('settings.subtitle')}
+            </p>
+          </div>
+          <LanguageSwitcher />
         </div>
 
         {/* Organization Info */}
@@ -520,16 +528,16 @@ export default function Settings() {
               <Building2 className="h-5 w-5" />
             </div>
             <div>
-              <h2 className="text-lg font-semibold text-white">Organization</h2>
-              <p className="text-sm text-slate-400">General settings</p>
+              <h2 className="text-lg font-semibold text-white">{t('settings.organization.title')}</h2>
+              <p className="text-sm text-slate-400">{t('settings.organization.subtitle')}</p>
             </div>
           </div>
 
           <div className="space-y-4">
             <div>
-              <label className="mb-2 block text-sm font-medium text-slate-300">
-                Organization Name
-              </label>
+                <label className="mb-2 block text-sm font-medium text-slate-300">
+                  {t('settings.organization.orgName')}
+                </label>
               <div className="flex gap-3">
                 <input
                   type="text"
@@ -548,13 +556,13 @@ export default function Settings() {
                     ) : (
                       <Save className="h-4 w-4" />
                     )}
-                    Save
+                    {t('settings.organization.save')}
                   </Button>
                 )}
               </div>
               {!isAdmin && (
                 <p className="mt-2 text-sm text-slate-500">
-                  Only admins can edit the organization name
+                  {t('settings.organization.adminOnly')}
                 </p>
               )}
             </div>
@@ -568,8 +576,8 @@ export default function Settings() {
               <Wallet className="h-5 w-5" />
             </div>
             <div>
-              <h2 className="text-lg font-semibold text-white">Safe Wallet</h2>
-              <p className="text-sm text-slate-400">Connect your Gnosis Safe</p>
+              <h2 className="text-lg font-semibold text-white">{t('settings.safe.title')}</h2>
+              <p className="text-sm text-slate-400">{t('settings.safe.subtitle')}</p>
             </div>
           </div>
 
@@ -578,7 +586,7 @@ export default function Settings() {
               <div className="rounded-xl border border-white/10 bg-navy-800/50 p-4">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm text-slate-400">Connected Safe</p>
+                    <p className="text-sm text-slate-400">{t('settings.safe.connected')}</p>
                     <p className="mt-1 font-mono text-white">{safe.safeAddress}</p>
                   </div>
                   <a
@@ -587,19 +595,19 @@ export default function Settings() {
                     rel="noopener noreferrer"
                     className="flex items-center gap-1 text-sm text-accent-400 hover:underline"
                   >
-                    Open Safe
+                    {t('settings.safe.openSafe')}
                     <ArrowUpRight className="h-4 w-4" />
                   </a>
                 </div>
                 <div className="mt-3 flex items-center gap-2">
                   <span className="rounded-full bg-green-500/10 px-3 py-1 text-xs font-medium text-green-400">
-                    Sepolia
+                    {t('settings.safe.network')}
                   </span>
                 </div>
               </div>
               {isAdmin && (
                 <Button variant="secondary" onClick={handleUnlinkSafe}>
-                  Unlink Safe
+                  {t('settings.safe.unlinkSafe')}
                 </Button>
               )}
             </div>
@@ -607,7 +615,7 @@ export default function Settings() {
             <form onSubmit={handleLinkSafe} className="space-y-4">
               <div>
                 <label className="mb-2 block text-sm font-medium text-slate-300">
-                  Safe Address (Sepolia)
+                  {t('settings.safe.safeAddress')}
                 </label>
                 <input
                   type="text"
@@ -616,12 +624,12 @@ export default function Settings() {
                     setSafeAddress(e.target.value);
                     setLinkingError(null);
                   }}
-                  placeholder="0x..."
+                  placeholder={t('settings.safe.safeAddressPlaceholder')}
                   className="w-full rounded-lg border border-white/10 bg-navy-800 px-4 py-2 font-mono text-white placeholder-slate-500 focus:border-accent-500 focus:outline-none focus:ring-1 focus:ring-accent-500"
                   required
                 />
                 <p className="mt-2 text-sm text-slate-500">
-                  Enter the address of your existing Gnosis Safe on Sepolia testnet
+                  {t('settings.safe.safeAddressDescription')}
                 </p>
               </div>
               
@@ -637,10 +645,10 @@ export default function Settings() {
                   {isValidating ? (
                     <>
                       <Loader2 className="h-4 w-4 animate-spin" />
-                      Validating...
+                      {t('settings.safe.validating')}
                     </>
                   ) : (
-                    'Link Safe'
+                    t('settings.safe.linkSafe')
                   )}
                 </Button>
                 <Button
@@ -651,28 +659,28 @@ export default function Settings() {
                     setLinkingError(null);
                   }}
                 >
-                  Cancel
+                  {t('common.cancel')}
                 </Button>
               </div>
             </form>
           ) : (
             <div className="text-center py-6">
               <Wallet className="mx-auto h-12 w-12 text-slate-500" />
-              <p className="mt-4 text-slate-400">No Safe connected yet</p>
+              <p className="mt-4 text-slate-400">{t('settings.safe.noSafe')}</p>
               {isAdmin && (
                 <Button className="mt-4" onClick={() => setIsLinking(true)}>
-                  Link Existing Safe
+                  {t('settings.safe.linkExisting')}
                 </Button>
               )}
               <p className="mt-4 text-sm text-slate-500">
-                Don't have a Safe?{' '}
+                {t('settings.safe.createSafe')}{' '}
                 <a
                   href="https://app.safe.global/new-safe/create"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="text-accent-400 hover:underline"
                 >
-                  Create one here
+                  {t('settings.safe.createSafeLink')}
                 </a>
               </p>
             </div>
@@ -687,14 +695,14 @@ export default function Settings() {
                 <Users className="h-5 w-5" />
               </div>
               <div>
-                <h2 className="text-lg font-semibold text-white">Team Members</h2>
-                <p className="text-sm text-slate-400">Manage access to your organization</p>
+                <h2 className="text-lg font-semibold text-white">{t('settings.team.title')}</h2>
+                <p className="text-sm text-slate-400">{t('settings.team.subtitle')}</p>
               </div>
             </div>
             {isAdmin && (
               <Button onClick={() => setIsAddingMember(true)}>
                 <Plus className="h-4 w-4" />
-                Add Member
+                {t('settings.team.addMember')}
               </Button>
             )}
           </div>
@@ -716,11 +724,11 @@ export default function Settings() {
           {/* Add Member Form */}
           {isAddingMember && (
             <form onSubmit={handleInviteMember} className="mb-6 rounded-xl border border-accent-500/30 bg-navy-800/50 p-4">
-              <h3 className="mb-4 font-medium text-white">Add Team Member</h3>
+              <h3 className="mb-4 font-medium text-white">{t('settings.team.addTeamMember')}</h3>
               <div className="space-y-4">
                 <div>
                   <label className="mb-2 block text-sm font-medium text-slate-300">
-                    Wallet Address
+                    {t('common.walletAddress')}
                   </label>
                   <input
                     type="text"
@@ -733,31 +741,31 @@ export default function Settings() {
                 </div>
                 <div>
                   <label className="mb-2 block text-sm font-medium text-slate-300">
-                    Display Name <span className="text-slate-500">(optional)</span>
+                    {t('settings.team.displayName')} <span className="text-slate-500">({t('common.optional')})</span>
                   </label>
                   <input
                     type="text"
                     value={newMemberName}
                     onChange={(e) => setNewMemberName(e.target.value)}
-                    placeholder="e.g., John Doe"
+                    placeholder={t('settings.team.displayNamePlaceholder')}
                     className="w-full rounded-lg border border-white/10 bg-navy-800 px-4 py-2 text-white placeholder-slate-500 focus:border-accent-500 focus:outline-none focus:ring-1 focus:ring-accent-500"
                   />
                 </div>
                 <div>
                   <label className="mb-2 block text-sm font-medium text-slate-300">
-                    Email <span className="text-slate-500">(optional)</span>
+                    {t('common.email')} <span className="text-slate-500">({t('common.optional')})</span>
                   </label>
                   <input
                     type="email"
                     value={newMemberEmail}
                     onChange={(e) => setNewMemberEmail(e.target.value)}
-                    placeholder="e.g., john@example.com"
+                    placeholder={t('settings.team.emailPlaceholder')}
                     className="w-full rounded-lg border border-white/10 bg-navy-800 px-4 py-2 text-white placeholder-slate-500 focus:border-accent-500 focus:outline-none focus:ring-1 focus:ring-accent-500"
                   />
                 </div>
                 <div>
                   <label className="mb-2 block text-sm font-medium text-slate-300">
-                    Role
+                    {t('settings.team.role')}
                   </label>
                   <select
                     value={newMemberRole}
@@ -772,7 +780,7 @@ export default function Settings() {
                   </select>
                 </div>
                 <div className="flex gap-3">
-                  <Button type="submit">Add Member</Button>
+                  <Button type="submit">{t('settings.team.addMember')}</Button>
                   <Button
                     type="button"
                     variant="secondary"
@@ -784,7 +792,7 @@ export default function Settings() {
                       setNewMemberRole('viewer');
                     }}
                   >
-                    Cancel
+                    {t('common.cancel')}
                   </Button>
                 </div>
               </div>
@@ -794,7 +802,7 @@ export default function Settings() {
           {/* Members List */}
           {members?.length === 0 ? (
             <div className="rounded-xl border border-dashed border-white/20 bg-navy-800/30 p-8 text-center">
-              <p className="text-slate-400">No team members yet</p>
+              <p className="text-slate-400">{t('settings.team.noMembers')}</p>
             </div>
           ) : (
             <div className="rounded-xl border border-white/10 overflow-hidden">
@@ -802,16 +810,16 @@ export default function Settings() {
                 <thead>
                   <tr className="border-b border-white/10 bg-navy-800/50">
                     <th className="px-4 py-3 text-left text-sm font-medium text-slate-400">
-                      Member
+                      {t('settings.team.member')}
                     </th>
                     <th className="px-4 py-3 text-left text-sm font-medium text-slate-400">
-                      Role
+                      {t('settings.team.role')}
                     </th>
                     <th className="px-4 py-3 text-left text-sm font-medium text-slate-400">
-                      Status
+                      {t('settings.team.status')}
                     </th>
                     <th className="px-4 py-3 text-right text-sm font-medium text-slate-400">
-                      Actions
+                      {t('settings.team.actions')}
                     </th>
                   </tr>
                 </thead>
@@ -830,14 +838,14 @@ export default function Settings() {
                               <p className="font-medium text-white">
                                 {member.name}
                                 {isCurrentUser && (
-                                  <span className="ml-2 text-xs text-accent-400">(you)</span>
+                                  <span className="ml-2 text-xs text-accent-400">({t('settings.team.you')})</span>
                                 )}
                               </p>
                             ) : (
                               <p className="text-sm text-slate-500 italic">
-                                No name
+                                {t('settings.team.noName')}
                                 {isCurrentUser && (
-                                  <span className="ml-1 text-xs text-accent-400 not-italic">(you)</span>
+                                  <span className="ml-1 text-xs text-accent-400 not-italic">({t('settings.team.you')})</span>
                                 )}
                               </p>
                             )}
@@ -905,23 +913,23 @@ export default function Settings() {
                 <CreditCard className="h-5 w-5" />
               </div>
               <div>
-                <h2 className="text-lg font-semibold text-white">Billing & Subscription</h2>
-                <p className="text-sm text-slate-400">Manage your subscription and payment</p>
+                <h2 className="text-lg font-semibold text-white">{t('settings.billing.title')}</h2>
+                <p className="text-sm text-slate-400">{t('settings.billing.subtitle')}</p>
               </div>
             </div>
             {billing?.status === 'trial' && (
               <div className="rounded-full bg-yellow-500/10 px-4 py-2 text-sm font-medium text-yellow-400">
-                {billing.daysRemaining} days left in trial
+                {t('settings.billing.trialDaysLeft', { days: billing.daysRemaining })}
               </div>
             )}
             {billing?.status === 'active' && (
               <div className="rounded-full bg-green-500/10 px-4 py-2 text-sm font-medium text-green-400">
-                Active - {billing.daysRemaining} days remaining
+                {t('settings.billing.activeDaysRemaining', { days: billing.daysRemaining })}
               </div>
             )}
             {billing?.status === 'expired' && (
               <div className="rounded-full bg-red-500/10 px-4 py-2 text-sm font-medium text-red-400">
-                Expired - Please renew
+                {t('settings.billing.expired')}
               </div>
             )}
           </div>
@@ -930,7 +938,7 @@ export default function Settings() {
           <div className="mb-6 rounded-xl border border-white/10 bg-navy-800/50 p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-slate-400">Current Plan</p>
+                <p className="text-sm text-slate-400">{t('settings.billing.currentPlan')}</p>
                 <p className="text-xl font-bold text-white capitalize">
                   {billing?.plan || 'Loading...'}
                 </p>
@@ -938,15 +946,15 @@ export default function Settings() {
               {billing?.limits && (
                 <div className="flex gap-4">
                   <div className="text-right">
-                    <p className="text-xs text-slate-400">Users</p>
+                    <p className="text-xs text-slate-400">{t('settings.billing.users')}</p>
                     <p className="font-semibold text-white">
-                      {billing.limits.maxUsers === Infinity ? 'Unlimited' : billing.limits.maxUsers}
+                      {billing.limits.maxUsers === Infinity ? t('settings.billing.unlimited') : billing.limits.maxUsers}
                     </p>
                   </div>
                   <div className="text-right">
-                    <p className="text-xs text-slate-400">Beneficiaries</p>
+                    <p className="text-xs text-slate-400">{t('settings.billing.beneficiaries')}</p>
                     <p className="font-semibold text-white">
-                      {billing.limits.maxBeneficiaries === Infinity ? 'Unlimited' : billing.limits.maxBeneficiaries}
+                      {billing.limits.maxBeneficiaries === Infinity ? t('settings.billing.unlimited') : billing.limits.maxBeneficiaries}
                     </p>
                   </div>
                 </div>
@@ -972,13 +980,13 @@ export default function Settings() {
                 >
                   {plan.popular && (
                     <span className="absolute -top-2 left-1/2 -translate-x-1/2 rounded-full bg-accent-500 px-2 py-0.5 text-xs font-medium text-navy-950">
-                      Popular
+                      {t('settings.billing.popular')}
                     </span>
                   )}
                   
                   {isCurrent && (
                     <span className="absolute -top-2 right-3 rounded-full bg-green-500 px-2 py-0.5 text-xs font-medium text-navy-950">
-                      Current
+                      {t('settings.billing.current')}
                     </span>
                   )}
 
@@ -989,28 +997,31 @@ export default function Settings() {
                       <Icon className="h-4 w-4" />
                     </div>
                     <div>
-                      <h3 className="font-semibold text-white">{plan.name}</h3>
-                      <p className="text-xs text-slate-400">{plan.description}</p>
+                    <h3 className="font-semibold text-white">{t(`settings.billing.plans.${key}.name`)}</h3>
+                    <p className="text-xs text-slate-400">{t(`settings.billing.plans.${key}.description`)}</p>
                     </div>
                   </div>
 
                   <div className="mb-3">
-                    <span className="text-2xl font-bold text-white">${plan.price}</span>
-                    <span className="text-sm text-slate-400">/mo</span>
+                    <span className="text-2xl font-bold text-white">{t(`settings.billing.plans.${key}.price`, { price: plan.price })}</span>
                   </div>
 
                   <ul className="space-y-1 mb-4 text-xs">
-                    {plan.features.slice(0, 3).map((feature) => (
-                      <li key={feature} className="flex items-center gap-2 text-slate-300">
-                        <Check className={`h-3 w-3 ${plan.popular ? 'text-accent-400' : 'text-green-400'}`} />
-                        {feature}
-                      </li>
-                    ))}
+                    {plan.features.slice(0, 3).map((feature, idx) => {
+                      const featureKeys = ['users', 'safe', 'beneficiaries', 'disbursements', 'audit', 'export', 'roles', 'multisig', 'everything', 'reports', 'support'];
+                      const featureKey = featureKeys[idx] || `feature${idx}`;
+                      return (
+                        <li key={idx} className="flex items-center gap-2 text-slate-300">
+                          <Check className={`h-3 w-3 ${plan.popular ? 'text-accent-400' : 'text-green-400'}`} />
+                          {t(`settings.billing.plans.${key}.features.${featureKey}`, { defaultValue: feature })}
+                        </li>
+                      );
+                    })}
                   </ul>
 
                   {isCurrent ? (
                     <Button className="w-full" size="sm" disabled variant="secondary">
-                      Current Plan
+                      {t('settings.billing.currentPlan')}
                     </Button>
                   ) : canSelectPlan ? (
                     <Button
@@ -1019,11 +1030,11 @@ export default function Settings() {
                       variant={plan.popular ? 'default' : 'secondary'}
                       onClick={() => handleOpenPayment(key)}
                     >
-                      {currentPlan === 'trial' ? 'Subscribe' : 'Upgrade'}
+                      {currentPlan === 'trial' ? t('settings.billing.subscribe') : t('settings.billing.upgrade')}
                     </Button>
                   ) : (
                     <Button className="w-full" size="sm" disabled variant="secondary">
-                      Downgrade N/A
+                      {t('settings.billing.downgradeNA')}
                     </Button>
                   )}
                 </div>
@@ -1034,7 +1045,7 @@ export default function Settings() {
           {/* Payment Info */}
           <div className="mt-6 pt-6 border-t border-white/10">
             <p className="text-sm text-slate-400">
-              Pay with stablecoins (USDC, USDT) on Ethereum Sepolia. All plans include a 30-day money-back guarantee.
+              {t('settings.billing.info')}
             </p>
           </div>
         </div>
@@ -1045,7 +1056,7 @@ export default function Settings() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
           <div className="w-full max-w-md rounded-2xl border border-white/10 bg-navy-900 p-6">
             <div className="flex items-center justify-between mb-6">
-              <h2 className="text-xl font-bold text-white">Edit Team Member</h2>
+              <h2 className="text-xl font-bold text-white">{t('settings.team.editMember')}</h2>
               <button
                 onClick={handleCloseEditMember}
                 className="text-slate-400 hover:text-white"
@@ -1064,7 +1075,7 @@ export default function Settings() {
             <form onSubmit={handleSaveEditMember} className="space-y-4">
               <div>
                 <label className="mb-2 block text-sm font-medium text-slate-300">
-                  Wallet Address
+                  {t('common.walletAddress')}
                 </label>
                 <p className="font-mono text-sm text-slate-400">
                   {editingMember.walletAddress}
@@ -1073,33 +1084,33 @@ export default function Settings() {
 
               <div>
                 <label className="mb-2 block text-sm font-medium text-slate-300">
-                  Display Name
+                  {t('settings.team.displayName')}
                 </label>
                 <input
                   type="text"
                   value={editingMember.name}
                   onChange={(e) => setEditingMember({ ...editingMember, name: e.target.value })}
-                  placeholder="e.g., John Doe"
+                  placeholder={t('settings.team.displayNamePlaceholder')}
                   className="w-full rounded-lg border border-white/10 bg-navy-800 px-4 py-2 text-white placeholder-slate-500 focus:border-accent-500 focus:outline-none focus:ring-1 focus:ring-accent-500"
                 />
               </div>
 
               <div>
                 <label className="mb-2 block text-sm font-medium text-slate-300">
-                  Email
+                  {t('common.email')}
                 </label>
                 <input
                   type="email"
                   value={editingMember.email}
                   onChange={(e) => setEditingMember({ ...editingMember, email: e.target.value })}
-                  placeholder="e.g., john@example.com"
+                  placeholder={t('settings.team.emailPlaceholder')}
                   className="w-full rounded-lg border border-white/10 bg-navy-800 px-4 py-2 text-white placeholder-slate-500 focus:border-accent-500 focus:outline-none focus:ring-1 focus:ring-accent-500"
                 />
               </div>
 
               <div>
                 <label className="mb-2 block text-sm font-medium text-slate-300">
-                  Role
+                  {t('settings.team.role')}
                 </label>
                 {isAdmin && !editingMember.isCurrentUser ? (
                   <select
@@ -1117,7 +1128,7 @@ export default function Settings() {
                   <p className="text-sm text-slate-400 capitalize">
                     {editingMember.role}
                     {editingMember.isCurrentUser && (
-                      <span className="ml-2 text-xs text-slate-500">(cannot change your own role)</span>
+                      <span className="ml-2 text-xs text-slate-500">({t('settings.team.cannotChangeRole')})</span>
                     )}
                   </p>
                 )}
@@ -1132,14 +1143,14 @@ export default function Settings() {
                   {processingMemberId === editingMember.membershipId ? (
                     <>
                       <Loader2 className="h-4 w-4 animate-spin" />
-                      Saving...
+                      {t('common.saving')}
                     </>
                   ) : (
-                    'Save Changes'
+                    t('beneficiaries.saveChanges')
                   )}
                 </Button>
                 <Button type="button" variant="secondary" onClick={handleCloseEditMember}>
-                  Cancel
+                  {t('common.cancel')}
                 </Button>
               </div>
             </form>

@@ -1,0 +1,483 @@
+{
+  "common": {
+    "save": "Salvar",
+    "cancel": "Cancelar",
+    "delete": "Excluir",
+    "edit": "Editar",
+    "create": "Criar",
+    "update": "Atualizar",
+    "close": "Fechar",
+    "back": "Voltar",
+    "next": "Próximo",
+    "previous": "Anterior",
+    "search": "Buscar",
+    "filter": "Filtro",
+    "filters": "Filtros",
+    "clear": "Limpar",
+    "clearAll": "Limpar tudo",
+    "clearFilters": "Limpar filtros",
+    "loading": "Carregando...",
+    "error": "Erro",
+    "success": "Sucesso",
+    "confirm": "Confirmar",
+    "dismiss": "Descartar",
+    "copy": "Copiar",
+    "copied": "Copiado!",
+    "copyAddress": "Copiar Endereço",
+    "view": "Ver",
+    "viewAll": "Ver tudo",
+    "add": "Adicionar",
+    "remove": "Remover",
+    "active": "Ativo",
+    "inactive": "Inativo",
+    "optional": "opcional",
+    "required": "obrigatório",
+    "name": "Nome",
+    "email": "E-mail",
+    "address": "Endereço",
+    "walletAddress": "Endereço da Carteira",
+    "status": "Status",
+    "date": "Data",
+    "amount": "Quantia",
+    "type": "Tipo",
+    "notes": "Notas",
+    "memo": "Memo",
+    "description": "Descrição",
+    "actions": "Ações",
+    "noResults": "Nenhum resultado corresponde à sua busca",
+    "noData": "Nenhum dado disponível",
+    "retry": "Tentar novamente",
+    "refresh": "Atualizar",
+    "saving": "Salvando...",
+    "processing": "Processando...",
+    "validating": "Validando...",
+    "select": "Selecionar",
+    "all": "Todos"
+  },
+  "landing": {
+    "header": {
+      "login": "Entrar",
+      "tryForFree": "Experimentar grátis"
+    },
+    "hero": {
+      "badge": "Não custodial e com Safe",
+      "title": "Gestão de Tesouraria para",
+      "titleHighlight": "Equipes Web3",
+      "subtitle": "Simplifique os desembolsos de stablecoins com segurança de nível empresarial. Gerencie beneficiários, rastreie pagamentos e mantenha trilhas de auditoria completas—tudo sem nunca abrir mão do controle das suas chaves.",
+      "tryForFree": "Experimentar grátis",
+      "learnMore": "Saber mais",
+      "trustIndicators": "Alimentado por segurança líder da indústria"
+    },
+    "features": {
+      "title": "Recursos",
+      "subtitle": "Tudo que você precisa para gerenciar operações de tesouraria",
+      "description": "Construído para equipes Web3 que precisam de segurança, transparência e controle sobre seus fundos.",
+      "nonCustodial": {
+        "title": "Não Custodial",
+        "description": "Suas chaves, seus fundos. Nunca temos acesso às suas chaves privadas ou ativos."
+      },
+      "safePowered": {
+        "title": "Com Safe",
+        "description": "Construído sobre Gnosis Safe, a carteira de contrato inteligente mais confiável em Web3."
+      },
+      "auditTrail": {
+        "title": "Trilha de Auditoria",
+        "description": "Histórico completo de transações com registros imutáveis na blockchain para conformidade."
+      },
+      "stablecoinNative": {
+        "title": "Nativo de Stablecoins",
+        "description": "Suporte de primeira classe para USDC e USDT com mais tokens em breve."
+      },
+      "roleBasedAccess": {
+        "title": "Acesso Baseado em Funções",
+        "description": "Permissões granulares para sua equipe. Administradores, aprovadores, iniciadores e mais."
+      },
+      "simpleBilling": {
+        "title": "Cobrança Simples",
+        "description": "Pague pela plataforma em stablecoins. Não são necessários cartões de crédito ou contas bancárias."
+      }
+    },
+    "howItWorks": {
+      "title": "Como Funciona",
+      "subtitle": "Comece em minutos",
+      "description": "Três passos simples para simplificar suas operações de tesouraria.",
+      "step1": {
+        "number": "01",
+        "title": "Conecte seu Safe",
+        "description": "Vincule seu Gnosis Safe existente ou crie um novo. Suas chaves ficam com você."
+      },
+      "step2": {
+        "number": "02",
+        "title": "Adicione Beneficiários",
+        "description": "Configure seus destinatários de pagamento com endereços de carteira e metadados opcionais."
+      },
+      "step3": {
+        "number": "03",
+        "title": "Envie Pagamentos",
+        "description": "Execute desembolsos de stablecoins com trilhas de auditoria completas e rastreamento de transações."
+      }
+    },
+    "cta": {
+      "badge": "Teste gratuito de 30 dias",
+      "title": "Pronto para simplificar sua tesouraria?",
+      "description": "Junte-se a equipes que já usam Disburse para gerenciar suas operações de stablecoins com confiança e controle.",
+      "tryForFree": "Experimentar grátis",
+      "noCreditCard": "Não é necessário cartão de crédito • Cancele a qualquer momento"
+    },
+    "footer": {
+      "tagline": "Gestão de tesouraria não custodial para equipes Web3.",
+      "product": "Produto",
+      "company": "Empresa",
+      "legal": "Legal",
+      "features": "Recursos",
+      "pricing": "Preços",
+      "documentation": "Documentação",
+      "about": "Sobre",
+      "blog": "Blog",
+      "contact": "Contato",
+      "privacy": "Privacidade",
+      "terms": "Termos",
+      "copyright": "© {{year}} Disburse. Todos os direitos reservados."
+    }
+  },
+  "auth": {
+    "login": {
+      "title": "Bem-vindo ao Disburse",
+      "subtitle": "Conecte sua carteira para começar",
+      "connectWallet": "Conectar Carteira",
+      "wrongNetwork": "Rede incorreta",
+      "signingIn": "Entrando...",
+      "terms": "Ao conectar, você concorda com nossos",
+      "termsOfService": "Termos de Serviço",
+      "and": "e",
+      "privacyPolicy": "Política de Privacidade",
+      "newToWeb3": "Novo em Web3?",
+      "learnWallet": "Aprenda como configurar uma carteira",
+      "backToHome": "Voltar ao início"
+    },
+    "selectOrg": {
+      "title": "Selecionar Organização",
+      "subtitle": "Escolha uma organização ou crie uma nova",
+      "createNew": "Criar Nova Organização",
+      "orgName": "Nome da Organização",
+      "orgNamePlaceholder": "Digite o nome da organização",
+      "createOrg": "Criar Organização",
+      "noOrgs": "Você ainda não é membro de nenhuma organização."
+    }
+  },
+  "navigation": {
+    "dashboard": "Painel",
+    "beneficiaries": "Beneficiários",
+    "disbursements": "Desembolsos",
+    "settings": "Configurações",
+    "disconnect": "Desconectar",
+    "language": "Idioma"
+  },
+  "dashboard": {
+    "title": "Painel",
+    "subtitle": "Visão geral das suas operações de tesouraria",
+    "noSafe": {
+      "title": "Nenhum Safe Conectado",
+      "description": "Vincule seu Gnosis Safe para começar a gerenciar desembolsos",
+      "linkSafe": "Vincular Safe"
+    },
+    "safe": {
+      "connected": "Safe Conectado",
+      "viewOnSafe": "Ver no Safe",
+      "refreshBalances": "Atualizar saldos",
+      "usdcBalance": "Saldo USDC",
+      "usdtBalance": "Saldo USDT",
+      "depositAddress": "Endereço de Depósito",
+      "depositDescription": "Envie USDC ou USDT para este endereço para financiar sua tesouraria"
+    },
+    "stats": {
+      "activeBeneficiaries": "Beneficiários Ativos",
+      "manageBeneficiaries": "Gerenciar Beneficiários",
+      "pendingDisbursements": "Desembolsos Pendentes",
+      "quickAction": "Ação Rápida",
+      "newPayment": "Novo Pagamento",
+      "createDisbursement": "Criar Desembolso"
+    },
+    "recent": {
+      "title": "Desembolsos Recentes",
+      "none": "Ainda não há desembolsos"
+    }
+  },
+  "beneficiaries": {
+    "title": "Beneficiários",
+    "subtitle": "Gerencie seus destinatários de pagamento",
+    "total": "{{count}} no total",
+    "addBeneficiary": "Adicionar Beneficiário",
+    "newBeneficiary": "Novo Beneficiário",
+    "noBeneficiaries": {
+      "title": "Ainda não há Beneficiários",
+      "description": "Adicione seu primeiro beneficiário para começar a fazer desembolsos"
+    },
+    "individuals": "Indivíduos",
+    "businesses": "Empresas",
+    "beneficiaryType": "Tipo de Beneficiário",
+    "individual": "Indivíduo",
+    "business": "Empresa",
+    "fullName": "Nome Completo",
+    "businessName": "Nome da Empresa",
+    "namePlaceholder": {
+      "individual": "ex., João Silva",
+      "business": "ex., Corporação Acme"
+    },
+    "notesPlaceholder": "Quaisquer notas adicionais...",
+    "createBeneficiary": "Criar Beneficiário",
+    "editBeneficiary": "Editar Beneficiário",
+    "saveChanges": "Salvar Alterações",
+    "searchPlaceholder": "Buscar por nome, endereço ou notas...",
+    "status": {
+      "all": "Todos",
+      "active": "Ativo",
+      "inactive": "Inativo"
+    },
+    "table": {
+      "name": "Nome",
+      "walletAddress": "Endereço da Carteira",
+      "status": "Status",
+      "added": "Adicionado",
+      "actions": "Ações",
+      "edit": "Editar beneficiário",
+      "deactivate": "Desativar",
+      "reactivate": "Reativar"
+    },
+    "section": {
+      "total": "{{count}} no total",
+      "active": "{{count}} ativos",
+      "inactive": "{{count}} inativos",
+      "noResults": "Ainda não foram adicionados {{type}}",
+      "noSearchResults": "Nenhum resultado corresponde à sua busca"
+    }
+  },
+  "disbursements": {
+    "title": "Desembolsos",
+    "subtitle": "Gerencie e rastreie pagamentos de stablecoins",
+    "total": "{{count}} no total",
+    "newDisbursement": "Novo Desembolso",
+    "createDisbursement": "Criar Desembolso",
+    "noDisbursements": {
+      "title": "Ainda não há Desembolsos",
+      "description": "Crie seu primeiro desembolso para enviar stablecoins"
+    },
+    "noResults": {
+      "title": "Nenhum Resultado Encontrado",
+      "description": "Tente ajustar sua busca ou filtros"
+    },
+    "noSafeWarning": "Você precisa vincular um Safe antes de criar desembolsos. Vá para Configurações para vincular seu Safe.",
+    "searchPlaceholder": "Buscar por beneficiário, memo ou quantia...",
+    "form": {
+      "beneficiary": "Beneficiário",
+      "selectBeneficiary": "Selecione um beneficiário...",
+      "amount": "Quantia",
+      "token": "Token",
+      "memo": "Memo",
+      "memoPlaceholder": "Descrição do pagamento..."
+    },
+    "filters": {
+      "status": "Status",
+      "token": "Token",
+      "allTokens": "Todos os Tokens",
+      "dateRange": "Intervalo de Datas",
+      "to": "até"
+    },
+    "table": {
+      "beneficiary": "Beneficiário",
+      "amount": "Quantia",
+      "memo": "Memo",
+      "status": "Status",
+      "date": "Data",
+      "actions": "Ações"
+    },
+    "pagination": {
+      "showing": "Mostrando {{from}} a {{to}} de {{total}} resultados",
+      "page": "Página {{current}} de {{total}}"
+    },
+    "actions": {
+      "propose": "Propor ao Safe",
+      "execute": "Executar Transação",
+      "cancel": "Cancelar",
+      "cancelConfirm": "Tem certeza de que deseja cancelar este desembolso?"
+    }
+  },
+  "settings": {
+    "title": "Configurações",
+    "subtitle": "Gerencie as configurações da sua organização",
+    "organization": {
+      "title": "Organização",
+      "subtitle": "Configurações gerais",
+      "orgName": "Nome da Organização",
+      "save": "Salvar",
+      "adminOnly": "Apenas administradores podem editar o nome da organização"
+    },
+    "safe": {
+      "title": "Carteira Safe",
+      "subtitle": "Conecte seu Gnosis Safe",
+      "connected": "Safe Conectado",
+      "openSafe": "Abrir Safe",
+      "unlinkSafe": "Desvincular Safe",
+      "unlinkConfirm": "Tem certeza de que deseja desvincular este Safe?",
+      "noSafe": "Ainda não há Safe conectado",
+      "linkExisting": "Vincular Safe Existente",
+      "createSafe": "Não tem um Safe?",
+      "createSafeLink": "Crie um aqui",
+      "safeAddress": "Endereço Safe (Sepolia)",
+      "safeAddressPlaceholder": "0x...",
+      "safeAddressDescription": "Digite o endereço do seu Gnosis Safe existente na rede de teste Sepolia",
+      "linkSafe": "Vincular Safe",
+      "validating": "Validando...",
+      "network": "Sepolia"
+    },
+    "team": {
+      "title": "Membros da Equipe",
+      "subtitle": "Gerencie o acesso à sua organização",
+      "addMember": "Adicionar Membro",
+      "noMembers": "Ainda não há membros da equipe",
+      "member": "Membro",
+      "role": "Função",
+      "status": "Status",
+      "actions": "Ações",
+      "addTeamMember": "Adicionar Membro da Equipe",
+      "displayName": "Nome para Exibição",
+      "displayNamePlaceholder": "ex., João Silva",
+      "emailPlaceholder": "ex., joao@exemplo.com",
+      "you": "você",
+      "noName": "Sem nome",
+      "editMember": "Editar Membro da Equipe",
+      "cannotChangeRole": "não pode alterar sua própria função",
+      "removeConfirm": "Tem certeza de que deseja remover este membro?",
+      "roles": {
+        "admin": "Administrador",
+        "adminDesc": "Acesso completo a todos os recursos",
+        "approver": "Aprovador",
+        "approverDesc": "Pode aprovar desembolsos",
+        "initiator": "Iniciador",
+        "initiatorDesc": "Pode criar desembolsos",
+        "clerk": "Funcionário",
+        "clerkDesc": "Pode gerenciar beneficiários",
+        "viewer": "Visualizador",
+        "viewerDesc": "Somente leitura"
+      }
+    },
+    "billing": {
+      "title": "Cobrança e Assinatura",
+      "subtitle": "Gerencie sua assinatura e pagamento",
+      "currentPlan": "Plano Atual",
+      "users": "Usuários",
+      "beneficiaries": "Beneficiários",
+      "unlimited": "Ilimitado",
+      "trialDaysLeft": "{{days}} dias restantes de teste",
+      "activeDaysRemaining": "Ativo - {{days}} dias restantes",
+      "expired": "Expirado - Por favor renove",
+      "popular": "Popular",
+      "current": "Atual",
+      "subscribe": "Assinar",
+      "upgrade": "Atualizar",
+      "downgradeNA": "Downgrade N/D",
+      "currentPlan": "Plano Atual",
+      "plans": {
+        "starter": {
+          "name": "Starter",
+          "description": "Para indivíduos",
+          "price": "R$ {{price}}/mês",
+          "features": {
+            "users": "1 usuário",
+            "safe": "1 Safe",
+            "beneficiaries": "25 beneficiários",
+            "disbursements": "Desembolsos únicos",
+            "audit": "Registros de auditoria",
+            "export": "Exportação CSV"
+          }
+        },
+        "team": {
+          "name": "Team",
+          "description": "Para equipes pequenas",
+          "price": "R$ {{price}}/mês",
+          "features": {
+            "users": "5 usuários",
+            "safe": "1 Safe",
+            "beneficiaries": "100 beneficiários",
+            "roles": "Todas as 5 funções",
+            "multisig": "Aprovação multi-assinatura",
+            "everything": "Tudo no Starter"
+          }
+        },
+        "pro": {
+          "name": "Pro",
+          "description": "Para equipes em crescimento",
+          "price": "R$ {{price}}/mês",
+          "features": {
+            "users": "Usuários ilimitados",
+            "safe": "1 Safe",
+            "beneficiaries": "Beneficiários ilimitados",
+            "reports": "Relatórios profissionais",
+            "support": "Suporte prioritário",
+            "everything": "Tudo no Team"
+          }
+        }
+      },
+      "payment": {
+        "title": "Assinar {{plan}}",
+        "success": "Pagamento Bem-sucedido",
+        "welcome": "Bem-vindo ao {{plan}}!",
+        "active": "Sua assinatura agora está ativa. Aproveite todos os recursos do {{plan}}.",
+        "paymentToken": "Token de Pagamento",
+        "platformWallet": "Carteira da Plataforma",
+        "payWithWallet": "Pagar com Carteira Conectada",
+        "alreadyPaid": "Já Paguei (Digite o Hash da TX)",
+        "confirming": "Confirme a transação na sua carteira...",
+        "waiting": "Aguardando confirmação...",
+        "dontClose": "Por favor não feche esta janela",
+        "pending": "Transação pendente",
+        "retry": "Tentar Pagamento Novamente",
+        "enterHash": "Digite o hash da transação do seu pagamento para verificar.",
+        "txHash": "Hash da Transação",
+        "txHashPlaceholder": "0x...",
+        "expectedPayment": "Pagamento esperado:",
+        "to": "para",
+        "verify": "Verificar Pagamento",
+        "viewTransaction": "Ver Transação",
+        "done": "Concluído"
+      },
+      "info": "Pague com stablecoins (USDC, USDT) na Ethereum Sepolia. Todos os planos incluem uma garantia de devolução do dinheiro de 30 dias."
+    }
+  },
+  "status": {
+    "draft": "Rascunho",
+    "pending": "Pendente",
+    "proposed": "Proposto",
+    "executed": "Executado",
+    "failed": "Falhou",
+    "cancelled": "Cancelado",
+    "active": "Ativo",
+    "inactive": "Inativo",
+    "invited": "Convidado",
+    "removed": "Removido",
+    "trial": "Teste",
+    "expired": "Expirado"
+  },
+  "errors": {
+    "generic": "Ocorreu um erro",
+    "userNotFound": "Usuário não encontrado",
+    "sessionExpired": "Sessão expirada",
+    "invalidNonce": "Nonce inválido na mensagem",
+    "noPendingSession": "Nenhuma sessão pendente encontrada",
+    "failedToCreate": "Falha ao criar {{item}}",
+    "failedToUpdate": "Falha ao atualizar {{item}}",
+    "failedToDelete": "Falha ao excluir {{item}}",
+    "invalidSafeAddress": "Endereço Safe inválido. Por favor verifique o endereço e a rede.",
+    "notSafeOwner": "Você deve ser proprietário deste Safe para vinculá-lo.",
+    "failedToLinkSafe": "Falha ao vincular Safe",
+    "failedToUnlinkSafe": "Falha ao desvincular Safe",
+    "failedToInviteMember": "Falha ao convidar membro",
+    "failedToUpdateMember": "Falha ao atualizar membro",
+    "failedToRemoveMember": "Falha ao remover membro",
+    "failedToPropose": "Falha ao propor transação",
+    "failedToExecute": "Falha ao executar transação",
+    "failedToCancel": "Falha ao cancelar desembolso",
+    "paymentFailed": "Falha no pagamento",
+    "failedToSubscribe": "Falha ao assinar"
+  }
+}

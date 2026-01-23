@@ -1,23 +1,25 @@
 import { Link } from 'react-router-dom'
-
-const footerLinks = {
-  product: [
-    { name: 'Features', href: '#features' },
-    { name: 'Pricing', href: '#' },
-    { name: 'Documentation', href: '#' },
-  ],
-  company: [
-    { name: 'About', href: '#' },
-    { name: 'Blog', href: '#' },
-    { name: 'Contact', href: '#' },
-  ],
-  legal: [
-    { name: 'Privacy', href: '#' },
-    { name: 'Terms', href: '#' },
-  ],
-}
+import { useTranslation } from 'react-i18next'
 
 export function Footer() {
+  const { t } = useTranslation();
+  
+  const footerLinks = {
+    product: [
+      { name: t('landing.footer.features'), href: '#features' },
+      { name: t('landing.footer.pricing'), href: '#' },
+      { name: t('landing.footer.documentation'), href: '#' },
+    ],
+    company: [
+      { name: t('landing.footer.about'), href: '#' },
+      { name: t('landing.footer.blog'), href: '#' },
+      { name: t('landing.footer.contact'), href: '#' },
+    ],
+    legal: [
+      { name: t('landing.footer.privacy'), href: '#' },
+      { name: t('landing.footer.terms'), href: '#' },
+    ],
+  }
   return (
     <footer className="border-t border-white/5 bg-navy-950">
       <div className="mx-auto max-w-7xl px-6 py-12 lg:px-8">
@@ -43,13 +45,13 @@ export function Footer() {
               <span className="text-lg font-bold text-white">Disburse</span>
             </Link>
             <p className="mt-4 text-sm text-slate-500">
-              Non-custodial treasury management for Web3 teams.
+              {t('landing.footer.tagline')}
             </p>
           </div>
 
           {/* Product links */}
           <div>
-            <h3 className="text-sm font-semibold text-white">Product</h3>
+            <h3 className="text-sm font-semibold text-white">{t('landing.footer.product')}</h3>
             <ul className="mt-4 space-y-3">
               {footerLinks.product.map((link) => (
                 <li key={link.name}>
@@ -66,7 +68,7 @@ export function Footer() {
 
           {/* Company links */}
           <div>
-            <h3 className="text-sm font-semibold text-white">Company</h3>
+            <h3 className="text-sm font-semibold text-white">{t('landing.footer.company')}</h3>
             <ul className="mt-4 space-y-3">
               {footerLinks.company.map((link) => (
                 <li key={link.name}>
@@ -83,7 +85,7 @@ export function Footer() {
 
           {/* Legal links */}
           <div>
-            <h3 className="text-sm font-semibold text-white">Legal</h3>
+            <h3 className="text-sm font-semibold text-white">{t('landing.footer.legal')}</h3>
             <ul className="mt-4 space-y-3">
               {footerLinks.legal.map((link) => (
                 <li key={link.name}>
@@ -102,7 +104,7 @@ export function Footer() {
         {/* Bottom bar */}
         <div className="mt-12 border-t border-white/5 pt-8">
           <p className="text-center text-sm text-slate-500">
-            © {new Date().getFullYear()} Disburse. All rights reserved.
+            {t('landing.footer.copyright', { year: new Date().getFullYear() })}
           </p>
         </div>
       </div>

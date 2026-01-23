@@ -2,12 +2,14 @@ import { useEffect, useState, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { ConnectButton } from '@rainbow-me/rainbowkit';
 import { useAccount, useSignMessage } from 'wagmi';
+import { useTranslation } from 'react-i18next';
 import { useMutation, useQuery } from 'convex/react';
 import { api } from '../../convex/_generated/api';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft } from 'lucide-react';
 
 export default function Login() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const { address, isConnected } = useAccount();
   const { signMessageAsync } = useSignMessage();
@@ -88,7 +90,7 @@ export default function Login() {
           className="mb-8 inline-flex items-center gap-2 text-sm text-slate-400 transition-colors hover:text-white"
         >
           <ArrowLeft className="h-4 w-4" />
-          Back to home
+          {t('auth.login.backToHome')}
         </Link>
 
         {/* Card */}
@@ -113,10 +115,10 @@ export default function Login() {
           </div>
 
           <h1 className="mb-2 text-center text-2xl font-bold text-white">
-            Welcome to Disburse
+            {t('auth.login.title')}
           </h1>
           <p className="mb-8 text-center text-slate-400">
-            Connect your wallet to get started
+            {t('auth.login.subtitle')}
           </p>
 
           {/* RainbowKit Connect Button */}
@@ -148,7 +150,7 @@ export default function Login() {
                       if (!connected) {
                         return (
                           <Button onClick={openConnectModal} size="lg" className="w-full">
-                            Connect Wallet
+                            {t('auth.login.connectWallet')}
                           </Button>
                         );
                       }
@@ -156,7 +158,7 @@ export default function Login() {
                       if (chain.unsupported) {
                         return (
                           <Button onClick={openChainModal} variant="secondary" size="lg">
-                            Wrong network
+                            {t('auth.login.wrongNetwork')}
                           </Button>
                         );
                       }
@@ -167,7 +169,7 @@ export default function Login() {
                             {account.displayName}
                           </Button>
                           <p className="text-center text-sm text-slate-400">
-                            Signing you in...
+                            {t('auth.login.signingIn')}
                           </p>
                         </div>
                       );
@@ -179,22 +181,22 @@ export default function Login() {
           </div>
 
           <p className="mt-6 text-center text-xs text-slate-500">
-            By connecting, you agree to our{' '}
+            {t('auth.login.terms')}{' '}
             <a href="#" className="text-accent-400 hover:underline">
-              Terms of Service
+              {t('auth.login.termsOfService')}
             </a>{' '}
-            and{' '}
+            {t('auth.login.and')}{' '}
             <a href="#" className="text-accent-400 hover:underline">
-              Privacy Policy
+              {t('auth.login.privacyPolicy')}
             </a>
           </p>
         </div>
 
         {/* Info */}
         <p className="mt-8 text-center text-sm text-slate-500">
-          New to Web3?{' '}
+          {t('auth.login.newToWeb3')}{' '}
           <a href="#" className="text-accent-400 hover:underline">
-            Learn how to set up a wallet
+            {t('auth.login.learnWallet')}
           </a>
         </p>
       </div>

@@ -33,7 +33,10 @@
     "react-router-dom": "^7.1.1",
     "tailwind-merge": "^3.4.0",
     "viem": "^2.21.0",
-    "wagmi": "^2.14.0"
+    "wagmi": "^2.14.0",
+    "i18next": "^23.15.1",
+    "react-i18next": "^15.1.0",
+    "i18next-browser-languagedetector": "^8.0.2"
   },
   "devDependencies": {
     "@eslint/js": "^9.17.0",

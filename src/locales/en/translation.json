@@ -1,0 +1,483 @@
+{
+  "common": {
+    "save": "Save",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "edit": "Edit",
+    "create": "Create",
+    "update": "Update",
+    "close": "Close",
+    "back": "Back",
+    "next": "Next",
+    "previous": "Previous",
+    "search": "Search",
+    "filter": "Filter",
+    "filters": "Filters",
+    "clear": "Clear",
+    "clearAll": "Clear all",
+    "clearFilters": "Clear Filters",
+    "loading": "Loading...",
+    "error": "Error",
+    "success": "Success",
+    "confirm": "Confirm",
+    "dismiss": "Dismiss",
+    "copy": "Copy",
+    "copied": "Copied!",
+    "copyAddress": "Copy Address",
+    "view": "View",
+    "viewAll": "View All",
+    "add": "Add",
+    "remove": "Remove",
+    "active": "Active",
+    "inactive": "Inactive",
+    "optional": "optional",
+    "required": "required",
+    "name": "Name",
+    "email": "Email",
+    "address": "Address",
+    "walletAddress": "Wallet Address",
+    "status": "Status",
+    "date": "Date",
+    "amount": "Amount",
+    "type": "Type",
+    "notes": "Notes",
+    "memo": "Memo",
+    "description": "Description",
+    "actions": "Actions",
+    "noResults": "No results match your search",
+    "noData": "No data available",
+    "retry": "Retry",
+    "refresh": "Refresh",
+    "saving": "Saving...",
+    "processing": "Processing...",
+    "validating": "Validating...",
+    "select": "Select",
+    "all": "All"
+  },
+  "landing": {
+    "header": {
+      "login": "Login",
+      "tryForFree": "Try For Free"
+    },
+    "hero": {
+      "badge": "Non-custodial & Safe-powered",
+      "title": "Treasury Management for",
+      "titleHighlight": "Web3 Teams",
+      "subtitle": "Streamline stablecoin disbursements with enterprise-grade security. Manage beneficiaries, track payments, and maintain complete audit trails—all without ever giving up control of your keys.",
+      "tryForFree": "Try For Free",
+      "learnMore": "Learn More",
+      "trustIndicators": "Powered by industry-leading security"
+    },
+    "features": {
+      "title": "Features",
+      "subtitle": "Everything you need to manage treasury operations",
+      "description": "Built for Web3 teams who need security, transparency, and control over their funds.",
+      "nonCustodial": {
+        "title": "Non-Custodial",
+        "description": "Your keys, your funds. We never have access to your private keys or assets."
+      },
+      "safePowered": {
+        "title": "Safe-Powered",
+        "description": "Built on Gnosis Safe, the most trusted smart contract wallet in Web3."
+      },
+      "auditTrail": {
+        "title": "Audit Trail",
+        "description": "Complete transaction history with immutable on-chain records for compliance."
+      },
+      "stablecoinNative": {
+        "title": "Stablecoin Native",
+        "description": "First-class support for USDC and USDT with more tokens coming soon."
+      },
+      "roleBasedAccess": {
+        "title": "Role-Based Access",
+        "description": "Granular permissions for your team. Admins, approvers, initiators, and more."
+      },
+      "simpleBilling": {
+        "title": "Simple Billing",
+        "description": "Pay for the platform in stablecoins. No credit cards or bank accounts needed."
+      }
+    },
+    "howItWorks": {
+      "title": "How It Works",
+      "subtitle": "Get started in minutes",
+      "description": "Three simple steps to streamline your treasury operations.",
+      "step1": {
+        "number": "01",
+        "title": "Connect Your Safe",
+        "description": "Link your existing Gnosis Safe or create a new one. Your keys stay with you."
+      },
+      "step2": {
+        "number": "02",
+        "title": "Add Beneficiaries",
+        "description": "Set up your payment recipients with wallet addresses and optional metadata."
+      },
+      "step3": {
+        "number": "03",
+        "title": "Send Payments",
+        "description": "Execute stablecoin disbursements with full audit trails and transaction tracking."
+      }
+    },
+    "cta": {
+      "badge": "30-day free trial",
+      "title": "Ready to streamline your treasury?",
+      "description": "Join teams already using Disburse to manage their stablecoin operations with confidence and control.",
+      "tryForFree": "Try For Free",
+      "noCreditCard": "No credit card required • Cancel anytime"
+    },
+    "footer": {
+      "tagline": "Non-custodial treasury management for Web3 teams.",
+      "product": "Product",
+      "company": "Company",
+      "legal": "Legal",
+      "features": "Features",
+      "pricing": "Pricing",
+      "documentation": "Documentation",
+      "about": "About",
+      "blog": "Blog",
+      "contact": "Contact",
+      "privacy": "Privacy",
+      "terms": "Terms",
+      "copyright": "© {{year}} Disburse. All rights reserved."
+    }
+  },
+  "auth": {
+    "login": {
+      "title": "Welcome to Disburse",
+      "subtitle": "Connect your wallet to get started",
+      "connectWallet": "Connect Wallet",
+      "wrongNetwork": "Wrong network",
+      "signingIn": "Signing you in...",
+      "terms": "By connecting, you agree to our",
+      "termsOfService": "Terms of Service",
+      "and": "and",
+      "privacyPolicy": "Privacy Policy",
+      "newToWeb3": "New to Web3?",
+      "learnWallet": "Learn how to set up a wallet",
+      "backToHome": "Back to home"
+    },
+    "selectOrg": {
+      "title": "Select Organization",
+      "subtitle": "Choose an organization or create a new one",
+      "createNew": "Create New Organization",
+      "orgName": "Organization Name",
+      "orgNamePlaceholder": "Enter organization name",
+      "createOrg": "Create Organization",
+      "noOrgs": "You're not a member of any organizations yet."
+    }
+  },
+  "navigation": {
+    "dashboard": "Dashboard",
+    "beneficiaries": "Beneficiaries",
+    "disbursements": "Disbursements",
+    "settings": "Settings",
+    "disconnect": "Disconnect",
+    "language": "Language"
+  },
+  "dashboard": {
+    "title": "Dashboard",
+    "subtitle": "Overview of your treasury operations",
+    "noSafe": {
+      "title": "No Safe Connected",
+      "description": "Link your Gnosis Safe to start managing disbursements",
+      "linkSafe": "Link Safe"
+    },
+    "safe": {
+      "connected": "Connected Safe",
+      "viewOnSafe": "View on Safe",
+      "refreshBalances": "Refresh balances",
+      "usdcBalance": "USDC Balance",
+      "usdtBalance": "USDT Balance",
+      "depositAddress": "Deposit Address",
+      "depositDescription": "Send USDC or USDT to this address to fund your treasury"
+    },
+    "stats": {
+      "activeBeneficiaries": "Active Beneficiaries",
+      "manageBeneficiaries": "Manage Beneficiaries",
+      "pendingDisbursements": "Pending Disbursements",
+      "quickAction": "Quick Action",
+      "newPayment": "New Payment",
+      "createDisbursement": "Create Disbursement"
+    },
+    "recent": {
+      "title": "Recent Disbursements",
+      "none": "No disbursements yet"
+    }
+  },
+  "beneficiaries": {
+    "title": "Beneficiaries",
+    "subtitle": "Manage your payment recipients",
+    "total": "{{count}} total",
+    "addBeneficiary": "Add Beneficiary",
+    "newBeneficiary": "New Beneficiary",
+    "noBeneficiaries": {
+      "title": "No Beneficiaries Yet",
+      "description": "Add your first beneficiary to start making disbursements"
+    },
+    "individuals": "Individuals",
+    "businesses": "Businesses",
+    "beneficiaryType": "Beneficiary Type",
+    "individual": "Individual",
+    "business": "Business",
+    "fullName": "Full Name",
+    "businessName": "Business Name",
+    "namePlaceholder": {
+      "individual": "e.g., John Doe",
+      "business": "e.g., Acme Corporation"
+    },
+    "notesPlaceholder": "Any additional notes...",
+    "createBeneficiary": "Create Beneficiary",
+    "editBeneficiary": "Edit Beneficiary",
+    "saveChanges": "Save Changes",
+    "searchPlaceholder": "Search by name, address, or notes...",
+    "status": {
+      "all": "All",
+      "active": "Active",
+      "inactive": "Inactive"
+    },
+    "table": {
+      "name": "Name",
+      "walletAddress": "Wallet Address",
+      "status": "Status",
+      "added": "Added",
+      "actions": "Actions",
+      "edit": "Edit beneficiary",
+      "deactivate": "Deactivate",
+      "reactivate": "Reactivate"
+    },
+    "section": {
+      "total": "{{count}} total",
+      "active": "{{count}} active",
+      "inactive": "{{count}} inactive",
+      "noResults": "No {{type}} added yet",
+      "noSearchResults": "No results match your search"
+    }
+  },
+  "disbursements": {
+    "title": "Disbursements",
+    "subtitle": "Manage and track stablecoin payments",
+    "total": "{{count}} total",
+    "newDisbursement": "New Disbursement",
+    "createDisbursement": "Create Disbursement",
+    "noDisbursements": {
+      "title": "No Disbursements Yet",
+      "description": "Create your first disbursement to send stablecoins"
+    },
+    "noResults": {
+      "title": "No Results Found",
+      "description": "Try adjusting your search or filters"
+    },
+    "noSafeWarning": "You need to link a Safe before creating disbursements. Go to Settings to link your Safe.",
+    "searchPlaceholder": "Search by beneficiary, memo, or amount...",
+    "form": {
+      "beneficiary": "Beneficiary",
+      "selectBeneficiary": "Select a beneficiary...",
+      "amount": "Amount",
+      "token": "Token",
+      "memo": "Memo",
+      "memoPlaceholder": "Payment description..."
+    },
+    "filters": {
+      "status": "Status",
+      "token": "Token",
+      "allTokens": "All Tokens",
+      "dateRange": "Date Range",
+      "to": "to"
+    },
+    "table": {
+      "beneficiary": "Beneficiary",
+      "amount": "Amount",
+      "memo": "Memo",
+      "status": "Status",
+      "date": "Date",
+      "actions": "Actions"
+    },
+    "pagination": {
+      "showing": "Showing {{from}} to {{to}} of {{total}} results",
+      "page": "Page {{current}} of {{total}}"
+    },
+    "actions": {
+      "propose": "Propose to Safe",
+      "execute": "Execute Transaction",
+      "cancel": "Cancel",
+      "cancelConfirm": "Are you sure you want to cancel this disbursement?"
+    }
+  },
+  "settings": {
+    "title": "Settings",
+    "subtitle": "Manage your organization settings",
+    "organization": {
+      "title": "Organization",
+      "subtitle": "General settings",
+      "orgName": "Organization Name",
+      "save": "Save",
+      "adminOnly": "Only admins can edit the organization name"
+    },
+    "safe": {
+      "title": "Safe Wallet",
+      "subtitle": "Connect your Gnosis Safe",
+      "connected": "Connected Safe",
+      "openSafe": "Open Safe",
+      "unlinkSafe": "Unlink Safe",
+      "unlinkConfirm": "Are you sure you want to unlink this Safe?",
+      "noSafe": "No Safe connected yet",
+      "linkExisting": "Link Existing Safe",
+      "createSafe": "Don't have a Safe?",
+      "createSafeLink": "Create one here",
+      "safeAddress": "Safe Address (Sepolia)",
+      "safeAddressPlaceholder": "0x...",
+      "safeAddressDescription": "Enter the address of your existing Gnosis Safe on Sepolia testnet",
+      "linkSafe": "Link Safe",
+      "validating": "Validating...",
+      "network": "Sepolia"
+    },
+    "team": {
+      "title": "Team Members",
+      "subtitle": "Manage access to your organization",
+      "addMember": "Add Member",
+      "noMembers": "No team members yet",
+      "member": "Member",
+      "role": "Role",
+      "status": "Status",
+      "actions": "Actions",
+      "addTeamMember": "Add Team Member",
+      "displayName": "Display Name",
+      "displayNamePlaceholder": "e.g., John Doe",
+      "emailPlaceholder": "e.g., john@example.com",
+      "you": "you",
+      "noName": "No name",
+      "editMember": "Edit Team Member",
+      "cannotChangeRole": "cannot change your own role",
+      "removeConfirm": "Are you sure you want to remove this member?",
+      "roles": {
+        "admin": "Admin",
+        "adminDesc": "Full access to all features",
+        "approver": "Approver",
+        "approverDesc": "Can approve disbursements",
+        "initiator": "Initiator",
+        "initiatorDesc": "Can create disbursements",
+        "clerk": "Clerk",
+        "clerkDesc": "Can manage beneficiaries",
+        "viewer": "Viewer",
+        "viewerDesc": "Read-only access"
+      }
+    },
+    "billing": {
+      "title": "Billing & Subscription",
+      "subtitle": "Manage your subscription and payment",
+      "currentPlan": "Current Plan",
+      "users": "Users",
+      "beneficiaries": "Beneficiaries",
+      "unlimited": "Unlimited",
+      "trialDaysLeft": "{{days}} days left in trial",
+      "activeDaysRemaining": "Active - {{days}} days remaining",
+      "expired": "Expired - Please renew",
+      "popular": "Popular",
+      "current": "Current",
+      "subscribe": "Subscribe",
+      "upgrade": "Upgrade",
+      "downgradeNA": "Downgrade N/A",
+      "currentPlan": "Current Plan",
+      "plans": {
+        "starter": {
+          "name": "Starter",
+          "description": "For individuals",
+          "price": "${{price}}/mo",
+          "features": {
+            "users": "1 user",
+            "safe": "1 Safe",
+            "beneficiaries": "25 beneficiaries",
+            "disbursements": "One-time disbursements",
+            "audit": "Audit logs",
+            "export": "CSV export"
+          }
+        },
+        "team": {
+          "name": "Team",
+          "description": "For small teams",
+          "price": "${{price}}/mo",
+          "features": {
+            "users": "5 users",
+            "safe": "1 Safe",
+            "beneficiaries": "100 beneficiaries",
+            "roles": "All 5 roles",
+            "multisig": "Multi-sig approval",
+            "everything": "Everything in Starter"
+          }
+        },
+        "pro": {
+          "name": "Pro",
+          "description": "For growing teams",
+          "price": "${{price}}/mo",
+          "features": {
+            "users": "Unlimited users",
+            "safe": "1 Safe",
+            "beneficiaries": "Unlimited beneficiaries",
+            "reports": "Professional reports",
+            "support": "Priority support",
+            "everything": "Everything in Team"
+          }
+        }
+      },
+      "payment": {
+        "title": "Subscribe to {{plan}}",
+        "success": "Payment Successful",
+        "welcome": "Welcome to {{plan}}!",
+        "active": "Your subscription is now active. Enjoy all {{plan}} features.",
+        "paymentToken": "Payment Token",
+        "platformWallet": "Platform Wallet",
+        "payWithWallet": "Pay with Connected Wallet",
+        "alreadyPaid": "I've Already Paid (Enter TX Hash)",
+        "confirming": "Confirm transaction in your wallet...",
+        "waiting": "Waiting for confirmation...",
+        "dontClose": "Please don't close this window",
+        "pending": "Transaction pending",
+        "retry": "Retry Payment",
+        "enterHash": "Enter the transaction hash of your payment to verify.",
+        "txHash": "Transaction Hash",
+        "txHashPlaceholder": "0x...",
+        "expectedPayment": "Expected payment:",
+        "to": "to",
+        "verify": "Verify Payment",
+        "viewTransaction": "View Transaction",
+        "done": "Done"
+      },
+      "info": "Pay with stablecoins (USDC, USDT) on Ethereum Sepolia. All plans include a 30-day money-back guarantee."
+    }
+  },
+  "status": {
+    "draft": "Draft",
+    "pending": "Pending",
+    "proposed": "Proposed",
+    "executed": "Executed",
+    "failed": "Failed",
+    "cancelled": "Cancelled",
+    "active": "Active",
+    "inactive": "Inactive",
+    "invited": "Invited",
+    "removed": "Removed",
+    "trial": "Trial",
+    "expired": "Expired"
+  },
+  "errors": {
+    "generic": "An error occurred",
+    "userNotFound": "User not found",
+    "sessionExpired": "Session expired",
+    "invalidNonce": "Invalid nonce in message",
+    "noPendingSession": "No pending session found",
+    "failedToCreate": "Failed to create {{item}}",
+    "failedToUpdate": "Failed to update {{item}}",
+    "failedToDelete": "Failed to delete {{item}}",
+    "invalidSafeAddress": "Invalid Safe address. Please check the address and network.",
+    "notSafeOwner": "You must be an owner of this Safe to link it.",
+    "failedToLinkSafe": "Failed to link Safe",
+    "failedToUnlinkSafe": "Failed to unlink Safe",
+    "failedToInviteMember": "Failed to invite member",
+    "failedToUpdateMember": "Failed to update member",
+    "failedToRemoveMember": "Failed to remove member",
+    "failedToPropose": "Failed to propose transaction",
+    "failedToExecute": "Failed to execute transaction",
+    "failedToCancel": "Failed to cancel disbursement",
+    "paymentFailed": "Payment failed",
+    "failedToSubscribe": "Failed to subscribe"
+  }
+}

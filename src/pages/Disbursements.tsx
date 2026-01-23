@@ -1,6 +1,7 @@
 import { useState, useMemo, useRef } from 'react';
 import { useParams } from 'react-router-dom';
 import { useAccount } from 'wagmi';
+import { useTranslation } from 'react-i18next';
 import { useQuery, useMutation } from 'convex/react';
 import { api } from '../../convex/_generated/api';
 import { Id } from '../../convex/_generated/dataModel';
@@ -16,27 +17,30 @@ import {
   executeTransaction,
 } from '@/lib/safe';
 
-const STATUS_OPTIONS = [
-  { value: 'draft', label: 'Draft' },
-  { value: 'pending', label: 'Pending' },
-  { value: 'proposed', label: 'Proposed' },
-  { value: 'executed', label: 'Executed' },
-  { value: 'failed', label: 'Failed' },
-  { value: 'cancelled', label: 'Cancelled' },
-];
-
-const TOKEN_OPTIONS = [
-  { value: '', label: 'All Tokens' },
-  { value: 'USDC', label: 'USDC' },
-  { value: 'USDT', label: 'USDT' },
-];
+// Status and token options will be translated in component
 
 const PAGE_SIZE = 10;
 
 export default function Disbursements() {
   const { orgId } = useParams<{ orgId: string }>();
   const { address } = useAccount();
+  const { t } = useTranslation();
   const [isCreating, setIsCreating] = useState(false);
+  
+  const STATUS_OPTIONS = [
+    { value: 'draft', label: t('status.draft') },
+    { value: 'pending', label: t('status.pending') },
+    { value: 'proposed', label: t('status.proposed') },
+    { value: 'executed', label: t('status.executed') },
+    { value: 'failed', label: t('status.failed') },
+    { value: 'cancelled', label: t('status.cancelled') },
+  ];
+
+  const TOKEN_OPTIONS = [
+    { value: '', label: t('disbursements.filters.allTokens') },
+    { value: 'USDC', label: 'USDC' },
+    { value: 'USDT', label: 'USDT' },
+  ];
   const [selectedBeneficiary, setSelectedBeneficiary] = useState('');
   const [amount, setAmount] = useState('');
   const [token, setToken] = useState('USDC');
@@ -305,7 +309,7 @@ export default function Disbursements() {
   const handleCancel = async (disbursementId: Id<'disbursements'>) => {
     if (!address) return;
     
-    if (!confirm('Are you sure you want to cancel this disbursement?')) return;
+    if (!confirm(t('disbursements.actions.cancelConfirm'))) return;
 
     try {
       await updateStatus({
@@ -353,7 +357,7 @@ export default function Disbursements() {
               variant="ghost"
               size="sm"
               onClick={() => handlePropose(disbursement)}
-              title="Propose to Safe"
+              title={t('disbursements.actions.propose')}
             >
               <Play className="h-4 w-4 text-accent-400" />
             </Button>
@@ -387,7 +391,7 @@ export default function Disbursements() {
             variant="ghost"
             size="sm"
             onClick={() => handleExecute(disbursement)}
-            title="Execute Transaction"
+            title={t('disbursements.actions.execute')}
           >
             <Rocket className="h-4 w-4 text-yellow-400" />
           </Button>
@@ -410,12 +414,12 @@ export default function Disbursements() {
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-white">Disbursements</h1>
+            <h1 className="text-2xl font-bold text-white">{t('disbursements.title')}</h1>
             <p className="mt-1 text-slate-400">
-              Manage and track stablecoin payments
+              {t('disbursements.subtitle')}
               {displayedResult && (
                 <span className="ml-2 text-slate-500">
-                  ({displayedResult.totalCount} total)
+                  ({t('disbursements.total', { count: displayedResult.totalCount })})
                   {isRefreshing && (
                     <RefreshCw className="ml-2 inline h-3 w-3 animate-spin" />
                   )}
@@ -425,7 +429,7 @@ export default function Disbursements() {
           </div>
           <Button onClick={() => setIsCreating(true)} disabled={!safe}>
             <Plus className="h-4 w-4" />
-            New Disbursement
+            {t('disbursements.newDisbursement')}
           </Button>
         </div>
 
@@ -439,7 +443,7 @@ export default function Disbursements() {
                 type="text"
                 value={search}
                 onChange={(e) => handleSearchChange(e.target.value)}
-                placeholder="Search by beneficiary, memo, or amount..."
+                placeholder={t('disbursements.searchPlaceholder')}
                 className="w-full rounded-lg border border-white/10 bg-navy-800 pl-10 pr-4 py-2 text-white placeholder-slate-500 focus:border-accent-500 focus:outline-none focus:ring-1 focus:ring-accent-500"
               />
             </div>
@@ -451,7 +455,7 @@ export default function Disbursements() {
               className={hasActiveFilters ? 'border-accent-500' : ''}
             >
               <Filter className="h-4 w-4" />
-              Filters
+              {t('common.filters')}
               {hasActiveFilters && (
                 <span className="ml-1 rounded-full bg-accent-500 px-1.5 py-0.5 text-xs text-white">
                   {(statusFilter.length > 0 ? 1 : 0) + (tokenFilter ? 1 : 0) + (dateFrom || dateTo ? 1 : 0)}
@@ -462,7 +466,7 @@ export default function Disbursements() {
             {/* Clear Filters */}
             {hasActiveFilters && (
               <Button variant="ghost" onClick={clearFilters} className="text-slate-400 hover:text-white">
-                Clear all
+                {t('common.clearAll')}
               </Button>
             )}
           </div>
@@ -474,7 +478,7 @@ export default function Disbursements() {
                 {/* Status Filter */}
                 <div>
                   <label className="mb-2 block text-sm font-medium text-slate-300">
-                    Status
+                    {t('disbursements.filters.status')}
                   </label>
                   <div className="flex flex-wrap gap-2">
                     {STATUS_OPTIONS.map((option) => (
@@ -515,7 +519,7 @@ export default function Disbursements() {
                 <div>
                   <label className="mb-2 block text-sm font-medium text-slate-300">
                     <Calendar className="inline h-4 w-4 mr-1" />
-                    Date Range
+                    {t('disbursements.filters.dateRange')}
                   </label>
                   <div className="flex items-center gap-2">
                     <input
@@ -524,7 +528,7 @@ export default function Disbursements() {
                       onChange={(e) => handleDateFromChange(e.target.value)}
                       className="flex-1 rounded-lg border border-white/10 bg-navy-800 px-3 py-2 text-white focus:border-accent-500 focus:outline-none focus:ring-1 focus:ring-accent-500"
                     />
-                    <span className="text-slate-500">to</span>
+                    <span className="text-slate-500">{t('disbursements.filters.to')}</span>
                     <input
                       type="date"
                       value={dateTo}
@@ -540,7 +544,7 @@ export default function Disbursements() {
 
         {safe === null && (
           <div className="rounded-lg border border-yellow-500/30 bg-yellow-500/10 p-4 text-yellow-400">
-            You need to link a Safe before creating disbursements. Go to Settings to link your Safe.
+            {t('disbursements.noSafeWarning')}
           </div>
         )}
 
@@ -561,12 +565,12 @@ export default function Disbursements() {
         {isCreating && (
           <div className="rounded-2xl border border-accent-500/30 bg-navy-900/50 p-6">
             <h2 className="mb-4 text-lg font-semibold text-white">
-              New Disbursement
+              {t('disbursements.createDisbursement')}
             </h2>
             <form onSubmit={handleCreate} className="space-y-4">
               <div>
                 <label className="mb-2 block text-sm font-medium text-slate-300">
-                  Beneficiary
+                  {t('disbursements.form.beneficiary')}
                 </label>
                 <select
                   value={selectedBeneficiary}
@@ -574,7 +578,7 @@ export default function Disbursements() {
                   className="w-full rounded-lg border border-white/10 bg-navy-800 px-4 py-2 text-white focus:border-accent-500 focus:outline-none focus:ring-1 focus:ring-accent-500"
                   required
                 >
-                  <option value="">Select a beneficiary...</option>
+                  <option value="">{t('disbursements.form.selectBeneficiary')}</option>
                   {beneficiaries?.map((b) => (
                     <option key={b._id} value={b._id}>
                       {b.name} ({b.walletAddress.slice(0, 6)}...{b.walletAddress.slice(-4)})
@@ -585,7 +589,7 @@ export default function Disbursements() {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="mb-2 block text-sm font-medium text-slate-300">
-                    Amount
+                    {t('disbursements.form.amount')}
                   </label>
                   <input
                     type="number"
@@ -614,24 +618,24 @@ export default function Disbursements() {
               </div>
               <div>
                 <label className="mb-2 block text-sm font-medium text-slate-300">
-                  Memo (optional)
+                  {t('disbursements.form.memo')} ({t('common.optional')})
                 </label>
                 <input
                   type="text"
                   value={memo}
                   onChange={(e) => setMemo(e.target.value)}
-                  placeholder="Payment description..."
+                  placeholder={t('disbursements.form.memoPlaceholder')}
                   className="w-full rounded-lg border border-white/10 bg-navy-800 px-4 py-2 text-white placeholder-slate-500 focus:border-accent-500 focus:outline-none focus:ring-1 focus:ring-accent-500"
                 />
               </div>
               <div className="flex gap-3">
-                <Button type="submit">Create Disbursement</Button>
+                <Button type="submit">{t('disbursements.createDisbursement')}</Button>
                 <Button
                   type="button"
                   variant="secondary"
                   onClick={() => setIsCreating(false)}
                 >
-                  Cancel
+                  {t('common.cancel')}
                 </Button>
               </div>
             </form>
@@ -643,23 +647,23 @@ export default function Disbursements() {
           <div className="rounded-2xl border border-dashed border-white/20 bg-navy-900/30 p-8 text-center">
             <Send className="mx-auto h-12 w-12 text-slate-500" />
             <h3 className="mt-4 text-lg font-medium text-white">
-              No Disbursements Yet
+              {t('disbursements.noDisbursements.title')}
             </h3>
             <p className="mt-2 text-slate-400">
-              Create your first disbursement to send stablecoins
+              {t('disbursements.noDisbursements.description')}
             </p>
           </div>
         ) : displayedResult?.items.length === 0 && hasActiveFilters ? (
           <div className="rounded-2xl border border-dashed border-white/20 bg-navy-900/30 p-8 text-center">
             <Search className="mx-auto h-12 w-12 text-slate-500" />
             <h3 className="mt-4 text-lg font-medium text-white">
-              No Results Found
+              {t('disbursements.noResults.title')}
             </h3>
             <p className="mt-2 text-slate-400">
-              Try adjusting your search or filters
+              {t('disbursements.noResults.description')}
             </p>
             <Button variant="secondary" onClick={clearFilters} className="mt-4">
-              Clear Filters
+              {t('common.clearFilters')}
             </Button>
           </div>
         ) : (
@@ -668,28 +672,28 @@ export default function Disbursements() {
               <thead>
                 <tr className="border-b border-white/10 bg-navy-800/50">
                   <th className="px-6 py-4 text-left text-sm font-medium text-slate-400">
-                    Beneficiary
+                    {t('disbursements.table.beneficiary')}
                   </th>
                   <th 
                     className="px-6 py-4 text-left text-sm font-medium text-slate-400 cursor-pointer hover:text-white transition-colors"
                     onClick={() => handleSort('amount')}
                   >
                     <span className="flex items-center gap-1">
-                      Amount
+                      {t('disbursements.table.amount')}
                       {sortBy === 'amount' && (
                         sortOrder === 'desc' ? <ChevronDown className="h-4 w-4" /> : <ChevronUp className="h-4 w-4" />
                       )}
                     </span>
                   </th>
                   <th className="px-6 py-4 text-left text-sm font-medium text-slate-400">
-                    Memo
+                    {t('disbursements.table.memo')}
                   </th>
                   <th 
                     className="px-6 py-4 text-left text-sm font-medium text-slate-400 cursor-pointer hover:text-white transition-colors"
                     onClick={() => handleSort('status')}
                   >
                     <span className="flex items-center gap-1">
-                      Status
+                      {t('disbursements.table.status')}
                       {sortBy === 'status' && (
                         sortOrder === 'desc' ? <ChevronDown className="h-4 w-4" /> : <ChevronUp className="h-4 w-4" />
                       )}
@@ -700,14 +704,14 @@ export default function Disbursements() {
                     onClick={() => handleSort('createdAt')}
                   >
                     <span className="flex items-center gap-1">
-                      Date
+                      {t('disbursements.table.date')}
                       {sortBy === 'createdAt' && (
                         sortOrder === 'desc' ? <ChevronDown className="h-4 w-4" /> : <ChevronUp className="h-4 w-4" />
                       )}
                     </span>
                   </th>
                   <th className="px-6 py-4 text-center text-sm font-medium text-slate-400">
-                    Actions
+                    {t('disbursements.table.actions')}
                   </th>
                 </tr>
               </thead>
@@ -733,7 +737,7 @@ export default function Disbursements() {
                           disbursement.status
                         )}`}
                       >
-                        {disbursement.status}
+                        {t(`status.${disbursement.status}`)}
                       </span>
                     </td>
                     <td className="px-6 py-4 text-slate-400">
@@ -763,9 +767,11 @@ export default function Disbursements() {
             {displayedResult && displayedResult.totalCount > PAGE_SIZE && (
               <div className="flex items-center justify-between border-t border-white/10 bg-navy-800/30 px-6 py-4">
                 <div className="text-sm text-slate-400">
-                  Showing {currentPage * PAGE_SIZE + 1} to{' '}
-                  {Math.min((currentPage + 1) * PAGE_SIZE, displayedResult.totalCount)} of{' '}
-                  {displayedResult.totalCount} results
+                  {t('disbursements.pagination.showing', {
+                    from: currentPage * PAGE_SIZE + 1,
+                    to: Math.min((currentPage + 1) * PAGE_SIZE, displayedResult.totalCount),
+                    total: displayedResult.totalCount
+                  })}
                 </div>
                 <div className="flex items-center gap-2">
                   <Button
@@ -775,10 +781,13 @@ export default function Disbursements() {
                     disabled={currentPage === 0}
                   >
                     <ChevronLeft className="h-4 w-4" />
-                    Previous
+                    {t('common.previous')}
                   </Button>
                   <span className="px-3 py-1 text-sm text-slate-400">
-                    Page {currentPage + 1} of {Math.ceil(displayedResult.totalCount / PAGE_SIZE)}
+                    {t('disbursements.pagination.page', {
+                      current: currentPage + 1,
+                      total: Math.ceil(displayedResult.totalCount / PAGE_SIZE)
+                    })}
                   </span>
                   <Button
                     variant="secondary"
@@ -786,7 +795,7 @@ export default function Disbursements() {
                     onClick={goToNextPage}
                     disabled={!displayedResult.hasMore}
                   >
-                    Next
+                    {t('common.next')}
                     <ChevronRight className="h-4 w-4" />
                   </Button>
                 </div>

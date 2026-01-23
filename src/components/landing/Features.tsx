@@ -1,4 +1,5 @@
 import { motion } from 'framer-motion'
+import { useTranslation } from 'react-i18next'
 import { 
   Shield, 
   Lock, 
@@ -7,39 +8,6 @@ import {
   Users, 
   CreditCard 
 } from 'lucide-react'
-
-const features = [
-  {
-    icon: Shield,
-    title: 'Non-Custodial',
-    description: 'Your keys, your funds. We never have access to your private keys or assets.',
-  },
-  {
-    icon: Lock,
-    title: 'Safe-Powered',
-    description: 'Built on Gnosis Safe, the most trusted smart contract wallet in Web3.',
-  },
-  {
-    icon: FileText,
-    title: 'Audit Trail',
-    description: 'Complete transaction history with immutable on-chain records for compliance.',
-  },
-  {
-    icon: Coins,
-    title: 'Stablecoin Native',
-    description: 'First-class support for USDC and USDT with more tokens coming soon.',
-  },
-  {
-    icon: Users,
-    title: 'Role-Based Access',
-    description: 'Granular permissions for your team. Admins, approvers, initiators, and more.',
-  },
-  {
-    icon: CreditCard,
-    title: 'Simple Billing',
-    description: 'Pay for the platform in stablecoins. No credit cards or bank accounts needed.',
-  },
-]
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -61,6 +29,40 @@ const itemVariants = {
 }
 
 export function Features() {
+  const { t } = useTranslation();
+  
+  const features = [
+    {
+      icon: Shield,
+      title: t('landing.features.nonCustodial.title'),
+      description: t('landing.features.nonCustodial.description'),
+    },
+    {
+      icon: Lock,
+      title: t('landing.features.safePowered.title'),
+      description: t('landing.features.safePowered.description'),
+    },
+    {
+      icon: FileText,
+      title: t('landing.features.auditTrail.title'),
+      description: t('landing.features.auditTrail.description'),
+    },
+    {
+      icon: Coins,
+      title: t('landing.features.stablecoinNative.title'),
+      description: t('landing.features.stablecoinNative.description'),
+    },
+    {
+      icon: Users,
+      title: t('landing.features.roleBasedAccess.title'),
+      description: t('landing.features.roleBasedAccess.description'),
+    },
+    {
+      icon: CreditCard,
+      title: t('landing.features.simpleBilling.title'),
+      description: t('landing.features.simpleBilling.description'),
+    },
+  ]
   return (
     <section id="features" className="relative py-24 sm:py-32">
       {/* Background accent */}
@@ -78,13 +80,13 @@ export function Features() {
           className="mx-auto max-w-2xl text-center"
         >
           <h2 className="text-base font-semibold uppercase tracking-wider text-accent-400">
-            Features
+            {t('landing.features.title')}
           </h2>
           <p className="mt-2 text-3xl font-bold tracking-tight text-white sm:text-4xl">
-            Everything you need to manage treasury operations
+            {t('landing.features.subtitle')}
           </p>
           <p className="mt-4 text-lg text-slate-400">
-            Built for Web3 teams who need security, transparency, and control over their funds.
+            {t('landing.features.description')}
           </p>
         </motion.div>
 

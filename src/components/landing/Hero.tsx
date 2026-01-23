@@ -1,9 +1,11 @@
 import { Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
+import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/ui/button'
 import { ArrowRight, Shield } from 'lucide-react'
 
 export function Hero() {
+  const { t } = useTranslation();
   return (
     <section className="relative min-h-screen overflow-hidden pt-16">
       {/* Animated background */}
@@ -34,7 +36,7 @@ export function Hero() {
           >
             <div className="mb-8 inline-flex items-center gap-2 rounded-full border border-accent-500/30 bg-accent-500/10 px-4 py-2 text-sm text-accent-400">
               <Shield className="h-4 w-4" />
-              <span>Non-custodial & Safe-powered</span>
+              <span>{t('landing.hero.badge')}</span>
             </div>
           </motion.div>
 
@@ -45,9 +47,9 @@ export function Hero() {
             transition={{ duration: 0.5, delay: 0.1 }}
             className="max-w-4xl text-5xl font-bold tracking-tight text-white sm:text-6xl lg:text-7xl"
           >
-            Treasury Management for{' '}
+            {t('landing.hero.title')}{' '}
             <span className="bg-gradient-to-r from-accent-400 to-accent-500 bg-clip-text text-transparent">
-              Web3 Teams
+              {t('landing.hero.titleHighlight')}
             </span>
           </motion.h1>
 
@@ -58,9 +60,7 @@ export function Hero() {
             transition={{ duration: 0.5, delay: 0.2 }}
             className="mt-6 max-w-2xl text-lg text-slate-400 sm:text-xl"
           >
-            Streamline stablecoin disbursements with enterprise-grade security. 
-            Manage beneficiaries, track payments, and maintain complete audit trails—all 
-            without ever giving up control of your keys.
+            {t('landing.hero.subtitle')}
           </motion.p>
 
           {/* CTAs */}
@@ -72,13 +72,13 @@ export function Hero() {
           >
             <Link to="/login">
               <Button size="lg" className="group">
-                Try For Free
+                {t('landing.hero.tryForFree')}
                 <ArrowRight className="transition-transform group-hover:translate-x-1" />
               </Button>
             </Link>
             <a href="#features">
               <Button variant="secondary" size="lg">
-                Learn More
+                {t('landing.hero.learnMore')}
               </Button>
             </a>
           </motion.div>
@@ -90,7 +90,7 @@ export function Hero() {
             transition={{ duration: 0.5, delay: 0.5 }}
             className="mt-16 flex flex-col items-center gap-4"
           >
-            <p className="text-sm text-slate-500">Powered by industry-leading security</p>
+            <p className="text-sm text-slate-500">{t('landing.hero.trustIndicators')}</p>
             <div className="flex items-center gap-8 opacity-60">
               <div className="flex items-center gap-2 text-slate-400">
                 <svg className="h-6 w-6" viewBox="0 0 24 24" fill="currentColor">

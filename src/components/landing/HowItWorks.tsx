@@ -1,28 +1,30 @@
 import { motion } from 'framer-motion'
+import { useTranslation } from 'react-i18next'
 import { Wallet, UserPlus, Send } from 'lucide-react'
 
-const steps = [
-  {
-    icon: Wallet,
-    step: '01',
-    title: 'Connect Your Safe',
-    description: 'Link your existing Gnosis Safe or create a new one. Your keys stay with you.',
-  },
-  {
-    icon: UserPlus,
-    step: '02',
-    title: 'Add Beneficiaries',
-    description: 'Set up your payment recipients with wallet addresses and optional metadata.',
-  },
-  {
-    icon: Send,
-    step: '03',
-    title: 'Send Payments',
-    description: 'Execute stablecoin disbursements with full audit trails and transaction tracking.',
-  },
-]
-
 export function HowItWorks() {
+  const { t } = useTranslation();
+  
+  const steps = [
+    {
+      icon: Wallet,
+      step: t('landing.howItWorks.step1.number'),
+      title: t('landing.howItWorks.step1.title'),
+      description: t('landing.howItWorks.step1.description'),
+    },
+    {
+      icon: UserPlus,
+      step: t('landing.howItWorks.step2.number'),
+      title: t('landing.howItWorks.step2.title'),
+      description: t('landing.howItWorks.step2.description'),
+    },
+    {
+      icon: Send,
+      step: t('landing.howItWorks.step3.number'),
+      title: t('landing.howItWorks.step3.title'),
+      description: t('landing.howItWorks.step3.description'),
+    },
+  ]
   return (
     <section className="relative py-24 sm:py-32">
       {/* Background */}
@@ -38,13 +40,13 @@ export function HowItWorks() {
           className="mx-auto max-w-2xl text-center"
         >
           <h2 className="text-base font-semibold uppercase tracking-wider text-accent-400">
-            How It Works
+            {t('landing.howItWorks.title')}
           </h2>
           <p className="mt-2 text-3xl font-bold tracking-tight text-white sm:text-4xl">
-            Get started in minutes
+            {t('landing.howItWorks.subtitle')}
           </p>
           <p className="mt-4 text-lg text-slate-400">
-            Three simple steps to streamline your treasury operations.
+            {t('landing.howItWorks.description')}
           </p>
         </motion.div>
 

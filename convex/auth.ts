@@ -100,6 +100,7 @@ export const verifySignature = mutation({
       sessionId: session._id,
       userId: user._id,
       walletAddress: user.walletAddress,
+      preferredLanguage: user.preferredLanguage,
     };
   },
 });
@@ -133,6 +134,7 @@ export const getSession = query({
       userId: user._id,
       walletAddress: user.walletAddress,
       email: user.email,
+      preferredLanguage: user.preferredLanguage,
     };
   },
 });

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { useAccount, useReadContracts, useWatchContractEvent } from 'wagmi';
+import { useTranslation } from 'react-i18next';
 import { useQuery } from 'convex/react';
 import { api } from '../../convex/_generated/api';
 import { Id } from '../../convex/_generated/dataModel';
@@ -44,6 +45,7 @@ const erc20Abi = [
 export default function Dashboard() {
   const { orgId } = useParams<{ orgId: string }>();
   const { address } = useAccount();
+  const { t } = useTranslation();
   const [copied, setCopied] = useState(false);
 
   const handleCopyAddress = async (addr: string) => {
@@ -158,9 +160,9 @@ export default function Dashboard() {
       <div className="space-y-8">
         {/* Header */}
         <div>
-          <h1 className="text-2xl font-bold text-white">Dashboard</h1>
+          <h1 className="text-2xl font-bold text-white">{t('dashboard.title')}</h1>
           <p className="mt-1 text-slate-400">
-            Overview of your treasury operations
+            {t('dashboard.subtitle')}
           </p>
         </div>
 
@@ -169,15 +171,15 @@ export default function Dashboard() {
           <div className="rounded-2xl border border-dashed border-white/20 bg-navy-900/30 p-8 text-center">
             <Wallet className="mx-auto h-12 w-12 text-slate-500" />
             <h3 className="mt-4 text-lg font-medium text-white">
-              No Safe Connected
+              {t('dashboard.noSafe.title')}
             </h3>
             <p className="mt-2 text-slate-400">
-              Link your Gnosis Safe to start managing disbursements
+              {t('dashboard.noSafe.description')}
             </p>
             <Link to={`/org/${orgId}/settings`}>
               <Button className="mt-6">
                 <Plus className="h-4 w-4" />
-                Link Safe
+                {t('dashboard.noSafe.linkSafe')}
               </Button>
             </Link>
           </div>
@@ -189,7 +191,7 @@ export default function Dashboard() {
                   <Wallet className="h-6 w-6" />
                 </div>
                 <div>
-                  <p className="text-sm text-slate-400">Connected Safe</p>
+                  <p className="text-sm text-slate-400">{t('dashboard.safe.connected')}</p>
                   <p className="font-mono text-white">
                     {safe.safeAddress.slice(0, 6)}...{safe.safeAddress.slice(-4)}
                   </p>
@@ -199,7 +201,7 @@ export default function Dashboard() {
                 <button
                   onClick={() => refetchBalances()}
                   className="flex items-center gap-1 text-sm text-slate-400 hover:text-white transition-colors"
-                  title="Refresh balances"
+                  title={t('dashboard.safe.refreshBalances')}
                 >
                   <RefreshCw className={`h-4 w-4 ${balancesLoading ? 'animate-spin' : ''}`} />
                 </button>
@@ -209,7 +211,7 @@ export default function Dashboard() {
                   rel="noopener noreferrer"
                   className="flex items-center gap-1 text-sm text-accent-400 hover:underline"
                 >
-                  View on Safe
+                  {t('dashboard.safe.viewOnSafe')}
                   <ArrowUpRight className="h-4 w-4" />
                 </a>
               </div>
@@ -218,7 +220,7 @@ export default function Dashboard() {
             {/* Token Balances */}
             <div className="mt-6 grid grid-cols-2 gap-4">
               <div className="rounded-xl bg-navy-800/50 p-4">
-                <p className="text-sm text-slate-400">USDC Balance</p>
+                <p className="text-sm text-slate-400">{t('dashboard.safe.usdcBalance')}</p>
                 <p className="mt-1 text-2xl font-bold text-white">
                   {balancesLoading ? (
                     <span className="inline-block h-8 w-24 animate-pulse rounded bg-navy-700" />
@@ -228,7 +230,7 @@ export default function Dashboard() {
                 </p>
               </div>
               <div className="rounded-xl bg-navy-800/50 p-4">
-                <p className="text-sm text-slate-400">USDT Balance</p>
+                <p className="text-sm text-slate-400">{t('dashboard.safe.usdtBalance')}</p>
                 <p className="mt-1 text-2xl font-bold text-white">
                   {balancesLoading ? (
                     <span className="inline-block h-8 w-24 animate-pulse rounded bg-navy-700" />
@@ -241,9 +243,9 @@ export default function Dashboard() {
 
             {/* Deposit Address */}
             <div className="mt-6 rounded-xl border border-accent-500/20 bg-accent-500/5 p-4">
-              <p className="text-sm font-medium text-accent-400">Deposit Address</p>
+              <p className="text-sm font-medium text-accent-400">{t('dashboard.safe.depositAddress')}</p>
               <p className="mt-1 text-xs text-slate-400">
-                Send USDC or USDT to this address to fund your treasury
+                {t('dashboard.safe.depositDescription')}
               </p>
               <div className="mt-3 flex items-center gap-2">
                 <code className="flex-1 rounded-lg bg-navy-800 px-3 py-2 font-mono text-sm text-white break-all">
@@ -274,7 +276,7 @@ export default function Dashboard() {
                 <Users className="h-5 w-5" />
               </div>
               <div>
-                <p className="text-sm text-slate-400">Active Beneficiaries</p>
+                <p className="text-sm text-slate-400">{t('dashboard.stats.activeBeneficiaries')}</p>
                 <p className="text-2xl font-bold text-white">
                   {beneficiaries?.length ?? '--'}
                 </p>
@@ -282,7 +284,7 @@ export default function Dashboard() {
             </div>
             <Link to={`/org/${orgId}/beneficiaries`}>
               <Button variant="ghost" size="sm" className="mt-4 w-full">
-                Manage Beneficiaries
+                {t('dashboard.stats.manageBeneficiaries')}
               </Button>
             </Link>
           </div>
@@ -294,7 +296,7 @@ export default function Dashboard() {
                 <Clock className="h-5 w-5" />
               </div>
               <div>
-                <p className="text-sm text-slate-400">Pending Disbursements</p>
+                <p className="text-sm text-slate-400">{t('dashboard.stats.pendingDisbursements')}</p>
                 <p className="text-2xl font-bold text-white">
                   {recentDisbursements?.items.filter((d) => d.status === 'pending' || d.status === 'draft' || d.status === 'proposed').length ?? '--'}
                 </p>
@@ -302,7 +304,7 @@ export default function Dashboard() {
             </div>
             <Link to={`/org/${orgId}/disbursements`}>
               <Button variant="ghost" size="sm" className="mt-4 w-full">
-                View All
+                {t('common.viewAll')}
               </Button>
             </Link>
           </div>
@@ -314,14 +316,14 @@ export default function Dashboard() {
                 <Send className="h-5 w-5" />
               </div>
               <div>
-                <p className="text-sm text-slate-400">Quick Action</p>
-                <p className="text-lg font-medium text-white">New Payment</p>
+                <p className="text-sm text-slate-400">{t('dashboard.stats.quickAction')}</p>
+                <p className="text-lg font-medium text-white">{t('dashboard.stats.newPayment')}</p>
               </div>
             </div>
             <Link to={`/org/${orgId}/disbursements`}>
               <Button size="sm" className="mt-4 w-full">
                 <Plus className="h-4 w-4" />
-                Create Disbursement
+                {t('dashboard.stats.createDisbursement')}
               </Button>
             </Link>
           </div>
@@ -329,11 +331,11 @@ export default function Dashboard() {
 
         {/* Recent Activity */}
         <div className="rounded-2xl border border-white/10 bg-navy-900/50 p-6">
-          <h2 className="text-lg font-semibold text-white">Recent Disbursements</h2>
+          <h2 className="text-lg font-semibold text-white">{t('dashboard.recent.title')}</h2>
           
           {recentDisbursements?.items.length === 0 ? (
             <p className="mt-4 text-center text-slate-500 py-8">
-              No disbursements yet
+              {t('dashboard.recent.none')}
             </p>
           ) : (
             <div className="mt-4 space-y-3">
