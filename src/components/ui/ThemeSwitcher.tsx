@@ -1,17 +1,19 @@
 import { useState } from 'react';
 import { Sun, Moon, Check } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { useTheme } from '@/lib/theme';
 import { Button } from './button';
 import { cn } from '@/lib/utils';
 
-const themes = [
-  { value: 'light' as const, label: 'Light', icon: Sun },
-  { value: 'dark' as const, label: 'Dark', icon: Moon },
-] as const;
-
 export function ThemeSwitcher({ variant = 'ghost', size = 'sm' }: { variant?: 'default' | 'ghost' | 'secondary', size?: 'sm' | 'md' | 'lg' }) {
   const { theme, setTheme } = useTheme();
+  const { t } = useTranslation();
   const [isOpen, setIsOpen] = useState(false);
+
+  const themes = [
+    { value: 'light' as const, label: t('theme.light'), icon: Sun },
+    { value: 'dark' as const, label: t('theme.dark'), icon: Moon },
+  ] as const;
 
   const currentTheme = themes.find(t => t.value === theme) || themes[1];
 

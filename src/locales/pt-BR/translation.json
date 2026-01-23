@@ -566,6 +566,10 @@
     "trial": "Teste",
     "expired": "Expirado"
   },
+  "theme": {
+    "light": "Claro",
+    "dark": "Escuro"
+  },
   "errors": {
     "generic": "Ocorreu um erro",
     "userNotFound": "Usuário não encontrado",
