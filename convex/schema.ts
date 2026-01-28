@@ -34,6 +34,11 @@ export default defineSchema({
   orgs: defineTable({
     name: v.string(),
     createdBy: v.id("users"),
+    screeningEnforcement: v.optional(v.union(
+      v.literal("block"),
+      v.literal("warn"),
+      v.literal("off")
+    )),
     createdAt: v.number(),
   }),
 
@@ -159,4 +164,43 @@ export default defineSchema({
   })
     .index("by_org", ["orgId"])
     .index("by_org_timestamp", ["orgId", "timestamp"]),
+
+  // SDN (Specially Designated Nationals) entries for OFAC screening
+  sdnEntries: defineTable({
+    sdnId: v.number(),
+    entityType: v.union(v.literal("individual"), v.literal("entity")),
+    primaryName: v.string(),
+    firstName: v.string(),
+    lastName: v.string(),
+    aliases: v.array(v.string()),
+    programs: v.array(v.string()),
+  })
+    .index("by_sdnId", ["sdnId"])
+    .searchIndex("search_primaryName", {
+      searchField: "primaryName",
+    }),
+
+  // Screening results for beneficiaries
+  screeningResults: defineTable({
+    orgId: v.id("orgs"),
+    beneficiaryId: v.id("beneficiaries"),
+    status: v.union(
+      v.literal("clear"),
+      v.literal("potential_match"),
+      v.literal("confirmed_match"),
+      v.literal("false_positive")
+    ),
+    matches: v.array(
+      v.object({
+        sdnId: v.number(),
+        matchScore: v.number(),
+        matchedName: v.string(),
+      })
+    ),
+    screenedAt: v.number(),
+    reviewedBy: v.optional(v.id("users")),
+    reviewedAt: v.optional(v.number()),
+  })
+    .index("by_org", ["orgId"])
+    .index("by_beneficiary", ["beneficiaryId"]),
 });

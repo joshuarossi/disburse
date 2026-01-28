@@ -19,6 +19,9 @@ import type * as migrations_backfillBeneficiaryType from "../migrations/backfill
 import type * as orgs from "../orgs.js";
 import type * as reports from "../reports.js";
 import type * as safes from "../safes.js";
+import type * as screening from "../screening.js";
+import type * as screeningMutations from "../screeningMutations.js";
+import type * as screeningQueries from "../screeningQueries.js";
 import type * as users from "../users.js";
 
 import type {
@@ -39,6 +42,9 @@ declare const fullApi: ApiFromModules<{
   orgs: typeof orgs;
   reports: typeof reports;
   safes: typeof safes;
+  screening: typeof screening;
+  screeningMutations: typeof screeningMutations;
+  screeningQueries: typeof screeningQueries;
   users: typeof users;
 }>;
 

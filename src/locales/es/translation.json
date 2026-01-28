@@ -636,5 +636,24 @@
     "failedToCancel": "Error al cancelar desembolso",
     "paymentFailed": "Error en el pago",
     "failedToSubscribe": "Error al suscribirse"
+  },
+  "screening": {
+    "title": "Verificación",
+    "checking": "Verificando...",
+    "pending": "Pendiente",
+    "clear": "Sin coincidencias",
+    "potentialMatch": "Posible coincidencia",
+    "confirmedMatch": "Coincidencia confirmada",
+    "falsePositive": "Falso positivo",
+    "detailTitle": "Detalles de verificación",
+    "beneficiary": "Beneficiario",
+    "status": "Estado de verificación",
+    "matches": "Coincidencias SDN",
+    "matchScore": "coincidencia",
+    "screenedAt": "Verificado el",
+    "reviewedAt": "Revisado el",
+    "noResults": "Sin resultados de verificación aún",
+    "markFalsePositive": "Marcar como falso positivo",
+    "confirmMatch": "Confirmar coincidencia"
   }
 }

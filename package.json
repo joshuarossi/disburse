@@ -26,17 +26,18 @@
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "convex": "1.31.6",
+    "fast-xml-parser": "^5.3.3",
     "framer-motion": "^12.27.5",
+    "i18next": "^23.15.1",
+    "i18next-browser-languagedetector": "^8.0.2",
     "lucide-react": "^0.562.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
+    "react-i18next": "^15.1.0",
     "react-router-dom": "^7.1.1",
     "tailwind-merge": "^3.4.0",
     "viem": "^2.21.0",
-    "wagmi": "^2.14.0",
-    "i18next": "^23.15.1",
-    "react-i18next": "^15.1.0",
-    "i18next-browser-languagedetector": "^8.0.2"
+    "wagmi": "^2.14.0"
   },
   "devDependencies": {
     "@eslint/js": "^9.17.0",

@@ -1,5 +1,6 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
+import { internal } from "./_generated/api";
 import { requireOrgAccess } from "./lib/rbac";
 import { getOrgLimits } from "./billing";
 
@@ -80,6 +81,13 @@ export const create = mutation({
       objectId: beneficiaryId,
       metadata: { type: args.type, name: args.name, walletAddress: args.beneficiaryAddress },
       timestamp: now,
+    });
+
+    // Schedule async SDN screening
+    await ctx.scheduler.runAfter(0, internal.screening.screenBeneficiary, {
+      beneficiaryId,
+      orgId: args.orgId,
+      walletAddress: args.walletAddress,
     });
 
     return { beneficiaryId };
@@ -301,6 +309,15 @@ export const createBulk = mutation({
           bulkImport: true,
         },
         timestamp: now,
+      });
+    }
+
+    // Schedule async SDN screening for all created beneficiaries
+    for (const id of createdIds) {
+      await ctx.scheduler.runAfter(0, internal.screening.screenBeneficiary, {
+        beneficiaryId: id as any,
+        orgId: args.orgId,
+        walletAddress: args.walletAddress,
       });
     }
 

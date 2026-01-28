@@ -636,5 +636,24 @@
     "failedToCancel": "Falha ao cancelar desembolso",
     "paymentFailed": "Falha no pagamento",
     "failedToSubscribe": "Falha ao assinar"
+  },
+  "screening": {
+    "title": "Triagem",
+    "checking": "Verificando...",
+    "pending": "Pendente",
+    "clear": "Sem correspondências",
+    "potentialMatch": "Possível correspondência",
+    "confirmedMatch": "Correspondência confirmada",
+    "falsePositive": "Falso positivo",
+    "detailTitle": "Detalhes da triagem",
+    "beneficiary": "Beneficiário",
+    "status": "Status da triagem",
+    "matches": "Correspondências SDN",
+    "matchScore": "correspondência",
+    "screenedAt": "Triado em",
+    "reviewedAt": "Revisado em",
+    "noResults": "Nenhum resultado de triagem ainda",
+    "markFalsePositive": "Marcar como falso positivo",
+    "confirmMatch": "Confirmar correspondência"
   }
 }

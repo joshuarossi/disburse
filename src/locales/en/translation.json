@@ -636,5 +636,24 @@
     "failedToCancel": "Failed to cancel disbursement",
     "paymentFailed": "Payment failed",
     "failedToSubscribe": "Failed to subscribe"
+  },
+  "screening": {
+    "title": "Screening",
+    "checking": "Checking...",
+    "pending": "Pending",
+    "clear": "Clear",
+    "potentialMatch": "Potential Match",
+    "confirmedMatch": "Confirmed Match",
+    "falsePositive": "False Positive",
+    "detailTitle": "Screening Details",
+    "beneficiary": "Beneficiary",
+    "status": "Screening Status",
+    "matches": "SDN Matches",
+    "matchScore": "match",
+    "screenedAt": "Screened at",
+    "reviewedAt": "Reviewed at",
+    "noResults": "No screening results yet",
+    "markFalsePositive": "Mark as False Positive",
+    "confirmMatch": "Confirm Match"
   }
 }

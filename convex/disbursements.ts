@@ -1,6 +1,7 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import { requireOrgAccess } from "./lib/rbac";
+import { Doc } from "./_generated/dataModel";
 
 // List disbursements for an org with filtering, searching, sorting, and pagination
 export const list = query({
@@ -238,6 +239,43 @@ export const updateStatus = mutation({
 
     // Admin or initiator can update status
     const { user } = await requireOrgAccess(ctx, disbursement.orgId, walletAddress, ["admin", "initiator"]);
+
+    // SDN screening check when moving to pending/proposed
+    if (args.status === "pending" || args.status === "proposed") {
+      const org = await ctx.db.get(disbursement.orgId);
+      const enforcement = (org as any)?.screeningEnforcement ?? "off";
+
+      if (enforcement === "block") {
+        // Collect beneficiary IDs
+        const beneficiaryIds: string[] = [];
+        if (disbursement.type === "batch") {
+          const recipients = await ctx.db
+            .query("disbursementRecipients")
+            .withIndex("by_disbursement", (q) => q.eq("disbursementId", args.disbursementId))
+            .collect();
+          for (const r of recipients) {
+            beneficiaryIds.push(r.beneficiaryId);
+          }
+        } else if (disbursement.beneficiaryId) {
+          beneficiaryIds.push(disbursement.beneficiaryId);
+        }
+
+        // Check screening results
+        for (const beneficiaryId of beneficiaryIds) {
+          const result = await ctx.db
+            .query("screeningResults")
+            .filter((q) => q.eq(q.field("beneficiaryId"), beneficiaryId))
+            .first();
+
+          if (result && (result.status === "potential_match" || result.status === "confirmed_match")) {
+            const flaggedBeneficiary = await ctx.db.get(result.beneficiaryId);
+            throw new Error(
+              `Disbursement blocked: beneficiary "${flaggedBeneficiary?.name ?? "Unknown"}" has an unresolved SDN screening match. An admin must review the screening result before proceeding.`
+            );
+          }
+        }
+      }
+    }
 
     const updates: Record<string, unknown> = {
       status: args.status,

@@ -8,6 +8,8 @@ import { Id } from '../../convex/_generated/dataModel';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { Button } from '@/components/ui/button';
 import { BulkImportModal } from '@/components/beneficiaries/BulkImportModal';
+import { ScreeningBadge } from '@/components/beneficiaries/ScreeningBadge';
+import { ScreeningDetailModal } from '@/components/beneficiaries/ScreeningDetailModal';
 import { cn } from '@/lib/utils';
 import { 
   Plus, 
@@ -64,6 +66,7 @@ function BeneficiarySection({
   icon: Icon,
   iconColor,
   beneficiaries,
+  walletAddress,
   onEdit,
   onToggleActive,
 }: {
@@ -71,10 +74,12 @@ function BeneficiarySection({
   icon: typeof User;
   iconColor: string;
   beneficiaries: Beneficiary[];
+  walletAddress: string;
   onEdit: (b: Beneficiary) => void;
   onToggleActive: (id: Id<'beneficiaries'>, isActive: boolean) => void;
 }) {
   const { t } = useTranslation();
+  const [screeningDetailId, setScreeningDetailId] = useState<{ id: Id<'beneficiaries'>; name: string } | null>(null);
   const [state, setState] = useState<SectionState>({
     search: '',
     sortField: 'name',
@@ -277,6 +282,9 @@ function BeneficiarySection({
                   <th className="px-6 py-3 text-left text-xs font-medium text-slate-400">
                       {t('common.status')}
                   </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-slate-400">
+                      {t('screening.title')}
+                  </th>
                   <th
                     className="px-6 py-3 text-left text-xs font-medium text-slate-400 cursor-pointer hover:text-white transition-colors"
                     onClick={() => handleSort('createdAt')}
@@ -322,6 +330,13 @@ function BeneficiarySection({
                       >
                         {beneficiary.isActive ? t('common.active') : t('common.inactive')}
                       </span>
+                    </td>
+                    <td className="px-6 py-4">
+                      <ScreeningBadge
+                        beneficiaryId={beneficiary._id}
+                        walletAddress={walletAddress}
+                        onClick={() => setScreeningDetailId({ id: beneficiary._id, name: beneficiary.name })}
+                      />
                     </td>
                     <td className="px-6 py-4 text-sm text-slate-400">
                       {new Date(beneficiary.createdAt).toLocaleDateString()}
@@ -372,15 +387,22 @@ function BeneficiarySection({
                       </p>
                     )}
                   </div>
-                  <span
-                    className={`ml-2 inline-flex rounded-full px-2.5 py-1 text-xs font-medium shrink-0 ${
-                      beneficiary.isActive
-                        ? 'bg-green-500/10 text-green-400'
-                        : 'bg-slate-500/10 text-slate-400'
-                    }`}
-                  >
-                    {beneficiary.isActive ? t('common.active') : t('common.inactive')}
-                  </span>
+                  <div className="flex items-center gap-2 ml-2 shrink-0">
+                    <ScreeningBadge
+                      beneficiaryId={beneficiary._id}
+                      walletAddress={walletAddress}
+                      onClick={() => setScreeningDetailId({ id: beneficiary._id, name: beneficiary.name })}
+                    />
+                    <span
+                      className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${
+                        beneficiary.isActive
+                          ? 'bg-green-500/10 text-green-400'
+                          : 'bg-slate-500/10 text-slate-400'
+                      }`}
+                    >
+                      {beneficiary.isActive ? t('common.active') : t('common.inactive')}
+                    </span>
+                  </div>
                 </div>
                 
                 <div className="space-y-2 text-sm">
@@ -430,6 +452,16 @@ function BeneficiarySection({
             ))}
           </div>
         </>
+      )}
+
+      {/* Screening Detail Modal */}
+      {screeningDetailId && (
+        <ScreeningDetailModal
+          beneficiaryId={screeningDetailId.id}
+          beneficiaryName={screeningDetailId.name}
+          walletAddress={walletAddress}
+          onClose={() => setScreeningDetailId(null)}
+        />
       )}
     </div>
   );
@@ -713,6 +745,7 @@ export default function Beneficiaries() {
             icon={User}
             iconColor="bg-purple-500/10 text-purple-400"
             beneficiaries={individuals as Beneficiary[]}
+            walletAddress={address!}
             onEdit={handleOpenEdit}
             onToggleActive={handleToggleActive}
           />
@@ -725,6 +758,7 @@ export default function Beneficiaries() {
             icon={Building2}
             iconColor="bg-blue-500/10 text-blue-400"
             beneficiaries={businesses as Beneficiary[]}
+            walletAddress={address!}
             onEdit={handleOpenEdit}
             onToggleActive={handleToggleActive}
           />
