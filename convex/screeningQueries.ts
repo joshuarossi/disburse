@@ -55,6 +55,31 @@ export const getActiveBeneficiariesForOrg = internalQuery({
   },
 });
 
+// Internal query to verify access to a beneficiary's org
+export const verifyBeneficiaryAccess = internalQuery({
+  args: {
+    beneficiaryId: v.id("beneficiaries"),
+    walletAddress: v.string(),
+    allowedRoles: v.array(
+      v.union(
+        v.literal("admin"),
+        v.literal("approver"),
+        v.literal("initiator"),
+        v.literal("clerk"),
+        v.literal("viewer")
+      )
+    ),
+  },
+  handler: async (ctx, args): Promise<{ orgId: any }> => {
+    const walletAddress = args.walletAddress.toLowerCase();
+    const beneficiary = await ctx.db.get(args.beneficiaryId);
+    if (!beneficiary) throw new Error("Beneficiary not found");
+
+    await requireOrgAccess(ctx, beneficiary.orgId, walletAddress, args.allowedRoles);
+    return { orgId: beneficiary.orgId };
+  },
+});
+
 // ─── Public queries ─────────────────────────────────────────────────────────────
 
 // Get screening result for a single beneficiary

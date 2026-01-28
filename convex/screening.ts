@@ -225,3 +225,29 @@ export const screenAllBeneficiaries = action({
     return { screened, flagged };
   },
 });
+
+// ─── Rerun screening for a single beneficiary ────────────────────────────────────
+
+export const rerunScreening = action({
+  args: {
+    beneficiaryId: v.id("beneficiaries"),
+    walletAddress: v.string(),
+  },
+  handler: async (ctx, args): Promise<{ status: string; matchCount: number }> => {
+    // Verify access (admin, approver, initiator, or clerk can rerun)
+    const { orgId } = await ctx.runQuery(internal.screeningQueries.verifyBeneficiaryAccess, {
+      beneficiaryId: args.beneficiaryId,
+      walletAddress: args.walletAddress,
+      allowedRoles: ["admin", "approver", "initiator", "clerk"],
+    });
+
+    // Rerun the screening
+    const result: { status: string; matchCount: number } = await ctx.runAction(internal.screening.screenBeneficiary, {
+      beneficiaryId: args.beneficiaryId,
+      orgId,
+      walletAddress: args.walletAddress,
+    });
+
+    return result;
+  },
+});

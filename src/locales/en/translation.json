@@ -595,6 +595,23 @@
         "done": "Done"
       },
       "info": "Pay with stablecoins (USDC, USDT) on Ethereum Sepolia. All plans include a 30-day money-back guarantee."
+    },
+    "screening": {
+      "title": "Sanctions Screening",
+      "subtitle": "Configure SDN screening enforcement",
+      "enforcement": "Enforcement Level",
+      "enforcementDescription": "Control how sanctions screening affects disbursements",
+      "options": {
+        "off": "Off",
+        "offDescription": "Screening is disabled. No checks are performed.",
+        "warn": "Warn",
+        "warnDescription": "Show warnings for matches but allow disbursements to proceed.",
+        "block": "Block",
+        "blockDescription": "Block disbursements with unresolved SDN matches. Admin review required."
+      },
+      "adminOnly": "Only admins can change screening enforcement settings",
+      "saving": "Saving...",
+      "saved": "Saved"
     }
   },
   "status": {
@@ -654,6 +671,11 @@
     "reviewedAt": "Reviewed at",
     "noResults": "No screening results yet",
     "markFalsePositive": "Mark as False Positive",
-    "confirmMatch": "Confirm Match"
+    "confirmMatch": "Confirm Match",
+    "run": "Run Screening",
+    "running": "Running...",
+    "rerun": "Rerun Screening",
+    "rerunning": "Rerunning...",
+    "runScreening": "Run screening for this beneficiary"
   }
 }

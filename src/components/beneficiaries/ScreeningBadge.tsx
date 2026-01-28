@@ -1,22 +1,48 @@
-import { useQuery } from 'convex/react';
+import { useQuery, useAction } from 'convex/react';
 import { api } from '../../../convex/_generated/api';
 import { Id } from '../../../convex/_generated/dataModel';
 import { useTranslation } from 'react-i18next';
-import { Shield, ShieldAlert, ShieldCheck, ShieldQuestion, Loader2 } from 'lucide-react';
+import { Shield, ShieldAlert, ShieldCheck, ShieldQuestion, Loader2, RefreshCw } from 'lucide-react';
+import { useState } from 'react';
 
 interface ScreeningBadgeProps {
   beneficiaryId: Id<'beneficiaries'>;
   walletAddress: string;
   onClick?: () => void;
+  onRerun?: () => void;
 }
 
-export function ScreeningBadge({ beneficiaryId, walletAddress, onClick }: ScreeningBadgeProps) {
+export function ScreeningBadge({ beneficiaryId, walletAddress, onClick, onRerun }: ScreeningBadgeProps) {
   const { t } = useTranslation();
+  const [isRunning, setIsRunning] = useState(false);
 
   const result = useQuery(
     api.screeningQueries.getScreeningResult,
     { beneficiaryId, walletAddress }
   );
+
+  const rerunScreening = useAction(api.screening.rerunScreening);
+
+  const handleRunScreening = async (e: React.MouseEvent) => {
+    e.stopPropagation(); // Prevent opening modal when clicking run button
+    if (isRunning) return;
+    
+    setIsRunning(true);
+    try {
+      await rerunScreening({
+        beneficiaryId,
+        walletAddress,
+      });
+      // Notify parent if callback provided
+      if (onRerun) {
+        onRerun();
+      }
+    } catch (error) {
+      console.error('Failed to run screening:', error);
+    } finally {
+      setIsRunning(false);
+    }
+  };
 
   // Loading state
   if (result === undefined) {
@@ -28,13 +54,24 @@ export function ScreeningBadge({ beneficiaryId, walletAddress, onClick }: Screen
     );
   }
 
-  // No screening result yet (pending)
+  // No screening result yet (pending) - show button to run screening
   if (result === null) {
     return (
-      <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium bg-slate-500/10 text-slate-400">
-        <ShieldQuestion className="h-3 w-3" />
-        {t('screening.pending')}
-      </span>
+      <div className="inline-flex items-center gap-2">
+        <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium bg-slate-500/10 text-slate-400">
+          <ShieldQuestion className="h-3 w-3" />
+          {t('screening.pending')}
+        </span>
+        <button
+          onClick={handleRunScreening}
+          disabled={isRunning}
+          className="inline-flex items-center gap-1 rounded-full px-2 py-1 text-xs font-medium bg-accent-500/10 text-accent-400 hover:bg-accent-500/20 transition-colors disabled:opacity-50"
+          title={t('screening.runScreening')}
+        >
+          <RefreshCw className={`h-3 w-3 ${isRunning ? 'animate-spin' : ''}`} />
+          {isRunning ? t('screening.running') : t('screening.run')}
+        </button>
+      </div>
     );
   }
 

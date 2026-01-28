@@ -1,9 +1,9 @@
-import { useQuery, useMutation } from 'convex/react';
+import { useQuery, useMutation, useAction } from 'convex/react';
 import { api } from '../../../convex/_generated/api';
 import { Id } from '../../../convex/_generated/dataModel';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
-import { X, ShieldAlert, ShieldCheck, Shield } from 'lucide-react';
+import { X, ShieldAlert, ShieldCheck, Shield, RefreshCw } from 'lucide-react';
 import { useState } from 'react';
 
 interface ScreeningDetailModalProps {
@@ -21,6 +21,8 @@ export function ScreeningDetailModal({
 }: ScreeningDetailModalProps) {
   const { t } = useTranslation();
   const [reviewError, setReviewError] = useState<string | null>(null);
+  const [isRerunning, setIsRerunning] = useState(false);
+  const [rerunError, setRerunError] = useState<string | null>(null);
 
   const result = useQuery(
     api.screeningQueries.getScreeningResult,
@@ -28,6 +30,7 @@ export function ScreeningDetailModal({
   );
 
   const reviewResult = useMutation(api.screeningMutations.reviewScreeningResult);
+  const rerunScreening = useAction(api.screening.rerunScreening);
 
   const handleReview = async (status: 'confirmed_match' | 'false_positive') => {
     if (!result?._id) return;
@@ -40,6 +43,22 @@ export function ScreeningDetailModal({
       });
     } catch (error) {
       setReviewError(error instanceof Error ? error.message : 'Failed to update review');
+    }
+  };
+
+  const handleRerun = async () => {
+    setRerunError(null);
+    setIsRerunning(true);
+    try {
+      await rerunScreening({
+        beneficiaryId,
+        walletAddress,
+      });
+      // The query will automatically refresh to show the new result
+    } catch (error) {
+      setRerunError(error instanceof Error ? error.message : 'Failed to rerun screening');
+    } finally {
+      setIsRerunning(false);
     }
   };
 
@@ -117,6 +136,13 @@ export function ScreeningDetailModal({
             </div>
           )}
 
+          {/* Rerun error */}
+          {rerunError && (
+            <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-400">
+              {rerunError}
+            </div>
+          )}
+
           {/* Review actions */}
           {result &&
             (result.status === 'potential_match') && (
@@ -139,6 +165,22 @@ export function ScreeningDetailModal({
                 </Button>
               </div>
             )}
+
+          {/* Run/Rerun screening button */}
+          <div className="pt-2">
+            <Button
+              variant="secondary"
+              onClick={handleRerun}
+              disabled={isRerunning}
+              className="w-full h-11"
+            >
+              <RefreshCw className={`h-4 w-4 mr-2 ${isRerunning ? 'animate-spin' : ''}`} />
+              {isRerunning 
+                ? (result === null ? t('screening.running') : t('screening.rerunning'))
+                : (result === null ? t('screening.run') : t('screening.rerun'))
+              }
+            </Button>
+          </div>
 
           <Button variant="secondary" onClick={onClose} className="w-full h-11">
             {t('common.close')}

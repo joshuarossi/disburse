@@ -595,6 +595,23 @@
         "done": "Hecho"
       },
       "info": "Paga con stablecoins (USDC, USDT) en Ethereum Sepolia. Todos los planes incluyen una garantía de devolución de dinero de 30 días."
+    },
+    "screening": {
+      "title": "Verificación de Sanciones",
+      "subtitle": "Configurar la aplicación de verificación SDN",
+      "enforcement": "Nivel de Aplicación",
+      "enforcementDescription": "Controla cómo la verificación de sanciones afecta los desembolsos",
+      "options": {
+        "off": "Desactivado",
+        "offDescription": "La verificación está desactivada. No se realizan verificaciones.",
+        "warn": "Advertir",
+        "warnDescription": "Mostrar advertencias para coincidencias pero permitir que los desembolsos continúen.",
+        "block": "Bloquear",
+        "blockDescription": "Bloquear desembolsos con coincidencias SDN no resueltas. Se requiere revisión del administrador."
+      },
+      "adminOnly": "Solo los administradores pueden cambiar la configuración de aplicación de verificación",
+      "saving": "Guardando...",
+      "saved": "Guardado"
     }
   },
   "status": {
@@ -654,6 +671,11 @@
     "reviewedAt": "Revisado el",
     "noResults": "Sin resultados de verificación aún",
     "markFalsePositive": "Marcar como falso positivo",
-    "confirmMatch": "Confirmar coincidencia"
+    "confirmMatch": "Confirmar coincidencia",
+    "run": "Ejecutar verificación",
+    "running": "Ejecutando...",
+    "rerun": "Reejecutar verificación",
+    "rerunning": "Reejecutando...",
+    "runScreening": "Ejecutar verificación para este beneficiario"
   }
 }
