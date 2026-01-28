@@ -81,9 +81,17 @@
         "title": "Con Safe",
         "description": "Construido sobre Gnosis Safe, la billetera de contrato inteligente más confiable en Web3."
       },
+      "sanctionsScreening": {
+        "title": "Verificación de Sanciones",
+        "description": "La verificación OFAC/SDN protege contra entidades sancionadas. Los niveles de aplicación configurables garantizan el cumplimiento mientras mantienen la flexibilidad del flujo de trabajo."
+      },
       "auditTrail": {
         "title": "Registro de Auditoría",
         "description": "Historial completo de transacciones con registros inmutables en la cadena para cumplimiento."
+      },
+      "batchTransactions": {
+        "title": "Transacciones por Lotes",
+        "description": "Envía pagos a múltiples destinatarios en una sola transacción. Reduce los costos de gas y agiliza los desembolsos estilo nómina."
       },
       "stablecoinNative": {
         "title": "Nativo de Stablecoins",

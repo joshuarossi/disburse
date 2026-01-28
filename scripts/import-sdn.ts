@@ -1,6 +1,7 @@
 /* eslint-disable */
 /* eslint-disable @typescript-eslint/no-unused-vars */
-/* ts-ignore */
+// @ts-nocheck
+/* eslint-disable */
 /**
  * Import SDN Enhanced XML into Convex sdnEntries table.
  *

@@ -81,9 +81,17 @@
         "title": "Com Safe",
         "description": "Construído sobre Gnosis Safe, a carteira de contrato inteligente mais confiável em Web3."
       },
+      "sanctionsScreening": {
+        "title": "Verificação de Sanções",
+        "description": "A verificação OFAC/SDN protege contra entidades sancionadas. Níveis de aplicação configuráveis garantem conformidade mantendo a flexibilidade do fluxo de trabalho."
+      },
       "auditTrail": {
         "title": "Trilha de Auditoria",
         "description": "Histórico completo de transações com registros imutáveis na blockchain para conformidade."
+      },
+      "batchTransactions": {
+        "title": "Transações em Lote",
+        "description": "Envie pagamentos para múltiplos destinatários em uma única transação. Reduza os custos de gas e agilize desembolsos estilo folha de pagamento."
       },
       "stablecoinNative": {
         "title": "Nativo de Stablecoins",

@@ -81,9 +81,17 @@
         "title": "Safe-Powered",
         "description": "Built on Gnosis Safe, the most trusted smart contract wallet in Web3."
       },
+      "sanctionsScreening": {
+        "title": "Sanctions Screening",
+        "description": "OFAC/SDN screening protects against sanctioned entities. Configurable enforcement levels ensure compliance while maintaining workflow flexibility."
+      },
       "auditTrail": {
         "title": "Audit Trail",
         "description": "Complete transaction history with immutable on-chain records for compliance."
+      },
+      "batchTransactions": {
+        "title": "Batch Transactions",
+        "description": "Send payments to multiple recipients in a single transaction. Reduce gas costs and streamline payroll-style disbursements."
       },
       "stablecoinNative": {
         "title": "Stablecoin Native",
