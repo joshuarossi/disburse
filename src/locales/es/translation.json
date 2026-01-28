@@ -104,6 +104,23 @@
       "simpleBilling": {
         "title": "Facturación Simple",
         "description": "Paga la plataforma con stablecoins. No se necesitan tarjetas de crédito ni cuentas bancarias."
+      },
+      "section1": {
+        "badge": "Seguridad y Cumplimiento",
+        "title": "Seguridad de nivel empresarial,",
+        "titleHighlight": "integrada"
+      },
+      "section2": {
+        "title": "Operaciones poderosas,",
+        "titleHighlight": "simplificadas"
+      },
+      "section3": {
+        "title": "Todo lo que necesitas",
+        "description": "Construido para equipos que exigen lo mejor"
+      },
+      "badges": {
+        "compliance": "Cumplimiento",
+        "efficient": "Eficiente"
       }
     },
     "howItWorks": {

@@ -104,6 +104,23 @@
       "simpleBilling": {
         "title": "Simple Billing",
         "description": "Pay for the platform in stablecoins. No credit cards or bank accounts needed."
+      },
+      "section1": {
+        "badge": "Security & Compliance",
+        "title": "Enterprise-grade security,",
+        "titleHighlight": "built-in"
+      },
+      "section2": {
+        "title": "Powerful operations,",
+        "titleHighlight": "simplified"
+      },
+      "section3": {
+        "title": "Everything you need",
+        "description": "Built for teams who demand the best"
+      },
+      "badges": {
+        "compliance": "Compliance",
+        "efficient": "Efficient"
       }
     },
     "howItWorks": {

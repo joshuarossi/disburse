@@ -72,12 +72,12 @@ export function Features() {
           >
             <div className="inline-flex items-center gap-2 rounded-full border border-accent-500/30 bg-accent-500/10 px-4 py-2 text-sm text-accent-400 mb-6">
               <ShieldCheck className="h-4 w-4" />
-              <span>Security & Compliance</span>
+              <span>{t('landing.features.section1.badge')}</span>
             </div>
             <h2 className="text-4xl font-bold tracking-tight text-white sm:text-5xl lg:text-6xl">
-              Enterprise-grade security,{' '}
+              {t('landing.features.section1.title')}{' '}
               <span className="bg-gradient-to-r from-accent-400 to-accent-500 bg-clip-text text-transparent">
-                built-in
+                {t('landing.features.section1.titleHighlight')}
               </span>
             </h2>
             <p className="mt-6 text-lg text-slate-400 max-w-2xl mx-auto">
@@ -135,7 +135,7 @@ export function Features() {
                     <h3 className="text-2xl font-bold text-white">{t('landing.features.sanctionsScreening.title')}</h3>
                     <span className="inline-flex items-center gap-1 rounded-full bg-green-500/10 px-3 py-1 text-xs font-medium text-green-400 border border-green-500/20">
                       <CheckCircle2 className="h-3 w-3" />
-                      Compliance
+                      {t('landing.features.badges.compliance')}
                     </span>
                   </div>
                   <p className="text-lg text-slate-300 leading-relaxed">{t('landing.features.sanctionsScreening.description')}</p>
@@ -159,9 +159,9 @@ export function Features() {
             className="mx-auto max-w-3xl text-center mb-16"
           >
             <h2 className="text-4xl font-bold tracking-tight text-white sm:text-5xl">
-              Powerful operations,{' '}
+              {t('landing.features.section2.title')}{' '}
               <span className="bg-gradient-to-r from-accent-400 to-accent-500 bg-clip-text text-transparent">
-                simplified
+                {t('landing.features.section2.titleHighlight')}
               </span>
             </h2>
           </motion.div>
@@ -197,7 +197,7 @@ export function Features() {
                 <h3 className="text-2xl font-bold text-white">{t('landing.features.batchTransactions.title')}</h3>
                 <span className="inline-flex items-center gap-1 rounded-full bg-accent-500/10 px-3 py-1 text-xs font-medium text-accent-400 border border-accent-500/20">
                   <CheckCircle2 className="h-3 w-3" />
-                  Efficient
+                  {t('landing.features.badges.efficient')}
                 </span>
               </div>
               <p className="text-lg text-slate-300 leading-relaxed">{t('landing.features.batchTransactions.description')}</p>
@@ -221,10 +221,10 @@ export function Features() {
             className="mx-auto max-w-3xl text-center mb-16"
           >
             <h2 className="text-4xl font-bold tracking-tight text-white sm:text-5xl">
-              Everything you need
+              {t('landing.features.section3.title')}
             </h2>
             <p className="mt-4 text-lg text-slate-400">
-              Built for teams who demand the best
+              {t('landing.features.section3.description')}
             </p>
           </motion.div>
 

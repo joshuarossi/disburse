@@ -104,6 +104,23 @@
       "simpleBilling": {
         "title": "Cobrança Simples",
         "description": "Pague pela plataforma em stablecoins. Não são necessários cartões de crédito ou contas bancárias."
+      },
+      "section1": {
+        "badge": "Segurança e Conformidade",
+        "title": "Segurança de nível empresarial,",
+        "titleHighlight": "integrada"
+      },
+      "section2": {
+        "title": "Operações poderosas,",
+        "titleHighlight": "simplificadas"
+      },
+      "section3": {
+        "title": "Tudo que você precisa",
+        "description": "Construído para equipes que exigem o melhor"
+      },
+      "badges": {
+        "compliance": "Conformidade",
+        "efficient": "Eficiente"
       }
     },
     "howItWorks": {
