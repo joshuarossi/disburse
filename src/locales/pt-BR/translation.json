@@ -498,6 +498,10 @@
         "viewerDesc": "Somente leitura"
       }
     },
+    "preferences": {
+      "title": "Preferências",
+      "subtitle": "Configurações de idioma e aparência"
+    },
     "language": {
       "title": "Preferências de Idioma",
       "subtitle": "Escolha seu idioma preferido",

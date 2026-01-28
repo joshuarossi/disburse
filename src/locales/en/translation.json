@@ -498,6 +498,10 @@
         "viewerDesc": "Read-only access"
       }
     },
+    "preferences": {
+      "title": "Preferences",
+      "subtitle": "Language and appearance settings"
+    },
     "language": {
       "title": "Language Preferences",
       "subtitle": "Choose your preferred language",
