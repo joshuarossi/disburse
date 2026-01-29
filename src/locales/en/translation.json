@@ -258,6 +258,14 @@
     "editBeneficiary": "Edit Beneficiary",
     "saveChanges": "Save Changes",
     "searchPlaceholder": "Search by name, address, or notes...",
+    "validation": {
+      "nameRequired": {
+        "individual": "Full name is required",
+        "business": "Business name is required"
+      },
+      "addressRequired": "Wallet address is required",
+      "addressInvalid": "Wallet address must start with 0x and be 42 characters long"
+    },
     "status": {
       "all": "All",
       "active": "Active",

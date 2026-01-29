@@ -258,6 +258,14 @@
     "editBeneficiary": "Editar Beneficiário",
     "saveChanges": "Salvar Alterações",
     "searchPlaceholder": "Buscar por nome, endereço ou notas...",
+    "validation": {
+      "nameRequired": {
+        "individual": "O nome completo é obrigatório",
+        "business": "O nome da empresa é obrigatório"
+      },
+      "addressRequired": "O endereço da carteira é obrigatório",
+      "addressInvalid": "O endereço da carteira deve começar com 0x e ter 42 caracteres"
+    },
     "status": {
       "all": "Todos",
       "active": "Ativo",

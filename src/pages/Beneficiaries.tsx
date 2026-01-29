@@ -479,10 +479,18 @@ export default function Beneficiaries() {
   const [newAddress, setNewAddress] = useState('');
   const [newNotes, setNewNotes] = useState('');
   const [createError, setCreateError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<{
+    name?: string;
+    address?: string;
+  }>({});
   
   // Edit modal state
   const [editingBeneficiary, setEditingBeneficiary] = useState<EditingBeneficiary | null>(null);
   const [editError, setEditError] = useState<string | null>(null);
+  const [editFieldErrors, setEditFieldErrors] = useState<{
+    name?: string;
+    address?: string;
+  }>({});
   
   // Bulk import modal state
   const [isBulkImportOpen, setIsBulkImportOpen] = useState(false);
@@ -510,7 +518,29 @@ export default function Beneficiaries() {
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!orgId || !address || !newName.trim() || !newAddress.trim()) return;
+    if (!orgId || !address) return;
+
+    // Validate fields
+    const errors: { name?: string; address?: string } = {};
+    
+    if (!newName.trim()) {
+      errors.name = newType === 'individual' 
+        ? t('beneficiaries.validation.nameRequired.individual')
+        : t('beneficiaries.validation.nameRequired.business');
+    }
+    
+    if (!newAddress.trim()) {
+      errors.address = t('beneficiaries.validation.addressRequired');
+    } else if (!newAddress.trim().startsWith('0x') || newAddress.trim().length !== 42) {
+      errors.address = t('beneficiaries.validation.addressInvalid');
+    }
+
+    setFieldErrors(errors);
+
+    // If there are validation errors, don't submit
+    if (Object.keys(errors).length > 0) {
+      return;
+    }
 
     setCreateError(null);
     
@@ -527,6 +557,7 @@ export default function Beneficiaries() {
       setNewName('');
       setNewAddress('');
       setNewNotes('');
+      setFieldErrors({});
       setIsCreating(false);
     } catch (error) {
       console.error('Failed to create beneficiary:', error);
@@ -543,16 +574,40 @@ export default function Beneficiaries() {
       notes: beneficiary.notes || '',
     });
     setEditError(null);
+    setEditFieldErrors({});
   };
 
   const handleCloseEdit = () => {
     setEditingBeneficiary(null);
     setEditError(null);
+    setEditFieldErrors({});
   };
 
   const handleSaveEdit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingBeneficiary || !address) return;
+
+    // Validate fields
+    const errors: { name?: string; address?: string } = {};
+    
+    if (!editingBeneficiary.name.trim()) {
+      errors.name = editingBeneficiary.type === 'individual' 
+        ? t('beneficiaries.validation.nameRequired.individual')
+        : t('beneficiaries.validation.nameRequired.business');
+    }
+    
+    if (!editingBeneficiary.walletAddress.trim()) {
+      errors.address = t('beneficiaries.validation.addressRequired');
+    } else if (!editingBeneficiary.walletAddress.trim().startsWith('0x') || editingBeneficiary.walletAddress.trim().length !== 42) {
+      errors.address = t('beneficiaries.validation.addressInvalid');
+    }
+
+    setEditFieldErrors(errors);
+
+    // If there are validation errors, don't submit
+    if (Object.keys(errors).length > 0) {
+      return;
+    }
 
     setEditError(null);
 
@@ -566,6 +621,7 @@ export default function Beneficiaries() {
         notes: editingBeneficiary.notes.trim() || undefined,
       });
       setEditingBeneficiary(null);
+      setEditFieldErrors({});
     } catch (error) {
       console.error('Failed to update beneficiary:', error);
       setEditError(error instanceof Error ? error.message : 'Failed to update beneficiary');
@@ -672,11 +728,26 @@ export default function Beneficiaries() {
                 <input
                   type="text"
                   value={newName}
-                  onChange={(e) => setNewName(e.target.value)}
+                  onChange={(e) => {
+                    setNewName(e.target.value);
+                    if (fieldErrors.name) {
+                      setFieldErrors(prev => ({ ...prev, name: undefined }));
+                    }
+                  }}
                   placeholder={newType === 'individual' ? t('beneficiaries.namePlaceholder.individual') : t('beneficiaries.namePlaceholder.business')}
-                  className="w-full rounded-lg border border-white/10 bg-navy-800 px-4 py-3 text-base text-white placeholder-slate-500 focus:border-accent-500 focus:outline-none focus:ring-1 focus:ring-accent-500"
-                  required
+                  className={cn(
+                    "w-full rounded-lg border bg-navy-800 px-4 py-3 text-base text-white placeholder-slate-500 focus:outline-none focus:ring-1 transition-colors",
+                    fieldErrors.name
+                      ? "border-red-500/50 focus:border-red-500 focus:ring-red-500"
+                      : "border-white/10 focus:border-accent-500 focus:ring-accent-500"
+                  )}
                 />
+                {fieldErrors.name && (
+                  <p className="mt-1.5 flex items-center gap-1.5 text-sm text-red-400">
+                    <AlertCircle className="h-3.5 w-3.5 flex-shrink-0" />
+                    {fieldErrors.name}
+                  </p>
+                )}
               </div>
               <div>
                 <label className="mb-2 block text-sm font-medium text-slate-300">
@@ -685,11 +756,26 @@ export default function Beneficiaries() {
                 <input
                   type="text"
                   value={newAddress}
-                  onChange={(e) => setNewAddress(e.target.value)}
+                  onChange={(e) => {
+                    setNewAddress(e.target.value);
+                    if (fieldErrors.address) {
+                      setFieldErrors(prev => ({ ...prev, address: undefined }));
+                    }
+                  }}
                   placeholder="0x..."
-                  className="w-full rounded-lg border border-white/10 bg-navy-800 px-4 py-3 font-mono text-base text-white placeholder-slate-500 focus:border-accent-500 focus:outline-none focus:ring-1 focus:ring-accent-500"
-                  required
+                  className={cn(
+                    "w-full rounded-lg border bg-navy-800 px-4 py-3 font-mono text-base text-white placeholder-slate-500 focus:outline-none focus:ring-1 transition-colors",
+                    fieldErrors.address
+                      ? "border-red-500/50 focus:border-red-500 focus:ring-red-500"
+                      : "border-white/10 focus:border-accent-500 focus:ring-accent-500"
+                  )}
                 />
+                {fieldErrors.address && (
+                  <p className="mt-1.5 flex items-center gap-1.5 text-sm text-red-400">
+                    <AlertCircle className="h-3.5 w-3.5 flex-shrink-0" />
+                    {fieldErrors.address}
+                  </p>
+                )}
               </div>
               <div>
                 <label className="mb-2 block text-sm font-medium text-slate-300">
@@ -715,6 +801,7 @@ export default function Beneficiaries() {
                     setNewAddress('');
                     setNewNotes('');
                     setCreateError(null);
+                    setFieldErrors({});
                   }}
                   className="w-full sm:w-auto h-11"
                 >
@@ -828,10 +915,25 @@ export default function Beneficiaries() {
                 <input
                   type="text"
                   value={editingBeneficiary.name}
-                  onChange={(e) => setEditingBeneficiary({ ...editingBeneficiary, name: e.target.value })}
-                  className="w-full rounded-lg border border-white/10 bg-navy-800 px-4 py-3 text-base text-white focus:border-accent-500 focus:outline-none focus:ring-1 focus:ring-accent-500"
-                  required
+                  onChange={(e) => {
+                    setEditingBeneficiary({ ...editingBeneficiary, name: e.target.value });
+                    if (editFieldErrors.name) {
+                      setEditFieldErrors(prev => ({ ...prev, name: undefined }));
+                    }
+                  }}
+                  className={cn(
+                    "w-full rounded-lg border bg-navy-800 px-4 py-3 text-base text-white focus:outline-none focus:ring-1 transition-colors",
+                    editFieldErrors.name
+                      ? "border-red-500/50 focus:border-red-500 focus:ring-red-500"
+                      : "border-white/10 focus:border-accent-500 focus:ring-accent-500"
+                  )}
                 />
+                {editFieldErrors.name && (
+                  <p className="mt-1.5 flex items-center gap-1.5 text-sm text-red-400">
+                    <AlertCircle className="h-3.5 w-3.5 flex-shrink-0" />
+                    {editFieldErrors.name}
+                  </p>
+                )}
               </div>
 
               <div>
@@ -841,10 +943,25 @@ export default function Beneficiaries() {
                 <input
                   type="text"
                   value={editingBeneficiary.walletAddress}
-                  onChange={(e) => setEditingBeneficiary({ ...editingBeneficiary, walletAddress: e.target.value })}
-                  className="w-full rounded-lg border border-white/10 bg-navy-800 px-4 py-3 font-mono text-base text-white focus:border-accent-500 focus:outline-none focus:ring-1 focus:ring-accent-500"
-                  required
+                  onChange={(e) => {
+                    setEditingBeneficiary({ ...editingBeneficiary, walletAddress: e.target.value });
+                    if (editFieldErrors.address) {
+                      setEditFieldErrors(prev => ({ ...prev, address: undefined }));
+                    }
+                  }}
+                  className={cn(
+                    "w-full rounded-lg border bg-navy-800 px-4 py-3 font-mono text-base text-white focus:outline-none focus:ring-1 transition-colors",
+                    editFieldErrors.address
+                      ? "border-red-500/50 focus:border-red-500 focus:ring-red-500"
+                      : "border-white/10 focus:border-accent-500 focus:ring-accent-500"
+                  )}
                 />
+                {editFieldErrors.address && (
+                  <p className="mt-1.5 flex items-center gap-1.5 text-sm text-red-400">
+                    <AlertCircle className="h-3.5 w-3.5 flex-shrink-0" />
+                    {editFieldErrors.address}
+                  </p>
+                )}
               </div>
 
               <div>

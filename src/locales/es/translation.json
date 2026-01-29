@@ -258,6 +258,14 @@
     "editBeneficiary": "Editar Beneficiario",
     "saveChanges": "Guardar Cambios",
     "searchPlaceholder": "Buscar por nombre, dirección o notas...",
+    "validation": {
+      "nameRequired": {
+        "individual": "El nombre completo es obligatorio",
+        "business": "El nombre de la empresa es obligatorio"
+      },
+      "addressRequired": "La dirección de la billetera es obligatoria",
+      "addressInvalid": "La dirección de la billetera debe comenzar con 0x y tener 42 caracteres"
+    },
     "status": {
       "all": "Todos",
       "active": "Activo",

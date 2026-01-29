@@ -52,16 +52,43 @@ export const list = query({
             .withIndex("by_disbursement", (q) => q.eq("disbursementId", d._id))
             .collect();
           
+          // Get all beneficiary names and objects for search
+          const recipientNames: string[] = [];
+          const recipientBeneficiaries: Array<{ recipient: typeof recipients[0]; beneficiary: NonNullable<Awaited<ReturnType<typeof ctx.db.get<"beneficiaries">>>> }> = [];
+          
+          for (const recipient of recipients) {
+            const beneficiary = await ctx.db.get(recipient.beneficiaryId);
+            if (beneficiary) {
+              recipientNames.push(beneficiary.name);
+              recipientBeneficiaries.push({ recipient, beneficiary });
+            }
+          }
+          
           let batchDisplayName = "Batch";
           if (recipients.length > 0) {
-            const firstRecipient = recipients[0];
-            const firstBeneficiary = await ctx.db.get(firstRecipient.beneficiaryId);
-            if (firstBeneficiary) {
-              const otherCount = recipients.length - 1;
+            // Check if there's a search term and find matching recipient
+            const searchLower = args.search?.toLowerCase().trim();
+            let displayBeneficiary = recipientBeneficiaries[0]?.beneficiary;
+            let otherCount = recipients.length - 1;
+            
+            if (searchLower) {
+              // Find first recipient whose name matches the search
+              const matchingIndex = recipientBeneficiaries.findIndex((rb) =>
+                rb.beneficiary.name.toLowerCase().includes(searchLower)
+              );
+              
+              if (matchingIndex !== -1) {
+                // Use the matching recipient for display
+                displayBeneficiary = recipientBeneficiaries[matchingIndex].beneficiary;
+                otherCount = recipients.length - 1; // Count of others (excluding the matched one)
+              }
+            }
+            
+            if (displayBeneficiary) {
               if (otherCount > 0) {
-                batchDisplayName = `${firstBeneficiary.name} +${otherCount}`;
+                batchDisplayName = `${displayBeneficiary.name} +${otherCount}`;
               } else {
-                batchDisplayName = firstBeneficiary.name;
+                batchDisplayName = displayBeneficiary.name;
               }
             }
           }
@@ -69,6 +96,8 @@ export const list = query({
           return {
             ...d,
             beneficiary: { name: batchDisplayName, walletAddress: "" },
+            // Store all recipient names for search
+            recipientNames,
             // Use totalAmount for batch, amount for single
             displayAmount: d.totalAmount || d.amount || "0",
           };
@@ -81,6 +110,7 @@ export const list = query({
           beneficiary: beneficiary
             ? { name: beneficiary.name, walletAddress: beneficiary.walletAddress }
             : null,
+          recipientNames: [],
           displayAmount: d.amount || "0",
         };
       })
@@ -114,9 +144,13 @@ export const list = query({
       const searchLower = args.search.toLowerCase().trim();
       filtered = filtered.filter((d) => {
         const beneficiaryMatch = d.beneficiary?.name?.toLowerCase().includes(searchLower);
+        // For batch disbursements, also search through all recipient names
+        const recipientMatch = (d as any).recipientNames?.some((name: string) => 
+          name.toLowerCase().includes(searchLower)
+        );
         const memoMatch = d.memo?.toLowerCase().includes(searchLower);
         const amountMatch = (d.displayAmount || d.amount || "").includes(searchLower);
-        return beneficiaryMatch || memoMatch || amountMatch;
+        return beneficiaryMatch || recipientMatch || memoMatch || amountMatch;
       });
     }
 
