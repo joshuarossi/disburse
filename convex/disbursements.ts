@@ -45,11 +45,30 @@ export const list = query({
     // Enrich with beneficiary data first (needed for search)
     const enriched = await Promise.all(
       allDisbursements.map(async (d) => {
-        // For batch disbursements, show "Batch" as beneficiary name
+        // For batch disbursements, get first beneficiary name and count
         if (d.type === "batch") {
+          const recipients = await ctx.db
+            .query("disbursementRecipients")
+            .withIndex("by_disbursement", (q) => q.eq("disbursementId", d._id))
+            .collect();
+          
+          let batchDisplayName = "Batch";
+          if (recipients.length > 0) {
+            const firstRecipient = recipients[0];
+            const firstBeneficiary = await ctx.db.get(firstRecipient.beneficiaryId);
+            if (firstBeneficiary) {
+              const otherCount = recipients.length - 1;
+              if (otherCount > 0) {
+                batchDisplayName = `${firstBeneficiary.name} +${otherCount}`;
+              } else {
+                batchDisplayName = firstBeneficiary.name;
+              }
+            }
+          }
+          
           return {
             ...d,
-            beneficiary: { name: "Batch", walletAddress: "" },
+            beneficiary: { name: batchDisplayName, walletAddress: "" },
             // Use totalAmount for batch, amount for single
             displayAmount: d.totalAmount || d.amount || "0",
           };

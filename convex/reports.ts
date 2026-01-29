@@ -29,11 +29,30 @@ export const getTransactionReport = query({
     // Enrich with beneficiary data
     const enriched = await Promise.all(
       allDisbursements.map(async (d) => {
-        // Handle batch disbursements (no beneficiaryId) vs single disbursements
+        // Handle batch disbursements - get first beneficiary name and count
         if (d.type === "batch") {
+          const recipients = await ctx.db
+            .query("disbursementRecipients")
+            .withIndex("by_disbursement", (q) => q.eq("disbursementId", d._id))
+            .collect();
+          
+          let batchDisplayName = "Batch";
+          if (recipients.length > 0) {
+            const firstRecipient = recipients[0];
+            const firstBeneficiary = await ctx.db.get(firstRecipient.beneficiaryId);
+            if (firstBeneficiary) {
+              const otherCount = recipients.length - 1;
+              if (otherCount > 0) {
+                batchDisplayName = `${firstBeneficiary.name} +${otherCount}`;
+              } else {
+                batchDisplayName = firstBeneficiary.name;
+              }
+            }
+          }
+          
           return {
             ...d,
-            beneficiaryName: "Batch",
+            beneficiaryName: batchDisplayName,
             beneficiaryWallet: "",
             displayAmount: d.totalAmount || d.amount || "0",
           };
@@ -145,18 +164,65 @@ export const getSpendingByBeneficiary = query({
     }
 
     // Enrich with beneficiary data
-    // Note: This report only includes single disbursements (batch disbursements are handled separately)
-    const enriched = await Promise.all(
-      executed
-        .filter((d) => d.beneficiaryId) // Only process single disbursements
-        .map(async (d) => {
-          const beneficiary = d.beneficiaryId ? await ctx.db.get(d.beneficiaryId) : null;
-          return {
-            ...d,
-            beneficiary: beneficiary || null,
-          };
-        })
-    );
+    // Process both single and batch disbursements
+    const enriched: Array<{
+      _id: Id<"disbursements">;
+      beneficiaryId: Id<"beneficiaries"> | null;
+      beneficiary: { _id: Id<"beneficiaries">; name: string; walletAddress: string; type?: "individual" | "business" } | null;
+      token: string;
+      amount: string | undefined;
+      createdAt: number;
+      status: string;
+    }> = [];
+
+    // Process single disbursements (including those without explicit type for backward compatibility)
+    for (const d of executed) {
+      if ((d.type === "single" || !d.type) && d.beneficiaryId) {
+        const beneficiary = await ctx.db.get(d.beneficiaryId);
+        if (beneficiary) {
+          enriched.push({
+            _id: d._id,
+            beneficiaryId: d.beneficiaryId,
+            beneficiary: {
+              _id: beneficiary._id,
+              name: beneficiary.name,
+              walletAddress: beneficiary.walletAddress,
+              type: beneficiary.type,
+            },
+            token: d.token,
+            amount: d.amount,
+            createdAt: d.createdAt,
+            status: d.status,
+          });
+        }
+      } else if (d.type === "batch") {
+        // Process batch disbursements - expand into individual recipient entries
+        const recipients = await ctx.db
+          .query("disbursementRecipients")
+          .withIndex("by_disbursement", (q) => q.eq("disbursementId", d._id))
+          .collect();
+        
+        for (const recipient of recipients) {
+          const beneficiary = await ctx.db.get(recipient.beneficiaryId);
+          if (beneficiary) {
+            enriched.push({
+              _id: d._id,
+              beneficiaryId: recipient.beneficiaryId,
+              beneficiary: {
+                _id: beneficiary._id,
+                name: beneficiary.name,
+                walletAddress: beneficiary.walletAddress,
+                type: beneficiary.type,
+              },
+              token: d.token,
+              amount: recipient.amount,
+              createdAt: d.createdAt,
+              status: d.status,
+            });
+          }
+        }
+      }
+    }
 
     // Filter by beneficiary type if specified
     let filtered = enriched;

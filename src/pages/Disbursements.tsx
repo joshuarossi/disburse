@@ -1053,7 +1053,7 @@ export default function Disbursements() {
                           onClick={() => setSelectedDisbursementId(disbursement._id)}
                           className="font-medium text-white hover:text-accent-400 transition-colors text-left"
                         >
-                          {isBatch ? t('disbursements.batch.batchLabel') : (disbursement.beneficiary?.name || 'Unknown')}
+                          {disbursement.beneficiary?.name || 'Unknown'}
                         </button>
                       </td>
                         <td className="px-6 py-4">
@@ -1099,7 +1099,7 @@ export default function Disbursements() {
                           onClick={() => setSelectedDisbursementId(disbursement._id)}
                           className="font-medium text-white hover:text-accent-400 transition-colors text-left"
                         >
-                          {isBatch ? t('disbursements.batch.batchLabel') : (disbursement.beneficiary?.name || 'Unknown')}
+                          {disbursement.beneficiary?.name || 'Unknown'}
                         </button>
                         <span className="font-mono text-sm text-slate-400 mt-1 block">
                           {displayAmount} {disbursement.token}
