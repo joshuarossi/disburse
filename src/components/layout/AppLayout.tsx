@@ -8,6 +8,7 @@ import { Id } from '../../../convex/_generated/dataModel';
 import {
   LayoutDashboard,
   Users,
+  UsersRound,
   Send,
   FileText,
   Settings,
@@ -53,6 +54,7 @@ export function AppLayout({ children }: AppLayoutProps) {
     { href: 'beneficiaries', label: t('navigation.beneficiaries'), icon: Users },
     { href: 'disbursements', label: t('navigation.disbursements'), icon: Send },
     { href: 'reports', label: t('navigation.reports'), icon: FileText },
+    { href: 'team', label: t('navigation.team'), icon: UsersRound },
     { href: 'settings', label: t('navigation.settings'), icon: Settings },
   ];
 

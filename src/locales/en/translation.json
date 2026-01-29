@@ -196,6 +196,7 @@
     "beneficiaries": "Beneficiaries",
     "disbursements": "Disbursements",
     "reports": "Reports",
+    "team": "Team",
     "settings": "Settings",
     "disconnect": "Disconnect",
     "language": "Language",
@@ -509,7 +510,10 @@
       "noName": "No name",
       "editMember": "Edit Team Member",
       "cannotChangeRole": "cannot change your own role",
+      "remove": "Remove",
       "removeConfirm": "Are you sure you want to remove this member?",
+      "removeFromTeam": "Remove from team",
+      "removeMemberTitle": "Remove team member",
       "roles": {
         "admin": "Admin",
         "adminDesc": "Full access to all features",

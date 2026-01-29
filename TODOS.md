@@ -12,3 +12,6 @@
 - Emails
 - Improved Onboarding Experience, collect name, create team, setup safe
 - Fix batch naming for disbursement list/reports
+- test trial end for feature restriction, how would that work
+- update logo to take you to the landing page
+- update error messages to be nice toasts 
