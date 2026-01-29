@@ -161,7 +161,7 @@ export const create = mutation({
     const now = Date.now();
 
     // Initiator, admin can create
-    const { user } = await requireOrgAccess(ctx, args.orgId, walletAddress, ["admin", "initiator"]);
+    const { user } = await requireOrgAccess(ctx, args.orgId, walletAddress, ["admin","approver", "initiator"]);
 
     // Get safe for org
     const safe = await ctx.db
@@ -238,7 +238,7 @@ export const updateStatus = mutation({
     }
 
     // Admin or initiator can update status
-    const { user } = await requireOrgAccess(ctx, disbursement.orgId, walletAddress, ["admin", "initiator"]);
+    const { user } = await requireOrgAccess(ctx, disbursement.orgId, walletAddress, ["admin","approver", "initiator"]);
 
     // SDN screening check when moving to pending/proposed
     if (args.status === "pending" || args.status === "proposed") {
@@ -321,7 +321,7 @@ export const createBatch = mutation({
     const now = Date.now();
 
     // Initiator, admin can create
-    const { user } = await requireOrgAccess(ctx, args.orgId, walletAddress, ["admin", "initiator"]);
+    const { user } = await requireOrgAccess(ctx, args.orgId, walletAddress, ["admin","approver", "initiator"]);
 
     // Validate at least 1 recipient
     if (args.recipients.length === 0) {
