@@ -205,6 +205,13 @@
   "dashboard": {
     "title": "Panel",
     "subtitle": "Resumen de tus operaciones de tesorería",
+    "totalTreasuryValue": "Valor Total de la Tesorería",
+    "byToken": "Por Token",
+    "byChain": "Por Cadena",
+    "ofTreasury": "del total de tesorería",
+    "noBalance": "Sin saldo",
+    "pending": "Pendientes",
+    "pendingNone": "No hay acciones pendientes",
     "noSafe": {
       "title": "No hay Safe Conectado",
       "description": "Vincula tu Gnosis Safe para comenzar a gestionar desembolsos",
@@ -367,6 +374,7 @@
     "filters": {
       "status": "Estado",
       "token": "Token",
+      "chain": "Cadena",
       "allTokens": "Todos los Tokens",
       "dateRange": "Rango de Fechas",
       "to": "a"
@@ -374,6 +382,7 @@
     "table": {
       "beneficiary": "Beneficiario",
       "amount": "Cantidad",
+      "chain": "Cadena",
       "memo": "Memo",
       "status": "Estado",
       "date": "Fecha",
@@ -402,6 +411,7 @@
       "dateRange": "Rango de Fechas",
       "status": "Estado",
       "token": "Token",
+      "chain": "Cadena",
       "beneficiary": "Beneficiario",
       "allBeneficiaries": "Todos los Beneficiarios",
       "type": "Tipo",
@@ -414,6 +424,7 @@
       "beneficiary": "Beneficiario",
       "amount": "Cantidad",
       "token": "Token",
+      "chain": "Cadena",
       "status": "Estado",
       "memo": "Memo",
       "tx": "Tx",
@@ -433,6 +444,7 @@
       "walletAddress": "Dirección de Billetera",
       "amount": "Cantidad",
       "token": "Token",
+      "chain": "Cadena",
       "status": "Estado",
       "memo": "Memo",
       "txHash": "Hash de Transacción",

@@ -13,6 +13,8 @@ export const getTransactionReport = query({
     status: v.optional(v.array(v.string())),
     beneficiaryId: v.optional(v.id("beneficiaries")),
     token: v.optional(v.array(v.string())),
+    chainId: v.optional(v.number()),
+    chainIds: v.optional(v.array(v.number())),
   },
   handler: async (ctx, args) => {
     const walletAddress = args.walletAddress.toLowerCase();
@@ -96,6 +98,14 @@ export const getTransactionReport = query({
       filtered = filtered.filter((d) => args.token!.includes(d.token));
     }
 
+    // Chain filter
+    if (args.chainId !== undefined) {
+      filtered = filtered.filter((d) => d.chainId === args.chainId);
+    }
+    if (args.chainIds && args.chainIds.length > 0) {
+      filtered = filtered.filter((d) => d.chainId !== undefined && args.chainIds!.includes(d.chainId));
+    }
+
     // Sort by createdAt descending
     filtered.sort((a, b) => b.createdAt - a.createdAt);
 
@@ -112,13 +122,14 @@ export const getTransactionReport = query({
       amount: amount.toFixed(2),
     }));
 
-    // Return items with beneficiary data
+    // Return items with beneficiary data (include chainId for UI)
     return {
       items: filtered.map((d) => ({
         _id: d._id,
         createdAt: d.createdAt,
         amount: d.displayAmount || d.amount || "0",
         token: d.token,
+        chainId: d.chainId,
         status: d.status,
         memo: d.memo,
         txHash: d.txHash,
@@ -138,6 +149,8 @@ export const getSpendingByBeneficiary = query({
     startDate: v.optional(v.number()),
     endDate: v.optional(v.number()),
     type: v.optional(v.union(v.literal("individual"), v.literal("business"))),
+    chainId: v.optional(v.number()),
+    chainIds: v.optional(v.array(v.number())),
   },
   handler: async (ctx, args) => {
     const walletAddress = args.walletAddress.toLowerCase();
@@ -161,6 +174,12 @@ export const getSpendingByBeneficiary = query({
     if (args.endDate) {
       const endOfDay = args.endDate + 24 * 60 * 60 * 1000;
       executed = executed.filter((d) => d.createdAt <= endOfDay);
+    }
+    if (args.chainId !== undefined) {
+      executed = executed.filter((d) => d.chainId === args.chainId);
+    }
+    if (args.chainIds && args.chainIds.length > 0) {
+      executed = executed.filter((d) => d.chainId !== undefined && args.chainIds!.includes(d.chainId));
     }
 
     // Enrich with beneficiary data

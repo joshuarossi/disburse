@@ -158,14 +158,76 @@ export const getScreeningEnforcement = query({
   },
 });
 
-// Check if any recipients of a disbursement are flagged
-export const checkDisbursementRecipients = internalQuery({
+// Check if beneficiaries are flagged before creating a disbursement
+export const checkBeneficiaries = query({
   args: {
-    disbursementId: v.id("disbursements"),
+    orgId: v.id("orgs"),
+    walletAddress: v.string(),
+    beneficiaryIds: v.array(v.id("beneficiaries")),
   },
   handler: async (ctx, args) => {
+    const walletAddress = args.walletAddress.toLowerCase();
+
+    // Check access
+    await requireOrgAccess(ctx, args.orgId, walletAddress, [
+      "admin", "approver", "initiator", "clerk", "viewer",
+    ]);
+
+    // Get org enforcement setting
+    const org = await ctx.db.get(args.orgId);
+    const enforcement = org?.screeningEnforcement ?? "off";
+
+    if (enforcement === "off") return { clear: true, flagged: [], enforcement };
+
+    // Check screening results for each beneficiary
+    const flagged: Array<{
+      beneficiaryId: string;
+      beneficiaryName: string;
+      status: string;
+    }> = [];
+
+    for (const beneficiaryId of args.beneficiaryIds) {
+      const result = await ctx.db
+        .query("screeningResults")
+        .filter((q) => q.eq(q.field("beneficiaryId"), beneficiaryId))
+        .first();
+
+      if (
+        result &&
+        (result.status === "potential_match" || result.status === "confirmed_match")
+      ) {
+        const beneficiary = await ctx.db.get(result.beneficiaryId);
+        flagged.push({
+          beneficiaryId,
+          beneficiaryName: beneficiary?.name ?? "Unknown",
+          status: result.status,
+        });
+      }
+    }
+
+    return {
+      clear: flagged.length === 0,
+      flagged,
+      enforcement,
+    };
+  },
+});
+
+// Check if any recipients of a disbursement are flagged
+export const checkDisbursementRecipients = query({
+  args: {
+    disbursementId: v.id("disbursements"),
+    walletAddress: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const walletAddress = args.walletAddress.toLowerCase();
     const disbursement = await ctx.db.get(args.disbursementId);
-    if (!disbursement) return { clear: true, flagged: [] };
+    if (!disbursement) return { clear: true, flagged: [], enforcement: "off" as const };
+
+    // Check access
+    await requireOrgAccess(ctx, disbursement.orgId, walletAddress, [
+      "admin", "approver", "initiator", "clerk", "viewer",
+    ]);
 
     // Get org enforcement setting
     const org = await ctx.db.get(disbursement.orgId);

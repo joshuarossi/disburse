@@ -2,7 +2,7 @@ import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import { requireOrgAccess } from "./lib/rbac";
 
-// Link a Safe to an org
+// Link a Safe to an org (one row per chain; same safeAddress required across chains for one org)
 export const link = mutation({
   args: {
     orgId: v.id("orgs"),
@@ -12,25 +12,40 @@ export const link = mutation({
   },
   handler: async (ctx, args) => {
     const walletAddress = args.walletAddress.toLowerCase();
+    const safeAddressLower = args.safeAddress.toLowerCase();
     const now = Date.now();
 
     // Only admin can link safes
     const { user } = await requireOrgAccess(ctx, args.orgId, walletAddress, ["admin"]);
 
-    // Check if safe already linked to this org
-    const existing = await ctx.db
+    // Check if this chain is already linked for this org
+    const existingForChain = await ctx.db
+      .query("safes")
+      .withIndex("by_org_chain", (q) =>
+        q.eq("orgId", args.orgId).eq("chainId", args.chainId)
+      )
+      .first();
+
+    if (existingForChain) {
+      throw new Error("Safe already linked for this chain");
+    }
+
+    // If org has any other safe rows, require the same address (one Safe address per org)
+    const existingAny = await ctx.db
       .query("safes")
       .withIndex("by_org", (q) => q.eq("orgId", args.orgId))
       .first();
 
-    if (existing) {
-      throw new Error("This organization already has a linked Safe");
+    if (existingAny && existingAny.safeAddress !== safeAddressLower) {
+      throw new Error(
+        `Your Safe address must be the same across all chains. You already have ${existingAny.safeAddress} linked.`
+      );
     }
 
     const safeId = await ctx.db.insert("safes", {
       orgId: args.orgId,
       chainId: args.chainId,
-      safeAddress: args.safeAddress.toLowerCase(),
+      safeAddress: safeAddressLower,
       createdAt: now,
     });
 
@@ -49,21 +64,41 @@ export const link = mutation({
   },
 });
 
-// Get Safe for an org
+// Get all Safe rows for an org (one per linked chain; same address across rows)
 export const getForOrg = query({
-  args: { 
+  args: {
     orgId: v.id("orgs"),
     walletAddress: v.string(),
   },
   handler: async (ctx, args) => {
     const walletAddress = args.walletAddress.toLowerCase();
 
-    // Any member can view the safe
     await requireOrgAccess(ctx, args.orgId, walletAddress, ["admin", "approver", "initiator", "clerk", "viewer"]);
 
     return await ctx.db
       .query("safes")
       .withIndex("by_org", (q) => q.eq("orgId", args.orgId))
+      .collect();
+  },
+});
+
+// Get Safe for an org on a specific chain
+export const getForOrgAndChain = query({
+  args: {
+    orgId: v.id("orgs"),
+    chainId: v.number(),
+    walletAddress: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const walletAddress = args.walletAddress.toLowerCase();
+
+    await requireOrgAccess(ctx, args.orgId, walletAddress, ["admin", "approver", "initiator", "clerk", "viewer"]);
+
+    return await ctx.db
+      .query("safes")
+      .withIndex("by_org_chain", (q) =>
+        q.eq("orgId", args.orgId).eq("chainId", args.chainId)
+      )
       .first();
   },
 });

@@ -33,6 +33,7 @@ describe("Disbursements", () => {
       const result = await t.mutation(api.disbursements.create, {
         orgId: orgId! as any,
         walletAddress: TEST_WALLETS.admin,
+        chainId: 11155111,
         beneficiaryId: beneficiaryId! as any,
         token: "USDC",
         amount: "100",
@@ -69,11 +70,12 @@ describe("Disbursements", () => {
         t.mutation(api.disbursements.create, {
           orgId: orgId! as any,
           walletAddress: TEST_WALLETS.admin,
+          chainId: 11155111,
           beneficiaryId: beneficiaryId! as any,
           token: "USDC",
           amount: "100",
         })
-      ).rejects.toThrow("No Safe linked");
+      ).rejects.toThrow(/No Safe linked/);
     });
 
     it("requires active beneficiary", async () => {
@@ -95,6 +97,7 @@ describe("Disbursements", () => {
         t.mutation(api.disbursements.create, {
           orgId: orgId! as any,
           walletAddress: TEST_WALLETS.admin,
+          chainId: 11155111,
           beneficiaryId: beneficiaryId! as any,
           token: "USDC",
           amount: "100",
@@ -123,6 +126,7 @@ describe("Disbursements", () => {
         t.mutation(api.disbursements.create, {
           orgId: orgId! as any,
           walletAddress: TEST_WALLETS.admin,
+          chainId: 11155111,
           beneficiaryId: otherBeneficiaryId! as any,
           token: "USDC",
           amount: "100",
@@ -147,6 +151,7 @@ describe("Disbursements", () => {
       const result = await t.mutation(api.disbursements.create, {
         orgId: orgId! as any,
         walletAddress: TEST_WALLETS.admin,
+        chainId: 11155111,
         beneficiaryId: beneficiaryId! as any,
         token: "USDC",
         amount: "100",
@@ -174,6 +179,7 @@ describe("Disbursements", () => {
       const result = await t.mutation(api.disbursements.create, {
         orgId: orgId! as any,
         walletAddress: TEST_WALLETS.initiator,
+        chainId: 11155111,
         beneficiaryId: beneficiaryId! as any,
         token: "USDC",
         amount: "100",
@@ -202,6 +208,7 @@ describe("Disbursements", () => {
         t.mutation(api.disbursements.create, {
           orgId: orgId! as any,
           walletAddress: TEST_WALLETS.clerk,
+          chainId: 11155111,
           beneficiaryId: beneficiaryId! as any,
           token: "USDC",
           amount: "100",
@@ -229,6 +236,7 @@ describe("Disbursements", () => {
         t.mutation(api.disbursements.create, {
           orgId: orgId! as any,
           walletAddress: TEST_WALLETS.viewer,
+          chainId: 11155111,
           beneficiaryId: beneficiaryId! as any,
           token: "USDC",
           amount: "100",
@@ -252,6 +260,7 @@ describe("Disbursements", () => {
       await t.mutation(api.disbursements.create, {
         orgId: orgId! as any,
         walletAddress: TEST_WALLETS.admin,
+        chainId: 11155111,
         beneficiaryId: beneficiaryId! as any,
         token: "USDC",
         amount: "100",
@@ -661,6 +670,7 @@ describe("Disbursements", () => {
       const result = await t.mutation(api.disbursements.createBatch, {
         orgId: orgId! as any,
         walletAddress: TEST_WALLETS.admin,
+        chainId: 11155111,
         token: "USDC",
         recipients: [
           { beneficiaryId: beneficiaryIds[0] as any, amount: "100" },
@@ -712,6 +722,7 @@ describe("Disbursements", () => {
         t.mutation(api.disbursements.createBatch, {
           orgId: orgId! as any,
           walletAddress: TEST_WALLETS.admin,
+          chainId: 11155111,
           token: "USDC",
           recipients: [],
         })
@@ -735,6 +746,7 @@ describe("Disbursements", () => {
         t.mutation(api.disbursements.createBatch, {
           orgId: orgId! as any,
           walletAddress: TEST_WALLETS.admin,
+          chainId: 11155111,
           token: "USDC",
           recipients: [
             { beneficiaryId: beneficiaryId! as any, amount: "100" },
@@ -763,6 +775,7 @@ describe("Disbursements", () => {
         t.mutation(api.disbursements.createBatch, {
           orgId: orgId! as any,
           walletAddress: TEST_WALLETS.admin,
+          chainId: 11155111,
           token: "USDC",
           recipients: [
             { beneficiaryId: beneficiaryIds[0] as any, amount: "0" },
@@ -775,6 +788,7 @@ describe("Disbursements", () => {
         t.mutation(api.disbursements.createBatch, {
           orgId: orgId! as any,
           walletAddress: TEST_WALLETS.admin,
+          chainId: 11155111,
           token: "USDC",
           recipients: [
             { beneficiaryId: beneficiaryIds[0] as any, amount: "-10" },
@@ -802,6 +816,7 @@ describe("Disbursements", () => {
         t.mutation(api.disbursements.createBatch, {
           orgId: orgId! as any,
           walletAddress: TEST_WALLETS.admin,
+          chainId: 11155111,
           token: "USDC",
           recipients: [
             { beneficiaryId: beneficiaryId! as any, amount: "100" },
@@ -826,12 +841,13 @@ describe("Disbursements", () => {
         t.mutation(api.disbursements.createBatch, {
           orgId: orgId! as any,
           walletAddress: TEST_WALLETS.admin,
+          chainId: 11155111,
           token: "USDC",
           recipients: [
             { beneficiaryId: beneficiaryId! as any, amount: "100" },
           ],
         })
-      ).rejects.toThrow("No Safe linked");
+      ).rejects.toThrow(/No Safe linked/);
     });
 
     it("creates audit log", async () => {
@@ -851,6 +867,7 @@ describe("Disbursements", () => {
       await t.mutation(api.disbursements.createBatch, {
         orgId: orgId! as any,
         walletAddress: TEST_WALLETS.admin,
+        chainId: 11155111,
         token: "USDC",
         recipients: [
           { beneficiaryId: beneficiaryIds[0] as any, amount: "100" },

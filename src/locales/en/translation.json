@@ -205,6 +205,13 @@
   "dashboard": {
     "title": "Dashboard",
     "subtitle": "Overview of your treasury operations",
+    "totalTreasuryValue": "Total Treasury Value",
+    "byToken": "By Token",
+    "byChain": "By Chain",
+    "ofTreasury": "of total treasury",
+    "noBalance": "No balance",
+    "pending": "Pending",
+    "pendingNone": "No pending actions",
     "noSafe": {
       "title": "No Safe Connected",
       "description": "Link your Gnosis Safe to start managing disbursements",
@@ -217,7 +224,7 @@
       "usdcBalance": "USDC Balance",
       "usdtBalance": "USDT Balance",
       "depositAddress": "Deposit Address",
-      "depositDescription": "Send USDC or USDT to this address to fund your treasury"
+      "depositDescription": "Send USDC, USDT, or other stablecoins to this address to fund your treasury"
     },
     "stats": {
       "activeBeneficiaries": "Active Beneficiaries",
@@ -254,6 +261,8 @@
       "business": "e.g., Acme Corporation"
     },
     "notesPlaceholder": "Any additional notes...",
+    "preferredToken": "Preferred token",
+    "preferredChain": "Preferred chain",
     "createBeneficiary": "Create Beneficiary",
     "editBeneficiary": "Edit Beneficiary",
     "saveChanges": "Save Changes",
@@ -367,6 +376,7 @@
     "filters": {
       "status": "Status",
       "token": "Token",
+      "chain": "Chain",
       "allTokens": "All Tokens",
       "dateRange": "Date Range",
       "to": "to"
@@ -374,6 +384,7 @@
     "table": {
       "beneficiary": "Beneficiary",
       "amount": "Amount",
+      "chain": "Chain",
       "memo": "Memo",
       "status": "Status",
       "date": "Date",
@@ -402,6 +413,7 @@
       "dateRange": "Date Range",
       "status": "Status",
       "token": "Token",
+      "chain": "Chain",
       "beneficiary": "Beneficiary",
       "allBeneficiaries": "All Beneficiaries",
       "type": "Type",
@@ -414,6 +426,7 @@
       "beneficiary": "Beneficiary",
       "amount": "Amount",
       "token": "Token",
+      "chain": "Chain",
       "status": "Status",
       "memo": "Memo",
       "tx": "Tx",
@@ -435,6 +448,7 @@
       "token": "Token",
       "status": "Status",
       "memo": "Memo",
+      "chain": "Chain",
       "txHash": "Transaction Hash",
       "type": "Type",
       "transactions": "Transactions",
@@ -485,18 +499,23 @@
     },
     "safe": {
       "title": "Safe Wallet",
-      "subtitle": "Connect your Gnosis Safe",
+      "subtitle": "Connect your Gnosis Safe (one address, multiple chains)",
       "connected": "Connected Safe",
-      "openSafe": "Open Safe",
-      "unlinkSafe": "Unlink Safe",
-      "unlinkConfirm": "Are you sure you want to unlink this Safe?",
+      "openSafe": "View on Safe",
+      "unlinkSafe": "Unlink",
+      "unlinkConfirm": "Are you sure you want to unlink this Safe from this chain?",
       "noSafe": "No Safe connected yet",
-      "linkExisting": "Link Existing Safe",
+      "linkExisting": "Link Safe",
+      "linkAnotherChain": "Add another chain",
+      "addChain": "Add another chain",
       "createSafe": "Don't have a Safe?",
       "createSafeLink": "Create one here",
-      "safeAddress": "Safe Address (Sepolia)",
+      "chain": "Chain",
+      "depositAddress": "Deposit address (same on all chains)",
+      "linkedChains": "Linked chains",
+      "safeAddress": "Safe Address",
       "safeAddressPlaceholder": "0x...",
-      "safeAddressDescription": "Enter the address of your existing Gnosis Safe on Sepolia testnet",
+      "safeAddressDescription": "Enter your Safe address. The same address will be used on each chain you link.",
       "linkSafe": "Link Safe",
       "validating": "Validating...",
       "network": "Sepolia"
@@ -574,7 +593,7 @@
           "price": "${{price}}/mo",
           "features": {
             "users": "1 user",
-            "safe": "1 Safe",
+            "safe": "1 Safe per chain",
             "beneficiaries": "25 beneficiaries",
             "disbursements": "One-time disbursements",
             "audit": "Audit logs",
@@ -587,7 +606,7 @@
           "price": "${{price}}/mo",
           "features": {
             "users": "5 users",
-            "safe": "1 Safe",
+            "safe": "1 Safe per chain",
             "beneficiaries": "100 beneficiaries",
             "roles": "All 5 roles",
             "multisig": "Multi-sig approval",
@@ -600,7 +619,7 @@
           "price": "${{price}}/mo",
           "features": {
             "users": "Unlimited users",
-            "safe": "1 Safe",
+            "safe": "1 Safe per chain",
             "beneficiaries": "Unlimited beneficiaries",
             "reports": "Professional reports",
             "support": "Priority support",
@@ -668,6 +687,13 @@
   "theme": {
     "light": "Light",
     "dark": "Dark"
+  },
+  "chains": {
+    "ethereum": "Ethereum",
+    "polygon": "Polygon",
+    "base": "Base",
+    "arbitrum": "Arbitrum",
+    "sepolia": "Sepolia"
   },
   "errors": {
     "generic": "An error occurred",

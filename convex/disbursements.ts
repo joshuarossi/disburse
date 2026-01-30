@@ -9,8 +9,9 @@ export const list = query({
     orgId: v.id("orgs"),
     walletAddress: v.string(),
     // Filtering
-    status: v.optional(v.array(v.string())), // Now supports multiple statuses
+    status: v.optional(v.array(v.string())),
     token: v.optional(v.string()),
+    chainId: v.optional(v.number()),
     // Date range
     dateFrom: v.optional(v.number()), // timestamp
     dateTo: v.optional(v.number()), // timestamp
@@ -129,6 +130,11 @@ export const list = query({
       filtered = filtered.filter((d) => d.token === args.token);
     }
 
+    // Chain filter
+    if (args.chainId !== undefined) {
+      filtered = filtered.filter((d) => d.chainId === args.chainId);
+    }
+
     // Date range filter
     if (args.dateFrom) {
       filtered = filtered.filter((d) => d.createdAt >= args.dateFrom!);
@@ -204,6 +210,7 @@ export const create = mutation({
   args: {
     orgId: v.id("orgs"),
     walletAddress: v.string(),
+    chainId: v.number(),
     beneficiaryId: v.id("beneficiaries"),
     token: v.string(),
     amount: v.string(),
@@ -213,20 +220,20 @@ export const create = mutation({
     const walletAddress = args.walletAddress.toLowerCase();
     const now = Date.now();
 
-    // Initiator, admin can create
-    const { user } = await requireOrgAccess(ctx, args.orgId, walletAddress, ["admin","approver", "initiator"]);
+    const { user } = await requireOrgAccess(ctx, args.orgId, walletAddress, ["admin", "approver", "initiator"]);
 
-    // Get safe for org
+    // Get safe for org on this chain
     const safe = await ctx.db
       .query("safes")
-      .withIndex("by_org", (q) => q.eq("orgId", args.orgId))
+      .withIndex("by_org_chain", (q) =>
+        q.eq("orgId", args.orgId).eq("chainId", args.chainId)
+      )
       .first();
 
     if (!safe) {
-      throw new Error("No Safe linked to this organization");
+      throw new Error("No Safe linked for this chain");
     }
 
-    // Verify beneficiary exists and belongs to org
     const beneficiary = await ctx.db.get(args.beneficiaryId);
     if (!beneficiary || beneficiary.orgId !== args.orgId) {
       throw new Error("Invalid beneficiary");
@@ -239,6 +246,7 @@ export const create = mutation({
     const disbursementId = await ctx.db.insert("disbursements", {
       orgId: args.orgId,
       safeId: safe._id,
+      chainId: args.chainId,
       beneficiaryId: args.beneficiaryId,
       token: args.token,
       amount: args.amount,
@@ -360,6 +368,7 @@ export const createBatch = mutation({
   args: {
     orgId: v.id("orgs"),
     walletAddress: v.string(),
+    chainId: v.number(),
     token: v.string(),
     recipients: v.array(
       v.object({
@@ -373,8 +382,7 @@ export const createBatch = mutation({
     const walletAddress = args.walletAddress.toLowerCase();
     const now = Date.now();
 
-    // Initiator, admin can create
-    const { user } = await requireOrgAccess(ctx, args.orgId, walletAddress, ["admin","approver", "initiator"]);
+    const { user } = await requireOrgAccess(ctx, args.orgId, walletAddress, ["admin", "approver", "initiator"]);
 
     // Validate at least 1 recipient
     if (args.recipients.length === 0) {
@@ -388,14 +396,16 @@ export const createBatch = mutation({
       throw new Error("Duplicate beneficiaries are not allowed");
     }
 
-    // Get safe for org
+    // Get safe for org on this chain
     const safe = await ctx.db
       .query("safes")
-      .withIndex("by_org", (q) => q.eq("orgId", args.orgId))
+      .withIndex("by_org_chain", (q) =>
+        q.eq("orgId", args.orgId).eq("chainId", args.chainId)
+      )
       .first();
 
     if (!safe) {
-      throw new Error("No Safe linked to this organization");
+      throw new Error("No Safe linked for this chain");
     }
 
     // Validate all beneficiaries and calculate total
@@ -435,6 +445,7 @@ export const createBatch = mutation({
     const disbursementId = await ctx.db.insert("disbursements", {
       orgId: args.orgId,
       safeId: safe._id,
+      chainId: args.chainId,
       type: "batch",
       token: args.token,
       totalAmount: totalAmount.toString(),

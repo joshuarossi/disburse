@@ -9,6 +9,7 @@ import { AppLayout } from '@/components/layout/AppLayout';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { exportToCsv, generateFilename } from '@/lib/csv';
+import { CHAINS_LIST, getChainName, getBlockExplorerTxUrl } from '@/lib/chains';
 import {
   FileText,
   Download,
@@ -105,6 +106,7 @@ function TransactionsTab({ orgId, address }: TransactionsTabProps) {
   const [dateTo, setDateTo] = useState('');
   const [statusFilter, setStatusFilter] = useState<string[]>([]);
   const [tokenFilter, setTokenFilter] = useState<string[]>([]);
+  const [chainFilter, setChainFilter] = useState<number | ''>('');
   const [beneficiaryFilter, setBeneficiaryFilter] = useState('');
 
   const STATUS_OPTIONS = [
@@ -131,9 +133,10 @@ function TransactionsTab({ orgId, address }: TransactionsTabProps) {
       endDate: dateTo ? new Date(dateTo).getTime() : undefined,
       status: statusFilter.length > 0 ? statusFilter : undefined,
       token: tokenFilter.length > 0 ? tokenFilter : undefined,
+      chainId: chainFilter !== '' ? chainFilter : undefined,
       beneficiaryId: beneficiaryFilter ? beneficiaryFilter as Id<'beneficiaries'> : undefined,
     };
-  }, [orgId, address, dateFrom, dateTo, statusFilter, tokenFilter, beneficiaryFilter]);
+  }, [orgId, address, dateFrom, dateTo, statusFilter, tokenFilter, chainFilter, beneficiaryFilter]);
 
   const reportData = useQuery(
     api.reports.getTransactionReport,
@@ -152,6 +155,7 @@ function TransactionsTab({ orgId, address }: TransactionsTabProps) {
     dateFrom || dateTo,
     statusFilter.length > 0,
     tokenFilter.length > 0,
+    chainFilter !== '',
     beneficiaryFilter,
   ].filter(Boolean).length;
 
@@ -172,6 +176,7 @@ function TransactionsTab({ orgId, address }: TransactionsTabProps) {
     setDateTo('');
     setStatusFilter([]);
     setTokenFilter([]);
+    setChainFilter('');
     setBeneficiaryFilter('');
   };
 
@@ -184,6 +189,7 @@ function TransactionsTab({ orgId, address }: TransactionsTabProps) {
       { key: 'walletAddress', label: t('reports.export.walletAddress') },
       { key: 'amount', label: t('reports.export.amount') },
       { key: 'token', label: t('reports.export.token') },
+      { key: 'chain', label: t('reports.export.chain') },
       { key: 'status', label: t('reports.export.status') },
       { key: 'memo', label: t('reports.export.memo') },
       { key: 'txHash', label: t('reports.export.txHash') },
@@ -195,6 +201,7 @@ function TransactionsTab({ orgId, address }: TransactionsTabProps) {
       walletAddress: item.beneficiaryWallet,
       amount: item.amount,
       token: item.token,
+      chain: item.chainId != null ? getChainName(item.chainId) : '',
       status: item.status,
       memo: item.memo || '',
       txHash: item.txHash || '',
@@ -320,6 +327,25 @@ function TransactionsTab({ orgId, address }: TransactionsTabProps) {
               </div>
             </div>
 
+            {/* Chain */}
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-slate-300">
+                {t('reports.filters.chain')}
+              </label>
+              <select
+                value={chainFilter === '' ? '' : chainFilter}
+                onChange={(e) => setChainFilter(e.target.value === '' ? '' : Number(e.target.value))}
+                className="w-full rounded-lg border border-white/10 bg-navy-800 px-3 py-2 text-sm text-white"
+              >
+                <option value="">{t('common.all')}</option>
+                {CHAINS_LIST.map((c) => (
+                  <option key={c.chainId} value={c.chainId}>
+                    {c.chainName}
+                  </option>
+                ))}
+              </select>
+            </div>
+
             {/* Beneficiary */}
             <div className="space-y-2">
               <label className="text-sm font-medium text-slate-300">
@@ -373,6 +399,9 @@ function TransactionsTab({ orgId, address }: TransactionsTabProps) {
                     {t('reports.table.token')}
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-400">
+                    {t('reports.table.chain')}
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-400">
                     {t('reports.table.status')}
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-400">
@@ -394,6 +423,9 @@ function TransactionsTab({ orgId, address }: TransactionsTabProps) {
                       {Number(item.amount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </td>
                     <td className="whitespace-nowrap px-4 py-3 text-sm text-slate-300">{item.token}</td>
+                    <td className="whitespace-nowrap px-4 py-3 text-sm text-slate-400">
+                      {item.chainId != null ? getChainName(item.chainId) : '—'}
+                    </td>
                     <td className="whitespace-nowrap px-4 py-3">
                       <StatusBadge status={item.status} />
                     </td>
@@ -403,7 +435,7 @@ function TransactionsTab({ orgId, address }: TransactionsTabProps) {
                     <td className="whitespace-nowrap px-4 py-3 text-sm">
                       {item.txHash ? (
                         <a
-                          href={`https://sepolia.etherscan.io/tx/${item.txHash}`}
+                          href={item.chainId != null ? getBlockExplorerTxUrl(item.chainId, item.txHash) : `https://etherscan.io/tx/${item.txHash}`}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="flex items-center gap-1 text-accent-400 hover:text-accent-300"
@@ -437,10 +469,15 @@ function TransactionsTab({ orgId, address }: TransactionsTabProps) {
                 <div className="mt-3 flex items-center justify-between">
                   <span className="text-lg font-bold text-white">
                     {Number(item.amount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {item.token}
+                    {item.chainId != null && (
+                      <span className="ml-2 rounded-full bg-navy-700 px-2 py-0.5 text-xs text-slate-500">
+                        {getChainName(item.chainId)}
+                      </span>
+                    )}
                   </span>
                   {item.txHash && (
                     <a
-                      href={`https://sepolia.etherscan.io/tx/${item.txHash}`}
+                      href={item.chainId != null ? getBlockExplorerTxUrl(item.chainId, item.txHash) : `https://etherscan.io/tx/${item.txHash}`}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="flex items-center gap-1 text-sm text-accent-400"
@@ -495,6 +532,7 @@ function SpendingTab({ orgId, address }: SpendingTabProps) {
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
   const [typeFilter, setTypeFilter] = useState('');
+  const [chainFilter, setChainFilter] = useState<number | ''>('');
 
   // Sort state
   const [sortBy, setSortBy] = useState<'name' | 'totalPaid' | 'transactionCount'>('totalPaid');
@@ -517,8 +555,9 @@ function SpendingTab({ orgId, address }: SpendingTabProps) {
       startDate: dateFrom ? new Date(dateFrom).getTime() : undefined,
       endDate: dateTo ? new Date(dateTo).getTime() : undefined,
       type,
+      chainId: chainFilter !== '' ? chainFilter : undefined,
     };
-  }, [orgId, address, dateFrom, dateTo, typeFilter]);
+  }, [orgId, address, dateFrom, dateTo, typeFilter, chainFilter]);
 
   const reportData = useQuery(
     api.reports.getSpendingByBeneficiary,
@@ -526,7 +565,7 @@ function SpendingTab({ orgId, address }: SpendingTabProps) {
   );
 
   const isLoading = reportData === undefined;
-  const activeFilterCount = [dateFrom || dateTo, typeFilter].filter(Boolean).length;
+  const activeFilterCount = [dateFrom || dateTo, typeFilter, chainFilter !== ''].filter(Boolean).length;
 
   // Sort data client-side
   const sortedData = useMemo(() => {
@@ -550,6 +589,7 @@ function SpendingTab({ orgId, address }: SpendingTabProps) {
     setDateFrom('');
     setDateTo('');
     setTypeFilter('');
+    setChainFilter('');
   };
 
   const handleSort = (field: typeof sortBy) => {
@@ -678,6 +718,25 @@ function SpendingTab({ orgId, address }: SpendingTabProps) {
                 {TYPE_OPTIONS.map((opt) => (
                   <option key={opt.value} value={opt.value}>
                     {opt.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Chain */}
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-slate-300">
+                {t('reports.filters.chain')}
+              </label>
+              <select
+                value={chainFilter === '' ? '' : chainFilter}
+                onChange={(e) => setChainFilter(e.target.value === '' ? '' : Number(e.target.value))}
+                className="w-full rounded-lg border border-white/10 bg-navy-800 px-3 py-2 text-sm text-white"
+              >
+                <option value="">{t('common.all')}</option>
+                {CHAINS_LIST.map((c) => (
+                  <option key={c.chainId} value={c.chainId}>
+                    {c.chainName}
                   </option>
                 ))}
               </select>

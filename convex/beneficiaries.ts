@@ -42,6 +42,8 @@ export const create = mutation({
     name: v.string(),
     beneficiaryAddress: v.string(),
     notes: v.optional(v.string()),
+    preferredToken: v.optional(v.string()),
+    preferredChainId: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
     const walletAddress = args.walletAddress.toLowerCase();
@@ -67,6 +69,8 @@ export const create = mutation({
       name: args.name,
       walletAddress: args.beneficiaryAddress.toLowerCase(),
       notes: args.notes,
+      preferredToken: args.preferredToken,
+      preferredChainId: args.preferredChainId,
       isActive: true,
       createdAt: now,
       updatedAt: now,
@@ -103,6 +107,8 @@ export const update = mutation({
     name: v.optional(v.string()),
     beneficiaryAddress: v.optional(v.string()),
     notes: v.optional(v.string()),
+    preferredToken: v.optional(v.string()),
+    preferredChainId: v.optional(v.number()),
     isActive: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
@@ -122,6 +128,8 @@ export const update = mutation({
     if (args.name !== undefined) updates.name = args.name;
     if (args.beneficiaryAddress !== undefined) updates.walletAddress = args.beneficiaryAddress.toLowerCase();
     if (args.notes !== undefined) updates.notes = args.notes;
+    if (args.preferredToken !== undefined) updates.preferredToken = args.preferredToken;
+    if (args.preferredChainId !== undefined) updates.preferredChainId = args.preferredChainId;
     if (args.isActive !== undefined) updates.isActive = args.isActive;
 
     await ctx.db.patch(args.beneficiaryId, updates);
@@ -210,6 +218,8 @@ export const createBulk = mutation({
         name: v.string(),
         beneficiaryAddress: v.string(),
         notes: v.optional(v.string()),
+        preferredToken: v.optional(v.string()),
+        preferredChainId: v.optional(v.number()),
       })
     ),
   },
@@ -288,6 +298,8 @@ export const createBulk = mutation({
         name: beneficiary.name.trim(),
         walletAddress: beneficiary.beneficiaryAddress.toLowerCase().trim(),
         notes: beneficiary.notes?.trim() || undefined,
+        preferredToken: beneficiary.preferredToken,
+        preferredChainId: beneficiary.preferredChainId,
         isActive: true,
         createdAt: now,
         updatedAt: now,

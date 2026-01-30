@@ -1,7 +1,7 @@
 import Safe from '@safe-global/protocol-kit';
 import SafeApiKit from '@safe-global/api-kit';
 import { encodeFunctionData, parseUnits, getAddress } from 'viem';
-import { TOKENS } from './wagmi';
+import { getTokensForChain, isSupportedChainId } from './chains';
 
 // Operation types for Safe transactions
 const OperationType = {
@@ -17,11 +17,14 @@ interface MetaTransactionData {
   operation?: number;
 }
 
-// Sepolia chain ID
-const CHAIN_ID = BigInt(11155111);
-
-// Safe Transaction Service URL for Sepolia (SDK appends /v1/... paths)
-const SAFE_TX_SERVICE_URL = 'https://safe-transaction-sepolia.safe.global/api';
+// Safe Transaction Service base URL per chain (Safe appends /api or /v1/...)
+const SAFE_TX_SERVICE_URL_BY_CHAIN: Record<number, string> = {
+  1: 'https://safe-transaction-mainnet.safe.global/api',
+  137: 'https://safe-transaction-polygon.safe.global/api',
+  8453: 'https://safe-transaction-base.safe.global/api',
+  42161: 'https://safe-transaction-arbitrum.safe.global/api',
+  11155111: 'https://safe-transaction-sepolia.safe.global/api',
+};
 
 // ERC20 ABI for transfer function
 const ERC20_ABI = [
@@ -36,18 +39,24 @@ const ERC20_ABI = [
   },
 ] as const;
 
+export function getSafeTxServiceUrl(chainId: number): string {
+  const url = SAFE_TX_SERVICE_URL_BY_CHAIN[chainId];
+  if (!url) {
+    throw new Error(`Unsupported chain for Safe: ${chainId}`);
+  }
+  return url;
+}
+
 /**
- * Initialize Safe API Kit for Sepolia
+ * Initialize Safe API Kit for a given chain
  */
-export function getSafeApiKit(): SafeApiKit {
-  console.log('[Safe] Initializing SafeApiKit with txServiceUrl:', SAFE_TX_SERVICE_URL);
+export function getSafeApiKit(chainId: number): SafeApiKit {
+  const txServiceUrl = getSafeTxServiceUrl(chainId);
   try {
-    const apiKit = new SafeApiKit({
-      chainId: CHAIN_ID,
-      txServiceUrl: SAFE_TX_SERVICE_URL,
+    return new SafeApiKit({
+      chainId: BigInt(chainId),
+      txServiceUrl,
     });
-    console.log('[Safe] SafeApiKit initialized successfully');
-    return apiKit;
   } catch (error) {
     console.error('[Safe] Failed to initialize SafeApiKit:', error);
     throw error;
@@ -55,22 +64,21 @@ export function getSafeApiKit(): SafeApiKit {
 }
 
 /**
- * Initialize Safe Protocol Kit with a signer
+ * Initialize Safe Protocol Kit with a signer (chainId needed for correct network)
  */
 export async function getSafeProtocolKit(
   safeAddress: string,
-  signer: string
+  signer: string,
+  chainId: number
 ): Promise<Safe> {
   const checksummedSafeAddress = getAddress(safeAddress);
   const checksummedSigner = getAddress(signer);
-  console.log('[Safe] getSafeProtocolKit called', { safeAddress: checksummedSafeAddress, signer: checksummedSigner });
   try {
     const protocolKit = await Safe.init({
       provider: window.ethereum,
       signer: checksummedSigner,
       safeAddress: checksummedSafeAddress,
     });
-    console.log('[Safe] Protocol Kit created successfully');
     return protocolKit;
   } catch (error) {
     console.error('[Safe] Failed to create Protocol Kit:', error);
@@ -79,16 +87,13 @@ export async function getSafeProtocolKit(
 }
 
 /**
- * Get Safe info including owners and threshold
+ * Get Safe info including owners and threshold (for a specific chain)
  */
-export async function getSafeInfo(safeAddress: string) {
+export async function getSafeInfo(safeAddress: string, chainId: number) {
   const checksummedAddress = getAddress(safeAddress);
-  console.log('[Safe] getSafeInfo called with address:', checksummedAddress);
-  const apiKit = getSafeApiKit();
-  console.log('[Safe] Calling apiKit.getSafeInfo...');
+  const apiKit = getSafeApiKit(chainId);
   try {
     const safeInfo = await apiKit.getSafeInfo(checksummedAddress);
-    console.log('[Safe] Got Safe info:', safeInfo);
     return {
       address: safeInfo.address,
       nonce: safeInfo.nonce,
@@ -103,12 +108,16 @@ export async function getSafeInfo(safeAddress: string) {
 }
 
 /**
- * Check if an address is an owner of the Safe
+ * Check if an address is an owner of the Safe (on the given chain)
  */
-export async function isOwner(safeAddress: string, address: string): Promise<boolean> {
+export async function isOwner(
+  safeAddress: string,
+  address: string,
+  chainId: number
+): Promise<boolean> {
   try {
     const checksummedAddress = getAddress(address);
-    const safeInfo = await getSafeInfo(safeAddress);
+    const safeInfo = await getSafeInfo(safeAddress, chainId);
     return safeInfo.owners.some(
       (owner) => getAddress(owner) === checksummedAddress
     );
@@ -118,14 +127,19 @@ export async function isOwner(safeAddress: string, address: string): Promise<boo
 }
 
 /**
- * Create an ERC20 transfer transaction
+ * Create an ERC20 transfer transaction (token address from chain config)
  */
 export function createTransferTx(
-  token: 'USDC' | 'USDT',
+  chainId: number,
+  token: string,
   to: string,
   amount: string
 ): MetaTransactionData {
-  const tokenConfig = TOKENS[token];
+  const tokens = getTokensForChain(chainId);
+  const tokenConfig = tokens[token];
+  if (!tokenConfig) {
+    throw new Error(`Token ${token} not supported on chain ${chainId}`);
+  }
   const value = parseUnits(amount, tokenConfig.decimals);
 
   const data = encodeFunctionData({
@@ -146,58 +160,38 @@ export function createTransferTx(
  * Create multiple ERC20 transfer transactions for batch disbursements
  */
 export function createBatchTransferTxs(
-  token: 'USDC' | 'USDT',
+  chainId: number,
+  token: string,
   recipients: Array<{ to: string; amount: string }>
 ): MetaTransactionData[] {
-  return recipients.map((recipient) => createTransferTx(token, recipient.to, recipient.amount));
+  return recipients.map((r) => createTransferTx(chainId, token, r.to, r.amount));
 }
 
 /**
- * Create and propose a Safe transaction
+ * Create and propose a Safe transaction (on the given chain)
  */
 export async function proposeTransaction(
   safeAddress: string,
   signerAddress: string,
+  chainId: number,
   transactions: MetaTransactionData[]
 ): Promise<string> {
-  // Ensure addresses are checksummed (Safe API requires this)
   const checksummedSafeAddress = getAddress(safeAddress);
   const checksummedSignerAddress = getAddress(signerAddress);
-  
-  console.log('[Safe] proposeTransaction called', { 
-    safeAddress: checksummedSafeAddress, 
-    signerAddress: checksummedSignerAddress, 
-    transactions 
-  });
-  
-  // Initialize Protocol Kit
-  console.log('[Safe] Initializing Protocol Kit...');
-  const protocolKit = await getSafeProtocolKit(checksummedSafeAddress, checksummedSignerAddress);
-  console.log('[Safe] Protocol Kit initialized');
-  
-  console.log('[Safe] Getting API Kit...');
-  const apiKit = getSafeApiKit();
-  console.log('[Safe] API Kit ready');
 
-  // Create the transaction
-  console.log('[Safe] Creating transaction...');
+  const protocolKit = await getSafeProtocolKit(
+    checksummedSafeAddress,
+    checksummedSignerAddress,
+    chainId
+  );
+  const apiKit = getSafeApiKit(chainId);
+
   const safeTransaction = await protocolKit.createTransaction({
     transactions,
   });
-  console.log('[Safe] Transaction created');
-
-  // Get the transaction hash
-  console.log('[Safe] Getting transaction hash...');
   const safeTxHash = await protocolKit.getTransactionHash(safeTransaction);
-  console.log('[Safe] Transaction hash:', safeTxHash);
-
-  // Sign the transaction
-  console.log('[Safe] Signing transaction...');
   const signature = await protocolKit.signHash(safeTxHash);
-  console.log('[Safe] Transaction signed');
 
-  // Propose the transaction to the Safe Transaction Service
-  console.log('[Safe] Proposing transaction to service...');
   await apiKit.proposeTransaction({
     safeAddress: checksummedSafeAddress,
     safeTransactionData: safeTransaction.data,
@@ -205,17 +199,19 @@ export async function proposeTransaction(
     senderAddress: checksummedSignerAddress,
     senderSignature: signature.data,
   });
-  console.log('[Safe] Transaction proposed successfully');
 
   return safeTxHash;
 }
 
 /**
- * Get pending transactions for a Safe
+ * Get pending transactions for a Safe (on the given chain)
  */
-export async function getPendingTransactions(safeAddress: string) {
+export async function getPendingTransactions(
+  safeAddress: string,
+  chainId: number
+) {
   const checksummedAddress = getAddress(safeAddress);
-  const apiKit = getSafeApiKit();
+  const apiKit = getSafeApiKit(chainId);
   try {
     const pendingTxs = await apiKit.getPendingTransactions(checksummedAddress);
     return pendingTxs.results;
@@ -226,36 +222,31 @@ export async function getPendingTransactions(safeAddress: string) {
 }
 
 /**
- * Execute a Safe transaction
- * For single-signer Safes, this will execute immediately
+ * Execute a Safe transaction (on the given chain)
  */
 export async function executeTransaction(
   safeAddress: string,
   signerAddress: string,
+  chainId: number,
   safeTxHash: string
 ): Promise<string> {
-  const protocolKit = await getSafeProtocolKit(safeAddress, signerAddress);
-  const apiKit = getSafeApiKit();
+  const protocolKit = await getSafeProtocolKit(
+    safeAddress,
+    signerAddress,
+    chainId
+  );
+  const apiKit = getSafeApiKit(chainId);
 
-  // Get the transaction from the service
   const safeTransaction = await apiKit.getTransaction(safeTxHash);
-
-  // Check if we need to add our signature first
   const threshold = await protocolKit.getThreshold();
   const currentSignatures = safeTransaction.confirmations?.length || 0;
 
   if (currentSignatures < threshold) {
-    // Sign the transaction
     const signature = await protocolKit.signHash(safeTxHash);
-    
-    // Add confirmation to the service
     await apiKit.confirmTransaction(safeTxHash, signature.data);
   }
 
-  // Re-fetch the transaction with updated signatures
   const updatedTx = await apiKit.getTransaction(safeTxHash);
-  
-  // Build the Safe transaction object from the API response
   const safeTransactionData = {
     to: updatedTx.to,
     value: updatedTx.value,
@@ -269,7 +260,6 @@ export async function executeTransaction(
     nonce: updatedTx.nonce,
   };
 
-  // Create Safe transaction object
   const safeTx = await protocolKit.createTransaction({
     transactions: [safeTransactionData],
     options: {
@@ -277,9 +267,7 @@ export async function executeTransaction(
     },
   });
 
-  // Add all confirmations/signatures
   for (const confirmation of updatedTx.confirmations || []) {
-    // Create a signature object compatible with the Safe SDK
     const sig = {
       signer: confirmation.owner,
       data: confirmation.signature,
@@ -290,36 +278,31 @@ export async function executeTransaction(
     safeTx.addSignature(sig);
   }
 
-  // Execute the transaction
   const executeTxResponse = await protocolKit.executeTransaction(safeTx);
-  
-  // Wait for the transaction to be mined and get the hash
   const txResponse = executeTxResponse.transactionResponse;
   if (txResponse && typeof txResponse === 'object' && 'wait' in txResponse) {
     const waitFn = txResponse.wait as () => Promise<{ hash?: string }>;
     const receipt = await waitFn();
     return receipt?.hash || executeTxResponse.hash;
   }
-  
   return executeTxResponse.hash;
 }
 
 /**
- * Validate that an address is a valid Safe contract
+ * Validate that an address is a valid Safe contract (on the given chain)
  */
-export async function validateSafeAddress(safeAddress: string): Promise<boolean> {
-  console.log('[Safe] validateSafeAddress called with:', safeAddress);
+export async function validateSafeAddress(
+  safeAddress: string,
+  chainId: number
+): Promise<boolean> {
+  if (!isSupportedChainId(chainId)) {
+    return false;
+  }
   try {
-    // First validate it's a valid Ethereum address
     const checksummedAddress = getAddress(safeAddress);
-    console.log('[Safe] Checksummed address:', checksummedAddress);
-    
-    const safeInfo = await getSafeInfo(checksummedAddress);
-    const isValid = !!safeInfo && !!safeInfo.address;
-    console.log('[Safe] validateSafeAddress result:', isValid, safeInfo);
-    return isValid;
-  } catch (error) {
-    console.error('[Safe] validateSafeAddress caught error:', error);
+    const safeInfo = await getSafeInfo(checksummedAddress, chainId);
+    return !!safeInfo && !!safeInfo.address;
+  } catch {
     return false;
   }
 }

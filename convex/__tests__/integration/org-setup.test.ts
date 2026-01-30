@@ -55,15 +55,16 @@ describe("Integration: Organization Setup Flow", () => {
 
     expect(safeResult.safeId).toBeDefined();
 
-    // Step 6: Verify Safe is retrievable
-    const safe = await t.query(api.safes.getForOrg, {
+    // Step 6: Verify Safe is retrievable (getForOrg returns array of safes, one per chain)
+    const safes = await t.query(api.safes.getForOrg, {
       orgId: orgResult.orgId as any,
       walletAddress: TEST_WALLETS.admin,
     });
 
-    expect(safe).not.toBeNull();
-    expect(safe?.safeAddress).toBe(safeAddress.toLowerCase());
-    expect(safe?.chainId).toBe(11155111);
+    expect(Array.isArray(safes)).toBe(true);
+    expect(safes.length).toBe(1);
+    expect(safes[0]?.safeAddress).toBe(safeAddress.toLowerCase());
+    expect(safes[0]?.chainId).toBe(11155111);
 
     // Verify complete audit trail
     await t.run(async (ctx) => {

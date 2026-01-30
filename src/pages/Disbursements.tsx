@@ -1,6 +1,6 @@
 import { useState, useMemo, useRef } from 'react';
 import { useParams } from 'react-router-dom';
-import { useAccount } from 'wagmi';
+import { useAccount, useReadContracts } from 'wagmi';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useMutation } from 'convex/react';
 import { api } from '../../convex/_generated/api';
@@ -10,7 +10,7 @@ import { AppLayout } from '@/components/layout/AppLayout';
 import { Button } from '@/components/ui/button';
 import { BatchDetailModal } from '@/components/disbursements/BatchDetailModal';
 import { cn } from '@/lib/utils';
-import { 
+import {
   Plus, Send, ArrowUpRight, Loader2, Play, CheckCircle, X, Rocket,
   Search, Filter, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Calendar, RefreshCw
 } from 'lucide-react';
@@ -20,8 +20,25 @@ import {
   proposeTransaction,
   executeTransaction,
 } from '@/lib/safe';
+import {
+  CHAINS_LIST,
+  getChainName,
+  getTokenSymbolsForChain,
+  getTokensForChain,
+  getBlockExplorerTxUrl,
+} from '@/lib/chains';
+import { useSwitchChain } from 'wagmi';
 
-// Status and token options will be translated in component
+// ERC20 ABI for balanceOf
+const erc20Abi = [
+  {
+    name: 'balanceOf',
+    type: 'function',
+    stateMutability: 'view',
+    inputs: [{ name: 'account', type: 'address' }],
+    outputs: [{ name: '', type: 'uint256' }],
+  },
+] as const;
 
 const PAGE_SIZE = 10;
 
@@ -40,11 +57,17 @@ export default function Disbursements() {
     { value: 'cancelled', label: t('status.cancelled') },
   ];
 
-  const TOKEN_OPTIONS = [
-    { value: '', label: t('disbursements.filters.allTokens') },
-    { value: 'USDC', label: 'USDC' },
-    { value: 'USDT', label: 'USDT' },
-  ];
+  const [chainFilter, setChainFilter] = useState<number | ''>('');
+  const [createChainId, setCreateChainId] = useState<number>(11155111); // Sepolia default
+  const filterTokenOptions = useMemo(
+    () => [
+      { value: '', label: t('disbursements.filters.allTokens') },
+      ...Array.from(
+        new Set(CHAINS_LIST.flatMap((c) => getTokenSymbolsForChain(c.chainId)))
+      ).map((symbol) => ({ value: symbol, label: symbol })),
+    ],
+    [t]
+  );
   const [selectedBeneficiary, setSelectedBeneficiary] = useState('');
   const [amount, setAmount] = useState('');
   const [token, setToken] = useState('USDC');
@@ -53,9 +76,16 @@ export default function Disbursements() {
   const [error, setError] = useState<string | null>(null);
   const [selectedDisbursementId, setSelectedDisbursementId] = useState<Id<'disbursements'> | null>(null);
   const [cancelDisbursementId, setCancelDisbursementId] = useState<Id<'disbursements'> | null>(null);
-  
+
   // Batch disbursement state
   const [recipients, setRecipients] = useState<Array<{ beneficiaryId: string; amount: string }>>([]);
+
+  // Screening warning state
+  const [screeningWarning, setScreeningWarning] = useState<{
+    flagged: Array<{ beneficiaryId: string; beneficiaryName: string; status: string }>;
+    action: 'create' | 'propose' | 'execute';
+    data: any;
+  } | null>(null);
 
   // Filter & search state
   const [search, setSearch] = useState('');
@@ -83,6 +113,7 @@ export default function Disbursements() {
       search: search.trim() || undefined,
       status: statusFilter.length > 0 ? statusFilter : undefined,
       token: tokenFilter || undefined,
+      chainId: chainFilter !== '' ? chainFilter : undefined,
       dateFrom: dateFrom ? new Date(dateFrom).getTime() : undefined,
       dateTo: dateTo ? new Date(dateTo).getTime() : undefined,
       sortBy,
@@ -90,7 +121,7 @@ export default function Disbursements() {
       cursor: cursors[currentPage] ?? undefined,
       limit: PAGE_SIZE,
     };
-  }, [orgId, address, search, statusFilter, tokenFilter, dateFrom, dateTo, sortBy, sortOrder, cursors, currentPage]);
+  }, [orgId, address, search, statusFilter, tokenFilter, chainFilter, dateFrom, dateTo, sortBy, sortOrder, cursors, currentPage]);
 
   const disbursementsResult = useQuery(
     api.disbursements.list,
@@ -112,12 +143,67 @@ export default function Disbursements() {
       : 'skip'
   );
 
-  const safe = useQuery(
+  const safes = useQuery(
     api.safes.getForOrg,
     orgId && address
       ? { orgId: orgId as Id<'orgs'>, walletAddress: address }
       : 'skip'
   );
+  const switchChain = useSwitchChain();
+
+  // Fetch token balances for the selected chain
+  const balanceContracts = useMemo(() => {
+    if (!safes?.length || !createChainId) return undefined;
+    const safe = safes.find((s) => s.chainId === createChainId);
+    if (!safe) return undefined;
+
+    const tokens = getTokensForChain(createChainId);
+    const contracts: Array<{
+      address: `0x${string}`;
+      abi: typeof erc20Abi;
+      functionName: 'balanceOf';
+      args: [`0x${string}`];
+      chainId: number;
+      symbol: string;
+      decimals: number;
+    }> = [];
+
+    for (const [symbol, config] of Object.entries(tokens)) {
+      contracts.push({
+        address: config.address,
+        abi: erc20Abi,
+        functionName: 'balanceOf',
+        args: [safe.safeAddress as `0x${string}`],
+        chainId: createChainId,
+        symbol,
+        decimals: config.decimals,
+      });
+    }
+
+    return contracts.length ? contracts : undefined;
+  }, [safes, createChainId]);
+
+  const { data: balanceResults } = useReadContracts({
+    contracts: balanceContracts,
+    query: {
+      enabled: !!balanceContracts?.length,
+    },
+  });
+
+  // Calculate available balance for selected token
+  const availableBalance = useMemo(() => {
+    if (!balanceContracts || !balanceResults) return null;
+
+    const tokenIndex = balanceContracts.findIndex((c) => c.symbol === token);
+    if (tokenIndex === -1) return null;
+
+    const result = balanceResults[tokenIndex]?.result;
+    if (result == null) return null;
+
+    const decimals = balanceContracts[tokenIndex].decimals;
+    const balance = Number(result) / Math.pow(10, decimals);
+    return balance;
+  }, [balanceContracts, balanceResults, token]);
 
   const createDisbursement = useMutation(api.disbursements.create);
   const createBatchDisbursement = useMutation(api.disbursements.createBatch);
@@ -148,6 +234,12 @@ export default function Disbursements() {
   // Handler for token filter
   const handleTokenFilterChange = (value: string) => {
     setTokenFilter(value);
+    resetPagination();
+  };
+
+  // Handler for chain filter
+  const handleChainFilterChange = (value: number | '') => {
+    setChainFilter(value);
     resetPagination();
   };
 
@@ -192,12 +284,13 @@ export default function Disbursements() {
     setSearch('');
     setStatusFilter([]);
     setTokenFilter('');
+    setChainFilter('');
     setDateFrom('');
     setDateTo('');
     resetPagination();
   };
 
-  const hasActiveFilters = search || statusFilter.length > 0 || tokenFilter || dateFrom || dateTo;
+  const hasActiveFilters = search || statusFilter.length > 0 || tokenFilter || chainFilter !== '' || dateFrom || dateTo;
 
   // Calculate total for batch disbursements
   const batchTotal = useMemo(() => {
@@ -277,10 +370,11 @@ export default function Disbursements() {
     setToken('USDC');
     setMemo('');
     setRecipients([]);
+    setCreateChainId(11155111);
     setIsCreating(false);
   };
 
-  const handleCreate = async (e: React.FormEvent) => {
+  const handleCreate = async (e: React.FormEvent, skipScreening = false) => {
     e.preventDefault();
     if (!orgId || !address) return;
 
@@ -295,7 +389,7 @@ export default function Disbursements() {
         setError('At least one recipient is required');
         return;
       }
-      
+
       // Validate all recipients have beneficiary and amount
       for (const recipient of allRecipients) {
         if (!recipient.beneficiaryId || !recipient.amount) {
@@ -309,10 +403,37 @@ export default function Disbursements() {
         }
       }
 
+      // Check screening before creating (unless skipping)
+      if (!skipScreening) {
+        const beneficiaryIds = allRecipients.map(r => r.beneficiaryId as Id<'beneficiaries'>);
+        const screeningCheck = await convex.query(api.screeningQueries.checkBeneficiaries, {
+          orgId: orgId as Id<'orgs'>,
+          walletAddress: address,
+          beneficiaryIds,
+        });
+
+        if (screeningCheck.enforcement === 'block' && screeningCheck.flagged.length > 0) {
+          setError(
+            `Cannot create disbursement: The following beneficiaries have unresolved SDN screening matches: ${screeningCheck.flagged.map(f => f.beneficiaryName).join(', ')}. An admin must review the screening results before proceeding.`
+          );
+          return;
+        }
+
+        if (screeningCheck.enforcement === 'warn' && screeningCheck.flagged.length > 0) {
+          setScreeningWarning({
+            flagged: screeningCheck.flagged,
+            action: 'create',
+            data: { allRecipients, isBatch: true },
+          });
+          return;
+        }
+      }
+
       try {
         await createBatchDisbursement({
           orgId: orgId as Id<'orgs'>,
           walletAddress: address,
+          chainId: createChainId,
           token,
           recipients: allRecipients.map(r => ({
             beneficiaryId: r.beneficiaryId as Id<'beneficiaries'>,
@@ -329,10 +450,36 @@ export default function Disbursements() {
       // Single disbursement
       if (!selectedBeneficiary || !amount) return;
 
+      // Check screening before creating (unless skipping)
+      if (!skipScreening) {
+        const screeningCheck = await convex.query(api.screeningQueries.checkBeneficiaries, {
+          orgId: orgId as Id<'orgs'>,
+          walletAddress: address,
+          beneficiaryIds: [selectedBeneficiary as Id<'beneficiaries'>],
+        });
+
+        if (screeningCheck.enforcement === 'block' && screeningCheck.flagged.length > 0) {
+          setError(
+            `Cannot create disbursement: ${screeningCheck.flagged[0].beneficiaryName} has an unresolved SDN screening match. An admin must review the screening result before proceeding.`
+          );
+          return;
+        }
+
+        if (screeningCheck.enforcement === 'warn' && screeningCheck.flagged.length > 0) {
+          setScreeningWarning({
+            flagged: screeningCheck.flagged,
+            action: 'create',
+            data: { isBatch: false },
+          });
+          return;
+        }
+      }
+
       try {
         await createDisbursement({
           orgId: orgId as Id<'orgs'>,
           walletAddress: address,
+          chainId: createChainId,
           beneficiaryId: selectedBeneficiary as Id<'beneficiaries'>,
           token,
           amount,
@@ -346,72 +493,102 @@ export default function Disbursements() {
     }
   };
 
-  const handlePropose = async (disbursement: {
-    _id: Id<'disbursements'>;
-    beneficiary: { walletAddress: string } | null;
-    token: string;
-    amount?: string;
-    type?: 'single' | 'batch';
-    totalAmount?: string;
-  }) => {
-    if (!safe || !address) return;
+  const handlePropose = async (
+    disbursement: {
+      _id: Id<'disbursements'>;
+      chainId?: number;
+      beneficiary: { walletAddress: string } | null;
+      token: string;
+      amount?: string;
+      type?: 'single' | 'batch';
+      totalAmount?: string;
+    },
+    skipScreening = false
+  ) => {
+    const chainId = disbursement.chainId;
+    if (chainId == null || !safes?.length || !address) return;
+    const safe = safes.find((s) => s.chainId === chainId);
+    if (!safe) {
+      setError('No Safe linked for this chain. Link the Safe for this chain in Settings.');
+      return;
+    }
 
     setProcessingId(disbursement._id);
     setError(null);
 
     try {
-      // Update status to pending
+      // Check screening before proposing (unless skipping)
+      if (!skipScreening) {
+        const screeningCheck = await convex.query(api.screeningQueries.checkDisbursementRecipients, {
+          disbursementId: disbursement._id,
+          walletAddress: address,
+        });
+
+        if (screeningCheck.enforcement === 'block' && screeningCheck.flagged.length > 0) {
+          setError(
+            `Cannot propose transaction: The following beneficiaries have unresolved SDN screening matches: ${screeningCheck.flagged.map(f => f.beneficiaryName).join(', ')}. An admin must review the screening results before proceeding.`
+          );
+          setProcessingId(null);
+          return;
+        }
+
+        if (screeningCheck.enforcement === 'warn' && screeningCheck.flagged.length > 0) {
+          setScreeningWarning({
+            flagged: screeningCheck.flagged,
+            action: 'propose',
+            data: { disbursement },
+          });
+          setProcessingId(null);
+          return;
+        }
+      }
+
+      if (switchChain && switchChain.switchChainAsync && switchChain.chain?.id !== chainId) {
+        await switchChain.switchChainAsync({ chainId });
+      }
+
       await updateStatus({
         disbursementId: disbursement._id,
         walletAddress: address,
         status: 'pending',
       });
 
-      let transactions;
+      let transactions: Array<{ to: string; value: string; data: string; operation?: number }>;
 
-      // Handle batch disbursements
       if (disbursement.type === 'batch') {
-        // Fetch recipients for batch disbursement using Convex client
         const batchData = await convex.query(api.disbursements.getWithRecipients, {
           disbursementId: disbursement._id,
           walletAddress: address,
         });
-        
         if (!batchData || !batchData.recipients || batchData.recipients.length === 0) {
           throw new Error('No recipients found for batch disbursement');
         }
-
-        // Create batch transfer transactions
         transactions = createBatchTransferTxs(
-          disbursement.token as 'USDC' | 'USDT',
-          batchData.recipients.map((r: any) => ({
-            to: r.recipientAddress,
-            amount: r.amount,
-          }))
+          chainId,
+          disbursement.token,
+          batchData.recipients.map((r: any) => ({ to: r.recipientAddress, amount: r.amount }))
         );
       } else {
-        // Single disbursement
         const singleAmount = disbursement.amount;
         if (!disbursement.beneficiary || !singleAmount) {
           throw new Error('Beneficiary or amount not found');
         }
-
         const transferTx = createTransferTx(
-          disbursement.token as 'USDC' | 'USDT',
+          chainId,
+          disbursement.token,
           disbursement.beneficiary.walletAddress,
           singleAmount
         );
         transactions = [transferTx];
       }
 
-      // Propose to Safe
       const safeTxHash = await proposeTransaction(
         safe.safeAddress,
         address,
+        chainId,
         transactions
       );
 
-      // Update status to proposed with safeTxHash
       await updateStatus({
         disbursementId: disbursement._id,
         walletAddress: address,
@@ -421,8 +598,6 @@ export default function Disbursements() {
     } catch (err) {
       console.error('Failed to propose transaction:', err);
       setError(err instanceof Error ? err.message : 'Failed to propose transaction');
-      
-      // Revert status to draft on failure
       await updateStatus({
         disbursementId: disbursement._id,
         walletAddress: address,
@@ -433,24 +608,63 @@ export default function Disbursements() {
     }
   };
 
-  const handleExecute = async (disbursement: {
-    _id: Id<'disbursements'>;
-    safeTxHash?: string;
-  }) => {
-    if (!safe || !address || !disbursement.safeTxHash) return;
+  const handleExecute = async (
+    disbursement: {
+      _id: Id<'disbursements'>;
+      chainId?: number;
+      safeTxHash?: string;
+    },
+    skipScreening = false
+  ) => {
+    const chainId = disbursement.chainId;
+    if (chainId == null || !safes?.length || !address || !disbursement.safeTxHash) return;
+    const safe = safes.find((s) => s.chainId === chainId);
+    if (!safe) {
+      setError('No Safe linked for this chain.');
+      return;
+    }
 
     setProcessingId(disbursement._id);
     setError(null);
 
     try {
-      // Execute the transaction
+      // Check screening before executing (unless skipping)
+      if (!skipScreening) {
+        const screeningCheck = await convex.query(api.screeningQueries.checkDisbursementRecipients, {
+          disbursementId: disbursement._id,
+          walletAddress: address,
+        });
+
+        if (screeningCheck.enforcement === 'block' && screeningCheck.flagged.length > 0) {
+          setError(
+            `Cannot execute transaction: The following beneficiaries have unresolved SDN screening matches: ${screeningCheck.flagged.map(f => f.beneficiaryName).join(', ')}. An admin must review the screening results before proceeding.`
+          );
+          setProcessingId(null);
+          return;
+        }
+
+        if (screeningCheck.enforcement === 'warn' && screeningCheck.flagged.length > 0) {
+          setScreeningWarning({
+            flagged: screeningCheck.flagged,
+            action: 'execute',
+            data: { disbursement },
+          });
+          setProcessingId(null);
+          return;
+        }
+      }
+
+      if (switchChain && switchChain.switchChainAsync && switchChain.chain?.id !== chainId) {
+        await switchChain.switchChainAsync({ chainId });
+      }
+
       const txHash = await executeTransaction(
         safe.safeAddress,
         address,
+        chainId,
         disbursement.safeTxHash
       );
 
-      // Update status to executed with txHash
       await updateStatus({
         disbursementId: disbursement._id,
         walletAddress: address,
@@ -460,8 +674,6 @@ export default function Disbursements() {
     } catch (err) {
       console.error('Failed to execute transaction:', err);
       setError(err instanceof Error ? err.message : 'Failed to execute transaction');
-      
-      // Mark as failed
       await updateStatus({
         disbursementId: disbursement._id,
         walletAddress: address,
@@ -580,7 +792,7 @@ export default function Disbursements() {
             <CheckCircle className="h-4 w-4 text-green-400" />
             {disbursement.txHash && (
               <a
-                href={`https://sepolia.etherscan.io/tx/${disbursement.txHash}`}
+                href={disbursement.chainId != null ? getBlockExplorerTxUrl(disbursement.chainId, disbursement.txHash) : `https://etherscan.io/tx/${disbursement.txHash}`}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="inline-flex items-center justify-center h-8 w-8 text-accent-400 hover:text-accent-300 transition-colors"
@@ -626,7 +838,7 @@ export default function Disbursements() {
               )}
             </p>
           </div>
-          <Button onClick={() => setIsCreating(true)} disabled={!safe} className="w-full sm:w-auto h-11">
+          <Button onClick={() => setIsCreating(true)} disabled={!safes?.length} className="w-full sm:w-auto h-11">
             <Plus className="h-4 w-4" />
             {t('disbursements.newDisbursement')}
           </Button>
@@ -658,7 +870,7 @@ export default function Disbursements() {
                 <span className="hidden sm:inline">{t('common.filters')}</span>
                 {hasActiveFilters && (
                   <span className="ml-1 rounded-full bg-accent-500 px-1.5 py-0.5 text-xs text-white">
-                    {(statusFilter.length > 0 ? 1 : 0) + (tokenFilter ? 1 : 0) + (dateFrom || dateTo ? 1 : 0)}
+                    {(statusFilter.length > 0 ? 1 : 0) + (tokenFilter ? 1 : 0) + (chainFilter !== '' ? 1 : 0) + (dateFrom || dateTo ? 1 : 0)}
                   </span>
                 )}
               </Button>
@@ -708,9 +920,28 @@ export default function Disbursements() {
                     onChange={(e) => handleTokenFilterChange(e.target.value)}
                     className="w-full rounded-lg border border-white/10 bg-navy-800 px-4 py-2 text-white focus:border-accent-500 focus:outline-none focus:ring-1 focus:ring-accent-500"
                   >
-                    {TOKEN_OPTIONS.map((option) => (
+                    {filterTokenOptions.map((option) => (
                       <option key={option.value} value={option.value}>
                         {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Chain Filter */}
+                <div>
+                  <label className="mb-2 block text-sm font-medium text-slate-300">
+                    {t('disbursements.filters.chain', { defaultValue: 'Chain' })}
+                  </label>
+                  <select
+                    value={chainFilter}
+                    onChange={(e) => handleChainFilterChange(e.target.value === '' ? '' : Number(e.target.value))}
+                    className="w-full rounded-lg border border-white/10 bg-navy-800 px-4 py-2 text-white focus:border-accent-500 focus:outline-none focus:ring-1 focus:ring-accent-500"
+                  >
+                    <option value="">{t('common.all')}</option>
+                    {CHAINS_LIST.map((c) => (
+                      <option key={c.chainId} value={c.chainId}>
+                        {c.chainName}
                       </option>
                     ))}
                   </select>
@@ -743,7 +974,7 @@ export default function Disbursements() {
           )}
         </div>
 
-        {safe === null && (
+        {safes && safes.length === 0 && (
           <div className="rounded-lg border border-yellow-500/30 bg-yellow-500/10 p-4 text-yellow-400">
             {t('disbursements.noSafeWarning')}
           </div>
@@ -769,22 +1000,43 @@ export default function Disbursements() {
               {t('disbursements.createDisbursement')}
             </h2>
             <form onSubmit={handleCreate} className="space-y-4 sm:space-y-6">
-              {/* Token selector - shown once, applies to all recipients */}
-              {isBatchMode && (
-                <div>
-                  <label className="mb-2 block text-sm font-medium text-slate-300">
-                    Token
-                  </label>
-                  <select
-                    value={token}
-                    onChange={(e) => setToken(e.target.value)}
-                    className="w-full rounded-lg border border-white/10 bg-navy-800 px-4 py-3 text-base text-white focus:border-accent-500 focus:outline-none focus:ring-1 focus:ring-accent-500"
-                  >
-                    <option value="USDC">USDC</option>
-                    <option value="USDT">USDT</option>
-                  </select>
-                </div>
-              )}
+              {/* Chain selector */}
+              <div>
+                <label className="mb-2 block text-sm font-medium text-slate-300">
+                  {t('disbursements.filters.chain', { defaultValue: 'Chain' })}
+                </label>
+                <select
+                  value={createChainId}
+                  onChange={(e) => {
+                    const newChainId = Number(e.target.value);
+                    const symbols = getTokenSymbolsForChain(newChainId);
+                    setCreateChainId(newChainId);
+                    setToken(symbols.includes(token) ? token : symbols[0] ?? 'USDC');
+                  }}
+                  className="w-full rounded-lg border border-white/10 bg-navy-800 px-4 py-3 text-base text-white focus:border-accent-500 focus:outline-none focus:ring-1 focus:ring-accent-500"
+                >
+                  {CHAINS_LIST.filter((c) => safes?.some((s) => s.chainId === c.chainId)).map((c) => (
+                    <option key={c.chainId} value={c.chainId}>
+                      {c.chainName}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              {/* Token selector - tokens for selected chain */}
+              <div>
+                <label className="mb-2 block text-sm font-medium text-slate-300">
+                  Token
+                </label>
+                <select
+                  value={token}
+                  onChange={(e) => setToken(e.target.value)}
+                  className="w-full rounded-lg border border-white/10 bg-navy-800 px-4 py-3 text-base text-white focus:border-accent-500 focus:outline-none focus:ring-1 focus:ring-accent-500"
+                >
+                  {Object.keys(getTokensForChain(createChainId)).map((sym) => (
+                    <option key={sym} value={sym}>{sym}</option>
+                  ))}
+                </select>
+              </div>
 
               {/* Locked recipient cards - show all added recipients ABOVE the input row */}
               {recipients.map((recipient, index) => {
@@ -855,36 +1107,32 @@ export default function Disbursements() {
                     })()}
                   </select>
                 </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
-                    <label className="mb-2 block text-sm font-medium text-slate-300">
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="text-sm font-medium text-slate-300">
                       {t('disbursements.form.amount')}
                     </label>
-                    <input
-                      type="number"
-                      step="0.01"
-                      min="0"
-                      value={amount}
-                      onChange={(e) => setAmount(e.target.value)}
-                      placeholder="0.00"
-                      className="w-full rounded-lg border border-white/10 bg-navy-800 px-4 py-3 text-base text-white placeholder-slate-500 focus:border-accent-500 focus:outline-none focus:ring-1 focus:ring-accent-500"
-                      required={!isBatchMode}
-                    />
+                    {availableBalance != null && (
+                      <span className="text-xs text-slate-400">
+                        Available: <span className="font-mono text-slate-300">{availableBalance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {token}</span>
+                      </span>
+                    )}
                   </div>
-                  {!isBatchMode && (
-                    <div>
-                      <label className="mb-2 block text-sm font-medium text-slate-300">
-                        Token
-                      </label>
-                      <select
-                        value={token}
-                        onChange={(e) => setToken(e.target.value)}
-                        className="w-full rounded-lg border border-white/10 bg-navy-800 px-4 py-3 text-base text-white focus:border-accent-500 focus:outline-none focus:ring-1 focus:ring-accent-500"
-                      >
-                        <option value="USDC">USDC</option>
-                        <option value="USDT">USDT</option>
-                      </select>
-                    </div>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    max={availableBalance ?? undefined}
+                    value={amount}
+                    onChange={(e) => setAmount(e.target.value)}
+                    placeholder="0.00"
+                    className="w-full rounded-lg border border-white/10 bg-navy-800 px-4 py-3 text-base text-white placeholder-slate-500 focus:border-accent-500 focus:outline-none focus:ring-1 focus:ring-accent-500"
+                    required={!isBatchMode}
+                  />
+                  {availableBalance != null && parseFloat(amount || '0') > availableBalance && (
+                    <p className="mt-1 text-xs text-red-400">
+                      Insufficient balance
+                    </p>
                   )}
                 </div>
                 
@@ -1013,6 +1261,9 @@ export default function Disbursements() {
                       </span>
                     </th>
                     <th className="px-6 py-4 text-left text-sm font-medium text-slate-400">
+                      {t('disbursements.table.chain', { defaultValue: 'Chain' })}
+                    </th>
+                    <th className="px-6 py-4 text-left text-sm font-medium text-slate-400">
                       {t('disbursements.table.memo')}
                     </th>
                     <th 
@@ -1061,6 +1312,15 @@ export default function Disbursements() {
                             {displayAmount} {disbursement.token}
                           </span>
                         </td>
+                        <td className="px-6 py-4">
+                          {disbursement.chainId != null ? (
+                            <span className="rounded-full bg-navy-700 px-2 py-0.5 text-xs text-slate-400">
+                              {getChainName(disbursement.chainId)}
+                            </span>
+                          ) : (
+                            <span className="text-slate-500">—</span>
+                          )}
+                        </td>
                         <td className="px-6 py-4 text-slate-400 max-w-xs truncate" title={disbursement.memo || undefined}>
                           {disbursement.memo || '-'}
                         </td>
@@ -1103,6 +1363,11 @@ export default function Disbursements() {
                         </button>
                         <span className="font-mono text-sm text-slate-400 mt-1 block">
                           {displayAmount} {disbursement.token}
+                          {disbursement.chainId != null && (
+                            <span className="ml-2 rounded-full bg-navy-700 px-2 py-0.5 text-xs text-slate-500">
+                              {getChainName(disbursement.chainId)}
+                            </span>
+                          )}
                         </span>
                       </div>
                       <span
@@ -1203,7 +1468,7 @@ export default function Disbursements() {
                   <X className="h-5 w-5" />
                 </button>
               </div>
-              
+
               <p className="text-sm text-slate-300 mb-6">
                 {t('disbursements.actions.cancelConfirm')}
               </p>
@@ -1221,6 +1486,74 @@ export default function Disbursements() {
                   className="w-full sm:w-auto bg-red-500 hover:bg-red-600 text-white"
                 >
                   Yes, Cancel Disbursement
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Screening Warning Modal */}
+        {screeningWarning && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={() => setScreeningWarning(null)}>
+            <div
+              className="rounded-2xl border border-yellow-500/30 bg-navy-900 p-6 max-w-md w-full"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-lg font-semibold text-yellow-400">
+                  SDN Screening Warning
+                </h2>
+                <button
+                  onClick={() => setScreeningWarning(null)}
+                  className="text-slate-400 hover:text-white transition-colors"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+
+              <div className="mb-6 space-y-3">
+                <p className="text-sm text-slate-300">
+                  The following beneficiary(ies) have potential or confirmed SDN matches:
+                </p>
+                <ul className="space-y-2">
+                  {screeningWarning.flagged.map((f) => (
+                    <li key={f.beneficiaryId} className="rounded-lg bg-yellow-500/10 border border-yellow-500/30 p-3">
+                      <p className="text-sm font-medium text-white">{f.beneficiaryName}</p>
+                      <p className="text-xs text-yellow-400 capitalize">{f.status.replace('_', ' ')}</p>
+                    </li>
+                  ))}
+                </ul>
+                <p className="text-sm text-slate-400">
+                  Proceeding with this transaction may violate sanctions regulations. Please review the screening results before continuing.
+                </p>
+              </div>
+
+              <div className="flex flex-col sm:flex-row gap-3 sm:justify-end">
+                <Button
+                  variant="secondary"
+                  onClick={() => setScreeningWarning(null)}
+                  className="w-full sm:w-auto"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={async () => {
+                    const warning = screeningWarning;
+                    setScreeningWarning(null);
+
+                    if (warning.action === 'create') {
+                      // Re-create the form event and call handleCreate with skipScreening=true
+                      const fakeEvent = { preventDefault: () => {} } as React.FormEvent;
+                      await handleCreate(fakeEvent, true);
+                    } else if (warning.action === 'propose') {
+                      await handlePropose(warning.data.disbursement, true);
+                    } else if (warning.action === 'execute') {
+                      await handleExecute(warning.data.disbursement, true);
+                    }
+                  }}
+                  className="w-full sm:w-auto bg-yellow-500 hover:bg-yellow-600 text-navy-900 font-medium"
+                >
+                  Proceed Anyway
                 </Button>
               </div>
             </div>

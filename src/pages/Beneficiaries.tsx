@@ -27,6 +27,7 @@ import {
   Filter,
   Upload,
 } from 'lucide-react';
+import { CHAINS_LIST, getChainName } from '@/lib/chains';
 
 type BeneficiaryType = 'individual' | 'business';
 type SortField = 'name' | 'createdAt' | 'walletAddress';
@@ -39,6 +40,8 @@ interface Beneficiary {
   name: string;
   walletAddress: string;
   notes?: string;
+  preferredToken?: string;
+  preferredChainId?: number;
   isActive: boolean;
   createdAt: number;
 }
@@ -49,7 +52,11 @@ interface EditingBeneficiary {
   name: string;
   walletAddress: string;
   notes: string;
+  preferredToken: string;
+  preferredChainId: number | '';
 }
+
+const PREFERRED_TOKEN_OPTIONS = ['USDC', 'USDT', 'PYUSD'];
 
 // Section state for search, sort, filter
 interface SectionState {
@@ -478,6 +485,8 @@ export default function Beneficiaries() {
   const [newName, setNewName] = useState('');
   const [newAddress, setNewAddress] = useState('');
   const [newNotes, setNewNotes] = useState('');
+  const [newPreferredToken, setNewPreferredToken] = useState<string>('');
+  const [newPreferredChainId, setNewPreferredChainId] = useState<number | ''>('');
   const [createError, setCreateError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<{
     name?: string;
@@ -552,11 +561,15 @@ export default function Beneficiaries() {
         name: newName.trim(),
         beneficiaryAddress: newAddress.trim(),
         notes: newNotes.trim() || undefined,
+        preferredToken: newPreferredToken || undefined,
+        preferredChainId: newPreferredChainId !== '' ? newPreferredChainId : undefined,
       });
       setNewType('individual');
       setNewName('');
       setNewAddress('');
       setNewNotes('');
+      setNewPreferredToken('');
+      setNewPreferredChainId('');
       setFieldErrors({});
       setIsCreating(false);
     } catch (error) {
@@ -572,6 +585,8 @@ export default function Beneficiaries() {
       name: beneficiary.name,
       walletAddress: beneficiary.walletAddress,
       notes: beneficiary.notes || '',
+      preferredToken: beneficiary.preferredToken ?? '',
+      preferredChainId: beneficiary.preferredChainId ?? '',
     });
     setEditError(null);
     setEditFieldErrors({});
@@ -619,6 +634,8 @@ export default function Beneficiaries() {
         name: editingBeneficiary.name.trim(),
         beneficiaryAddress: editingBeneficiary.walletAddress.trim(),
         notes: editingBeneficiary.notes.trim() || undefined,
+        preferredToken: editingBeneficiary.preferredToken || undefined,
+        preferredChainId: editingBeneficiary.preferredChainId !== '' ? editingBeneficiary.preferredChainId : undefined,
       });
       setEditingBeneficiary(null);
       setEditFieldErrors({});
@@ -789,6 +806,36 @@ export default function Beneficiaries() {
                   className="w-full rounded-lg border border-white/10 bg-navy-800 px-4 py-3 text-base text-white placeholder-slate-500 focus:border-accent-500 focus:outline-none focus:ring-1 focus:ring-accent-500"
                 />
               </div>
+              <div>
+                <label className="mb-2 block text-sm font-medium text-slate-300">
+                  {t('beneficiaries.preferredToken', { defaultValue: 'Preferred token' })} ({t('common.optional')})
+                </label>
+                <select
+                  value={newPreferredToken}
+                  onChange={(e) => setNewPreferredToken(e.target.value)}
+                  className="w-full rounded-lg border border-white/10 bg-navy-800 px-4 py-3 text-base text-white focus:border-accent-500 focus:outline-none focus:ring-1 focus:ring-accent-500"
+                >
+                  <option value="">—</option>
+                  {PREFERRED_TOKEN_OPTIONS.map((sym) => (
+                    <option key={sym} value={sym}>{sym}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="mb-2 block text-sm font-medium text-slate-300">
+                  {t('beneficiaries.preferredChain', { defaultValue: 'Preferred chain' })} ({t('common.optional')})
+                </label>
+                <select
+                  value={newPreferredChainId}
+                  onChange={(e) => setNewPreferredChainId(e.target.value === '' ? '' : Number(e.target.value))}
+                  className="w-full rounded-lg border border-white/10 bg-navy-800 px-4 py-3 text-base text-white focus:border-accent-500 focus:outline-none focus:ring-1 focus:ring-accent-500"
+                >
+                  <option value="">—</option>
+                  {CHAINS_LIST.map((c) => (
+                    <option key={c.chainId} value={c.chainId}>{c.chainName}</option>
+                  ))}
+                </select>
+              </div>
               <div className="flex flex-col sm:flex-row gap-3">
                 <Button type="submit" className="w-full sm:w-auto h-11">{t('beneficiaries.createBeneficiary')}</Button>
                 <Button
@@ -800,6 +847,8 @@ export default function Beneficiaries() {
                     setNewName('');
                     setNewAddress('');
                     setNewNotes('');
+                    setNewPreferredToken('');
+                    setNewPreferredChainId('');
                     setCreateError(null);
                     setFieldErrors({});
                   }}
@@ -974,6 +1023,37 @@ export default function Beneficiaries() {
                   rows={3}
                   className="w-full rounded-lg border border-white/10 bg-navy-800 px-4 py-3 text-base text-white focus:border-accent-500 focus:outline-none focus:ring-1 focus:ring-accent-500"
                 />
+              </div>
+
+              <div>
+                <label className="mb-2 block text-sm font-medium text-slate-300">
+                  {t('beneficiaries.preferredToken', { defaultValue: 'Preferred token' })} (optional)
+                </label>
+                <select
+                  value={editingBeneficiary.preferredToken}
+                  onChange={(e) => setEditingBeneficiary({ ...editingBeneficiary, preferredToken: e.target.value })}
+                  className="w-full rounded-lg border border-white/10 bg-navy-800 px-4 py-3 text-base text-white focus:border-accent-500 focus:outline-none focus:ring-1 focus:ring-accent-500"
+                >
+                  <option value="">—</option>
+                  {PREFERRED_TOKEN_OPTIONS.map((sym) => (
+                    <option key={sym} value={sym}>{sym}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="mb-2 block text-sm font-medium text-slate-300">
+                  {t('beneficiaries.preferredChain', { defaultValue: 'Preferred chain' })} (optional)
+                </label>
+                <select
+                  value={editingBeneficiary.preferredChainId === '' ? '' : editingBeneficiary.preferredChainId}
+                  onChange={(e) => setEditingBeneficiary({ ...editingBeneficiary, preferredChainId: e.target.value === '' ? '' : Number(e.target.value) })}
+                  className="w-full rounded-lg border border-white/10 bg-navy-800 px-4 py-3 text-base text-white focus:border-accent-500 focus:outline-none focus:ring-1 focus:ring-accent-500"
+                >
+                  <option value="">—</option>
+                  {CHAINS_LIST.map((c) => (
+                    <option key={c.chainId} value={c.chainId}>{c.chainName}</option>
+                  ))}
+                </select>
               </div>
 
               <div className="flex flex-col sm:flex-row gap-3 pt-2">

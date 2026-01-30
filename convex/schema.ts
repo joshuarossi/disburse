@@ -66,7 +66,7 @@ export default defineSchema({
     .index("by_user", ["userId"])
     .index("by_org_and_user", ["orgId", "userId"]),
 
-  // Safes linked to orgs
+  // Safes linked to orgs (one row per org per chain; same safeAddress across chains for one org)
   safes: defineTable({
     orgId: v.id("orgs"),
     chainId: v.number(),
@@ -74,6 +74,7 @@ export default defineSchema({
     createdAt: v.number(),
   })
     .index("by_org", ["orgId"])
+    .index("by_org_chain", ["orgId", "chainId"])
     .index("by_address", ["safeAddress"]),
 
   // Beneficiaries (payment recipients)
@@ -84,6 +85,8 @@ export default defineSchema({
     name: v.string(),
     walletAddress: v.string(),
     notes: v.optional(v.string()),
+    preferredToken: v.optional(v.string()),
+    preferredChainId: v.optional(v.number()),
     isActive: v.boolean(),
     createdAt: v.number(),
     updatedAt: v.number(),
@@ -95,8 +98,9 @@ export default defineSchema({
   disbursements: defineTable({
     orgId: v.id("orgs"),
     safeId: v.id("safes"),
+    chainId: v.optional(v.number()), // Required for new records; backfilled for existing
     beneficiaryId: v.optional(v.id("beneficiaries")), // Optional for batch disbursements
-    token: v.string(), // "USDC" or "USDT"
+    token: v.string(), // "USDC", "USDT", "PYUSD", etc.
     amount: v.optional(v.string()), // Optional for batch disbursements (stored as string to preserve precision)
     totalAmount: v.optional(v.string()), // For batch disbursements, sum of all recipient amounts
     type: v.optional(v.union(v.literal("single"), v.literal("batch"))), // Defaults to "single" for backward compatibility
@@ -117,6 +121,7 @@ export default defineSchema({
   })
     .index("by_org", ["orgId"])
     .index("by_org_status", ["orgId", "status"])
+    .index("by_org_chain", ["orgId", "chainId"])
     .index("by_safe", ["safeId"]),
 
   // Disbursement recipients (for batch disbursements)

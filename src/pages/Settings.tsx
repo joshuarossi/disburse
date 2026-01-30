@@ -30,6 +30,7 @@ import {
 import { validateSafeAddress, isOwner } from '@/lib/safe';
 import { TOKENS } from '@/lib/wagmi';
 import { encodeFunctionData, parseUnits } from 'viem';
+import { CHAINS_LIST, getChainName, getSafeAppUrl } from '@/lib/chains';
 
 const SEPOLIA_CHAIN_ID = 11155111;
 
@@ -45,7 +46,7 @@ const PLANS = {
     icon: User,
     features: [
       '1 user',
-      '1 Safe',
+      '1 Safe per chain',
       '25 beneficiaries',
       'One-time disbursements',
       'Audit logs',
@@ -64,7 +65,7 @@ const PLANS = {
     popular: true,
     features: [
       '5 users',
-      '1 Safe',
+      '1 Safe per chain',
       '100 beneficiaries',
       'All 5 roles',
       'Multi-sig approval',
@@ -82,7 +83,7 @@ const PLANS = {
     icon: Building2,
     features: [
       'Unlimited users',
-      '1 Safe',
+      '1 Safe per chain',
       'Unlimited beneficiaries',
       'Professional reports',
       'Priority support',
@@ -122,6 +123,7 @@ export default function Settings() {
   
   // Safe state
   const [safeAddress, setSafeAddress] = useState('');
+  const [selectedChainId, setSelectedChainId] = useState<number>(11155111);
   const [isLinking, setIsLinking] = useState(false);
   const [linkingError, setLinkingError] = useState<string | null>(null);
   const [isValidating, setIsValidating] = useState(false);
@@ -147,12 +149,15 @@ export default function Settings() {
     orgId ? { orgId: orgId as Id<'orgs'> } : 'skip'
   );
 
-  const safe = useQuery(
+  const safes = useQuery(
     api.safes.getForOrg,
     orgId && address
       ? { orgId: orgId as Id<'orgs'>, walletAddress: address }
       : 'skip'
   );
+  const depositAddress = safes && safes.length > 0 ? safes[0].safeAddress : undefined;
+  const linkedChainIds = new Set((safes ?? []).map((s) => s.chainId));
+  const availableChainsToLink = CHAINS_LIST.filter((c) => !linkedChainIds.has(c.chainId));
 
   const members = useQuery(
     api.orgs.listMembers,
@@ -213,28 +218,20 @@ export default function Settings() {
 
   const handleLinkSafe = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.log('[Settings] handleLinkSafe called', { orgId, address, safeAddress: safeAddress.trim() });
-    if (!orgId || !address || !safeAddress.trim()) {
-      console.log('[Settings] Early return - missing data', { orgId, address, safeAddress });
-      return;
-    }
+    if (!orgId || !address || !safeAddress.trim()) return;
 
     setIsValidating(true);
     setLinkingError(null);
 
     try {
-      // Validate the Safe address
-      console.log('[Settings] Calling validateSafeAddress...');
-      const isValid = await validateSafeAddress(safeAddress.trim());
-      console.log('[Settings] validateSafeAddress returned:', isValid);
+      const isValid = await validateSafeAddress(safeAddress.trim(), selectedChainId);
       if (!isValid) {
         setLinkingError('Invalid Safe address. Please check the address and network.');
         setIsValidating(false);
         return;
       }
 
-      // Check if user is an owner
-      const userIsOwner = await isOwner(safeAddress.trim(), address);
+      const userIsOwner = await isOwner(safeAddress.trim(), address, selectedChainId);
       if (!userIsOwner) {
         setLinkingError('You must be an owner of this Safe to link it.');
         setIsValidating(false);
@@ -247,10 +244,10 @@ export default function Settings() {
         orgId: orgId as Id<'orgs'>,
         walletAddress: address,
         safeAddress: safeAddress.trim(),
-        chainId: SEPOLIA_CHAIN_ID,
+        chainId: selectedChainId,
       });
       setSafeAddress('');
-      setIsLinking(false);
+      if (availableChainsToLink.length <= 1) setIsLinking(false);
     } catch (error) {
       console.error('Failed to link safe:', error);
       setLinkingError(error instanceof Error ? error.message : 'Failed to link Safe');
@@ -258,15 +255,11 @@ export default function Settings() {
     }
   };
 
-  const handleUnlinkSafe = async () => {
-    if (!safe || !address) return;
+  const handleUnlinkSafe = async (safeId: Id<'safes'>) => {
+    if (!address) return;
     if (!confirm(t('settings.safe.unlinkConfirm'))) return;
-
     try {
-      await unlinkSafe({
-        safeId: safe._id,
-        walletAddress: address,
-      });
+      await unlinkSafe({ safeId, walletAddress: address });
     } catch (error) {
       console.error('Failed to unlink safe:', error);
     }
@@ -444,38 +437,75 @@ export default function Settings() {
             </div>
           </div>
 
-          {safe ? (
-            <div className="space-y-4">
-              <div className="rounded-xl border border-white/10 bg-navy-800/50 p-3 sm:p-4">
-                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                  <div className="min-w-0 flex-1">
-                    <p className="text-xs sm:text-sm text-slate-400">{t('settings.safe.connected')}</p>
-                    <p className="mt-1 font-mono text-sm sm:text-base text-white break-all">{safe.safeAddress}</p>
-                  </div>
-                  <a
-                    href={`https://app.safe.global/sep:${safe.safeAddress}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center gap-1 text-sm text-accent-400 hover:underline shrink-0"
-                  >
-                    <span className="hidden sm:inline">{t('settings.safe.openSafe')}</span>
-                    <ArrowUpRight className="h-4 w-4" />
-                  </a>
-                </div>
-                <div className="mt-3 flex items-center gap-2">
-                  <span className="rounded-full bg-green-500/10 px-2.5 sm:px-3 py-1 text-xs font-medium text-green-400">
-                    {t('settings.safe.network')}
-                  </span>
+          {safes && safes.length > 0 ? (
+            <div className="space-y-6">
+              <div>
+                <label className="mb-2 block text-sm font-medium text-slate-300">
+                  {t('settings.safe.depositAddress', { defaultValue: 'Deposit address (same on all chains)' })}
+                </label>
+                <div className="rounded-lg border border-white/10 bg-navy-800 p-4">
+                  <p className="font-mono text-sm text-white break-all">{depositAddress}</p>
                 </div>
               </div>
-              {isAdmin && (
-                <Button variant="secondary" onClick={handleUnlinkSafe} className="w-full sm:w-auto h-11">
-                  {t('settings.safe.unlinkSafe')}
+
+              <div>
+                <label className="mb-2 block text-sm font-medium text-slate-300">
+                  {t('settings.safe.linkedChains', { defaultValue: 'Linked chains' })}
+                </label>
+                <div className="space-y-2">
+                  {safes.map((safe) => {
+                    return (
+                      <div
+                        key={safe._id}
+                        className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 rounded-lg border border-white/10 bg-navy-800 p-4"
+                      >
+                        <div className="flex items-center gap-3">
+                          <span className="rounded-full bg-green-500/10 px-3 py-1 text-xs font-medium text-green-400">
+                            {getChainName(safe.chainId)}
+                          </span>
+                          <a
+                            href={getSafeAppUrl(safe.chainId, safe.safeAddress)}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex items-center gap-1 text-sm text-accent-400 hover:text-accent-300 transition-colors"
+                          >
+                            {t('settings.safe.openSafe')}
+                            <ArrowUpRight className="h-4 w-4" />
+                          </a>
+                        </div>
+                        {isAdmin && (
+                          <Button
+                            variant="secondary"
+                            size="sm"
+                            onClick={() => handleUnlinkSafe(safe._id)}
+                            className="w-full sm:w-auto"
+                          >
+                            {t('settings.safe.unlinkSafe')}
+                          </Button>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {isAdmin && availableChainsToLink.length > 0 && !isLinking && (
+                <Button
+                  variant="secondary"
+                  onClick={() => {
+                    setIsLinking(true);
+                    setSafeAddress(depositAddress ?? '');
+                    setSelectedChainId(availableChainsToLink[0].chainId);
+                  }}
+                  className="w-full sm:w-auto h-11"
+                >
+                  {t('settings.safe.addChain', { defaultValue: 'Add another chain' })}
                 </Button>
               )}
             </div>
-          ) : isLinking ? (
-            <form onSubmit={handleLinkSafe} className="space-y-4 sm:space-y-6">
+          ) : null}
+          {isLinking ? (
+            <form onSubmit={handleLinkSafe} className="mt-6 space-y-6">
               <div>
                 <label className="mb-2 block text-sm font-medium text-slate-300">
                   {t('settings.safe.safeAddress')}
@@ -487,23 +517,40 @@ export default function Settings() {
                     setSafeAddress(e.target.value);
                     setLinkingError(null);
                   }}
-                  placeholder={t('settings.safe.safeAddressPlaceholder')}
-                  className="w-full rounded-lg border border-white/10 bg-navy-800 px-4 py-3 font-mono text-base text-white placeholder-slate-500 focus:border-accent-500 focus:outline-none focus:ring-1 focus:ring-accent-500"
+                  placeholder="0x..."
+                  className="w-full rounded-lg border border-white/10 bg-navy-800 px-4 py-3 font-mono text-sm text-white placeholder-slate-500 focus:border-accent-500 focus:outline-none focus:ring-1 focus:ring-accent-500"
                   required
                 />
-                <p className="mt-2 text-xs sm:text-sm text-slate-500">
+                <p className="mt-2 text-xs text-slate-500">
                   {t('settings.safe.safeAddressDescription')}
                 </p>
               </div>
-              
+
+              <div>
+                <label className="mb-2 block text-sm font-medium text-slate-300">
+                  {t('settings.safe.chain', { defaultValue: 'Chain' })}
+                </label>
+                <select
+                  value={selectedChainId}
+                  onChange={(e) => setSelectedChainId(Number(e.target.value))}
+                  className="w-full rounded-lg border border-white/10 bg-navy-800 px-4 py-3 text-base text-white focus:border-accent-500 focus:outline-none focus:ring-1 focus:ring-accent-500"
+                >
+                  {(safes && safes.length > 0 ? availableChainsToLink : CHAINS_LIST).map((c) => (
+                    <option key={c.chainId} value={c.chainId}>
+                      {c.chainName}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
               {linkingError && (
-                <div className="flex items-center gap-2 rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-400">
-                  <AlertCircle className="h-4 w-4 flex-shrink-0" />
-                  {linkingError}
+                <div className="flex items-start gap-3 rounded-lg border border-red-500/30 bg-red-500/5 p-4">
+                  <AlertCircle className="h-5 w-5 text-red-400 shrink-0 mt-0.5" />
+                  <p className="text-sm text-red-400">{linkingError}</p>
                 </div>
               )}
-              
-              <div className="flex flex-col sm:flex-row gap-3">
+
+              <div className="flex flex-col sm:flex-row gap-3 pt-2">
                 <Button type="submit" disabled={isValidating} className="w-full sm:w-auto h-11">
                   {isValidating ? (
                     <>
@@ -527,12 +574,13 @@ export default function Settings() {
                 </Button>
               </div>
             </form>
-          ) : (
+          ) : null}
+          {(!safes || safes.length === 0) && !isLinking ? (
             <div className="text-center py-6">
               <Wallet className="mx-auto h-12 w-12 text-slate-500" />
               <p className="mt-4 text-sm sm:text-base text-slate-400">{t('settings.safe.noSafe')}</p>
               {isAdmin && (
-                <Button className="mt-4 w-full sm:w-auto h-11" onClick={() => setIsLinking(true)}>
+                <Button className="mt-4 w-full sm:w-auto h-11" onClick={() => { setIsLinking(true); setSelectedChainId(SEPOLIA_CHAIN_ID); }}>
                   {t('settings.safe.linkExisting')}
                 </Button>
               )}
@@ -548,7 +596,7 @@ export default function Settings() {
                 </a>
               </p>
             </div>
-          )}
+          ) : null}
         </div>
 
         {/* Preferences */}

@@ -26,6 +26,7 @@ describe("Integration: Disbursement Flow", () => {
     const createResult = await t.mutation(api.disbursements.create, {
       orgId: orgId! as any,
       walletAddress: TEST_WALLETS.admin,
+      chainId: 11155111,
       beneficiaryId: beneficiaryId! as any,
       token: "USDC",
       amount: "1500.00",
@@ -115,6 +116,7 @@ describe("Integration: Disbursement Flow", () => {
     const createResult = await t.mutation(api.disbursements.create, {
       orgId: orgId! as any,
       walletAddress: TEST_WALLETS.admin,
+      chainId: 11155111,
       beneficiaryId: beneficiaryId! as any,
       token: "USDT",
       amount: "500",
@@ -159,6 +161,7 @@ describe("Integration: Disbursement Flow", () => {
     const createResult = await t.mutation(api.disbursements.create, {
       orgId: orgId! as any,
       walletAddress: TEST_WALLETS.admin,
+      chainId: 11155111,
       beneficiaryId: beneficiaryId! as any,
       token: "USDC",
       amount: "100",
@@ -196,6 +199,7 @@ describe("Integration: Disbursement Flow", () => {
     const draft1 = await t.mutation(api.disbursements.create, {
       orgId: orgId! as any,
       walletAddress: TEST_WALLETS.admin,
+      chainId: 11155111,
       beneficiaryId: beneficiaryId! as any,
       token: "USDC",
       amount: "100",
@@ -204,6 +208,7 @@ describe("Integration: Disbursement Flow", () => {
     const draft2 = await t.mutation(api.disbursements.create, {
       orgId: orgId! as any,
       walletAddress: TEST_WALLETS.admin,
+      chainId: 11155111,
       beneficiaryId: beneficiaryId! as any,
       token: "USDC",
       amount: "200",
@@ -271,6 +276,7 @@ describe("Integration: Disbursement Flow", () => {
     const createResult = await t.mutation(api.disbursements.create, {
       orgId: orgId! as any,
       walletAddress: TEST_WALLETS.admin,
+      chainId: 11155111,
       beneficiaryId: beneficiaryId! as any,
       token: "USDC",
       amount: "50",

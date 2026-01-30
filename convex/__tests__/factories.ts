@@ -164,10 +164,13 @@ export async function createTestDisbursement(
     type?: "single" | "batch";
   } = {}
 ): Promise<Id<"disbursements">> {
+  const safe = await ctx.db.get(safeId);
+  const chainId = safe?.chainId ?? 11155111;
   const now = Date.now();
   return await ctx.db.insert("disbursements", {
     orgId,
     safeId,
+    chainId,
     beneficiaryId: overrides.type === "batch" ? undefined : beneficiaryId,
     token: overrides.token || "USDC",
     amount: overrides.type === "batch" ? undefined : (overrides.amount || "100"),
@@ -206,6 +209,8 @@ export async function createTestBatchDisbursement(
   disbursementId: Id<"disbursements">;
   recipientIds: Id<"disbursementRecipients">[];
 }> {
+  const safe = await ctx.db.get(safeId);
+  const chainId = safe?.chainId ?? 11155111;
   const now = Date.now();
   
   // Calculate total
@@ -215,6 +220,7 @@ export async function createTestBatchDisbursement(
   const disbursementId = await ctx.db.insert("disbursements", {
     orgId,
     safeId,
+    chainId,
     type: "batch",
     token: overrides.token || "USDC",
     totalAmount,

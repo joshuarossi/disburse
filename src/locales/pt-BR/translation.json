@@ -205,6 +205,13 @@
   "dashboard": {
     "title": "Painel",
     "subtitle": "Visão geral das suas operações de tesouraria",
+    "totalTreasuryValue": "Valor Total da Tesouraria",
+    "byToken": "Por Token",
+    "byChain": "Por Cadeia",
+    "ofTreasury": "do total da tesouraria",
+    "noBalance": "Sem saldo",
+    "pending": "Pendentes",
+    "pendingNone": "Nenhuma ação pendente",
     "noSafe": {
       "title": "Nenhum Safe Conectado",
       "description": "Vincule seu Gnosis Safe para começar a gerenciar desembolsos",
@@ -367,6 +374,7 @@
     "filters": {
       "status": "Status",
       "token": "Token",
+      "chain": "Rede",
       "allTokens": "Todos os Tokens",
       "dateRange": "Intervalo de Datas",
       "to": "até"
@@ -374,6 +382,7 @@
     "table": {
       "beneficiary": "Beneficiário",
       "amount": "Quantia",
+      "chain": "Rede",
       "memo": "Memo",
       "status": "Status",
       "date": "Data",
@@ -402,6 +411,7 @@
       "dateRange": "Período",
       "status": "Status",
       "token": "Token",
+      "chain": "Rede",
       "beneficiary": "Beneficiário",
       "allBeneficiaries": "Todos os Beneficiários",
       "type": "Tipo",
@@ -414,6 +424,7 @@
       "beneficiary": "Beneficiário",
       "amount": "Valor",
       "token": "Token",
+      "chain": "Rede",
       "status": "Status",
       "memo": "Memo",
       "tx": "Tx",
@@ -433,6 +444,7 @@
       "walletAddress": "Endereço da Carteira",
       "amount": "Valor",
       "token": "Token",
+      "chain": "Rede",
       "status": "Status",
       "memo": "Memo",
       "txHash": "Hash da Transação",
