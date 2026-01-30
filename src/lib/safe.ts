@@ -24,6 +24,7 @@ const SAFE_TX_SERVICE_URL_BY_CHAIN: Record<number, string> = {
   8453: 'https://safe-transaction-base.safe.global/api',
   42161: 'https://safe-transaction-arbitrum.safe.global/api',
   11155111: 'https://safe-transaction-sepolia.safe.global/api',
+  84532: 'https://safe-transaction-base-sepolia.safe.global/api',
 };
 
 // ERC20 ABI for transfer function

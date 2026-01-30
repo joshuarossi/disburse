@@ -3,9 +3,9 @@
  * Single source of truth for supported chains and token addresses per chain.
  */
 
-import { mainnet, polygon, base, arbitrum, sepolia } from 'wagmi/chains';
+import { mainnet, polygon, base, arbitrum, sepolia, baseSepolia } from 'wagmi/chains';
 
-export type SupportedChainId = 1 | 137 | 8453 | 42161 | 11155111;
+export type SupportedChainId = 1 | 137 | 8453 | 42161 | 11155111 | 84532;
 
 export interface TokenConfig {
   address: `0x${string}`;
@@ -95,12 +95,30 @@ const CHAIN_TOKENS: Record<SupportedChainId, ChainTokenConfig> = {
       decimals: 6,
       symbol: 'USDT',
     },
+    PYUSD: {
+      address: '0xCaC524BcA292aaade2DF8A05cC58F0a65B1B3bB9' as const,
+      decimals: 6,
+      symbol: 'PYUSD',
+    },
+  },
+  // Base Sepolia
+  84532: {
+    USDC: {
+      address: '0x036CbD53842c5426634e7929541eC2318f3dCF7e' as const,
+      decimals: 6,
+      symbol: 'USDC',
+    },
+    USDT: {
+      address: '0x036CbD53842c5426634e7929541eC2318f3dCF7e' as const, // Using USDC address as placeholder
+      decimals: 6,
+      symbol: 'USDT',
+    },
   },
 };
 
-export const SUPPORTED_CHAINS = [mainnet, polygon, base, arbitrum, sepolia] as const;
+export const SUPPORTED_CHAINS = [mainnet, polygon, base, arbitrum, sepolia, baseSepolia] as const;
 
-export const SUPPORTED_CHAIN_IDS: SupportedChainId[] = [1, 137, 8453, 42161, 11155111];
+export const SUPPORTED_CHAIN_IDS: SupportedChainId[] = [1, 137, 8453, 42161, 11155111, 84532];
 
 export const CHAIN_ID_TO_CHAIN = {
   1: mainnet,
@@ -108,6 +126,7 @@ export const CHAIN_ID_TO_CHAIN = {
   8453: base,
   42161: arbitrum,
   11155111: sepolia,
+  84532: baseSepolia,
 } as const;
 
 export interface ChainInfo {
@@ -121,6 +140,7 @@ export const CHAINS_LIST: ChainInfo[] = [
   { chainId: 8453, chainName: 'Base' },
   { chainId: 42161, chainName: 'Arbitrum' },
   { chainId: 11155111, chainName: 'Sepolia' },
+  { chainId: 84532, chainName: 'Base Sepolia' },
 ];
 
 export function getChainName(chainId: number): string {
@@ -135,6 +155,7 @@ const SAFE_APP_CHAIN_PREFIX: Record<SupportedChainId, string> = {
   8453: 'base',
   42161: 'arbitrum',
   11155111: 'sep',
+  84532: 'basesep',
 };
 
 /**

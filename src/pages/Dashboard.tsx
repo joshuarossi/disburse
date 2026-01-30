@@ -45,6 +45,7 @@ const CHAIN_COLORS: Record<number, string> = {
   8453: '#0052ff',     // Base - official blue
   42161: '#28a0f0',    // Arbitrum - official blue
   11155111: '#a78bfa', // Sepolia - lighter purple
+  84532: '#0052ff',    // Base Sepolia - same as Base mainnet
 };
 
 const TOKEN_COLORS: Record<string, string> = {
