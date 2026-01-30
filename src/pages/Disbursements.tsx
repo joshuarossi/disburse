@@ -87,6 +87,12 @@ export default function Disbursements() {
     data: any;
   } | null>(null);
 
+  // Screening block state
+  const [screeningBlock, setScreeningBlock] = useState<{
+    flagged: Array<{ beneficiaryId: string; beneficiaryName: string; status: string }>;
+    action: 'create' | 'propose' | 'execute';
+  } | null>(null);
+
   // Filter & search state
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<string[]>([]);
@@ -413,9 +419,10 @@ export default function Disbursements() {
         });
 
         if (screeningCheck.enforcement === 'block' && screeningCheck.flagged.length > 0) {
-          setError(
-            `Cannot create disbursement: The following beneficiaries have unresolved SDN screening matches: ${screeningCheck.flagged.map(f => f.beneficiaryName).join(', ')}. An admin must review the screening results before proceeding.`
-          );
+          setScreeningBlock({
+            flagged: screeningCheck.flagged,
+            action: 'create',
+          });
           return;
         }
 
@@ -459,9 +466,10 @@ export default function Disbursements() {
         });
 
         if (screeningCheck.enforcement === 'block' && screeningCheck.flagged.length > 0) {
-          setError(
-            `Cannot create disbursement: ${screeningCheck.flagged[0].beneficiaryName} has an unresolved SDN screening match. An admin must review the screening result before proceeding.`
-          );
+          setScreeningBlock({
+            flagged: screeningCheck.flagged,
+            action: 'create',
+          });
           return;
         }
 
@@ -525,9 +533,10 @@ export default function Disbursements() {
         });
 
         if (screeningCheck.enforcement === 'block' && screeningCheck.flagged.length > 0) {
-          setError(
-            `Cannot propose transaction: The following beneficiaries have unresolved SDN screening matches: ${screeningCheck.flagged.map(f => f.beneficiaryName).join(', ')}. An admin must review the screening results before proceeding.`
-          );
+          setScreeningBlock({
+            flagged: screeningCheck.flagged,
+            action: 'propose',
+          });
           setProcessingId(null);
           return;
         }
@@ -636,9 +645,10 @@ export default function Disbursements() {
         });
 
         if (screeningCheck.enforcement === 'block' && screeningCheck.flagged.length > 0) {
-          setError(
-            `Cannot execute transaction: The following beneficiaries have unresolved SDN screening matches: ${screeningCheck.flagged.map(f => f.beneficiaryName).join(', ')}. An admin must review the screening results before proceeding.`
-          );
+          setScreeningBlock({
+            flagged: screeningCheck.flagged,
+            action: 'execute',
+          });
           setProcessingId(null);
           return;
         }
@@ -1554,6 +1564,55 @@ export default function Disbursements() {
                   className="w-full sm:w-auto bg-yellow-500 hover:bg-yellow-600 text-navy-900 font-medium"
                 >
                   Proceed Anyway
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Screening Block Modal */}
+        {screeningBlock && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={() => setScreeningBlock(null)}>
+            <div
+              className="rounded-2xl border border-red-500/30 bg-navy-900 p-6 max-w-md w-full"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-lg font-semibold text-red-400">
+                  SDN Screening Block
+                </h2>
+                <button
+                  onClick={() => setScreeningBlock(null)}
+                  className="text-slate-400 hover:text-white transition-colors"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+
+              <div className="mb-6 space-y-3">
+                <p className="text-sm text-slate-300">
+                  The following beneficiary(ies) have unresolved SDN matches and cannot be processed:
+                </p>
+                <ul className="space-y-2">
+                  {screeningBlock.flagged.map((f) => (
+                    <li key={f.beneficiaryId} className="rounded-lg bg-red-500/10 border border-red-500/30 p-3">
+                      <p className="text-sm font-medium text-white">{f.beneficiaryName}</p>
+                      <p className="text-xs text-red-400 capitalize">{f.status.replace('_', ' ')}</p>
+                    </li>
+                  ))}
+                </ul>
+                <p className="text-sm text-slate-400">
+                  An admin must review and resolve the screening results before this {screeningBlock.action === 'create' ? 'disbursement can be created' : screeningBlock.action === 'propose' ? 'transaction can be proposed' : 'transaction can be executed'}.
+                </p>
+              </div>
+
+              <div className="flex justify-end">
+                <Button
+                  variant="secondary"
+                  onClick={() => setScreeningBlock(null)}
+                  className="w-full sm:w-auto"
+                >
+                  Close
                 </Button>
               </div>
             </div>
