@@ -195,10 +195,10 @@ export default function Dashboard() {
 
   return (
     <AppLayout>
-      <div className="space-y-8">
-        <div className="pt-4 lg:pt-6">
+      <div className="space-y-6">
+        <div className="pt-2 lg:pt-4">
           <h1 className="text-xl sm:text-2xl font-bold text-white">{t('dashboard.title')}</h1>
-          <p className="mt-1 text-sm sm:text-base text-slate-400">{t('dashboard.subtitle')}</p>
+          <p className="mt-0.5 text-sm sm:text-base text-slate-400">{t('dashboard.subtitle')}</p>
         </div>
 
         {!safes?.length ? (
@@ -215,111 +215,117 @@ export default function Dashboard() {
           </div>
         ) : (
           <>
-            {/* Unified treasury: Left = Total + Deposit | Center = QR | Right = View on Safe */}
-            <div className="rounded-2xl border border-white/10 bg-navy-900/50 p-6 sm:p-8">
-              <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-8">
-                {/* Left: Total Treasury + Deposit Address */}
-                <div className="flex-1 min-w-0 space-y-6">
-                  <div>
-                    <p className="text-sm text-slate-400">{t('dashboard.totalTreasuryValue')}</p>
-                    <p className="mt-2 text-3xl sm:text-4xl font-bold text-white">
-                      {balancesLoading ? (
-                        <span className="inline-block h-10 w-32 animate-pulse rounded bg-navy-700" />
-                      ) : (
-                        `$${formatBalance(totalUsd)}`
-                      )}
-                    </p>
-                  </div>
-                  <div>
-                    <div className="flex items-center gap-3 sm:gap-4 min-w-0">
-                      <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-accent-500/10 text-accent-400 shrink-0">
-                        <Wallet className="h-6 w-6" />
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <p className="text-sm text-slate-400">{t('dashboard.safe.depositAddress')}</p>
-                        <div className="mt-1 flex items-center gap-2 flex-wrap">
-                          <p className="font-mono text-sm sm:text-base text-white break-all">
-                            {depositAddress ?? ''}
-                          </p>
-                          {depositAddress && (
-                            <button
-                              onClick={() => handleCopyAddress(depositAddress)}
-                              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-navy-800 text-slate-400 hover:text-white transition-colors"
-                              title={t('common.copyAddress')}
-                            >
-                              {copied ? <Check className="h-4 w-4 text-green-400" /> : <Copy className="h-4 w-4" />}
-                            </button>
-                          )}
+            {/* Unified card: hero + divider + toggle + breakdown */}
+            <div className="rounded-2xl border border-white/10 bg-navy-900/50">
+              {/* Hero: Total Treasury + Deposit + QR + View on Safe */}
+              <div className="p-6 sm:p-8">
+                <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-8">
+                  {/* Left: Total Treasury + Deposit Address */}
+                  <div className="flex-1 min-w-0 space-y-6">
+                    <div>
+                      <p className="text-sm text-slate-400">{t('dashboard.totalTreasuryValue')}</p>
+                      <p className="mt-2 text-3xl sm:text-4xl font-bold text-white">
+                        {balancesLoading ? (
+                          <span className="inline-block h-10 w-32 animate-pulse rounded bg-navy-700" />
+                        ) : (
+                          `$${formatBalance(totalUsd)}`
+                        )}
+                      </p>
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-3 sm:gap-4 min-w-0">
+                        <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-accent-500/10 text-accent-400 shrink-0">
+                          <Wallet className="h-6 w-6" />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm text-slate-400">{t('dashboard.safe.depositAddress')}</p>
+                          <div className="mt-1 flex items-center gap-2 flex-wrap">
+                            <p className="font-mono text-sm sm:text-base text-white break-all">
+                              {depositAddress ?? ''}
+                            </p>
+                            {depositAddress && (
+                              <button
+                                onClick={() => handleCopyAddress(depositAddress)}
+                                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-navy-800 text-slate-400 hover:text-white transition-colors"
+                                title={t('common.copyAddress')}
+                              >
+                                {copied ? <Check className="h-4 w-4 text-green-400" /> : <Copy className="h-4 w-4" />}
+                              </button>
+                            )}
+                          </div>
                         </div>
                       </div>
-                    </div>
-                    <p className="mt-2 text-xs text-slate-500">{t('dashboard.safe.depositDescription')}</p>
-                  </div>
-                </div>
-
-                {/* Center: QR Code */}
-                {depositAddress && (
-                  <div className="flex justify-center lg:justify-center shrink-0">
-                    <div className="rounded-lg bg-white p-3 sm:p-4">
-                      <QRCodeSVG value={depositAddress} size={qrSize} level="M" />
+                      <p className="mt-2 text-xs text-slate-500">{t('dashboard.safe.depositDescription')}</p>
                     </div>
                   </div>
-                )}
 
-                {/* Right: View on Safe */}
-                <div className="flex justify-start lg:justify-end lg:items-start shrink-0">
-                  {safes?.[0] && (
-                    <a
-                      href={getSafeAppUrl(safes[0].chainId, safes[0].safeAddress)}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1.5 rounded-lg bg-navy-800 px-4 py-2.5 text-sm text-accent-400 hover:bg-navy-700 transition-colors"
-                    >
-                      <span>{t('dashboard.safe.viewOnSafe')}</span>
-                      <ArrowUpRight className="h-4 w-4" />
-                    </a>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            {/* Token/chain switch — right above balances */}
-            <div className="flex justify-end">
-              <div className="flex rounded-xl border border-white/10 bg-navy-800/50 p-1">
-                <button
-                  type="button"
-                  onClick={() => setViewMode('byToken')}
-                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                    viewMode === 'byToken' ? 'bg-accent-500 text-navy-950' : 'text-slate-400 hover:text-white'
-                  }`}
-                >
-                  {t('dashboard.byToken')}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setViewMode('byChain')}
-                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                    viewMode === 'byChain' ? 'bg-accent-500 text-navy-950' : 'text-slate-400 hover:text-white'
-                  }`}
-                >
-                  {t('dashboard.byChain')}
-                </button>
-              </div>
-            </div>
-
-            {/* By Token / By Chain breakdown */}
-            {viewMode === 'byToken' && (
-              <div className="space-y-3">
-                {tokenSymbols.length === 0 && totalUsd === 0 && (
-                  <div className="rounded-2xl border border-dashed border-white/10 bg-navy-900/30 p-3 sm:p-4">
-                    <div className="flex flex-col sm:flex-row sm:items-baseline sm:justify-between gap-2 mb-3">
-                      <div className="flex items-baseline gap-3">
-                        <p className="text-base sm:text-lg font-semibold text-slate-500">No Tokens</p>
-                        <p className="text-lg sm:text-xl font-bold text-slate-600">$0.00</p>
+                  {/* Center: QR Code */}
+                  {depositAddress && (
+                    <div className="flex justify-center lg:justify-center shrink-0">
+                      <div className="rounded-lg bg-white p-3 sm:p-4">
+                        <QRCodeSVG value={depositAddress} size={qrSize} level="M" />
                       </div>
                     </div>
-                    <div className="h-12 sm:h-14 rounded-lg border-2 border-dashed border-white/10 bg-navy-800/50 flex items-center justify-center">
-                      <p className="text-sm text-slate-500">{t('dashboard.noBalance')}</p>
+                  )}
+
+                  {/* Right: View on Safe */}
+                  <div className="flex justify-start lg:justify-end lg:items-start shrink-0">
+                    {safes?.[0] && (
+                      <a
+                        href={getSafeAppUrl(safes[0].chainId, safes[0].safeAddress)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1.5 rounded-lg bg-navy-800 px-4 py-2.5 text-sm text-accent-400 hover:bg-navy-700 transition-colors"
+                      >
+                        <span>{t('dashboard.safe.viewOnSafe')}</span>
+                        <ArrowUpRight className="h-4 w-4" />
+                      </a>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Divider between primary and secondary */}
+              <div className="border-t border-white/10" />
+
+              {/* Secondary: compact toggle + breakdown */}
+              <div className="px-4 sm:px-6 pt-3 pb-4 sm:pb-5">
+                <div className="flex justify-end mb-2">
+                  <div className="flex rounded-lg border border-white/10 bg-navy-800/50 p-1">
+                    <button
+                      type="button"
+                      onClick={() => setViewMode('byToken')}
+                      className={`py-1.5 px-3 rounded-md text-sm font-medium transition-colors ${
+                        viewMode === 'byToken' ? 'bg-accent-500 text-navy-950' : 'text-slate-400 hover:text-white'
+                      }`}
+                    >
+                      {t('dashboard.byToken')}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setViewMode('byChain')}
+                      className={`py-1.5 px-3 rounded-md text-sm font-medium transition-colors ${
+                        viewMode === 'byChain' ? 'bg-accent-500 text-navy-950' : 'text-slate-400 hover:text-white'
+                      }`}
+                    >
+                      {t('dashboard.byChain')}
+                    </button>
+                  </div>
+                </div>
+
+                {/* By Token / By Chain breakdown */}
+                {viewMode === 'byToken' && (
+              <div className="space-y-2">
+                {tokenSymbols.length === 0 && totalUsd === 0 && (
+                  <div className="rounded-xl border border-dashed border-white/10 bg-navy-900/30 p-2.5 sm:p-3">
+                    <div className="flex flex-col sm:flex-row sm:items-baseline sm:justify-between gap-1.5 mb-2">
+                      <div className="flex items-baseline gap-2">
+                        <p className="text-sm font-semibold text-slate-500">No Tokens</p>
+                        <p className="text-base font-bold text-slate-600">$0.00</p>
+                      </div>
+                    </div>
+                    <div className="h-8 sm:h-9 rounded-lg border-2 border-dashed border-white/10 bg-navy-800/50 flex items-center justify-center">
+                      <p className="text-xs text-slate-500">{t('dashboard.noBalance')}</p>
                     </div>
                   </div>
                 )}
@@ -333,16 +339,16 @@ export default function Dashboard() {
                   return (
                     <div
                       key={symbol}
-                      className="rounded-2xl border border-white/10 bg-navy-900/50 p-3 sm:p-4"
+                      className="rounded-xl border border-white/10 bg-navy-900/50 p-2.5 sm:p-3"
                     >
-                      <div className="flex flex-col sm:flex-row sm:items-baseline sm:justify-between gap-2 mb-3">
-                        <div className="flex items-baseline gap-3">
-                          <p className="text-base sm:text-lg font-semibold text-white">{symbol}</p>
-                          <p className="text-lg sm:text-xl font-bold text-accent-400">${formatBalance(tokenTotal)}</p>
+                      <div className="flex flex-col sm:flex-row sm:items-baseline sm:justify-between gap-1.5 mb-2">
+                        <div className="flex items-baseline gap-2">
+                          <p className="text-sm font-semibold text-white">{symbol}</p>
+                          <p className="text-base font-bold text-accent-400">${formatBalance(tokenTotal)}</p>
                         </div>
                         <p className="text-xs text-slate-500">{pct.toFixed(1)}% {t('dashboard.ofTreasury')}</p>
                       </div>
-                      <div className="flex gap-0.5 h-12 sm:h-14 rounded-lg overflow-hidden bg-navy-800">
+                      <div className="flex gap-0.5 h-8 sm:h-9 rounded-lg overflow-hidden bg-navy-800">
                         {entries.map(([chainIdStr, balance]) => {
                           const chainId = Number(chainIdStr);
                           const segmentPct = tokenTotal > 0 ? (balance / tokenTotal) * 100 : 0;
@@ -358,15 +364,15 @@ export default function Dashboard() {
                             >
                               {segmentPct > 15 && (
                                 <>
-                                  <span className="text-[11px] font-semibold text-white uppercase truncate max-w-full px-1">
+                                  <span className="text-[10px] font-semibold text-white uppercase truncate max-w-full px-0.5">
                                     {getChainName(chainId)}
                                   </span>
-                                  <span className="text-sm font-bold text-white">${formatBalance(balance)}</span>
+                                  <span className="text-xs font-bold text-white">${formatBalance(balance)}</span>
                                 </>
                               )}
                               {/* Tooltip for small segments */}
                               {segmentPct <= 15 && (
-                                <div className="absolute bottom-full mb-2 hidden group-hover:block z-10 px-2 py-1 bg-navy-950 border border-white/20 rounded text-xs text-white whitespace-nowrap">
+                                <div className="absolute bottom-full mb-1.5 hidden group-hover:block z-10 px-2 py-1 bg-navy-950 border border-white/20 rounded text-xs text-white whitespace-nowrap">
                                   {getChainName(chainId)}: ${formatBalance(balance)}
                                 </div>
                               )}
@@ -374,13 +380,13 @@ export default function Dashboard() {
                           );
                         })}
                       </div>
-                      <div className="flex flex-wrap gap-2 mt-2 text-xs text-slate-500">
+                      <div className="flex flex-wrap gap-1.5 mt-1.5 text-xs text-slate-500">
                         {entries.map(([chainIdStr]) => {
                           const chainId = Number(chainIdStr);
                           return (
-                            <div key={chainId} className="flex items-center gap-1.5">
+                            <div key={chainId} className="flex items-center gap-1">
                               <div
-                                className="w-2.5 h-2.5 rounded"
+                                className="w-2 h-2 rounded"
                                 style={{ backgroundColor: CHAIN_COLORS[chainId] ?? '#64748b' }}
                               />
                               <span>{getChainName(chainId)}</span>
@@ -395,17 +401,17 @@ export default function Dashboard() {
             )}
 
             {viewMode === 'byChain' && (
-              <div className="space-y-3">
+              <div className="space-y-2">
                 {chainIdsWithBalances.length === 0 && totalUsd === 0 && (
-                  <div className="rounded-2xl border border-dashed border-white/10 bg-navy-900/30 p-3 sm:p-4">
-                    <div className="flex flex-col sm:flex-row sm:items-baseline sm:justify-between gap-2 mb-3">
-                      <div className="flex items-baseline gap-3">
-                        <p className="text-base sm:text-lg font-semibold text-slate-500">No Chains</p>
-                        <p className="text-lg sm:text-xl font-bold text-slate-600">$0.00</p>
+                  <div className="rounded-xl border border-dashed border-white/10 bg-navy-900/30 p-2.5 sm:p-3">
+                    <div className="flex flex-col sm:flex-row sm:items-baseline sm:justify-between gap-1.5 mb-2">
+                      <div className="flex items-baseline gap-2">
+                        <p className="text-sm font-semibold text-slate-500">No Chains</p>
+                        <p className="text-base font-bold text-slate-600">$0.00</p>
                       </div>
                     </div>
-                    <div className="h-12 sm:h-14 rounded-lg border-2 border-dashed border-white/10 bg-navy-800/50 flex items-center justify-center">
-                      <p className="text-sm text-slate-500">{t('dashboard.noBalance')}</p>
+                    <div className="h-8 sm:h-9 rounded-lg border-2 border-dashed border-white/10 bg-navy-800/50 flex items-center justify-center">
+                      <p className="text-xs text-slate-500">{t('dashboard.noBalance')}</p>
                     </div>
                   </div>
                 )}
@@ -419,13 +425,13 @@ export default function Dashboard() {
                   return (
                     <div
                       key={chainId}
-                      className="rounded-2xl border border-white/10 bg-navy-900/50 p-3 sm:p-4"
+                      className="rounded-xl border border-white/10 bg-navy-900/50 p-2.5 sm:p-3"
                     >
-                      <div className="flex flex-col sm:flex-row sm:items-baseline sm:justify-between gap-2 mb-3">
-                        <div className="flex items-baseline gap-3">
-                          <p className="text-base sm:text-lg font-semibold text-white">{getChainName(chainId)}</p>
+                      <div className="flex flex-col sm:flex-row sm:items-baseline sm:justify-between gap-1.5 mb-2">
+                        <div className="flex items-baseline gap-2">
+                          <p className="text-sm font-semibold text-white">{getChainName(chainId)}</p>
                           <p
-                            className="text-lg sm:text-xl font-bold"
+                            className="text-base font-bold"
                             style={{ color: CHAIN_COLORS[chainId] ?? '#14b8a6' }}
                           >
                             ${formatBalance(chainTotal)}
@@ -433,7 +439,7 @@ export default function Dashboard() {
                         </div>
                         <p className="text-xs text-slate-500">{pct.toFixed(1)}% {t('dashboard.ofTreasury')}</p>
                       </div>
-                      <div className="flex gap-0.5 h-12 sm:h-14 rounded-lg overflow-hidden bg-navy-800">
+                      <div className="flex gap-0.5 h-8 sm:h-9 rounded-lg overflow-hidden bg-navy-800">
                         {entries.map(([symbol, balance]) => {
                           const segmentPct = chainTotal > 0 ? (balance / chainTotal) * 100 : 0;
                           return (
@@ -448,13 +454,13 @@ export default function Dashboard() {
                             >
                               {segmentPct > 15 && (
                                 <>
-                                  <span className="text-[11px] font-semibold text-white truncate max-w-full px-1">{symbol}</span>
-                                  <span className="text-sm font-bold text-white">${formatBalance(balance)}</span>
+                                  <span className="text-[10px] font-semibold text-white truncate max-w-full px-0.5">{symbol}</span>
+                                  <span className="text-xs font-bold text-white">${formatBalance(balance)}</span>
                                 </>
                               )}
                               {/* Tooltip for small segments */}
                               {segmentPct <= 15 && (
-                                <div className="absolute bottom-full mb-2 hidden group-hover:block z-10 px-2 py-1 bg-navy-950 border border-white/20 rounded text-xs text-white whitespace-nowrap">
+                                <div className="absolute bottom-full mb-1.5 hidden group-hover:block z-10 px-2 py-1 bg-navy-950 border border-white/20 rounded text-xs text-white whitespace-nowrap">
                                   {symbol}: ${formatBalance(balance)}
                                 </div>
                               )}
@@ -462,11 +468,11 @@ export default function Dashboard() {
                           );
                         })}
                       </div>
-                      <div className="flex flex-wrap gap-2 mt-2 text-xs text-slate-500">
+                      <div className="flex flex-wrap gap-1.5 mt-1.5 text-xs text-slate-500">
                         {entries.map(([symbol]) => (
-                          <div key={symbol} className="flex items-center gap-1.5">
+                          <div key={symbol} className="flex items-center gap-1">
                             <div
-                              className="w-2.5 h-2.5 rounded"
+                              className="w-2 h-2 rounded"
                               style={{ backgroundColor: TOKEN_COLORS[symbol] ?? '#64748b' }}
                             />
                             <span>{symbol}</span>
@@ -478,6 +484,8 @@ export default function Dashboard() {
                 })}
               </div>
             )}
+                </div>
+            </div>
 
             {/* Pending section */}
             <div className="rounded-2xl border border-white/10 bg-navy-900/50 p-3 sm:p-4">
