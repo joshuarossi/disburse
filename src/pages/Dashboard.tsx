@@ -309,16 +309,16 @@ export default function Dashboard() {
 
             {/* By Token / By Chain breakdown */}
             {viewMode === 'byToken' && (
-              <div className="space-y-4">
+              <div className="space-y-3">
                 {tokenSymbols.length === 0 && totalUsd === 0 && (
-                  <div className="rounded-2xl border border-dashed border-white/10 bg-navy-900/30 p-5 sm:p-7">
-                    <div className="flex flex-col sm:flex-row sm:items-baseline sm:justify-between gap-2 mb-5">
+                  <div className="rounded-2xl border border-dashed border-white/10 bg-navy-900/30 p-3 sm:p-4">
+                    <div className="flex flex-col sm:flex-row sm:items-baseline sm:justify-between gap-2 mb-3">
                       <div className="flex items-baseline gap-3">
-                        <p className="text-xl sm:text-2xl font-bold text-slate-500">No Tokens</p>
-                        <p className="text-2xl sm:text-3xl font-bold text-slate-600">$0.00</p>
+                        <p className="text-base sm:text-lg font-semibold text-slate-500">No Tokens</p>
+                        <p className="text-lg sm:text-xl font-bold text-slate-600">$0.00</p>
                       </div>
                     </div>
-                    <div className="h-16 sm:h-20 rounded-lg border-2 border-dashed border-white/10 bg-navy-800/50 flex items-center justify-center">
+                    <div className="h-12 sm:h-14 rounded-lg border-2 border-dashed border-white/10 bg-navy-800/50 flex items-center justify-center">
                       <p className="text-sm text-slate-500">{t('dashboard.noBalance')}</p>
                     </div>
                   </div>
@@ -333,16 +333,16 @@ export default function Dashboard() {
                   return (
                     <div
                       key={symbol}
-                      className="rounded-2xl border border-white/10 bg-navy-900/50 p-5 sm:p-7"
+                      className="rounded-2xl border border-white/10 bg-navy-900/50 p-3 sm:p-4"
                     >
-                      <div className="flex flex-col sm:flex-row sm:items-baseline sm:justify-between gap-2 mb-5">
+                      <div className="flex flex-col sm:flex-row sm:items-baseline sm:justify-between gap-2 mb-3">
                         <div className="flex items-baseline gap-3">
-                          <p className="text-xl sm:text-2xl font-bold text-white">{symbol}</p>
-                          <p className="text-2xl sm:text-3xl font-bold text-accent-400">${formatBalance(tokenTotal)}</p>
+                          <p className="text-base sm:text-lg font-semibold text-white">{symbol}</p>
+                          <p className="text-lg sm:text-xl font-bold text-accent-400">${formatBalance(tokenTotal)}</p>
                         </div>
-                        <p className="text-xs sm:text-sm text-slate-500">{pct.toFixed(1)}% {t('dashboard.ofTreasury')}</p>
+                        <p className="text-xs text-slate-500">{pct.toFixed(1)}% {t('dashboard.ofTreasury')}</p>
                       </div>
-                      <div className="flex gap-0.5 h-16 sm:h-20 rounded-lg overflow-hidden bg-navy-800">
+                      <div className="flex gap-0.5 h-12 sm:h-14 rounded-lg overflow-hidden bg-navy-800">
                         {entries.map(([chainIdStr, balance]) => {
                           const chainId = Number(chainIdStr);
                           const segmentPct = tokenTotal > 0 ? (balance / tokenTotal) * 100 : 0;
@@ -374,7 +374,7 @@ export default function Dashboard() {
                           );
                         })}
                       </div>
-                      <div className="flex flex-wrap gap-3 mt-3 text-xs text-slate-500">
+                      <div className="flex flex-wrap gap-2 mt-2 text-xs text-slate-500">
                         {entries.map(([chainIdStr]) => {
                           const chainId = Number(chainIdStr);
                           return (
@@ -395,16 +395,16 @@ export default function Dashboard() {
             )}
 
             {viewMode === 'byChain' && (
-              <div className="space-y-4">
+              <div className="space-y-3">
                 {chainIdsWithBalances.length === 0 && totalUsd === 0 && (
-                  <div className="rounded-2xl border border-dashed border-white/10 bg-navy-900/30 p-5 sm:p-7">
-                    <div className="flex flex-col sm:flex-row sm:items-baseline sm:justify-between gap-2 mb-5">
+                  <div className="rounded-2xl border border-dashed border-white/10 bg-navy-900/30 p-3 sm:p-4">
+                    <div className="flex flex-col sm:flex-row sm:items-baseline sm:justify-between gap-2 mb-3">
                       <div className="flex items-baseline gap-3">
-                        <p className="text-xl sm:text-2xl font-bold text-slate-500">No Chains</p>
-                        <p className="text-2xl sm:text-3xl font-bold text-slate-600">$0.00</p>
+                        <p className="text-base sm:text-lg font-semibold text-slate-500">No Chains</p>
+                        <p className="text-lg sm:text-xl font-bold text-slate-600">$0.00</p>
                       </div>
                     </div>
-                    <div className="h-16 sm:h-20 rounded-lg border-2 border-dashed border-white/10 bg-navy-800/50 flex items-center justify-center">
+                    <div className="h-12 sm:h-14 rounded-lg border-2 border-dashed border-white/10 bg-navy-800/50 flex items-center justify-center">
                       <p className="text-sm text-slate-500">{t('dashboard.noBalance')}</p>
                     </div>
                   </div>
@@ -419,21 +419,21 @@ export default function Dashboard() {
                   return (
                     <div
                       key={chainId}
-                      className="rounded-2xl border border-white/10 bg-navy-900/50 p-5 sm:p-7"
+                      className="rounded-2xl border border-white/10 bg-navy-900/50 p-3 sm:p-4"
                     >
-                      <div className="flex flex-col sm:flex-row sm:items-baseline sm:justify-between gap-2 mb-5">
+                      <div className="flex flex-col sm:flex-row sm:items-baseline sm:justify-between gap-2 mb-3">
                         <div className="flex items-baseline gap-3">
-                          <p className="text-xl sm:text-2xl font-bold text-white">{getChainName(chainId)}</p>
+                          <p className="text-base sm:text-lg font-semibold text-white">{getChainName(chainId)}</p>
                           <p
-                            className="text-2xl sm:text-3xl font-bold"
+                            className="text-lg sm:text-xl font-bold"
                             style={{ color: CHAIN_COLORS[chainId] ?? '#14b8a6' }}
                           >
                             ${formatBalance(chainTotal)}
                           </p>
                         </div>
-                        <p className="text-xs sm:text-sm text-slate-500">{pct.toFixed(1)}% {t('dashboard.ofTreasury')}</p>
+                        <p className="text-xs text-slate-500">{pct.toFixed(1)}% {t('dashboard.ofTreasury')}</p>
                       </div>
-                      <div className="flex gap-0.5 h-16 sm:h-20 rounded-lg overflow-hidden bg-navy-800">
+                      <div className="flex gap-0.5 h-12 sm:h-14 rounded-lg overflow-hidden bg-navy-800">
                         {entries.map(([symbol, balance]) => {
                           const segmentPct = chainTotal > 0 ? (balance / chainTotal) * 100 : 0;
                           return (
@@ -462,7 +462,7 @@ export default function Dashboard() {
                           );
                         })}
                       </div>
-                      <div className="flex flex-wrap gap-3 mt-3 text-xs text-slate-500">
+                      <div className="flex flex-wrap gap-2 mt-2 text-xs text-slate-500">
                         {entries.map(([symbol]) => (
                           <div key={symbol} className="flex items-center gap-1.5">
                             <div
@@ -480,17 +480,17 @@ export default function Dashboard() {
             )}
 
             {/* Pending section */}
-            <div className="rounded-2xl border border-white/10 bg-navy-900/50 p-4 sm:p-6">
-              <h2 className="text-base sm:text-lg font-semibold text-white">{t('dashboard.pending')}</h2>
+            <div className="rounded-2xl border border-white/10 bg-navy-900/50 p-3 sm:p-4">
+              <h2 className="text-sm font-semibold text-white">{t('dashboard.pending')}</h2>
               {pendingItems.length === 0 ? (
-                <p className="mt-4 text-center text-sm text-slate-500 py-6">{t('dashboard.pendingNone')}</p>
+                <p className="mt-3 text-center text-sm text-slate-500 py-4">{t('dashboard.pendingNone')}</p>
               ) : (
-                <div className="mt-4 space-y-3">
+                <div className="mt-3 space-y-2">
                   {pendingItems.slice(0, 5).map((d) => (
                     <Link
                       key={d._id}
                       to={`/org/${orgId}/disbursements`}
-                      className="flex items-center justify-between gap-3 rounded-lg bg-navy-800/50 p-3 sm:p-4 hover:bg-navy-800 transition-colors"
+                      className="flex items-center justify-between gap-3 rounded-lg bg-navy-800/50 p-2.5 sm:p-3 hover:bg-navy-800 transition-colors"
                     >
                       <div className="flex items-center gap-3 min-w-0 flex-1">
                         <Send className="h-5 w-5 text-slate-400 shrink-0" />
@@ -512,16 +512,16 @@ export default function Dashboard() {
             </div>
 
             {/* Recent activity */}
-            <div className="rounded-2xl border border-white/10 bg-navy-900/50 p-4 sm:p-6">
-              <h2 className="text-base sm:text-lg font-semibold text-white">{t('dashboard.recent.title')}</h2>
+            <div className="rounded-2xl border border-white/10 bg-navy-900/50 p-3 sm:p-4">
+              <h2 className="text-sm font-semibold text-white">{t('dashboard.recent.title')}</h2>
               {!disbursementsList?.items?.length ? (
-                <p className="mt-4 text-center text-sm sm:text-base text-slate-500 py-8">{t('dashboard.recent.none')}</p>
+                <p className="mt-3 text-center text-sm text-slate-500 py-5">{t('dashboard.recent.none')}</p>
               ) : (
-                <div className="mt-4 space-y-3">
+                <div className="mt-3 space-y-2">
                   {disbursementsList.items.slice(0, 5).map((d) => (
                     <div
                       key={d._id}
-                      className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 rounded-lg bg-navy-800/50 p-3 sm:p-4"
+                      className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 rounded-lg bg-navy-800/50 p-2.5 sm:p-3"
                     >
                       <div className="flex items-center gap-3 min-w-0 flex-1">
                         <Send className="h-5 w-5 text-slate-400 shrink-0" />
