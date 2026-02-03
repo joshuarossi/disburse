@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef } from 'react';
+import { useState, useMemo, useRef, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { useAccount, useReadContracts } from 'wagmi';
 import { useTranslation } from 'react-i18next';
@@ -21,6 +21,9 @@ import {
   proposeTransaction,
   executeTransaction,
 } from '@/lib/safe';
+import { executeTransactionViaGelato, proposeTransactionViaGelato } from '@/lib/safeRelay';
+import { selectRelayFeeToken } from '@/lib/relayFee';
+import { RELAY_FEATURE_ENABLED, resolveRelaySettings } from '@/lib/relayConfig';
 import {
   CHAINS_LIST,
   getChainName,
@@ -54,6 +57,7 @@ export default function Disbursements() {
     { value: 'draft', label: t('status.draft') },
     { value: 'pending', label: t('status.pending') },
     { value: 'proposed', label: t('status.proposed') },
+    { value: 'relaying', label: t('status.relaying') },
     { value: 'executed', label: t('status.executed') },
     { value: 'failed', label: t('status.failed') },
     { value: 'cancelled', label: t('status.cancelled') },
@@ -165,7 +169,12 @@ export default function Disbursements() {
       ? { orgId: orgId as Id<'orgs'>, walletAddress: address }
       : 'skip'
   );
+  const org = useQuery(
+    api.orgs.get,
+    orgId ? { orgId: orgId as Id<'orgs'> } : 'skip'
+  );
   const switchChain = useSwitchChain();
+  const relaySettings = resolveRelaySettings(org);
 
   // Fetch token balances for the selected chain
   const balanceContracts = useMemo(() => {
@@ -224,6 +233,78 @@ export default function Disbursements() {
   const createDisbursement = useMutation(api.disbursements.create);
   const createBatchDisbursement = useMutation(api.disbursements.createBatch);
   const updateStatus = useMutation(api.disbursements.updateStatus);
+
+  const relayingDisbursements = useMemo(() => {
+    if (!displayedResult?.items) return [];
+    return displayedResult.items.filter(
+      (d) => d.status === 'relaying' && d.relayTaskId
+    );
+  }, [displayedResult]);
+
+  useEffect(() => {
+    if (!RELAY_FEATURE_ENABLED || !address || relayingDisbursements.length === 0) {
+      return;
+    }
+
+    let cancelled = false;
+
+    const pollRelayStatuses = async () => {
+      for (const disbursement of relayingDisbursements) {
+        if (!disbursement.relayTaskId) continue;
+        try {
+          const status = await convex.action(api.relay.getTaskStatus, {
+            taskId: disbursement.relayTaskId,
+          });
+
+          if (cancelled) return;
+
+          const taskState = status?.taskState;
+          const txHash = status?.transactionHash;
+
+          if (txHash) {
+            await updateStatus({
+              disbursementId: disbursement._id,
+              walletAddress: address,
+              status: 'executed',
+              txHash,
+              relayStatus: taskState,
+            });
+            continue;
+          }
+
+          if (taskState === 'Cancelled' || taskState === 'ExecReverted') {
+            await updateStatus({
+              disbursementId: disbursement._id,
+              walletAddress: address,
+              status: 'failed',
+              relayStatus: taskState,
+              relayError: taskState,
+            });
+            continue;
+          }
+
+          if (taskState && taskState !== disbursement.relayStatus) {
+            await updateStatus({
+              disbursementId: disbursement._id,
+              walletAddress: address,
+              status: 'relaying',
+              relayStatus: taskState,
+            });
+          }
+        } catch (err) {
+          console.error('Failed to poll relay status:', err);
+        }
+      }
+    };
+
+    pollRelayStatuses();
+    const interval = setInterval(pollRelayStatuses, 15000);
+
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, [address, relayingDisbursements, updateStatus]);
 
   // Helper to reset pagination when filters change
   const resetPagination = () => {
@@ -596,6 +677,22 @@ export default function Disbursements() {
         await switchChain.switchChainAsync({ chainId });
       }
 
+      let relayFeeToken: string | undefined;
+      let relayFeeTokenSymbol: string | undefined;
+      let relayFeeMode: string | undefined;
+
+      if (RELAY_FEATURE_ENABLED) {
+        const feeSelection = await selectRelayFeeToken({
+          chainId,
+          safeAddress: safe.safeAddress,
+          feeTokenSymbol: relaySettings.relayFeeTokenSymbol,
+          feeMode: relaySettings.relayFeeMode,
+        });
+        relayFeeToken = feeSelection.feeTokenAddress;
+        relayFeeTokenSymbol = feeSelection.feeTokenSymbol;
+        relayFeeMode = relaySettings.relayFeeMode;
+      }
+
       await updateStatus({
         disbursementId: disbursement._id,
         walletAddress: address,
@@ -631,18 +728,29 @@ export default function Disbursements() {
         transactions = [transferTx];
       }
 
-      const safeTxHash = await proposeTransaction(
-        safe.safeAddress,
-        address,
-        chainId,
-        transactions
-      );
+      const safeTxHash = RELAY_FEATURE_ENABLED
+        ? await proposeTransactionViaGelato({
+            safeAddress: safe.safeAddress,
+            signerAddress: address,
+            chainId,
+            transactions,
+            gasToken: relayFeeToken as `0x${string}` | undefined,
+          })
+        : await proposeTransaction(
+            safe.safeAddress,
+            address,
+            chainId,
+            transactions
+          );
 
       await updateStatus({
         disbursementId: disbursement._id,
         walletAddress: address,
         status: 'proposed',
         safeTxHash,
+        relayFeeToken,
+        relayFeeTokenSymbol,
+        relayFeeMode,
       });
     } catch (err) {
       console.error('Failed to propose transaction:', err);
@@ -708,19 +816,36 @@ export default function Disbursements() {
         await switchChain.switchChainAsync({ chainId });
       }
 
-      const txHash = await executeTransaction(
-        safe.safeAddress,
-        address,
-        chainId,
-        disbursement.safeTxHash
-      );
+      if (RELAY_FEATURE_ENABLED) {
+        const relayResult = await executeTransactionViaGelato({
+          safeAddress: safe.safeAddress,
+          signerAddress: address,
+          chainId,
+          safeTxHash: disbursement.safeTxHash,
+        });
 
-      await updateStatus({
-        disbursementId: disbursement._id,
-        walletAddress: address,
-        status: 'executed',
-        txHash,
-      });
+        await updateStatus({
+          disbursementId: disbursement._id,
+          walletAddress: address,
+          status: 'relaying',
+          relayTaskId: relayResult.taskId,
+          relayStatus: 'submitted',
+        });
+      } else {
+        const txHash = await executeTransaction(
+          safe.safeAddress,
+          address,
+          chainId,
+          disbursement.safeTxHash
+        );
+
+        await updateStatus({
+          disbursementId: disbursement._id,
+          walletAddress: address,
+          status: 'executed',
+          txHash,
+        });
+      }
     } catch (err) {
       console.error('Failed to execute transaction:', err);
       setError(err instanceof Error ? err.message : 'Failed to execute transaction');
@@ -730,6 +855,52 @@ export default function Disbursements() {
         status: 'failed',
       });
     } finally {
+      setProcessingId(null);
+    }
+  };
+
+  const handleRetryRelay = async (
+    disbursement: {
+      _id: Id<'disbursements'>;
+      chainId?: number;
+      safeTxHash?: string;
+    }
+  ) => {
+    if (!address) return;
+    setProcessingId(disbursement._id);
+    setError(null);
+
+    try {
+      const retryResult = await convex.action(api.relay.retryDisbursement, {
+        disbursementId: disbursement._id,
+        walletAddress: address,
+      });
+
+      if (retryResult?.status === 'executed') {
+        setProcessingId(null);
+        return;
+      }
+
+      if (retryResult?.status === 'needs_confirmations') {
+        const remaining = Math.max(
+          0,
+          (retryResult.confirmationsRequired ?? 0) -
+            (retryResult.confirmations ?? 0)
+        );
+        setError(
+          remaining > 0
+            ? `Needs ${remaining} more confirmation(s) before relay.`
+            : 'Needs more confirmations before relay.'
+        );
+        setProcessingId(null);
+        return;
+      }
+
+      setProcessingId(null);
+      await handleExecute(disbursement);
+    } catch (err) {
+      console.error('Failed to retry relay:', err);
+      setError(err instanceof Error ? err.message : 'Failed to retry relay');
       setProcessingId(null);
     }
   };
@@ -766,6 +937,7 @@ export default function Disbursements() {
         return 'bg-red-500/10 text-red-400';
       case 'pending':
       case 'proposed':
+      case 'relaying':
         return 'bg-yellow-500/10 text-yellow-400';
       default:
         return 'bg-slate-500/10 text-slate-400';
@@ -836,6 +1008,12 @@ export default function Disbursements() {
             </Button>
           </div>
         );
+      case 'relaying':
+        return (
+          <div className="flex items-center justify-center gap-2 h-8">
+            <Loader2 className="h-4 w-4 animate-spin text-yellow-400" />
+          </div>
+        );
       case 'executed':
         return (
           <div className="flex items-center justify-center gap-2 h-8">
@@ -854,6 +1032,27 @@ export default function Disbursements() {
           </div>
         );
       case 'failed':
+        return (
+          <div className="flex items-center justify-center gap-2 h-8">
+            {disbursement.safeTxHash ? (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() =>
+                  handleRetryRelay({
+                    _id: disbursement._id,
+                    chainId: disbursement.chainId,
+                    safeTxHash: disbursement.safeTxHash,
+                  })
+                }
+                title="Retry relay"
+                className="h-8 w-8 p-0"
+              >
+                <RefreshCw className="h-4 w-4 text-slate-400 hover:text-accent-300" />
+              </Button>
+            ) : null}
+          </div>
+        );
       case 'cancelled':
         return (
           <div className="flex items-center justify-center gap-2 h-8">

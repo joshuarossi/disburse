@@ -530,6 +530,19 @@
       "validating": "Validating...",
       "network": "Sepolia"
     },
+    "relay": {
+      "title": "Gasless Execution",
+      "subtitle": "Configure how relay fees are paid by your Safe",
+      "feeTokenLabel": "Fee token",
+      "feeTokenDescription": "Supported fee tokens: USDC, USDT.",
+      "feeModeLabel": "Fee mode",
+      "feeModePreferred": "Stablecoin preferred (fallback to native)",
+      "feeModeOnly": "Stablecoin only (block if insufficient)",
+      "feeModeDescription": "If USDC is unavailable, fallback to native only in preferred mode.",
+      "save": "Save",
+      "adminOnly": "Only admins can change gasless settings",
+      "disabled": "Gasless relay is disabled by environment settings."
+    },
     "team": {
       "title": "Team Members",
       "subtitle": "Manage access to your organization",
@@ -684,6 +697,7 @@
     "draft": "Draft",
     "pending": "Pending",
     "proposed": "Proposed",
+    "relaying": "Relaying",
     "executed": "Executed",
     "failed": "Failed",
     "cancelled": "Cancelled",

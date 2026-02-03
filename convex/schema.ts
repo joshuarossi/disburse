@@ -39,6 +39,11 @@ export default defineSchema({
       v.literal("warn"),
       v.literal("off")
     )),
+    relayFeeTokenSymbol: v.optional(v.string()),
+    relayFeeMode: v.optional(v.union(
+      v.literal("stablecoin_preferred"),
+      v.literal("stablecoin_only")
+    )),
     createdAt: v.number(),
   }),
 
@@ -134,12 +139,22 @@ export default defineSchema({
       v.literal("draft"),
       v.literal("pending"),
       v.literal("proposed"),
+      v.literal("relaying"),
       v.literal("executed"),
       v.literal("failed"),
       v.literal("cancelled")
     ),
     safeTxHash: v.optional(v.string()),
     txHash: v.optional(v.string()),
+    relayTaskId: v.optional(v.string()),
+    relayStatus: v.optional(v.string()),
+    relayFeeToken: v.optional(v.string()),
+    relayFeeTokenSymbol: v.optional(v.string()),
+    relayFeeMode: v.optional(v.union(
+      v.literal("stablecoin_preferred"),
+      v.literal("stablecoin_only")
+    )),
+    relayError: v.optional(v.string()),
     createdBy: v.id("users"),
     createdAt: v.number(),
     updatedAt: v.number(),

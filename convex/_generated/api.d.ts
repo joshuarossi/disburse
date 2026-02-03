@@ -19,6 +19,7 @@ import type * as lib_tags from "../lib/tags.js";
 import type * as migrations_backfillBeneficiaryType from "../migrations/backfillBeneficiaryType.js";
 import type * as migrations_backfillDisbursementChainId from "../migrations/backfillDisbursementChainId.js";
 import type * as orgs from "../orgs.js";
+import type * as relay from "../relay.js";
 import type * as reports from "../reports.js";
 import type * as safes from "../safes.js";
 import type * as screening from "../screening.js";
@@ -45,6 +46,7 @@ declare const fullApi: ApiFromModules<{
   "migrations/backfillBeneficiaryType": typeof migrations_backfillBeneficiaryType;
   "migrations/backfillDisbursementChainId": typeof migrations_backfillDisbursementChainId;
   orgs: typeof orgs;
+  relay: typeof relay;
   reports: typeof reports;
   safes: typeof safes;
   screening: typeof screening;

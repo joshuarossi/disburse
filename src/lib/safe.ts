@@ -175,7 +175,15 @@ export async function proposeTransaction(
   safeAddress: string,
   signerAddress: string,
   chainId: number,
-  transactions: MetaTransactionData[]
+  transactions: MetaTransactionData[],
+  options?: {
+    gasToken?: string;
+    safeTxGas?: string;
+    baseGas?: string;
+    gasPrice?: string;
+    refundReceiver?: string;
+    nonce?: number;
+  }
 ): Promise<string> {
   const checksummedSafeAddress = getAddress(safeAddress);
   const checksummedSignerAddress = getAddress(signerAddress);
@@ -189,6 +197,18 @@ export async function proposeTransaction(
 
   const safeTransaction = await protocolKit.createTransaction({
     transactions,
+    options: options
+      ? {
+          gasToken: options.gasToken ? getAddress(options.gasToken) : undefined,
+          safeTxGas: options.safeTxGas,
+          baseGas: options.baseGas,
+          gasPrice: options.gasPrice,
+          refundReceiver: options.refundReceiver
+            ? getAddress(options.refundReceiver)
+            : undefined,
+          nonce: options.nonce,
+        }
+      : undefined,
   });
   const safeTxHash = await protocolKit.getTransactionHash(safeTransaction);
   const signature = await protocolKit.signHash(safeTxHash);

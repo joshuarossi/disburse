@@ -54,6 +54,15 @@
 
 ---
 
+# Unreleased
+
+### ⚡ Gasless Execution
+
+- Added Gelato relay integration for Safe execution with USDC-first fee payment and native fallback.
+- Added relay status tracking and polling for relayed disbursements.
+
+---
+
 ## v0.2.0
 
 ### 🎉 Major Features

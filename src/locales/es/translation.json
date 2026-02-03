@@ -523,6 +523,19 @@
       "validating": "Validando...",
       "network": "Sepolia"
     },
+    "relay": {
+      "title": "Ejecución sin gas",
+      "subtitle": "Configura cómo se pagan las comisiones de relay desde tu Safe",
+      "feeTokenLabel": "Token de comisión",
+      "feeTokenDescription": "Tokens de comisión compatibles: USDC, USDT.",
+      "feeModeLabel": "Modo de comisión",
+      "feeModePreferred": "Stablecoin preferida (fallback a nativo)",
+      "feeModeOnly": "Solo stablecoin (bloquea si es insuficiente)",
+      "feeModeDescription": "Si USDC no está disponible, solo se usa nativo en modo preferido.",
+      "save": "Guardar",
+      "adminOnly": "Solo los administradores pueden cambiar esta configuración",
+      "disabled": "El relay sin gas está deshabilitado por configuración de entorno."
+    },
     "team": {
       "title": "Miembros del Equipo",
       "subtitle": "Gestiona el acceso a tu organización",
@@ -677,6 +690,7 @@
     "draft": "Borrador",
     "pending": "Pendiente",
     "proposed": "Propuesto",
+    "relaying": "En relay",
     "executed": "Ejecutado",
     "failed": "Fallido",
     "cancelled": "Cancelado",

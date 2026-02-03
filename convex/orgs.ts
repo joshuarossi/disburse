@@ -2,6 +2,40 @@ import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import { getOrgLimits } from "./billing";
 
+const SUPPORTED_RELAY_FEE_TOKENS = ["USDC", "USDT"] as const;
+type RelayFeeMode = "stablecoin_preferred" | "stablecoin_only";
+
+const DEFAULT_RELAY_FEE_TOKEN_SYMBOL = (() => {
+  const envValue = (process.env.VITE_GELATO_DEFAULT_FEE_TOKEN ?? "USDC")
+    .toString()
+    .toUpperCase();
+  return SUPPORTED_RELAY_FEE_TOKENS.includes(
+    envValue as (typeof SUPPORTED_RELAY_FEE_TOKENS)[number]
+  )
+    ? (envValue as (typeof SUPPORTED_RELAY_FEE_TOKENS)[number])
+    : "USDC";
+})();
+
+const DEFAULT_RELAY_FEE_MODE: RelayFeeMode =
+  process.env.VITE_GELATO_DEFAULT_FEE_MODE === "stablecoin_only"
+    ? "stablecoin_only"
+    : "stablecoin_preferred";
+
+function normalizeRelayFeeMode(value?: string | null): RelayFeeMode {
+  return value === "stablecoin_only" ? "stablecoin_only" : "stablecoin_preferred";
+}
+
+function normalizeRelayFeeTokenSymbol(value?: string | null) {
+  const normalized = (value ?? DEFAULT_RELAY_FEE_TOKEN_SYMBOL)
+    .toString()
+    .toUpperCase();
+  return SUPPORTED_RELAY_FEE_TOKENS.includes(
+    normalized as (typeof SUPPORTED_RELAY_FEE_TOKENS)[number]
+  )
+    ? (normalized as (typeof SUPPORTED_RELAY_FEE_TOKENS)[number])
+    : DEFAULT_RELAY_FEE_TOKEN_SYMBOL;
+}
+
 // Create a new organization
 export const create = mutation({
   args: {
@@ -26,6 +60,8 @@ export const create = mutation({
     const orgId = await ctx.db.insert("orgs", {
       name: args.name,
       createdBy: user._id,
+      relayFeeTokenSymbol: DEFAULT_RELAY_FEE_TOKEN_SYMBOL,
+      relayFeeMode: DEFAULT_RELAY_FEE_MODE,
       createdAt: now,
     });
 
@@ -146,6 +182,64 @@ export const updateName = mutation({
       objectType: "org",
       objectId: args.orgId,
       metadata: { name: args.name },
+      timestamp: Date.now(),
+    });
+
+    return { success: true };
+  },
+});
+
+// Update org relay fee settings
+export const updateRelaySettings = mutation({
+  args: {
+    orgId: v.id("orgs"),
+    walletAddress: v.string(),
+    relayFeeTokenSymbol: v.string(),
+    relayFeeMode: v.union(
+      v.literal("stablecoin_preferred"),
+      v.literal("stablecoin_only")
+    ),
+  },
+  handler: async (ctx, args) => {
+    const walletAddress = args.walletAddress.toLowerCase();
+
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_wallet", (q) => q.eq("walletAddress", walletAddress))
+      .first();
+
+    if (!user) {
+      throw new Error("User not found");
+    }
+
+    const membership = await ctx.db
+      .query("orgMemberships")
+      .withIndex("by_org_and_user", (q) =>
+        q.eq("orgId", args.orgId).eq("userId", user._id)
+      )
+      .first();
+
+    if (!membership || membership.role !== "admin") {
+      throw new Error("Not authorized");
+    }
+
+    const relayFeeTokenSymbol = normalizeRelayFeeTokenSymbol(
+      args.relayFeeTokenSymbol
+    );
+    const relayFeeMode = normalizeRelayFeeMode(args.relayFeeMode);
+
+    await ctx.db.patch(args.orgId, {
+      relayFeeTokenSymbol,
+      relayFeeMode,
+    });
+
+    await ctx.db.insert("auditLog", {
+      orgId: args.orgId,
+      actorUserId: user._id,
+      action: "org.relaySettingsUpdated",
+      objectType: "org",
+      objectId: args.orgId,
+      metadata: { relayFeeTokenSymbol, relayFeeMode },
       timestamp: Date.now(),
     });
 

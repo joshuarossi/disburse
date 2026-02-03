@@ -523,6 +523,19 @@
       "validating": "Validando...",
       "network": "Sepolia"
     },
+    "relay": {
+      "title": "Execucao sem gas",
+      "subtitle": "Configure como as taxas de relay sao pagas pela sua Safe",
+      "feeTokenLabel": "Token de taxa",
+      "feeTokenDescription": "Tokens de taxa suportados: USDC, USDT.",
+      "feeModeLabel": "Modo de taxa",
+      "feeModePreferred": "Stablecoin preferida (fallback para nativo)",
+      "feeModeOnly": "Apenas stablecoin (bloqueia se insuficiente)",
+      "feeModeDescription": "Se o USDC nao estiver disponivel, o nativo so sera usado no modo preferido.",
+      "save": "Salvar",
+      "adminOnly": "Apenas administradores podem alterar estas configuracoes",
+      "disabled": "O relay sem gas esta desativado pelas configuracoes de ambiente."
+    },
     "team": {
       "title": "Membros da Equipe",
       "subtitle": "Gerencie o acesso à sua organização",
@@ -677,6 +690,7 @@
     "draft": "Rascunho",
     "pending": "Pendente",
     "proposed": "Proposto",
+    "relaying": "Em relay",
     "executed": "Executado",
     "failed": "Falhou",
     "cancelled": "Cancelado",

@@ -282,12 +282,22 @@ export const updateStatus = mutation({
       v.literal("draft"),
       v.literal("pending"),
       v.literal("proposed"),
+      v.literal("relaying"),
       v.literal("executed"),
       v.literal("failed"),
       v.literal("cancelled")
     ),
     safeTxHash: v.optional(v.string()),
     txHash: v.optional(v.string()),
+    relayTaskId: v.optional(v.string()),
+    relayStatus: v.optional(v.string()),
+    relayFeeToken: v.optional(v.string()),
+    relayFeeTokenSymbol: v.optional(v.string()),
+    relayFeeMode: v.optional(v.union(
+      v.literal("stablecoin_preferred"),
+      v.literal("stablecoin_only")
+    )),
+    relayError: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const walletAddress = args.walletAddress.toLowerCase();
@@ -345,6 +355,22 @@ export const updateStatus = mutation({
 
     if (args.safeTxHash) updates.safeTxHash = args.safeTxHash;
     if (args.txHash) updates.txHash = args.txHash;
+    if (args.relayTaskId) updates.relayTaskId = args.relayTaskId;
+    if (args.relayStatus) updates.relayStatus = args.relayStatus;
+    if (args.relayFeeToken) updates.relayFeeToken = args.relayFeeToken;
+    if (args.relayFeeTokenSymbol) updates.relayFeeTokenSymbol = args.relayFeeTokenSymbol;
+    if (args.relayFeeMode) updates.relayFeeMode = args.relayFeeMode;
+    if (args.relayError) updates.relayError = args.relayError;
+
+    if (args.relayTaskId || args.relayStatus || args.relayError) {
+      console.info("[Relay] Disbursement status update", {
+        disbursementId: args.disbursementId,
+        status: args.status,
+        relayTaskId: args.relayTaskId,
+        relayStatus: args.relayStatus,
+        relayError: args.relayError,
+      });
+    }
 
     await ctx.db.patch(args.disbursementId, updates);
 
@@ -355,7 +381,17 @@ export const updateStatus = mutation({
       action: `disbursement.${args.status}`,
       objectType: "disbursement",
       objectId: args.disbursementId,
-      metadata: { status: args.status, safeTxHash: args.safeTxHash, txHash: args.txHash },
+      metadata: {
+        status: args.status,
+        safeTxHash: args.safeTxHash,
+        txHash: args.txHash,
+        relayTaskId: args.relayTaskId,
+        relayStatus: args.relayStatus,
+        relayFeeToken: args.relayFeeToken,
+        relayFeeTokenSymbol: args.relayFeeTokenSymbol,
+        relayFeeMode: args.relayFeeMode,
+        relayError: args.relayError,
+      },
       timestamp: now,
     });
 

@@ -24,6 +24,7 @@ describe('Safe library', () => {
   describe('createTransferTx', () => {
     it('creates USDC transfer transaction', () => {
       const tx = createTransferTx(
+        11155111,
         'USDC',
         VALID_RECIPIENT,
         '100'
@@ -41,6 +42,7 @@ describe('Safe library', () => {
 
     it('creates USDT transfer transaction', () => {
       const tx = createTransferTx(
+        11155111,
         'USDT',
         VALID_RECIPIENT,
         '100'
@@ -56,6 +58,7 @@ describe('Safe library', () => {
 
     it('encodes correct ERC20 transfer function selector', () => {
       const tx = createTransferTx(
+        11155111,
         'USDC',
         VALID_RECIPIENT,
         '100'
@@ -67,6 +70,7 @@ describe('Safe library', () => {
 
     it('handles decimal amounts correctly', () => {
       const tx = createTransferTx(
+        11155111,
         'USDC',
         VALID_RECIPIENT,
         '100.50'
@@ -80,6 +84,7 @@ describe('Safe library', () => {
 
     it('handles large amounts', () => {
       const tx = createTransferTx(
+        11155111,
         'USDC',
         VALID_RECIPIENT,
         '1000000' // 1M USDC
@@ -90,7 +95,7 @@ describe('Safe library', () => {
     });
 
     it('encodes recipient address in data', () => {
-      const tx = createTransferTx('USDC', VALID_RECIPIENT, '100');
+      const tx = createTransferTx(11155111, 'USDC', VALID_RECIPIENT, '100');
 
       // The recipient address should be encoded in the data (after function selector)
       // Address is zero-padded to 32 bytes
@@ -100,6 +105,7 @@ describe('Safe library', () => {
 
     it('sets value to 0 for ERC20 transfer', () => {
       const tx = createTransferTx(
+        11155111,
         'USDC',
         VALID_RECIPIENT,
         '100'
@@ -111,6 +117,7 @@ describe('Safe library', () => {
 
     it('uses Call operation type', () => {
       const tx = createTransferTx(
+        11155111,
         'USDC',
         VALID_RECIPIENT,
         '100'
@@ -129,7 +136,7 @@ describe('Safe library', () => {
         { to: '0x90F79bf6EB2c4f870365E785982E1f101E93b906', amount: '300' },
       ];
 
-      const transactions = createBatchTransferTxs('USDC', recipients);
+      const transactions = createBatchTransferTxs(11155111, 'USDC', recipients);
 
       expect(transactions.length).toBe(3);
       transactions.forEach((tx, index) => {
@@ -147,7 +154,7 @@ describe('Safe library', () => {
         { to: '0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC', amount: '75.25' },
       ];
 
-      const transactions = createBatchTransferTxs('USDC', recipients);
+      const transactions = createBatchTransferTxs(11155111, 'USDC', recipients);
 
       expect(transactions.length).toBe(2);
       
@@ -166,7 +173,7 @@ describe('Safe library', () => {
         { to: '0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC', amount: '200' },
       ];
 
-      const transactions = createBatchTransferTxs('USDT', recipients);
+      const transactions = createBatchTransferTxs(11155111, 'USDT', recipients);
 
       expect(transactions.length).toBe(2);
       transactions.forEach((tx) => {
@@ -179,14 +186,14 @@ describe('Safe library', () => {
         { to: VALID_RECIPIENT, amount: '100' },
       ];
 
-      const transactions = createBatchTransferTxs('USDC', recipients);
+      const transactions = createBatchTransferTxs(11155111, 'USDC', recipients);
 
       expect(transactions.length).toBe(1);
       expect(transactions[0].to).toBe('0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238');
     });
 
     it('handles empty recipients array', () => {
-      const transactions = createBatchTransferTxs('USDC', []);
+      const transactions = createBatchTransferTxs(11155111, 'USDC', []);
 
       expect(transactions.length).toBe(0);
     });
@@ -197,7 +204,7 @@ describe('Safe library', () => {
         { to: '0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC', amount: '200' },
       ];
 
-      const transactions = createBatchTransferTxs('USDC', recipients);
+      const transactions = createBatchTransferTxs(11155111, 'USDC', recipients);
 
       // Each transaction should have different data (different recipients/amounts)
       expect(transactions[0].data).not.toBe(transactions[1].data);
