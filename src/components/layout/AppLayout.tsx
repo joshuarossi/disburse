@@ -132,22 +132,29 @@ export function AppLayout({ children }: AppLayoutProps) {
       >
         {/* Logo */}
         <div className="flex h-16 items-center gap-2 border-b border-white/5 px-6">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-accent-500 to-accent-400">
-            <svg
-              className="h-4 w-4 text-navy-950"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              strokeWidth={2.5}
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-              />
-            </svg>
-          </div>
-          <span className="text-lg font-bold text-white">Disburse</span>
+          <Link
+            to="/"
+            onClick={() => setIsMobileMenuOpen(false)}
+            className="flex items-center gap-2"
+            aria-label="Disburse home"
+          >
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-accent-500 to-accent-400">
+              <svg
+                className="h-4 w-4 text-navy-950"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth={2.5}
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                />
+              </svg>
+            </div>
+            <span className="text-lg font-bold text-white">Disburse</span>
+          </Link>
           {/* Close button for mobile */}
           <button
             onClick={() => setIsMobileMenuOpen(false)}

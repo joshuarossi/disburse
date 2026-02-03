@@ -102,6 +102,7 @@ export default function Disbursements() {
   // Batch disbursement state
   const [recipients, setRecipients] = useState<Array<{ beneficiaryId: string; amount: string }>>([]);
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
+  const [addMode, setAddMode] = useState<'beneficiary' | 'tag'>('beneficiary');
 
   // Screening warning state
   const [screeningWarning, setScreeningWarning] = useState<{
@@ -436,6 +437,21 @@ export default function Disbursements() {
     return total;
   }, [recipients, selectedBeneficiary, amount]);
 
+  const hasDraftRecipient = Boolean(selectedBeneficiary && amount && parseFloat(amount) > 0);
+  const recipientCount = recipients.length + (hasDraftRecipient ? 1 : 0);
+  const hasRecipients = recipientCount > 0;
+  const hasDetails = Boolean(memo.trim() || scheduledAt);
+  const stageSteps = useMemo(
+    () => [
+      { key: 'context', label: t('disbursements.form.stage.context', { defaultValue: 'Context' }) },
+      { key: 'recipients', label: t('disbursements.form.stage.recipients', { defaultValue: 'Recipients' }) },
+      { key: 'details', label: t('disbursements.form.stage.details', { defaultValue: 'Details' }) },
+    ],
+    [t]
+  );
+  const currentStageIndex = hasRecipients ? (hasDetails ? 2 : 1) : 0;
+  const currentStageLabel = stageSteps[Math.min(currentStageIndex, stageSteps.length - 1)]?.label ?? 'Context';
+
   // Check if in batch mode (once we have at least one recipient)
   const isBatchMode = recipients.length > 0;
 
@@ -527,6 +543,7 @@ export default function Disbursements() {
     setScheduledAtError(null);
     setRecipients([]);
     setSelectedTags([]);
+    setAddMode('beneficiary');
     setCreateChainId(11155111);
     setIsCreating(false);
   };
@@ -951,6 +968,12 @@ export default function Disbursements() {
         return;
       }
 
+      if (retryResult?.status === 'not_found') {
+        setError('Safe transaction not found. Please re-propose the disbursement.');
+        setProcessingId(null);
+        return;
+      }
+
       setProcessingId(null);
       await handleExecute(disbursement);
     } catch (err) {
@@ -1353,288 +1376,383 @@ export default function Disbursements() {
         {/* Create Form */}
         {isCreating && (
           <div className="rounded-2xl border border-accent-500/30 bg-navy-900/50 p-4 sm:p-6">
-            <h2 className="mb-4 text-base sm:text-lg font-semibold text-white">
-              {t('disbursements.createDisbursement')}
-            </h2>
-            <form onSubmit={handleCreate} className="space-y-4 sm:space-y-6">
-              {/* Chain selector */}
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
               <div>
-                <label className="mb-2 block text-sm font-medium text-slate-300">
-                  {t('disbursements.filters.chain', { defaultValue: 'Chain' })}
-                </label>
-                <select
-                  value={createChainId}
-                  onChange={(e) => {
-                    const newChainId = Number(e.target.value);
-                    const symbols = getTokenSymbolsForChain(newChainId);
-                    setCreateChainId(newChainId);
-                    setToken(symbols.includes(token) ? token : symbols[0] ?? 'USDC');
-                  }}
-                  className="w-full rounded-lg border border-white/10 bg-navy-800 px-4 py-3 text-base text-white focus:border-accent-500 focus:outline-none focus:ring-1 focus:ring-accent-500"
-                >
-                  {CHAINS_LIST.filter((c) => safes?.some((s) => s.chainId === c.chainId)).map((c) => (
-                    <option key={c.chainId} value={c.chainId}>
-                      {c.chainName}
-                    </option>
-                  ))}
-                </select>
+                <h2 className="text-base sm:text-lg font-semibold text-white">
+                  {t('disbursements.createDisbursement')}
+                </h2>
+                <p className="mt-1 text-xs text-slate-400">
+                  {t('disbursements.form.stageLabel', { defaultValue: 'Stage' })}:{' '}
+                  <span className="font-medium text-slate-200">{currentStageLabel}</span>
+                </p>
               </div>
-              {/* Token selector - tokens for selected chain */}
-              <div>
-                <label className="mb-2 block text-sm font-medium text-slate-300">
-                  Token
-                </label>
-                <select
-                  value={token}
-                  onChange={(e) => setToken(e.target.value)}
-                  className="w-full rounded-lg border border-white/10 bg-navy-800 px-4 py-3 text-base text-white focus:border-accent-500 focus:outline-none focus:ring-1 focus:ring-accent-500"
-                >
-                  {Object.keys(getTokensForChain(createChainId)).map((sym) => (
-                    <option key={sym} value={sym}>{sym}</option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Select by tag */}
-              <div className="rounded-lg border border-white/10 bg-navy-800/30 p-4 space-y-3">
-                <div className="flex items-center justify-between">
-                  <label className="text-sm font-medium text-slate-300">
-                    {t('disbursements.form.selectByTag')} ({t('common.optional')})
-                  </label>
-                  {selectedTags.length > 0 && (
-                    <span className="text-xs text-slate-400">
-                      {t('disbursements.form.tagMatches', { count: beneficiariesByTag.length })}
-                    </span>
-                  )}
-                </div>
-                <TagInput
-                  availableTags={availableTags ?? []}
-                  value={selectedTags}
-                  onChange={setSelectedTags}
-                  placeholder={t('disbursements.form.selectTagsPlaceholder')}
-                  allowCreate={false}
-                />
-                <div className="flex justify-end">
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    size="sm"
-                    onClick={addRecipientsByTag}
-                    disabled={selectedTags.length === 0}
-                    className="h-9"
-                  >
-                    {t('disbursements.form.addTaggedBeneficiaries')}
-                  </Button>
-                </div>
-              </div>
-
-              {/* Recipient rows - editable amounts */}
-              {recipients.length > 0 && (
-                <div className="space-y-3">
-                  {recipients.map((recipient, index) => {
-                    const recipientBeneficiary = beneficiaries?.find(b => b._id === recipient.beneficiaryId);
-                    return (
-                      <div
-                        key={`recipient-${index}-${recipient.beneficiaryId}`}
-                        className="rounded-lg border border-white/10 bg-navy-800/50 p-4"
-                      >
-                        <div className="flex items-center justify-between mb-3">
-                          <span className="text-sm font-medium text-slate-300">
-                            {t('disbursements.form.beneficiary')} {index + 1}
-                          </span>
-                          <button
-                            type="button"
-                            onClick={() => removeRecipient(index)}
-                            className="text-slate-400 hover:text-red-400 transition-colors"
-                            title={t('disbursements.batch.remove')}
-                          >
-                            <X className="h-4 w-4" />
-                          </button>
-                        </div>
-                        <div className="grid gap-3 sm:grid-cols-[1fr_160px]">
-                          <div>
-                            <p className="text-xs text-slate-400 mb-1">{t('disbursements.form.beneficiary')}</p>
-                            <p className="text-sm font-medium text-white">{recipientBeneficiary?.name || 'Unknown'}</p>
-                            {recipientBeneficiary && (
-                              <p className="text-xs text-slate-500">
-                                {recipientBeneficiary.walletAddress.slice(0, 6)}...{recipientBeneficiary.walletAddress.slice(-4)}
-                              </p>
-                            )}
-                          </div>
-                          <div>
-                            <label className="mb-1 block text-xs text-slate-400">
-                              {t('disbursements.form.amount')}
-                            </label>
-                            <input
-                              type="number"
-                              step="0.01"
-                              min="0"
-                              max={availableBalance ?? undefined}
-                              value={recipient.amount}
-                              onChange={(e) => updateRecipientAmount(index, e.target.value)}
-                              placeholder="0.00"
-                              className="w-full rounded-lg border border-white/10 bg-navy-800 px-3 py-2 text-sm text-white placeholder-slate-500 focus:border-accent-500 focus:outline-none focus:ring-1 focus:ring-accent-500"
-                            />
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-
-              {/* Input row (always at the bottom) - this is the "add new" row */}
-              <div className="space-y-4 rounded-lg border border-white/10 bg-navy-800/30 p-4">
-                <div>
-                  <label className="mb-2 block text-sm font-medium text-slate-300">
-                    {t('disbursements.form.beneficiary')}
-                  </label>
-                  <select
-                    value={selectedBeneficiary}
-                    onChange={(e) => setSelectedBeneficiary(e.target.value)}
-                    className="w-full rounded-lg border border-white/10 bg-navy-800 px-4 py-3 text-base text-white focus:border-accent-500 focus:outline-none focus:ring-1 focus:ring-accent-500"
-                    required={!isBatchMode}
-                  >
-                    <option value="">{t('disbursements.form.selectBeneficiary')}</option>
-                    {(() => {
-                      // In batch mode, show available beneficiaries + currently selected one
-                      if (isBatchMode) {
-                        const selectedBen = selectedBeneficiary ? beneficiaries?.find(b => b._id === selectedBeneficiary) : null;
-                        const allOptions = selectedBen && !availableBeneficiaries?.some(b => b._id === selectedBeneficiary)
-                          ? [selectedBen, ...(availableBeneficiaries || [])]
-                          : (availableBeneficiaries || []);
-                        return allOptions.map((b) => (
-                          <option key={b._id} value={b._id}>
-                            {b.name} ({b.walletAddress.slice(0, 6)}...{b.walletAddress.slice(-4)})
-                          </option>
-                        ));
-                      }
-                      // Single mode - show all beneficiaries
-                      return beneficiaries?.map((b) => (
-                        <option key={b._id} value={b._id}>
-                          {b.name} ({b.walletAddress.slice(0, 6)}...{b.walletAddress.slice(-4)})
-                        </option>
-                      ));
-                    })()}
-                  </select>
-                </div>
-                <div>
-                  <div className="flex items-center justify-between mb-2">
-                    <label className="text-sm font-medium text-slate-300">
-                      {t('disbursements.form.amount')}
-                    </label>
-                    {availableBalance != null && (
-                      <span className="text-xs text-slate-400">
-                        Available: <span className="font-mono text-slate-300">{availableBalance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {token}</span>
-                      </span>
-                    )}
-                  </div>
-                  <input
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    max={availableBalance ?? undefined}
-                    value={amount}
-                    onChange={(e) => setAmount(e.target.value)}
-                    placeholder="0.00"
-                    className="w-full rounded-lg border border-white/10 bg-navy-800 px-4 py-3 text-base text-white placeholder-slate-500 focus:border-accent-500 focus:outline-none focus:ring-1 focus:ring-accent-500"
-                    required={!isBatchMode}
-                  />
-                  {availableBalance != null && parseFloat(amount || '0') > availableBalance && (
-                    <p className="mt-1 text-xs text-red-400">
-                      Insufficient balance
-                    </p>
-                  )}
-                </div>
-                
-                {/* Add another beneficiary button - shown when beneficiary and amount are filled */}
-                {selectedBeneficiary && amount && parseFloat(amount) > 0 && (
-                  <button
-                    type="button"
-                    onClick={addRecipient}
-                    className="text-sm text-accent-400 hover:text-accent-300 underline"
-                  >
-                    {t('disbursements.batch.addAnother')}
-                  </button>
-                )}
-              </div>
-
-              {/* Memo field - shown below all recipients */}
-              <div>
-                <label className="mb-2 block text-sm font-medium text-slate-300">
-                  {t('disbursements.form.memo')} ({t('common.optional')})
-                </label>
-                <input
-                  type="text"
-                  value={memo}
-                  onChange={(e) => setMemo(e.target.value)}
-                  placeholder={t('disbursements.form.memoPlaceholder')}
-                  className="w-full rounded-lg border border-white/10 bg-navy-800 px-4 py-3 text-base text-white placeholder-slate-500 focus:border-accent-500 focus:outline-none focus:ring-1 focus:ring-accent-500"
-                />
-              </div>
-
-              <div>
-                <label className="mb-2 block text-sm font-medium text-slate-300">
-                  {t('disbursements.form.scheduleFor')} ({t('common.optional')})
-                </label>
-                <input
-                  type="datetime-local"
-                  value={scheduledAt}
-                  onChange={(e) => {
-                    const nextValue = e.target.value;
-                    setScheduledAt(nextValue);
-                    setScheduledAtError(validateScheduledAt(nextValue));
-                  }}
-                  className="w-full rounded-lg border border-white/10 bg-navy-800 px-4 py-3 text-base text-white placeholder-slate-500 focus:border-accent-500 focus:outline-none focus:ring-1 focus:ring-accent-500"
-                />
-                {scheduledAtError ? (
-                  <p className="mt-1 text-xs text-red-400">
-                    {scheduledAtError}
-                  </p>
-                ) : scheduledAt ? (
-                  <p className="mt-1 text-xs text-slate-400">
-                    {t('disbursements.form.scheduleNote')}
-                  </p>
-                ) : null}
-              </div>
-
-              {/* Total summary - show when we have at least one recipient (added or in first row) */}
-              {(isBatchMode || (selectedBeneficiary && amount && parseFloat(amount) > 0)) && (
-                <div className="rounded-lg border border-accent-500/30 bg-accent-500/10 p-4">
-                  <p className="text-sm font-medium text-white">
-                    {(() => {
-                      const count = recipients.length + (selectedBeneficiary && amount && parseFloat(amount) > 0 ? 1 : 0);
-                      const beneficiaryText = count === 1 ? 'beneficiary' : 'beneficiaries';
-                      return `Total: ${batchTotal.toFixed(2)} ${token} to ${count} ${beneficiaryText}`;
-                    })()}
-                  </p>
-                  {(recipients.length + (selectedBeneficiary && amount ? 1 : 0)) <= 10 && (
-                    <div className="mt-3 space-y-1.5">
-                      {recipients.map((r, idx) => {
-                        const b = beneficiaries?.find(b => b._id === r.beneficiaryId);
-                        return (
-                          <div key={`breakdown-${idx}-${r.beneficiaryId}`} className="flex items-center justify-between text-xs">
-                            <span className="text-slate-300">{b?.name || 'Unknown'}</span>
-                            <span className="text-slate-400 font-mono">{r.amount} {token}</span>
-                          </div>
-                        );
-                      })}
-                      {selectedBeneficiary && amount && parseFloat(amount) > 0 && (
-                        <div className="flex items-center justify-between text-xs">
-                          <span className="text-slate-300">
-                            {beneficiaries?.find(b => b._id === selectedBeneficiary)?.name || 'Unknown'}
-                          </span>
-                          <span className="text-slate-400 font-mono">{amount} {token}</span>
-                        </div>
+              <div className="grid gap-2 sm:grid-cols-3">
+                {stageSteps.map((step, index) => {
+                  const isActive = index === currentStageIndex;
+                  const isComplete = index < currentStageIndex;
+                  return (
+                    <div
+                      key={step.key}
+                      className={cn(
+                        'flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs',
+                        isComplete
+                          ? 'border-accent-500/40 bg-accent-500/10 text-white'
+                          : isActive
+                            ? 'border-accent-500/60 bg-navy-800 text-white'
+                            : 'border-white/10 bg-navy-900/50 text-slate-400'
                       )}
-                      <div className="pt-1.5 border-t border-white/10 flex items-center justify-between text-xs font-medium">
-                        <span className="text-white">Total</span>
-                        <span className="text-white font-mono">{batchTotal.toFixed(2)} {token}</span>
+                    >
+                      <span
+                        className={cn(
+                          'flex h-5 w-5 items-center justify-center rounded-full text-[11px] font-semibold',
+                          isComplete
+                            ? 'bg-accent-500 text-white'
+                            : isActive
+                              ? 'bg-accent-500/20 text-accent-200'
+                              : 'bg-navy-800 text-slate-500'
+                        )}
+                      >
+                        {index + 1}
+                      </span>
+                      <span>{step.label}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            <form onSubmit={handleCreate} className="mt-4 space-y-6">
+              <div className="grid gap-6 lg:grid-cols-[1.3fr_0.7fr]">
+                <div className="space-y-4">
+                  <div className="rounded-xl border border-white/10 bg-navy-900/40 p-4">
+                    <div className="mb-3 flex items-center justify-between">
+                      <h3 className="text-sm font-semibold text-white">
+                        {t('disbursements.form.context', { defaultValue: 'Context' })}
+                      </h3>
+                      {availableBalance != null && (
+                        <span className="text-xs text-slate-400">
+                          {t('disbursements.form.availableBalance', { defaultValue: 'Available' })}:{' '}
+                          <span className="font-mono text-slate-300">
+                            {availableBalance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {token}
+                          </span>
+                        </span>
+                      )}
+                    </div>
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <div>
+                        <label className="mb-2 block text-sm font-medium text-slate-300">
+                          {t('disbursements.filters.chain', { defaultValue: 'Chain' })}
+                        </label>
+                        <select
+                          value={createChainId}
+                          onChange={(e) => {
+                            const newChainId = Number(e.target.value);
+                            const symbols = getTokenSymbolsForChain(newChainId);
+                            setCreateChainId(newChainId);
+                            setToken(symbols.includes(token) ? token : symbols[0] ?? 'USDC');
+                          }}
+                          className="w-full rounded-lg border border-white/10 bg-navy-800 px-4 py-3 text-base text-white focus:border-accent-500 focus:outline-none focus:ring-1 focus:ring-accent-500"
+                        >
+                          {CHAINS_LIST.filter((c) => safes?.some((s) => s.chainId === c.chainId)).map((c) => (
+                            <option key={c.chainId} value={c.chainId}>
+                              {c.chainName}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="mb-2 block text-sm font-medium text-slate-300">
+                          Token
+                        </label>
+                        <select
+                          value={token}
+                          onChange={(e) => setToken(e.target.value)}
+                          className="w-full rounded-lg border border-white/10 bg-navy-800 px-4 py-3 text-base text-white focus:border-accent-500 focus:outline-none focus:ring-1 focus:ring-accent-500"
+                        >
+                          {Object.keys(getTokensForChain(createChainId)).map((sym) => (
+                            <option key={sym} value={sym}>{sym}</option>
+                          ))}
+                        </select>
                       </div>
                     </div>
-                  )}
+                  </div>
+
+                  <div className="rounded-xl border border-white/10 bg-navy-900/40 p-4 space-y-4">
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-sm font-semibold text-white">
+                        {t('disbursements.form.recipients', { defaultValue: 'Recipients' })}
+                      </h3>
+                      <span className="text-xs text-slate-400">
+                        {recipientCount} {recipientCount === 1 ? t('disbursements.form.recipient', { defaultValue: 'recipient' }) : t('disbursements.form.recipientsCount', { defaultValue: 'recipients' })}
+                      </span>
+                    </div>
+
+                    <div className="inline-flex rounded-lg border border-white/10 bg-navy-800/70 p-1 text-xs">
+                      <button
+                        type="button"
+                        onClick={() => setAddMode('beneficiary')}
+                        className={cn(
+                          'rounded-md px-3 py-1.5 transition-colors',
+                          addMode === 'beneficiary'
+                            ? 'bg-accent-500/20 text-accent-200'
+                            : 'text-slate-400 hover:text-white'
+                        )}
+                      >
+                        {t('disbursements.form.byBeneficiary', { defaultValue: 'By beneficiary' })}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setAddMode('tag')}
+                        className={cn(
+                          'rounded-md px-3 py-1.5 transition-colors',
+                          addMode === 'tag'
+                            ? 'bg-accent-500/20 text-accent-200'
+                            : 'text-slate-400 hover:text-white'
+                        )}
+                      >
+                        {t('disbursements.form.byTag', { defaultValue: 'By tag' })}
+                      </button>
+                    </div>
+
+                    {addMode === 'beneficiary' ? (
+                      <div className="grid gap-3 sm:grid-cols-[1.4fr_0.7fr_auto] sm:items-end">
+                        <div>
+                          <label className="mb-2 block text-sm font-medium text-slate-300">
+                            {t('disbursements.form.beneficiary')}
+                          </label>
+                          <select
+                            value={selectedBeneficiary}
+                            onChange={(e) => setSelectedBeneficiary(e.target.value)}
+                            className="w-full rounded-lg border border-white/10 bg-navy-800 px-4 py-3 text-base text-white focus:border-accent-500 focus:outline-none focus:ring-1 focus:ring-accent-500"
+                            required={!isBatchMode}
+                          >
+                            <option value="">{t('disbursements.form.selectBeneficiary')}</option>
+                            {(() => {
+                              if (isBatchMode) {
+                                const selectedBen = selectedBeneficiary ? beneficiaries?.find(b => b._id === selectedBeneficiary) : null;
+                                const allOptions = selectedBen && !availableBeneficiaries?.some(b => b._id === selectedBeneficiary)
+                                  ? [selectedBen, ...(availableBeneficiaries || [])]
+                                  : (availableBeneficiaries || []);
+                                return allOptions.map((b) => (
+                                  <option key={b._id} value={b._id}>
+                                    {b.name} ({b.walletAddress.slice(0, 6)}...{b.walletAddress.slice(-4)})
+                                  </option>
+                                ));
+                              }
+                              return beneficiaries?.map((b) => (
+                                <option key={b._id} value={b._id}>
+                                  {b.name} ({b.walletAddress.slice(0, 6)}...{b.walletAddress.slice(-4)})
+                                </option>
+                              ));
+                            })()}
+                          </select>
+                        </div>
+                        <div>
+                          <label className="mb-2 block text-sm font-medium text-slate-300">
+                            {t('disbursements.form.amount')}
+                          </label>
+                          <input
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            max={availableBalance ?? undefined}
+                            value={amount}
+                            onChange={(e) => setAmount(e.target.value)}
+                            placeholder="0.00"
+                            className="w-full rounded-lg border border-white/10 bg-navy-800 px-4 py-3 text-base text-white placeholder-slate-500 focus:border-accent-500 focus:outline-none focus:ring-1 focus:ring-accent-500"
+                            required={!isBatchMode}
+                          />
+                          {availableBalance != null && parseFloat(amount || '0') > availableBalance && (
+                            <p className="mt-1 text-xs text-red-400">
+                              Insufficient balance
+                            </p>
+                          )}
+                        </div>
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          onClick={addRecipient}
+                          disabled={!selectedBeneficiary || !amount || parseFloat(amount) <= 0}
+                          className="h-11"
+                        >
+                          <Plus className="mr-2 h-4 w-4" />
+                          {t('disbursements.batch.addAnother')}
+                        </Button>
+                      </div>
+                    ) : (
+                      <div className="space-y-3">
+                        <TagInput
+                          availableTags={availableTags ?? []}
+                          value={selectedTags}
+                          onChange={setSelectedTags}
+                          placeholder={t('disbursements.form.selectTagsPlaceholder')}
+                          allowCreate={false}
+                        />
+                        <div className="flex items-center justify-between text-xs text-slate-400">
+                          <span>
+                            {t('disbursements.form.tagMatches', { count: beneficiariesByTag.length })}
+                          </span>
+                          <Button
+                            type="button"
+                            variant="secondary"
+                            size="sm"
+                            onClick={addRecipientsByTag}
+                            disabled={selectedTags.length === 0}
+                            className="h-9"
+                          >
+                            {t('disbursements.form.addTaggedBeneficiaries')}
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+
+                    <p className="text-xs text-slate-500">
+                      {t('disbursements.form.batchHint', { defaultValue: 'Add multiple recipients to create a batch.' })}
+                    </p>
+                  </div>
+
+                  <div className="rounded-xl border border-white/10 bg-navy-900/40 p-4">
+                    <h3 className="mb-3 text-sm font-semibold text-white">
+                      {t('disbursements.form.details', { defaultValue: 'Details' })}
+                    </h3>
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <div>
+                        <label className="mb-2 block text-sm font-medium text-slate-300">
+                          {t('disbursements.form.memo')} ({t('common.optional')})
+                        </label>
+                        <input
+                          type="text"
+                          value={memo}
+                          onChange={(e) => setMemo(e.target.value)}
+                          placeholder={t('disbursements.form.memoPlaceholder')}
+                          className="w-full rounded-lg border border-white/10 bg-navy-800 px-4 py-3 text-base text-white placeholder-slate-500 focus:border-accent-500 focus:outline-none focus:ring-1 focus:ring-accent-500"
+                        />
+                      </div>
+                      <div>
+                        <label className="mb-2 block text-sm font-medium text-slate-300">
+                          {t('disbursements.form.scheduleFor')} ({t('common.optional')})
+                        </label>
+                        <input
+                          type="datetime-local"
+                          value={scheduledAt}
+                          onChange={(e) => {
+                            const nextValue = e.target.value;
+                            setScheduledAt(nextValue);
+                            setScheduledAtError(validateScheduledAt(nextValue));
+                          }}
+                          className="w-full rounded-lg border border-white/10 bg-navy-800 px-4 py-3 text-base text-white placeholder-slate-500 focus:border-accent-500 focus:outline-none focus:ring-1 focus:ring-accent-500"
+                        />
+                        {scheduledAtError ? (
+                          <p className="mt-1 text-xs text-red-400">
+                            {scheduledAtError}
+                          </p>
+                        ) : scheduledAt ? (
+                          <p className="mt-1 text-xs text-slate-400">
+                            {t('disbursements.form.scheduleNote')}
+                          </p>
+                        ) : null}
+                      </div>
+                    </div>
+                  </div>
                 </div>
-              )}
+
+                <div className="space-y-4">
+                  <div className="rounded-xl border border-white/10 bg-navy-900/40 p-4 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-sm font-semibold text-white">
+                        {t('disbursements.form.currentBatch', { defaultValue: 'Current batch' })}
+                      </h3>
+                      <span className="text-xs text-slate-400">
+                        {recipientCount} {recipientCount === 1 ? t('disbursements.form.recipient', { defaultValue: 'recipient' }) : t('disbursements.form.recipientsCount', { defaultValue: 'recipients' })}
+                      </span>
+                    </div>
+
+                    <div className="rounded-lg border border-accent-500/30 bg-accent-500/10 p-3">
+                      <div className="flex items-center justify-between text-xs text-slate-300">
+                        <span>{t('disbursements.form.totalAmount', { defaultValue: 'Total amount' })}</span>
+                        <span className="font-mono text-white">{batchTotal.toFixed(2)} {token}</span>
+                      </div>
+                      <div className="mt-1 flex items-center justify-between text-[11px] text-slate-400">
+                        <span>{t('disbursements.form.recipientCount', { defaultValue: 'Recipients' })}: {recipientCount}</span>
+                        {availableBalance != null && (
+                          <span>
+                            {t('disbursements.form.availableBalance', { defaultValue: 'Available' })}:{' '}
+                            <span className="font-mono text-slate-300">
+                              {availableBalance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {token}
+                            </span>
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    {recipients.length === 0 && !hasDraftRecipient && (
+                      <div className="rounded-lg border border-dashed border-white/10 bg-navy-900/40 p-3 text-center text-xs text-slate-500">
+                        {t('disbursements.form.noRecipients', { defaultValue: 'No recipients added yet.' })}
+                      </div>
+                    )}
+
+                    {(recipients.length > 0 || hasDraftRecipient) && (
+                      <div className="space-y-2 max-h-[360px] overflow-auto pr-1">
+                        {recipients.map((recipient, index) => {
+                          const recipientBeneficiary = beneficiaries?.find(b => b._id === recipient.beneficiaryId);
+                          return (
+                            <div
+                              key={`recipient-${index}-${recipient.beneficiaryId}`}
+                              className="flex items-center gap-3 rounded-lg border border-white/10 bg-navy-800/60 p-3"
+                            >
+                              <div className="min-w-0 flex-1">
+                                <p className="truncate text-sm font-medium text-white">
+                                  {recipientBeneficiary?.name || 'Unknown'}
+                                </p>
+                                {recipientBeneficiary && (
+                                  <p className="text-xs text-slate-500 font-mono">
+                                    {recipientBeneficiary.walletAddress.slice(0, 6)}...{recipientBeneficiary.walletAddress.slice(-4)}
+                                  </p>
+                                )}
+                              </div>
+                              <div className="w-24">
+                                <input
+                                  type="number"
+                                  step="0.01"
+                                  min="0"
+                                  max={availableBalance ?? undefined}
+                                  value={recipient.amount}
+                                  onChange={(e) => updateRecipientAmount(index, e.target.value)}
+                                  placeholder="0.00"
+                                  className="h-9 w-full rounded-lg border border-white/10 bg-navy-800 px-2 text-sm text-white placeholder-slate-500 focus:border-accent-500 focus:outline-none focus:ring-1 focus:ring-accent-500"
+                                />
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => removeRecipient(index)}
+                                className="text-slate-400 hover:text-red-400 transition-colors"
+                                title={t('disbursements.batch.remove')}
+                              >
+                                <X className="h-4 w-4" />
+                              </button>
+                            </div>
+                          );
+                        })}
+                        {hasDraftRecipient && (
+                          <div className="flex items-center gap-3 rounded-lg border border-dashed border-white/10 bg-navy-900/40 p-3">
+                            <div className="min-w-0 flex-1">
+                              <p className="text-xs text-slate-500">
+                                {t('disbursements.form.draft', { defaultValue: 'Draft' })}
+                              </p>
+                              <p className="truncate text-sm font-medium text-white">
+                                {beneficiaries?.find(b => b._id === selectedBeneficiary)?.name || 'Unknown'}
+                              </p>
+                            </div>
+                            <span className="text-xs font-mono text-slate-300">
+                              {amount} {token}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
 
               <div className="flex flex-col sm:flex-row gap-3">
                 <Button type="submit" className="w-full sm:w-auto h-11">{t('disbursements.createDisbursement')}</Button>

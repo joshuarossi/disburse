@@ -133,10 +133,29 @@ export const retryDisbursement = action({
 
     const txServiceUrl = getSafeTxServiceUrl(disbursement.chainId);
     const response = await fetch(
-      `${txServiceUrl}/v1/transactions/${disbursement.safeTxHash}`
+      `${txServiceUrl}/v2/multisig-transactions/${disbursement.safeTxHash}/`
     );
 
     if (!response.ok) {
+      const errorBody = await response.text().catch(() => "");
+      console.error("[Relay] Failed to fetch Safe transaction status", {
+        safeTxHash: disbursement.safeTxHash,
+        chainId: disbursement.chainId,
+        status: response.status,
+        body: errorBody,
+      });
+
+      if (response.status === 404) {
+        await ctx.runMutation(api.disbursements.updateStatus, {
+          disbursementId: args.disbursementId,
+          walletAddress: args.walletAddress,
+          status: "failed",
+          relayStatus: "safe_tx_not_found",
+          relayError: "Safe transaction not found in service.",
+        });
+        return { status: "not_found" };
+      }
+
       throw new Error("Failed to fetch Safe transaction status");
     }
 
