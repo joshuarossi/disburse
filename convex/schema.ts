@@ -139,6 +139,7 @@ export default defineSchema({
       v.literal("draft"),
       v.literal("pending"),
       v.literal("proposed"),
+      v.literal("scheduled"),
       v.literal("relaying"),
       v.literal("executed"),
       v.literal("failed"),
@@ -155,6 +156,9 @@ export default defineSchema({
       v.literal("stablecoin_only")
     )),
     relayError: v.optional(v.string()),
+    scheduledAt: v.optional(v.number()), // epoch ms when relay should fire
+    scheduledJobId: v.optional(v.string()), // "sched_{disbursementId}_{version}" - audit trail only
+    scheduledVersion: v.optional(v.number()), // increments on reschedule/cancel for idempotency
     createdBy: v.id("users"),
     createdAt: v.number(),
     updatedAt: v.number(),
@@ -162,7 +166,8 @@ export default defineSchema({
     .index("by_org", ["orgId"])
     .index("by_org_status", ["orgId", "status"])
     .index("by_org_chain", ["orgId", "chainId"])
-    .index("by_safe", ["safeId"]),
+    .index("by_safe", ["safeId"])
+    .index("by_org_scheduledAt", ["orgId", "scheduledAt"]),
 
   // Disbursement recipients (for batch disbursements)
   disbursementRecipients: defineTable({

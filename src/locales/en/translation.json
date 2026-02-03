@@ -371,6 +371,10 @@
       "token": "Token",
       "memo": "Memo",
       "memoPlaceholder": "Payment description...",
+      "scheduleFor": "Schedule for",
+      "scheduleNote": "You will sign now. The relay will execute at the scheduled time.",
+      "scheduleInvalid": "Please enter a valid date and time.",
+      "scheduleTooSoon": "Scheduled time must be at least 1 minute in the future.",
       "duplicateBeneficiary": "This beneficiary is already added",
       "invalidAmount": "Amount must be greater than 0"
     },
@@ -397,6 +401,7 @@
       "chain": "Chain",
       "memo": "Memo",
       "status": "Status",
+      "scheduledFor": "Scheduled For",
       "date": "Date",
       "actions": "Actions"
     },
@@ -407,6 +412,9 @@
     "actions": {
       "propose": "Propose to Safe",
       "execute": "Execute Transaction",
+      "reschedule": "Reschedule",
+      "rescheduleTitle": "Reschedule Disbursement",
+      "rescheduleConfirm": "Pick a new date and time for this disbursement.",
       "cancel": "Cancel",
       "cancelConfirm": "Are you sure you want to cancel this disbursement?"
     }
@@ -697,6 +705,7 @@
     "draft": "Draft",
     "pending": "Pending",
     "proposed": "Proposed",
+    "scheduled": "Scheduled",
     "relaying": "Relaying",
     "executed": "Executed",
     "failed": "Failed",

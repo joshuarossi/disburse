@@ -369,6 +369,10 @@
       "token": "Token",
       "memo": "Memo",
       "memoPlaceholder": "Descripción del pago...",
+      "scheduleFor": "Programar para",
+      "scheduleNote": "Firmarás ahora. El relay se ejecutará en el momento programado.",
+      "scheduleInvalid": "Por favor ingresa una fecha y hora válidas.",
+      "scheduleTooSoon": "La hora programada debe ser al menos 1 minuto en el futuro.",
       "duplicateBeneficiary": "Este beneficiario ya está agregado",
       "invalidAmount": "La cantidad debe ser mayor que 0"
     },
@@ -395,6 +399,7 @@
       "chain": "Cadena",
       "memo": "Memo",
       "status": "Estado",
+      "scheduledFor": "Programado Para",
       "date": "Fecha",
       "actions": "Acciones"
     },
@@ -405,6 +410,9 @@
     "actions": {
       "propose": "Proponer a Safe",
       "execute": "Ejecutar Transacción",
+      "reschedule": "Reprogramar",
+      "rescheduleTitle": "Reprogramar Desembolso",
+      "rescheduleConfirm": "Elige una nueva fecha y hora para este desembolso.",
       "cancel": "Cancelar",
       "cancelConfirm": "¿Estás seguro de que quieres cancelar este desembolso?"
     }
@@ -690,6 +698,7 @@
     "draft": "Borrador",
     "pending": "Pendiente",
     "proposed": "Propuesto",
+    "scheduled": "Programado",
     "relaying": "En relay",
     "executed": "Ejecutado",
     "failed": "Fallido",

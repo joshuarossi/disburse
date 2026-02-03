@@ -46,6 +46,16 @@ const erc20Abi = [
 
 const PAGE_SIZE = 10;
 const normalizeTag = (tag: string) => tag.trim().toLowerCase();
+const toLocalDateTimeInputValue = (date: Date) => {
+  const pad = (value: number) => String(value).padStart(2, '0');
+  const year = date.getFullYear();
+  const month = pad(date.getMonth() + 1);
+  const day = pad(date.getDate());
+  const hours = pad(date.getHours());
+  const minutes = pad(date.getMinutes());
+  return `${year}-${month}-${day}T${hours}:${minutes}`;
+};
+const MIN_SCHEDULE_OFFSET_MS = 60_000;
 
 export default function Disbursements() {
   const { orgId } = useParams<{ orgId: string }>();
@@ -57,6 +67,7 @@ export default function Disbursements() {
     { value: 'draft', label: t('status.draft') },
     { value: 'pending', label: t('status.pending') },
     { value: 'proposed', label: t('status.proposed') },
+    { value: 'scheduled', label: t('status.scheduled') },
     { value: 'relaying', label: t('status.relaying') },
     { value: 'executed', label: t('status.executed') },
     { value: 'failed', label: t('status.failed') },
@@ -78,10 +89,15 @@ export default function Disbursements() {
   const [amount, setAmount] = useState('');
   const [token, setToken] = useState('USDC');
   const [memo, setMemo] = useState('');
+  const [scheduledAt, setScheduledAt] = useState<string>('');
+  const [scheduledAtError, setScheduledAtError] = useState<string | null>(null);
   const [processingId, setProcessingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [selectedDisbursementId, setSelectedDisbursementId] = useState<Id<'disbursements'> | null>(null);
   const [cancelDisbursementId, setCancelDisbursementId] = useState<Id<'disbursements'> | null>(null);
+  const [rescheduleDisbursementId, setRescheduleDisbursementId] = useState<Id<'disbursements'> | null>(null);
+  const [newScheduledAt, setNewScheduledAt] = useState<string>('');
+  const [newScheduledAtError, setNewScheduledAtError] = useState<string | null>(null);
 
   // Batch disbursement state
   const [recipients, setRecipients] = useState<Array<{ beneficiaryId: string; amount: string }>>([]);
@@ -109,7 +125,7 @@ export default function Disbursements() {
   const [showFilters, setShowFilters] = useState(false);
 
   // Sorting state
-  const [sortBy, setSortBy] = useState<'createdAt' | 'amount' | 'status'>('createdAt');
+  const [sortBy, setSortBy] = useState<'createdAt' | 'amount' | 'status' | 'scheduledAt'>('createdAt');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
 
   // Pagination state
@@ -233,6 +249,8 @@ export default function Disbursements() {
   const createDisbursement = useMutation(api.disbursements.create);
   const createBatchDisbursement = useMutation(api.disbursements.createBatch);
   const updateStatus = useMutation(api.disbursements.updateStatus);
+  const scheduleDisbursement = useMutation(api.disbursements.schedule);
+  const rescheduleDisbursement = useMutation(api.disbursements.reschedule);
 
   const relayingDisbursements = useMemo(() => {
     if (!displayedResult?.items) return [];
@@ -349,6 +367,16 @@ export default function Disbursements() {
   const handleDateToChange = (value: string) => {
     setDateTo(value);
     resetPagination();
+  };
+
+  const validateScheduledAt = (value: string) => {
+    if (!value) return null;
+    const ts = new Date(value).getTime();
+    if (Number.isNaN(ts)) return t('disbursements.form.scheduleInvalid');
+    if (ts < Date.now() + MIN_SCHEDULE_OFFSET_MS) {
+      return t('disbursements.form.scheduleTooSoon');
+    }
+    return null;
   };
 
   // Handler for sort
@@ -495,6 +523,8 @@ export default function Disbursements() {
     setAmount('');
     setToken('USDC');
     setMemo('');
+    setScheduledAt('');
+    setScheduledAtError(null);
     setRecipients([]);
     setSelectedTags([]);
     setCreateChainId(11155111);
@@ -504,6 +534,12 @@ export default function Disbursements() {
   const handleCreate = async (e: React.FormEvent, skipScreening = false) => {
     e.preventDefault();
     if (!orgId || !address) return;
+
+    const scheduleError = validateScheduledAt(scheduledAt);
+    if (scheduleError) {
+      setScheduledAtError(scheduleError);
+      return;
+    }
 
     // Validate batch mode
     if (isBatchMode || (selectedBeneficiary && amount)) {
@@ -568,6 +604,7 @@ export default function Disbursements() {
             amount: r.amount,
           })),
           memo: memo.trim() || undefined,
+          scheduledAt: scheduledAt ? new Date(scheduledAt).getTime() : undefined,
         });
         resetForm();
       } catch (error) {
@@ -613,6 +650,7 @@ export default function Disbursements() {
           token,
           amount,
           memo: memo.trim() || undefined,
+          scheduledAt: scheduledAt ? new Date(scheduledAt).getTime() : undefined,
         });
         resetForm();
       } catch (error) {
@@ -743,15 +781,32 @@ export default function Disbursements() {
             transactions
           );
 
-      await updateStatus({
+      const currentDisb = await convex.query(api.disbursements.get, {
         disbursementId: disbursement._id,
         walletAddress: address,
-        status: 'proposed',
-        safeTxHash,
-        relayFeeToken,
-        relayFeeTokenSymbol,
-        relayFeeMode,
       });
+
+      if (currentDisb?.scheduledAt && currentDisb.scheduledAt > Date.now()) {
+        await scheduleDisbursement({
+          disbursementId: disbursement._id,
+          walletAddress: address,
+          scheduledAt: currentDisb.scheduledAt,
+          safeTxHash,
+          relayFeeToken,
+          relayFeeTokenSymbol,
+          relayFeeMode,
+        });
+      } else {
+        await updateStatus({
+          disbursementId: disbursement._id,
+          walletAddress: address,
+          status: 'proposed',
+          safeTxHash,
+          relayFeeToken,
+          relayFeeTokenSymbol,
+          relayFeeMode,
+        });
+      }
     } catch (err) {
       console.error('Failed to propose transaction:', err);
       setError(err instanceof Error ? err.message : 'Failed to propose transaction');
@@ -928,6 +983,27 @@ export default function Disbursements() {
     }
   };
 
+  const handleReschedule = async () => {
+    if (!rescheduleDisbursementId || !newScheduledAt || !address) return;
+    const scheduleError = validateScheduledAt(newScheduledAt);
+    if (scheduleError) {
+      setNewScheduledAtError(scheduleError);
+      return;
+    }
+    try {
+      await rescheduleDisbursement({
+        disbursementId: rescheduleDisbursementId,
+        walletAddress: address,
+        newScheduledAt: new Date(newScheduledAt).getTime(),
+      });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to reschedule');
+    }
+    setRescheduleDisbursementId(null);
+    setNewScheduledAt('');
+    setNewScheduledAtError(null);
+  };
+
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'executed':
@@ -937,6 +1013,7 @@ export default function Disbursements() {
         return 'bg-red-500/10 text-red-400';
       case 'pending':
       case 'proposed':
+      case 'scheduled':
       case 'relaying':
         return 'bg-yellow-500/10 text-yellow-400';
       default:
@@ -1005,6 +1082,37 @@ export default function Disbursements() {
               className="h-8 w-8 p-0"
             >
               <Rocket className="h-4 w-4 text-yellow-400" />
+            </Button>
+          </div>
+        );
+      case 'scheduled':
+        return (
+          <div className="flex items-center justify-center gap-2 h-8">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                setRescheduleDisbursementId(disbursement._id);
+                setNewScheduledAt(
+                  disbursement.scheduledAt
+                    ? toLocalDateTimeInputValue(new Date(disbursement.scheduledAt))
+                    : ''
+                );
+                setNewScheduledAtError(null);
+              }}
+              title={t('disbursements.actions.reschedule')}
+              className="h-8 w-8 p-0"
+            >
+              <Calendar className="h-4 w-4 text-yellow-400" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => handleCancel(disbursement._id)}
+              title="Cancel"
+              className="h-8 w-8 p-0"
+            >
+              <X className="h-4 w-4 text-slate-400 hover:text-red-400" />
             </Button>
           </div>
         );
@@ -1465,6 +1573,31 @@ export default function Disbursements() {
                 />
               </div>
 
+              <div>
+                <label className="mb-2 block text-sm font-medium text-slate-300">
+                  {t('disbursements.form.scheduleFor')} ({t('common.optional')})
+                </label>
+                <input
+                  type="datetime-local"
+                  value={scheduledAt}
+                  onChange={(e) => {
+                    const nextValue = e.target.value;
+                    setScheduledAt(nextValue);
+                    setScheduledAtError(validateScheduledAt(nextValue));
+                  }}
+                  className="w-full rounded-lg border border-white/10 bg-navy-800 px-4 py-3 text-base text-white placeholder-slate-500 focus:border-accent-500 focus:outline-none focus:ring-1 focus:ring-accent-500"
+                />
+                {scheduledAtError ? (
+                  <p className="mt-1 text-xs text-red-400">
+                    {scheduledAtError}
+                  </p>
+                ) : scheduledAt ? (
+                  <p className="mt-1 text-xs text-slate-400">
+                    {t('disbursements.form.scheduleNote')}
+                  </p>
+                ) : null}
+              </div>
+
               {/* Total summary - show when we have at least one recipient (added or in first row) */}
               {(isBatchMode || (selectedBeneficiary && amount && parseFloat(amount) > 0)) && (
                 <div className="rounded-lg border border-accent-500/30 bg-accent-500/10 p-4">
@@ -1580,6 +1713,17 @@ export default function Disbursements() {
                         )}
                       </span>
                     </th>
+                    <th
+                      className="px-6 py-4 text-left text-sm font-medium text-slate-400 cursor-pointer hover:text-white transition-colors"
+                      onClick={() => handleSort('scheduledAt')}
+                    >
+                      <span className="flex items-center gap-1">
+                        {t('disbursements.table.scheduledFor')}
+                        {sortBy === 'scheduledAt' && (
+                          sortOrder === 'desc' ? <ChevronDown className="h-4 w-4" /> : <ChevronUp className="h-4 w-4" />
+                        )}
+                      </span>
+                    </th>
                     <th 
                       className="px-6 py-4 text-left text-sm font-medium text-slate-400 cursor-pointer hover:text-white transition-colors"
                       onClick={() => handleSort('createdAt')}
@@ -1637,6 +1781,11 @@ export default function Disbursements() {
                           </span>
                         </td>
                         <td className="px-6 py-4 text-slate-400">
+                          {disbursement.scheduledAt
+                            ? new Date(disbursement.scheduledAt).toLocaleString()
+                            : <span className="text-slate-600">—</span>}
+                        </td>
+                        <td className="px-6 py-4 text-slate-400">
                           {new Date(disbursement.createdAt).toLocaleDateString()}
                         </td>
                       <td className="px-6 py-4">
@@ -1680,12 +1829,28 @@ export default function Disbursements() {
                       >
                         {t(`status.${disbursement.status}`)}
                       </span>
+                      {disbursement.status === 'scheduled' && disbursement.scheduledAt && (
+                        <span className="ml-2 text-xs text-slate-500">
+                          {new Date(disbursement.scheduledAt).toLocaleString()}
+                        </span>
+                      )}
                     </div>
                     
                     {disbursement.memo && (
                       <div>
                         <p className="text-xs text-slate-500 mb-1">{t('disbursements.table.memo')}</p>
                         <p className="text-sm text-slate-400">{disbursement.memo}</p>
+                      </div>
+                    )}
+
+                    {disbursement.scheduledAt && (
+                      <div>
+                        <p className="text-xs text-slate-500 mb-0.5">
+                          {t('disbursements.table.scheduledFor')}
+                        </p>
+                        <p className="text-sm text-yellow-400">
+                          {new Date(disbursement.scheduledAt).toLocaleString()}
+                        </p>
                       </div>
                     )}
                     
@@ -1789,6 +1954,83 @@ export default function Disbursements() {
                   className="w-full sm:w-auto bg-red-500 hover:bg-red-600 text-white"
                 >
                   Yes, Cancel Disbursement
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Reschedule Modal */}
+        {rescheduleDisbursementId && (
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+            onClick={() => {
+              setRescheduleDisbursementId(null);
+              setNewScheduledAt('');
+              setNewScheduledAtError(null);
+            }}
+          >
+            <div
+              className="rounded-2xl border border-white/10 bg-navy-900 p-6 max-w-md w-full"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-lg font-semibold text-white">
+                  {t('disbursements.actions.rescheduleTitle')}
+                </h2>
+                <button
+                  onClick={() => {
+                    setRescheduleDisbursementId(null);
+                    setNewScheduledAt('');
+                    setNewScheduledAtError(null);
+                  }}
+                  className="text-slate-400 hover:text-white transition-colors"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+
+              <p className="text-sm text-slate-300 mb-4">
+                {t('disbursements.actions.rescheduleConfirm')}
+              </p>
+
+              <div className="mb-6">
+                <label className="mb-2 block text-sm font-medium text-slate-300">
+                  {t('disbursements.form.scheduleFor')}
+                </label>
+                <input
+                  type="datetime-local"
+                  value={newScheduledAt}
+                  onChange={(e) => {
+                    const nextValue = e.target.value;
+                    setNewScheduledAt(nextValue);
+                    setNewScheduledAtError(validateScheduledAt(nextValue));
+                  }}
+                  className="w-full rounded-lg border border-white/10 bg-navy-800 px-4 py-3 text-base text-white placeholder-slate-500 focus:border-accent-500 focus:outline-none focus:ring-1 focus:ring-accent-500"
+                />
+                {newScheduledAtError && (
+                  <p className="mt-1 text-xs text-red-400">
+                    {newScheduledAtError}
+                  </p>
+                )}
+              </div>
+
+              <div className="flex flex-col sm:flex-row gap-3 sm:justify-end">
+                <Button
+                  variant="secondary"
+                  onClick={() => {
+                    setRescheduleDisbursementId(null);
+                    setNewScheduledAt('');
+                  }}
+                  className="w-full sm:w-auto"
+                >
+                  {t('common.cancel')}
+                </Button>
+                <Button
+                  onClick={handleReschedule}
+                  className="w-full sm:w-auto"
+                >
+                  {t('disbursements.actions.reschedule')}
                 </Button>
               </div>
             </div>

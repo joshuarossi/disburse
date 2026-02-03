@@ -1,7 +1,7 @@
 import { v } from "convex/values";
-import { mutation, query } from "./_generated/server";
+import { internalMutation, internalQuery, mutation, query } from "./_generated/server";
 import { requireOrgAccess } from "./lib/rbac";
-import { Doc } from "./_generated/dataModel";
+import { internal } from "./_generated/api";
 
 // List disbursements for an org with filtering, searching, sorting, and pagination
 export const list = query({
@@ -21,7 +21,8 @@ export const list = query({
     sortBy: v.optional(v.union(
       v.literal("createdAt"),
       v.literal("amount"),
-      v.literal("status")
+      v.literal("status"),
+      v.literal("scheduledAt")
     )),
     sortOrder: v.optional(v.union(v.literal("asc"), v.literal("desc"))),
     // Pagination
@@ -175,6 +176,17 @@ export const list = query({
         case "status":
           comparison = a.status.localeCompare(b.status);
           break;
+        case "scheduledAt": {
+          const aScheduled = a.scheduledAt;
+          const bScheduled = b.scheduledAt;
+          const aNull = aScheduled == null;
+          const bNull = bScheduled == null;
+          if (aNull && bNull) return 0;
+          if (aNull) return 1;
+          if (bNull) return -1;
+          comparison = aScheduled - bScheduled;
+          break;
+        }
       }
       return sortOrder === "desc" ? -comparison : comparison;
     });
@@ -215,6 +227,7 @@ export const create = mutation({
     token: v.string(),
     amount: v.string(),
     memo: v.optional(v.string()),
+    scheduledAt: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
     const walletAddress = args.walletAddress.toLowerCase();
@@ -251,6 +264,7 @@ export const create = mutation({
       token: args.token,
       amount: args.amount,
       memo: args.memo,
+      scheduledAt: args.scheduledAt,
       type: "single",
       status: "draft",
       createdBy: user._id,
@@ -282,6 +296,7 @@ export const updateStatus = mutation({
       v.literal("draft"),
       v.literal("pending"),
       v.literal("proposed"),
+      v.literal("scheduled"),
       v.literal("relaying"),
       v.literal("executed"),
       v.literal("failed"),
@@ -361,6 +376,9 @@ export const updateStatus = mutation({
     if (args.relayFeeTokenSymbol) updates.relayFeeTokenSymbol = args.relayFeeTokenSymbol;
     if (args.relayFeeMode) updates.relayFeeMode = args.relayFeeMode;
     if (args.relayError) updates.relayError = args.relayError;
+    if (args.status === "cancelled") {
+      updates.scheduledVersion = (disbursement.scheduledVersion ?? 0) + 1;
+    }
 
     if (args.relayTaskId || args.relayStatus || args.relayError) {
       console.info("[Relay] Disbursement status update", {
@@ -399,6 +417,164 @@ export const updateStatus = mutation({
   },
 });
 
+// Internal query for scheduled relay jobs
+export const getInternal = internalQuery({
+  args: { disbursementId: v.id("disbursements") },
+  handler: async (ctx, args) => {
+    const d = await ctx.db.get(args.disbursementId);
+    if (!d) return null;
+    const safe = await ctx.db.get(d.safeId);
+    return { ...d, safeAddress: safe?.safeAddress ?? null };
+  },
+});
+
+// Internal status update without RBAC (used by scheduled relay)
+export const updateStatusInternal = internalMutation({
+  args: {
+    disbursementId: v.id("disbursements"),
+    status: v.union(v.literal("relaying"), v.literal("failed"), v.literal("cancelled")),
+    relayTaskId: v.optional(v.string()),
+    relayStatus: v.optional(v.string()),
+    relayError: v.optional(v.string()),
+    txHash: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const now = Date.now();
+    const updates: Record<string, unknown> = { status: args.status, updatedAt: now };
+    if (args.relayTaskId) updates.relayTaskId = args.relayTaskId;
+    if (args.relayStatus) updates.relayStatus = args.relayStatus;
+    if (args.relayError) updates.relayError = args.relayError;
+    if (args.txHash) updates.txHash = args.txHash;
+
+    const disbursement = await ctx.db.get(args.disbursementId);
+    if (args.status === "cancelled") {
+      updates.scheduledVersion = (disbursement?.scheduledVersion ?? 0) + 1;
+    }
+
+    await ctx.db.patch(args.disbursementId, updates);
+
+    if (disbursement) {
+      await ctx.db.insert("auditLog", {
+        orgId: disbursement.orgId,
+        actorUserId: disbursement.createdBy,
+        action: `disbursement.${args.status}`,
+        objectType: "disbursement",
+        objectId: args.disbursementId,
+        metadata: {
+          status: args.status,
+          source: "scheduled_relay",
+          relayTaskId: args.relayTaskId,
+          relayError: args.relayError,
+        },
+        timestamp: now,
+      });
+    }
+    return { success: true };
+  },
+});
+
+// Schedule a disbursement to relay at a future time
+export const schedule = mutation({
+  args: {
+    disbursementId: v.id("disbursements"),
+    walletAddress: v.string(),
+    scheduledAt: v.number(),
+    safeTxHash: v.string(),
+    relayFeeToken: v.optional(v.string()),
+    relayFeeTokenSymbol: v.optional(v.string()),
+    relayFeeMode: v.optional(v.union(v.literal("stablecoin_preferred"), v.literal("stablecoin_only"))),
+  },
+  handler: async (ctx, args) => {
+    const walletAddress = args.walletAddress.toLowerCase();
+    const now = Date.now();
+    const disbursement = await ctx.db.get(args.disbursementId);
+    if (!disbursement) throw new Error("Disbursement not found");
+
+    const { user } = await requireOrgAccess(ctx, disbursement.orgId, walletAddress, ["admin", "approver", "initiator"]);
+
+    const scheduledVersion = (disbursement.scheduledVersion ?? 0) + 1;
+
+    await ctx.db.patch(args.disbursementId, {
+      status: "scheduled",
+      scheduledAt: args.scheduledAt,
+      scheduledJobId: `sched_${args.disbursementId}_${scheduledVersion}`,
+      scheduledVersion,
+      safeTxHash: args.safeTxHash,
+      relayFeeToken: args.relayFeeToken,
+      relayFeeTokenSymbol: args.relayFeeTokenSymbol,
+      relayFeeMode: args.relayFeeMode,
+      updatedAt: now,
+    });
+
+    await ctx.scheduler.runAt(args.scheduledAt, internal.relay.fireScheduledRelay, {
+      disbursementId: args.disbursementId,
+      scheduledVersion,
+    });
+
+    await ctx.db.insert("auditLog", {
+      orgId: disbursement.orgId,
+      actorUserId: user._id,
+      action: "disbursement.scheduled",
+      objectType: "disbursement",
+      objectId: args.disbursementId,
+      metadata: { scheduledAt: args.scheduledAt, scheduledVersion },
+      timestamp: now,
+    });
+
+    return { success: true };
+  },
+});
+
+// Reschedule an existing scheduled disbursement
+export const reschedule = mutation({
+  args: {
+    disbursementId: v.id("disbursements"),
+    walletAddress: v.string(),
+    newScheduledAt: v.number(),
+  },
+  handler: async (ctx, args) => {
+    const walletAddress = args.walletAddress.toLowerCase();
+    const now = Date.now();
+    const disbursement = await ctx.db.get(args.disbursementId);
+    if (!disbursement) throw new Error("Disbursement not found");
+    if (disbursement.status !== "scheduled") {
+      throw new Error("Only scheduled disbursements can be rescheduled");
+    }
+
+    const { user } = await requireOrgAccess(ctx, disbursement.orgId, walletAddress, ["admin", "approver", "initiator"]);
+
+    const scheduledVersion = (disbursement.scheduledVersion ?? 0) + 1;
+
+    await ctx.db.patch(args.disbursementId, {
+      scheduledAt: args.newScheduledAt,
+      scheduledJobId: `sched_${args.disbursementId}_${scheduledVersion}`,
+      scheduledVersion,
+      updatedAt: now,
+    });
+
+    await ctx.scheduler.runAt(args.newScheduledAt, internal.relay.fireScheduledRelay, {
+      disbursementId: args.disbursementId,
+      scheduledVersion,
+    });
+
+    await ctx.db.insert("auditLog", {
+      orgId: disbursement.orgId,
+      actorUserId: user._id,
+      action: "disbursement.rescheduled",
+      objectType: "disbursement",
+      objectId: args.disbursementId,
+      metadata: {
+        previousScheduledAt: disbursement.scheduledAt,
+        newScheduledAt: args.newScheduledAt,
+        scheduledVersion,
+      },
+      timestamp: now,
+    });
+
+    return { success: true };
+  },
+});
+
 // Create a batch disbursement draft
 export const createBatch = mutation({
   args: {
@@ -413,6 +589,7 @@ export const createBatch = mutation({
       })
     ),
     memo: v.optional(v.string()),
+    scheduledAt: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
     const walletAddress = args.walletAddress.toLowerCase();
@@ -486,6 +663,7 @@ export const createBatch = mutation({
       token: args.token,
       totalAmount: totalAmount.toString(),
       memo: args.memo,
+      scheduledAt: args.scheduledAt,
       status: "draft",
       createdBy: user._id,
       createdAt: now,

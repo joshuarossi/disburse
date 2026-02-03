@@ -1,8 +1,9 @@
 "use node";
 
 import { v } from "convex/values";
-import { action } from "./_generated/server";
-import { api } from "./_generated/api";
+import { action, internalAction } from "./_generated/server";
+import { api, internal } from "./_generated/api";
+import { encodeFunctionData, getAddress } from "viem";
 
 const GELATO_TASK_STATUS_URL = "https://api.gelato.digital/tasks/status";
 const SAFE_TX_SERVICE_URL_BY_CHAIN: Record<number, string> = {
@@ -14,12 +15,67 @@ const SAFE_TX_SERVICE_URL_BY_CHAIN: Record<number, string> = {
   84532: "https://safe-transaction-base-sepolia.safe.global/api",
 };
 
+const GELATO_NATIVE_TOKEN_ADDRESS = "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE";
+const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
+
+const SAFE_EXEC_TX_ABI = [
+  {
+    type: "function",
+    name: "execTransaction",
+    stateMutability: "payable",
+    inputs: [
+      { name: "to", type: "address" },
+      { name: "value", type: "uint256" },
+      { name: "data", type: "bytes" },
+      { name: "operation", type: "uint8" },
+      { name: "safeTxGas", type: "uint256" },
+      { name: "baseGas", type: "uint256" },
+      { name: "gasPrice", type: "uint256" },
+      { name: "gasToken", type: "address" },
+      { name: "refundReceiver", type: "address" },
+      { name: "signatures", type: "bytes" },
+    ],
+    outputs: [{ name: "success", type: "bool" }],
+  },
+] as const;
+
 function getSafeTxServiceUrl(chainId: number): string {
   const url = SAFE_TX_SERVICE_URL_BY_CHAIN[chainId];
   if (!url) {
     throw new Error(`Unsupported chain for Safe: ${chainId}`);
   }
   return url;
+}
+
+function encodeExecTransaction(safeTx: any): string {
+  const confirmations = [...(safeTx.confirmations || [])];
+  confirmations.sort((a: any, b: any) =>
+    getAddress(a.owner).localeCompare(getAddress(b.owner))
+  );
+  const signaturesHex = "0x" + confirmations
+    .map((c: any) => c.signature.replace("0x", ""))
+    .join("");
+
+  const operation = typeof safeTx.operation === "string"
+    ? Number(safeTx.operation)
+    : safeTx.operation ?? 0;
+
+  return encodeFunctionData({
+    abi: SAFE_EXEC_TX_ABI,
+    functionName: "execTransaction",
+    args: [
+      safeTx.to,
+      BigInt(safeTx.value ?? 0),
+      safeTx.data || "0x",
+      operation,
+      BigInt(safeTx.safeTxGas ?? 0),
+      BigInt(safeTx.baseGas ?? 0),
+      BigInt(safeTx.gasPrice ?? 0),
+      safeTx.gasToken || ZERO_ADDRESS,
+      safeTx.refundReceiver || ZERO_ADDRESS,
+      signaturesHex as `0x${string}`,
+    ],
+  });
 }
 
 export const getTaskStatus = action({
@@ -128,5 +184,108 @@ export const retryDisbursement = action({
     return {
       status: "ready",
     };
+  },
+});
+
+export const fireScheduledRelay = internalAction({
+  args: {
+    disbursementId: v.id("disbursements"),
+    scheduledVersion: v.number(),
+  },
+  handler: async (ctx, args) => {
+    const disbursement = await ctx.runQuery(internal.disbursements.getInternal, {
+      disbursementId: args.disbursementId,
+    });
+
+    if (
+      !disbursement ||
+      disbursement.status !== "scheduled" ||
+      disbursement.scheduledVersion !== args.scheduledVersion
+    ) {
+      console.info("[Relay] Scheduled job skipped", {
+        disbursementId: args.disbursementId,
+        status: disbursement?.status,
+        scheduledVersion: disbursement?.scheduledVersion,
+        jobVersion: args.scheduledVersion,
+      });
+      return { skipped: true };
+    }
+
+    if (!disbursement.safeTxHash || !disbursement.chainId || !disbursement.safeAddress) {
+      await ctx.runMutation(internal.disbursements.updateStatusInternal, {
+        disbursementId: args.disbursementId,
+        status: "failed",
+        relayError: "Missing safeTxHash, chainId, or safeAddress at relay time.",
+      });
+      return { error: "missing_data" };
+    }
+
+    try {
+      const txServiceUrl = getSafeTxServiceUrl(disbursement.chainId);
+      const txResponse = await fetch(
+        `${txServiceUrl}/v2/multisig-transactions/${disbursement.safeTxHash}/`
+      );
+      if (!txResponse.ok) {
+        throw new Error(`Safe TX service returned ${txResponse.status}`);
+      }
+      const safeTx = await txResponse.json();
+
+      const encodedTransaction = encodeExecTransaction(safeTx);
+
+      const gasToken = safeTx.gasToken ?? ZERO_ADDRESS;
+      const feeToken = (!gasToken || gasToken === ZERO_ADDRESS)
+        ? GELATO_NATIVE_TOKEN_ADDRESS
+        : gasToken;
+
+      const relayResponse = await fetch(
+        "https://api.gelato.digital/relays/v2/call-with-sync-fee",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            chainId: String(disbursement.chainId),
+            target: disbursement.safeAddress,
+            data: encodedTransaction,
+            feeToken,
+            isRelayContext: false,
+          }),
+        }
+      );
+
+      const responseBody = await relayResponse.text();
+      console.info("[Relay] Gelato response (scheduled)", {
+        status: relayResponse.status,
+        body: responseBody,
+      });
+
+      if (!relayResponse.ok) {
+        throw new Error(`Gelato relay failed: ${relayResponse.status} ${responseBody}`);
+      }
+
+      const parsed = JSON.parse(responseBody);
+      if (!parsed?.taskId) {
+        throw new Error("Relay did not return a taskId.");
+      }
+
+      await ctx.runMutation(internal.disbursements.updateStatusInternal, {
+        disbursementId: args.disbursementId,
+        status: "relaying",
+        relayTaskId: parsed.taskId,
+        relayStatus: "submitted",
+      });
+
+      return { taskId: parsed.taskId };
+    } catch (err) {
+      await ctx.runMutation(internal.disbursements.updateStatusInternal, {
+        disbursementId: args.disbursementId,
+        status: "failed",
+        relayError: err instanceof Error ? err.message : "Unknown error",
+      });
+      console.error("[Relay] Scheduled relay failed", {
+        disbursementId: args.disbursementId,
+        error: err,
+      });
+      return { error: "relay_failed" };
+    }
   },
 });
