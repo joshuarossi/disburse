@@ -15,6 +15,7 @@ import type * as beneficiaries from "../beneficiaries.js";
 import type * as billing from "../billing.js";
 import type * as disbursements from "../disbursements.js";
 import type * as lib_rbac from "../lib/rbac.js";
+import type * as lib_tags from "../lib/tags.js";
 import type * as migrations_backfillBeneficiaryType from "../migrations/backfillBeneficiaryType.js";
 import type * as migrations_backfillDisbursementChainId from "../migrations/backfillDisbursementChainId.js";
 import type * as orgs from "../orgs.js";
@@ -23,6 +24,7 @@ import type * as safes from "../safes.js";
 import type * as screening from "../screening.js";
 import type * as screeningMutations from "../screeningMutations.js";
 import type * as screeningQueries from "../screeningQueries.js";
+import type * as tags from "../tags.js";
 import type * as users from "../users.js";
 
 import type {
@@ -39,6 +41,7 @@ declare const fullApi: ApiFromModules<{
   billing: typeof billing;
   disbursements: typeof disbursements;
   "lib/rbac": typeof lib_rbac;
+  "lib/tags": typeof lib_tags;
   "migrations/backfillBeneficiaryType": typeof migrations_backfillBeneficiaryType;
   "migrations/backfillDisbursementChainId": typeof migrations_backfillDisbursementChainId;
   orgs: typeof orgs;
@@ -47,6 +50,7 @@ declare const fullApi: ApiFromModules<{
   screening: typeof screening;
   screeningMutations: typeof screeningMutations;
   screeningQueries: typeof screeningQueries;
+  tags: typeof tags;
   users: typeof users;
 }>;
 

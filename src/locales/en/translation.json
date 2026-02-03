@@ -267,6 +267,11 @@
     "editBeneficiary": "Edit Beneficiary",
     "saveChanges": "Save Changes",
     "searchPlaceholder": "Search by name, address, or notes...",
+    "tags": "Tags",
+    "tagsPlaceholder": "Type to add tags...",
+    "filterTags": "Filter by tag...",
+    "showHidden": "Show hidden",
+    "hideHidden": "Hide hidden",
     "validation": {
       "nameRequired": {
         "individual": "Full name is required",
@@ -357,6 +362,11 @@
     "form": {
       "beneficiary": "Beneficiary",
       "selectBeneficiary": "Select a beneficiary...",
+      "selectByTag": "Select by tag",
+      "selectTagsPlaceholder": "Choose tags...",
+      "addTaggedBeneficiaries": "Add tagged beneficiaries",
+      "tagMatches": "{{count}} match{{count, plural, one {} other {es}}}",
+      "noTaggedBeneficiaries": "No beneficiaries match the selected tags",
       "amount": "Amount",
       "token": "Token",
       "memo": "Memo",

@@ -9,6 +9,7 @@ import { Id } from '../../convex/_generated/dataModel';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { Button } from '@/components/ui/button';
 import { BatchDetailModal } from '@/components/disbursements/BatchDetailModal';
+import { TagInput } from '@/components/beneficiaries/TagInput';
 import { cn } from '@/lib/utils';
 import {
   Plus, Send, ArrowUpRight, Loader2, Play, CheckCircle, X, Rocket,
@@ -41,6 +42,7 @@ const erc20Abi = [
 ] as const;
 
 const PAGE_SIZE = 10;
+const normalizeTag = (tag: string) => tag.trim().toLowerCase();
 
 export default function Disbursements() {
   const { orgId } = useParams<{ orgId: string }>();
@@ -79,6 +81,7 @@ export default function Disbursements() {
 
   // Batch disbursement state
   const [recipients, setRecipients] = useState<Array<{ beneficiaryId: string; amount: string }>>([]);
+  const [selectedTags, setSelectedTags] = useState<string[]>([]);
 
   // Screening warning state
   const [screeningWarning, setScreeningWarning] = useState<{
@@ -145,7 +148,14 @@ export default function Disbursements() {
   const beneficiaries = useQuery(
     api.beneficiaries.list,
     orgId && address
-      ? { orgId: orgId as Id<'orgs'>, walletAddress: address, activeOnly: true }
+      ? { orgId: orgId as Id<'orgs'>, walletAddress: address, activeOnly: true, includeTags: true }
+      : 'skip'
+  );
+
+  const availableTags = useQuery(
+    api.tags.list,
+    orgId && address
+      ? { orgId: orgId as Id<'orgs'>, walletAddress: address }
       : 'skip'
   );
 
@@ -330,6 +340,14 @@ export default function Disbursements() {
     return beneficiaries.filter(b => !selectedIds.has(b._id));
   }, [beneficiaries, recipients]);
 
+  const beneficiariesByTag = useMemo(() => {
+    if (!beneficiaries || selectedTags.length === 0) return [];
+    const selected = new Set(selectedTags.map(normalizeTag));
+    return beneficiaries.filter((b) =>
+      b.tags?.some((tag) => selected.has(normalizeTag(tag)))
+    );
+  }, [beneficiaries, selectedTags]);
+
   // Add recipient row (adds current first row to recipients, keeps first row for next entry)
   const addRecipient = () => {
     if (!selectedBeneficiary || !amount) return;
@@ -354,6 +372,27 @@ export default function Disbursements() {
     setAmount('');
   };
 
+  const addRecipientsByTag = () => {
+    if (selectedTags.length === 0) return;
+    if (!beneficiariesByTag.length) {
+      setError(t('disbursements.form.noTaggedBeneficiaries'));
+      return;
+    }
+
+    setError(null);
+    setRecipients((prev) => {
+      const existing = new Set(prev.map((r) => r.beneficiaryId));
+      const updated = [...prev];
+      for (const beneficiary of beneficiariesByTag) {
+        if (existing.has(beneficiary._id) || beneficiary._id === selectedBeneficiary) {
+          continue;
+        }
+        updated.push({ beneficiaryId: beneficiary._id, amount: '' });
+      }
+      return updated;
+    });
+  };
+
   // Remove recipient row
   const removeRecipient = (index: number) => {
     setRecipients(prev => prev.filter((_, i) => i !== index));
@@ -376,6 +415,7 @@ export default function Disbursements() {
     setToken('USDC');
     setMemo('');
     setRecipients([]);
+    setSelectedTags([]);
     setCreateChainId(11155111);
     setIsCreating(false);
   };
@@ -1048,39 +1088,93 @@ export default function Disbursements() {
                 </select>
               </div>
 
-              {/* Locked recipient cards - show all added recipients ABOVE the input row */}
-              {recipients.map((recipient, index) => {
-                const recipientBeneficiary = beneficiaries?.find(b => b._id === recipient.beneficiaryId);
-                return (
-                  <div key={`recipient-${index}-${recipient.beneficiaryId}`} className="rounded-lg border border-white/10 bg-navy-800/50 p-4">
-                    <div className="flex items-center justify-between mb-3">
-                      <span className="text-sm font-medium text-slate-300">
-                        {t('disbursements.form.beneficiary')} {index + 1}
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => removeRecipient(index)}
-                        className="text-slate-400 hover:text-red-400 transition-colors"
-                        title={t('disbursements.batch.remove')}
+              {/* Select by tag */}
+              <div className="rounded-lg border border-white/10 bg-navy-800/30 p-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <label className="text-sm font-medium text-slate-300">
+                    {t('disbursements.form.selectByTag')} ({t('common.optional')})
+                  </label>
+                  {selectedTags.length > 0 && (
+                    <span className="text-xs text-slate-400">
+                      {t('disbursements.form.tagMatches', { count: beneficiariesByTag.length })}
+                    </span>
+                  )}
+                </div>
+                <TagInput
+                  availableTags={availableTags ?? []}
+                  value={selectedTags}
+                  onChange={setSelectedTags}
+                  placeholder={t('disbursements.form.selectTagsPlaceholder')}
+                  allowCreate={false}
+                />
+                <div className="flex justify-end">
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="sm"
+                    onClick={addRecipientsByTag}
+                    disabled={selectedTags.length === 0}
+                    className="h-9"
+                  >
+                    {t('disbursements.form.addTaggedBeneficiaries')}
+                  </Button>
+                </div>
+              </div>
+
+              {/* Recipient rows - editable amounts */}
+              {recipients.length > 0 && (
+                <div className="space-y-3">
+                  {recipients.map((recipient, index) => {
+                    const recipientBeneficiary = beneficiaries?.find(b => b._id === recipient.beneficiaryId);
+                    return (
+                      <div
+                        key={`recipient-${index}-${recipient.beneficiaryId}`}
+                        className="rounded-lg border border-white/10 bg-navy-800/50 p-4"
                       >
-                        <X className="h-4 w-4" />
-                      </button>
-                    </div>
-                    <div className="space-y-2">
-                      <div>
-                        <p className="text-xs text-slate-400 mb-1">{t('disbursements.form.beneficiary')}</p>
-                        <p className="text-sm font-medium text-white">{recipientBeneficiary?.name || 'Unknown'}</p>
+                        <div className="flex items-center justify-between mb-3">
+                          <span className="text-sm font-medium text-slate-300">
+                            {t('disbursements.form.beneficiary')} {index + 1}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => removeRecipient(index)}
+                            className="text-slate-400 hover:text-red-400 transition-colors"
+                            title={t('disbursements.batch.remove')}
+                          >
+                            <X className="h-4 w-4" />
+                          </button>
+                        </div>
+                        <div className="grid gap-3 sm:grid-cols-[1fr_160px]">
+                          <div>
+                            <p className="text-xs text-slate-400 mb-1">{t('disbursements.form.beneficiary')}</p>
+                            <p className="text-sm font-medium text-white">{recipientBeneficiary?.name || 'Unknown'}</p>
+                            {recipientBeneficiary && (
+                              <p className="text-xs text-slate-500">
+                                {recipientBeneficiary.walletAddress.slice(0, 6)}...{recipientBeneficiary.walletAddress.slice(-4)}
+                              </p>
+                            )}
+                          </div>
+                          <div>
+                            <label className="mb-1 block text-xs text-slate-400">
+                              {t('disbursements.form.amount')}
+                            </label>
+                            <input
+                              type="number"
+                              step="0.01"
+                              min="0"
+                              max={availableBalance ?? undefined}
+                              value={recipient.amount}
+                              onChange={(e) => updateRecipientAmount(index, e.target.value)}
+                              placeholder="0.00"
+                              className="w-full rounded-lg border border-white/10 bg-navy-800 px-3 py-2 text-sm text-white placeholder-slate-500 focus:border-accent-500 focus:outline-none focus:ring-1 focus:ring-accent-500"
+                            />
+                          </div>
+                        </div>
                       </div>
-                      <div>
-                        <p className="text-xs text-slate-400 mb-1">{t('disbursements.form.amount')}</p>
-                        <p className="text-sm font-mono text-white">
-                          {recipient.amount} {token}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
+                    );
+                  })}
+                </div>
+              )}
 
               {/* Input row (always at the bottom) - this is the "add new" row */}
               <div className="space-y-4 rounded-lg border border-white/10 bg-navy-800/30 p-4">

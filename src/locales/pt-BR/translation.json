@@ -265,6 +265,11 @@
     "editBeneficiary": "Editar Beneficiário",
     "saveChanges": "Salvar Alterações",
     "searchPlaceholder": "Buscar por nome, endereço ou notas...",
+    "tags": "Tags",
+    "tagsPlaceholder": "Digite para adicionar tags...",
+    "filterTags": "Filtrar por tag...",
+    "showHidden": "Mostrar ocultos",
+    "hideHidden": "Ocultar ocultos",
     "validation": {
       "nameRequired": {
         "individual": "O nome completo é obrigatório",
@@ -355,6 +360,11 @@
     "form": {
       "beneficiary": "Beneficiário",
       "selectBeneficiary": "Selecione um beneficiário...",
+      "selectByTag": "Selecionar por tag",
+      "selectTagsPlaceholder": "Escolha tags...",
+      "addTaggedBeneficiaries": "Adicionar beneficiários com tag",
+      "tagMatches": "{{count}} correspondência{{count, plural, one {} other {s}}}",
+      "noTaggedBeneficiaries": "Nenhum beneficiário corresponde às tags selecionadas",
       "amount": "Quantia",
       "token": "Token",
       "memo": "Memo",
