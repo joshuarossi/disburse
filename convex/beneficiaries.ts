@@ -1,8 +1,112 @@
 import { v } from "convex/values";
-import { mutation, query } from "./_generated/server";
+import { mutation, query, QueryCtx, MutationCtx } from "./_generated/server";
 import { internal } from "./_generated/api";
 import { requireOrgAccess } from "./lib/rbac";
 import { getOrgLimits } from "./billing";
+import { dedupeTagNames } from "./lib/tags";
+import { Id } from "./_generated/dataModel";
+
+const buildTagsForOrg = async (ctx: QueryCtx, orgId: Id<"orgs">) => {
+  const assignments = await ctx.db
+    .query("beneficiaryTags")
+    .withIndex("by_org", (q) => q.eq("orgId", orgId))
+    .collect();
+
+  const tagIds = Array.from(new Set(assignments.map((assignment) => assignment.tagId)));
+  const tagDocs = await Promise.all(tagIds.map((tagId) => ctx.db.get(tagId)));
+  const tagsById = new Map(
+    tagDocs.filter(Boolean).map((tag) => [tag!._id, tag])
+  );
+
+  const tagsByBeneficiary = new Map<Id<"beneficiaries">, string[]>();
+  for (const assignment of assignments) {
+    const tag = tagsById.get(assignment.tagId);
+    if (!tag) continue;
+    const list = tagsByBeneficiary.get(assignment.beneficiaryId) ?? [];
+    list.push(tag.name);
+    tagsByBeneficiary.set(assignment.beneficiaryId, list);
+  }
+
+  for (const [beneficiaryId, tags] of tagsByBeneficiary.entries()) {
+    tags.sort((a, b) => a.localeCompare(b));
+    tagsByBeneficiary.set(beneficiaryId, tags);
+  }
+
+  return tagsByBeneficiary;
+};
+
+const upsertTags = async (
+  ctx: MutationCtx,
+  orgId: Id<"orgs">,
+  userId: Id<"users">,
+  tagNames: string[]
+): Promise<Array<Id<"tags">>> => {
+  const now = Date.now();
+  const deduped = dedupeTagNames(tagNames);
+  const tagIds: Array<Id<"tags">> = [];
+
+  for (const tag of deduped) {
+    const existing = await ctx.db
+      .query("tags")
+      .withIndex("by_org_normalized", (q) =>
+        q.eq("orgId", orgId).eq("normalizedName", tag.normalized)
+      )
+      .first();
+
+    if (existing) {
+      tagIds.push(existing._id);
+      continue;
+    }
+
+    const tagId = await ctx.db.insert("tags", {
+      orgId,
+      name: tag.name,
+      normalizedName: tag.normalized,
+      createdBy: userId,
+      createdAt: now,
+      updatedAt: now,
+    });
+    tagIds.push(tagId);
+  }
+
+  return tagIds;
+};
+
+const setBeneficiaryTags = async (
+  ctx: MutationCtx,
+  orgId: Id<"orgs">,
+  beneficiaryId: Id<"beneficiaries">,
+  userId: Id<"users">,
+  tagNames: string[]
+) => {
+  const now = Date.now();
+  const tagIds = await upsertTags(ctx, orgId, userId, tagNames);
+  const desiredIds = new Set(tagIds);
+
+  const existing = await ctx.db
+    .query("beneficiaryTags")
+    .withIndex("by_beneficiary", (q) => q.eq("beneficiaryId", beneficiaryId))
+    .collect();
+
+  const existingIds = new Set(existing.map((assignment) => assignment.tagId));
+
+  for (const assignment of existing) {
+    if (!desiredIds.has(assignment.tagId)) {
+      await ctx.db.delete(assignment._id);
+    }
+  }
+
+  for (const tagId of desiredIds) {
+    if (!existingIds.has(tagId)) {
+      await ctx.db.insert("beneficiaryTags", {
+        orgId,
+        beneficiaryId,
+        tagId,
+        createdAt: now,
+      });
+    }
+  }
+};
 
 // List beneficiaries for an org
 export const list = query({
@@ -10,6 +114,7 @@ export const list = query({
     orgId: v.id("orgs"),
     walletAddress: v.string(),
     activeOnly: v.optional(v.boolean()),
+    includeTags: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
     const walletAddress = args.walletAddress.toLowerCase();
@@ -17,19 +122,34 @@ export const list = query({
     // Verify access (any role can view)
     await requireOrgAccess(ctx, args.orgId, walletAddress, ["admin", "approver", "initiator", "clerk", "viewer"]);
 
+    const includeTags = args.includeTags ?? false;
+    const tagsByBeneficiary = includeTags
+      ? await buildTagsForOrg(ctx, args.orgId)
+      : new Map();
+
     if (args.activeOnly) {
-      return await ctx.db
+      const beneficiaries = await ctx.db
         .query("beneficiaries")
         .withIndex("by_org_active", (q) => 
           q.eq("orgId", args.orgId).eq("isActive", true)
         )
         .collect();
+
+      return beneficiaries.map((beneficiary) => ({
+        ...beneficiary,
+        tags: includeTags ? (tagsByBeneficiary.get(beneficiary._id) ?? []) : [],
+      }));
     }
 
-    return await ctx.db
+    const beneficiaries = await ctx.db
       .query("beneficiaries")
       .withIndex("by_org", (q) => q.eq("orgId", args.orgId))
       .collect();
+
+    return beneficiaries.map((beneficiary) => ({
+      ...beneficiary,
+      tags: includeTags ? (tagsByBeneficiary.get(beneficiary._id) ?? []) : [],
+    }));
   },
 });
 
@@ -44,6 +164,7 @@ export const create = mutation({
     notes: v.optional(v.string()),
     preferredToken: v.optional(v.string()),
     preferredChainId: v.optional(v.number()),
+    tags: v.optional(v.array(v.string())),
   },
   handler: async (ctx, args) => {
     const walletAddress = args.walletAddress.toLowerCase();
@@ -76,6 +197,10 @@ export const create = mutation({
       updatedAt: now,
     });
 
+    if (args.tags && args.tags.length > 0) {
+      await setBeneficiaryTags(ctx, args.orgId, beneficiaryId, user._id, args.tags);
+    }
+
     // Audit log
     await ctx.db.insert("auditLog", {
       orgId: args.orgId,
@@ -83,7 +208,12 @@ export const create = mutation({
       action: "beneficiary.created",
       objectType: "beneficiary",
       objectId: beneficiaryId,
-      metadata: { type: args.type, name: args.name, walletAddress: args.beneficiaryAddress },
+      metadata: {
+        type: args.type,
+        name: args.name,
+        walletAddress: args.beneficiaryAddress,
+        tags: args.tags ?? [],
+      },
       timestamp: now,
     });
 
@@ -110,6 +240,7 @@ export const update = mutation({
     preferredToken: v.optional(v.string()),
     preferredChainId: v.optional(v.number()),
     isActive: v.optional(v.boolean()),
+    tags: v.optional(v.array(v.string())),
   },
   handler: async (ctx, args) => {
     const walletAddress = args.walletAddress.toLowerCase();
@@ -134,6 +265,15 @@ export const update = mutation({
 
     await ctx.db.patch(args.beneficiaryId, updates);
 
+    if (args.tags !== undefined) {
+      await setBeneficiaryTags(ctx, beneficiary.orgId, args.beneficiaryId, user._id, args.tags);
+    }
+
+    const auditMetadata: Record<string, unknown> = { ...updates };
+    if (args.tags !== undefined) {
+      auditMetadata.tags = args.tags;
+    }
+
     // Audit log
     await ctx.db.insert("auditLog", {
       orgId: beneficiary.orgId,
@@ -141,7 +281,7 @@ export const update = mutation({
       action: "beneficiary.updated",
       objectType: "beneficiary",
       objectId: args.beneficiaryId,
-      metadata: updates,
+      metadata: auditMetadata,
       timestamp: now,
     });
 

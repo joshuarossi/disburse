@@ -94,6 +94,31 @@ export default defineSchema({
     .index("by_org", ["orgId"])
     .index("by_org_active", ["orgId", "isActive"]),
 
+  // Beneficiary tags (org-wide labels)
+  tags: defineTable({
+    orgId: v.id("orgs"),
+    name: v.string(),
+    normalizedName: v.string(),
+    createdBy: v.id("users"),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_org", ["orgId"])
+    .index("by_org_normalized", ["orgId", "normalizedName"]),
+
+  // Beneficiary tag assignments
+  beneficiaryTags: defineTable({
+    orgId: v.id("orgs"),
+    beneficiaryId: v.id("beneficiaries"),
+    tagId: v.id("tags"),
+    createdAt: v.number(),
+  })
+    .index("by_org", ["orgId"])
+    .index("by_beneficiary", ["beneficiaryId"])
+    .index("by_tag", ["tagId"])
+    .index("by_org_beneficiary", ["orgId", "beneficiaryId"])
+    .index("by_org_tag", ["orgId", "tagId"]),
+
   // Disbursements (payment intents)
   disbursements: defineTable({
     orgId: v.id("orgs"),

@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button';
 import { BulkImportModal } from '@/components/beneficiaries/BulkImportModal';
 import { ScreeningBadge } from '@/components/beneficiaries/ScreeningBadge';
 import { ScreeningDetailModal } from '@/components/beneficiaries/ScreeningDetailModal';
+import { TagInput } from '@/components/beneficiaries/TagInput';
 import { cn } from '@/lib/utils';
 import { 
   Plus, 
@@ -26,6 +27,8 @@ import {
   ChevronUp,
   Filter,
   Upload,
+  Eye,
+  EyeOff,
 } from 'lucide-react';
 import { CHAINS_LIST, getChainName } from '@/lib/chains';
 
@@ -44,6 +47,7 @@ interface Beneficiary {
   preferredChainId?: number;
   isActive: boolean;
   createdAt: number;
+  tags: string[];
 }
 
 interface EditingBeneficiary {
@@ -54,6 +58,7 @@ interface EditingBeneficiary {
   notes: string;
   preferredToken: string;
   preferredChainId: number | '';
+  tags: string[];
 }
 
 const PREFERRED_TOKEN_OPTIONS = ['USDC', 'USDT', 'PYUSD'];
@@ -64,6 +69,7 @@ interface SectionState {
   sortField: SortField;
   sortOrder: SortOrder;
   statusFilter: StatusFilter;
+  tagFilter: string[];
   showFilters: boolean;
 }
 
@@ -73,6 +79,7 @@ function BeneficiarySection({
   icon: Icon,
   iconColor,
   beneficiaries,
+  availableTags,
   walletAddress,
   onEdit,
   onToggleActive,
@@ -81,6 +88,7 @@ function BeneficiarySection({
   icon: typeof User;
   iconColor: string;
   beneficiaries: Beneficiary[];
+  availableTags: { name: string; normalizedName?: string }[];
   walletAddress: string;
   onEdit: (b: Beneficiary) => void;
   onToggleActive: (id: Id<'beneficiaries'>, isActive: boolean) => void;
@@ -91,7 +99,8 @@ function BeneficiarySection({
     search: '',
     sortField: 'name',
     sortOrder: 'asc',
-    statusFilter: 'all',
+    statusFilter: 'active',
+    tagFilter: [],
     showFilters: false,
   });
 
@@ -117,6 +126,14 @@ function BeneficiarySection({
       result = result.filter((b) => !b.isActive);
     }
 
+    // Tag filter (match any selected tag)
+    if (state.tagFilter.length > 0) {
+      const selectedTags = new Set(state.tagFilter.map((tag) => tag.toLowerCase()));
+      result = result.filter((b) =>
+        b.tags?.some((tag) => selectedTags.has(tag.toLowerCase()))
+      );
+    }
+
     // Sort
     result.sort((a, b) => {
       let comparison = 0;
@@ -135,7 +152,7 @@ function BeneficiarySection({
     });
 
     return result;
-  }, [beneficiaries, state.search, state.sortField, state.sortOrder, state.statusFilter]);
+  }, [beneficiaries, state.search, state.sortField, state.sortOrder, state.statusFilter, state.tagFilter]);
 
   const handleSort = (field: SortField) => {
     if (state.sortField === field) {
@@ -145,10 +162,16 @@ function BeneficiarySection({
     }
   };
 
-  const hasActiveFilters = state.search || state.statusFilter !== 'all';
+  const hasActiveFilters =
+    state.search || state.statusFilter !== 'active' || state.tagFilter.length > 0;
+
+  const filterCount =
+    (state.statusFilter !== 'active' ? 1 : 0) +
+    (state.tagFilter.length > 0 ? 1 : 0);
+  const showHidden = state.statusFilter === 'all';
 
   const clearFilters = () => {
-    setState((s) => ({ ...s, search: '', statusFilter: 'all' }));
+    setState((s) => ({ ...s, search: '', statusFilter: 'active', tagFilter: [] }));
   };
 
   const activeCount = beneficiaries.filter((b) => b.isActive).length;
@@ -189,6 +212,23 @@ function BeneficiarySection({
           </div>
 
           <div className="flex items-center gap-2">
+            {/* Show hidden toggle */}
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() =>
+                setState((s) => ({
+                  ...s,
+                  statusFilter: s.statusFilter === 'all' ? 'active' : 'all',
+                }))
+              }
+              className={cn("h-11", showHidden ? 'border-accent-500' : '')}
+            >
+              {showHidden ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+              <span className="hidden sm:inline">
+                {showHidden ? t('beneficiaries.hideHidden') : t('beneficiaries.showHidden')}
+              </span>
+            </Button>
             {/* Filter Toggle */}
             <Button
               variant="secondary"
@@ -200,7 +240,7 @@ function BeneficiarySection({
               <span className="hidden sm:inline">{t('common.filters')}</span>
               {hasActiveFilters && (
                 <span className="ml-1 rounded-full bg-accent-500 px-1.5 py-0.5 text-xs text-white">
-                  {(state.statusFilter !== 'all' ? 1 : 0)}
+                  {filterCount}
                 </span>
               )}
             </Button>
@@ -217,22 +257,36 @@ function BeneficiarySection({
         {/* Expanded Filters */}
         {state.showFilters && (
           <div className="mt-3 pt-3 border-t border-white/5">
-            <div className="flex items-center gap-4">
-              <span className="text-sm text-slate-400">Status:</span>
-              <div className="flex gap-2">
-                {(['all', 'active', 'inactive'] as StatusFilter[]).map((status) => (
-                  <button
-                    key={status}
-                    onClick={() => setState((s) => ({ ...s, statusFilter: status }))}
-                    className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
-                      state.statusFilter === status
-                        ? 'bg-accent-500 text-white'
-                        : 'bg-navy-800 text-slate-400 hover:bg-navy-700 hover:text-white'
-                    }`}
-                  >
-                    {t(`beneficiaries.status.${status}`)}
-                  </button>
-                ))}
+            <div className="flex flex-col gap-4">
+              <div className="flex items-center gap-4">
+                <span className="text-sm text-slate-400">Status:</span>
+                <div className="flex gap-2">
+                  {(['all', 'active', 'inactive'] as StatusFilter[]).map((status) => (
+                    <button
+                      key={status}
+                      onClick={() => setState((s) => ({ ...s, statusFilter: status }))}
+                      className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
+                        state.statusFilter === status
+                          ? 'bg-accent-500 text-white'
+                          : 'bg-navy-800 text-slate-400 hover:bg-navy-700 hover:text-white'
+                      }`}
+                    >
+                      {t(`beneficiaries.status.${status}`)}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <span className="mb-2 block text-sm text-slate-400">
+                  {t('beneficiaries.tags')}
+                </span>
+                <TagInput
+                  availableTags={availableTags}
+                  value={state.tagFilter}
+                  onChange={(tags) => setState((s) => ({ ...s, tagFilter: tags }))}
+                  placeholder={t('beneficiaries.filterTags')}
+                  allowCreate={false}
+                />
               </div>
             </div>
           </div>
@@ -319,6 +373,18 @@ function BeneficiarySection({
                             {beneficiary.notes}
                           </p>
                         )}
+                        {beneficiary.tags?.length > 0 && (
+                          <div className="mt-2 flex flex-wrap gap-1">
+                            {beneficiary.tags.map((tag) => (
+                              <span
+                                key={tag}
+                                className="rounded-full bg-navy-700 px-2 py-0.5 text-xs text-slate-300"
+                              >
+                                {tag}
+                              </span>
+                            ))}
+                          </div>
+                        )}
                       </div>
                     </td>
                     <td className="px-6 py-4">
@@ -392,6 +458,18 @@ function BeneficiarySection({
                       <p className="text-sm text-slate-500 mt-1 line-clamp-2" title={beneficiary.notes}>
                         {beneficiary.notes}
                       </p>
+                    )}
+                    {beneficiary.tags?.length > 0 && (
+                      <div className="mt-2 flex flex-wrap gap-1">
+                        {beneficiary.tags.map((tag) => (
+                          <span
+                            key={tag}
+                            className="rounded-full bg-navy-700 px-2 py-0.5 text-xs text-slate-300"
+                          >
+                            {tag}
+                          </span>
+                        ))}
+                      </div>
                     )}
                   </div>
                   <div className="flex items-center gap-2 ml-2 shrink-0">
@@ -487,6 +565,7 @@ export default function Beneficiaries() {
   const [newNotes, setNewNotes] = useState('');
   const [newPreferredToken, setNewPreferredToken] = useState<string>('');
   const [newPreferredChainId, setNewPreferredChainId] = useState<number | ''>('');
+  const [newTags, setNewTags] = useState<string[]>([]);
   const [createError, setCreateError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<{
     name?: string;
@@ -506,6 +585,13 @@ export default function Beneficiaries() {
 
   const beneficiaries = useQuery(
     api.beneficiaries.list,
+    orgId && address
+      ? { orgId: orgId as Id<'orgs'>, walletAddress: address, includeTags: true }
+      : 'skip'
+  );
+
+  const availableTags = useQuery(
+    api.tags.list,
     orgId && address
       ? { orgId: orgId as Id<'orgs'>, walletAddress: address }
       : 'skip'
@@ -563,6 +649,7 @@ export default function Beneficiaries() {
         notes: newNotes.trim() || undefined,
         preferredToken: newPreferredToken || undefined,
         preferredChainId: newPreferredChainId !== '' ? newPreferredChainId : undefined,
+        tags: newTags,
       });
       setNewType('individual');
       setNewName('');
@@ -570,6 +657,7 @@ export default function Beneficiaries() {
       setNewNotes('');
       setNewPreferredToken('');
       setNewPreferredChainId('');
+      setNewTags([]);
       setFieldErrors({});
       setIsCreating(false);
     } catch (error) {
@@ -587,6 +675,7 @@ export default function Beneficiaries() {
       notes: beneficiary.notes || '',
       preferredToken: beneficiary.preferredToken ?? '',
       preferredChainId: beneficiary.preferredChainId ?? '',
+      tags: beneficiary.tags ?? [],
     });
     setEditError(null);
     setEditFieldErrors({});
@@ -636,6 +725,7 @@ export default function Beneficiaries() {
         notes: editingBeneficiary.notes.trim() || undefined,
         preferredToken: editingBeneficiary.preferredToken || undefined,
         preferredChainId: editingBeneficiary.preferredChainId !== '' ? editingBeneficiary.preferredChainId : undefined,
+        tags: editingBeneficiary.tags,
       });
       setEditingBeneficiary(null);
       setEditFieldErrors({});
@@ -808,6 +898,17 @@ export default function Beneficiaries() {
               </div>
               <div>
                 <label className="mb-2 block text-sm font-medium text-slate-300">
+                  {t('beneficiaries.tags')} ({t('common.optional')})
+                </label>
+                <TagInput
+                  availableTags={availableTags ?? []}
+                  value={newTags}
+                  onChange={setNewTags}
+                  placeholder={t('beneficiaries.tagsPlaceholder')}
+                />
+              </div>
+              <div>
+                <label className="mb-2 block text-sm font-medium text-slate-300">
                   {t('beneficiaries.preferredToken', { defaultValue: 'Preferred token' })} ({t('common.optional')})
                 </label>
                 <select
@@ -849,6 +950,7 @@ export default function Beneficiaries() {
                     setNewNotes('');
                     setNewPreferredToken('');
                     setNewPreferredChainId('');
+                    setNewTags([]);
                     setCreateError(null);
                     setFieldErrors({});
                   }}
@@ -881,6 +983,7 @@ export default function Beneficiaries() {
             icon={User}
             iconColor="bg-purple-500/10 text-purple-400"
             beneficiaries={individuals as Beneficiary[]}
+            availableTags={availableTags ?? []}
             walletAddress={address!}
             onEdit={handleOpenEdit}
             onToggleActive={handleToggleActive}
@@ -894,6 +997,7 @@ export default function Beneficiaries() {
             icon={Building2}
             iconColor="bg-blue-500/10 text-blue-400"
             beneficiaries={businesses as Beneficiary[]}
+            availableTags={availableTags ?? []}
             walletAddress={address!}
             onEdit={handleOpenEdit}
             onToggleActive={handleToggleActive}
@@ -1022,6 +1126,21 @@ export default function Beneficiaries() {
                   onChange={(e) => setEditingBeneficiary({ ...editingBeneficiary, notes: e.target.value })}
                   rows={3}
                   className="w-full rounded-lg border border-white/10 bg-navy-800 px-4 py-3 text-base text-white focus:border-accent-500 focus:outline-none focus:ring-1 focus:ring-accent-500"
+                />
+              </div>
+              <div>
+                <label className="mb-2 block text-sm font-medium text-slate-300">
+                  {t('beneficiaries.tags')} ({t('common.optional')})
+                </label>
+                <TagInput
+                  availableTags={availableTags ?? []}
+                  value={editingBeneficiary.tags}
+                  onChange={(tags) =>
+                    setEditingBeneficiary((prev) =>
+                      prev ? { ...prev, tags } : prev
+                    )
+                  }
+                  placeholder={t('beneficiaries.tagsPlaceholder')}
                 />
               </div>
 
