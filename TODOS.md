@@ -15,4 +15,4 @@
 - Emails
 - Improved Onboarding Experience, collect name, create team, setup safe
 - test trial end for feature restriction, how would that work
-- add infura for RPC
+- add infura for RPC  ✅
