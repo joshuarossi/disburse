@@ -14,6 +14,7 @@ const SAFE_TX_SERVICE_URL_BY_CHAIN: Record<number, string> = {
   84532: "https://safe-transaction-base-sepolia.safe.global/api",
 };
 
+const SYNC_THROTTLE_MS = 10 * 60 * 1000;
 const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
 
 function getSafeTxServiceUrl(chainId: number): string {
@@ -72,6 +73,16 @@ export const syncForOrg = action({
     for (const safe of safes) {
       const safeAddress = getAddress(safe.safeAddress);
       const baseUrl = getSafeTxServiceUrl(safe.chainId);
+      const lastSyncedAt = await ctx.runQuery(api.depositsData.getSyncForSafe, {
+        orgId: args.orgId,
+        walletAddress: args.walletAddress,
+        safeId: safe._id,
+      });
+
+      if (lastSyncedAt && Date.now() - lastSyncedAt < SYNC_THROTTLE_MS) {
+        continue;
+      }
+
       const latestTimestamp = await ctx.runQuery(api.depositsData.getLatestForSafe, {
         orgId: args.orgId,
         walletAddress: args.walletAddress,
@@ -81,6 +92,7 @@ export const syncForOrg = action({
       const sinceTimestamp = Math.max(safe.createdAt ?? 0, latestTimestamp ?? 0);
 
       let nextUrl: string | null = `${baseUrl}/v1/safes/${safeAddress}/incoming-transfers/`;
+      const syncAttemptAt = Date.now();
 
       while (nextUrl) {
         const response = await fetch(nextUrl, {
@@ -165,6 +177,14 @@ export const syncForOrg = action({
           }
         }
       }
+
+      await ctx.runMutation(api.depositsData.upsertSyncForSafe, {
+        orgId: args.orgId,
+        walletAddress: args.walletAddress,
+        safeId: safe._id,
+        chainId: safe.chainId,
+        lastSyncedAt: syncAttemptAt,
+      });
     }
 
     return { inserted };

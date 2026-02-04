@@ -195,6 +195,16 @@ export default defineSchema({
     .index("by_safe_time", ["safeId", "timestamp"])
     .index("by_tx", ["chainId", "txHash", "tokenAddress", "toAddress"]),
 
+  // Deposit sync checkpoints (per safe)
+  depositSyncs: defineTable({
+    orgId: v.id("orgs"),
+    safeId: v.id("safes"),
+    chainId: v.number(),
+    lastSyncedAt: v.number(),
+  })
+    .index("by_org", ["orgId"])
+    .index("by_safe", ["safeId"]),
+
   // Disbursement recipients (for batch disbursements)
   disbursementRecipients: defineTable({
     disbursementId: v.id("disbursements"),
