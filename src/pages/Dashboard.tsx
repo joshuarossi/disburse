@@ -54,6 +54,8 @@ const TOKEN_COLORS: Record<string, string> = {
   PYUSD: '#0042ff',
 };
 
+const TESTNET_CHAIN_IDS = new Set<number>([11155111, 84532]);
+
 type ViewMode = 'byToken' | 'byChain';
 
 export default function Dashboard() {
@@ -62,7 +64,16 @@ export default function Dashboard() {
   const { t } = useTranslation();
   const [copied, setCopied] = useState(false);
   const [viewMode, setViewMode] = useState<ViewMode>('byToken');
+  const [hideTestnets, setHideTestnets] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    return window.localStorage.getItem('disburse.dashboard.hideTestnets') === 'true';
+  });
   const [qrSize, setQrSize] = useState(180);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    window.localStorage.setItem('disburse.dashboard.hideTestnets', String(hideTestnets));
+  }, [hideTestnets]);
 
   useEffect(() => {
     const updateQrSize = () => {
@@ -151,12 +162,11 @@ export default function Dashboard() {
   });
 
   // Aggregate: byChain[chainId][symbol] = balance (number), byToken[symbol][chainId] = balance
-  const { byChain, byToken, totalUsd } = useMemo(() => {
+  const { byChain, byToken } = useMemo(() => {
     const byChain: Record<number, Record<string, number>> = {};
     const byToken: Record<string, Record<number, number>> = {};
-    let totalUsd = 0;
 
-    if (!balanceContracts || !balanceResults) return { byChain, byToken, totalUsd };
+    if (!balanceContracts || !balanceResults) return { byChain, byToken };
 
     balanceContracts.forEach((c, i) => {
       const result = balanceResults[i]?.result;
@@ -166,11 +176,52 @@ export default function Dashboard() {
       byChain[c.chainId][c.symbol] = balance;
       if (!byToken[c.symbol]) byToken[c.symbol] = {};
       byToken[c.symbol][c.chainId] = balance;
-      totalUsd += balance; // 1:1 USD for stablecoins
     });
 
-    return { byChain, byToken, totalUsd };
+    return { byChain, byToken };
   }, [balanceContracts, balanceResults]);
+
+  const chainSummaries = useMemo(() => {
+    return Object.entries(byChain)
+      .map(([chainIdStr, tokenTotals]) => {
+        const chainId = Number(chainIdStr);
+        const total = Object.values(tokenTotals).reduce((a, b) => a + b, 0);
+        return { chainId, total, tokenTotals };
+      })
+      .filter(({ chainId, total }) => {
+        if (total <= 0) return false;
+        if (hideTestnets && TESTNET_CHAIN_IDS.has(chainId)) return false;
+        return true;
+      })
+      .sort((a, b) => b.total - a.total);
+  }, [byChain, hideTestnets]);
+
+  const tokenSummaries = useMemo(() => {
+    return Object.keys(byToken)
+      .map((symbol) => {
+        const chainTotals = byToken[symbol] ?? {};
+        const entries = Object.entries(chainTotals)
+          .map(([chainIdStr, balance]) => ({
+            chainId: Number(chainIdStr),
+            balance,
+          }))
+          .filter(({ chainId, balance }) => {
+            if (balance <= 0) return false;
+            if (hideTestnets && TESTNET_CHAIN_IDS.has(chainId)) return false;
+            return true;
+          })
+          .sort((a, b) => b.balance - a.balance);
+        const total = entries.reduce((sum, entry) => sum + entry.balance, 0);
+        return { symbol, total, entries };
+      })
+      .filter((item) => item.total > 0)
+      .sort((a, b) => b.total - a.total);
+  }, [byToken, hideTestnets]);
+
+  const visibleTotalUsd = useMemo(
+    () => chainSummaries.reduce((sum, item) => sum + item.total, 0),
+    [chainSummaries]
+  );
 
   const formatBalance = (balance: number) =>
     balance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -179,19 +230,6 @@ export default function Dashboard() {
   const pendingItems = disbursementsList?.items?.filter(
     (d) => d.status === 'draft' || d.status === 'pending' || d.status === 'proposed'
   ) ?? [];
-
-  // Tokens/chains with at least one balance (we fetch all tokens on all chains the org has safes for)
-  const tokenSymbols = useMemo(() => {
-    const set = new Set<string>();
-    Object.keys(byToken).forEach((s) => set.add(s));
-    return Array.from(set).sort();
-  }, [byToken]);
-
-  const chainIdsWithBalances = useMemo(() => {
-    const set = new Set<number>();
-    Object.keys(byChain).forEach((k) => set.add(Number(k)));
-    return Array.from(set).sort((a, b) => a - b);
-  }, [byChain]);
 
   return (
     <AppLayout>
@@ -228,7 +266,7 @@ export default function Dashboard() {
                         {balancesLoading ? (
                           <span className="inline-block h-10 w-32 animate-pulse rounded bg-navy-700" />
                         ) : (
-                          `$${formatBalance(totalUsd)}`
+                          `$${formatBalance(visibleTotalUsd)}`
                         )}
                       </p>
                     </div>
@@ -290,7 +328,28 @@ export default function Dashboard() {
 
               {/* Secondary: compact toggle + breakdown */}
               <div className="px-4 sm:px-6 pt-3 pb-4 sm:pb-5">
-                <div className="flex justify-end mb-2">
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between mb-2">
+                  <button
+                    type="button"
+                    onClick={() => setHideTestnets((prev) => !prev)}
+                    className="inline-flex items-center gap-2 text-xs text-slate-400 hover:text-white"
+                  >
+                    <span
+                      className={`relative inline-flex h-5 w-9 items-center rounded-full border transition-colors ${
+                        hideTestnets ? 'border-accent-500/60 bg-accent-500/20' : 'border-white/10 bg-navy-800'
+                      }`}
+                    >
+                      <span
+                        className={`inline-block h-3.5 w-3.5 rounded-full transition-transform ${
+                          hideTestnets ? 'translate-x-4 bg-accent-400' : 'translate-x-1 bg-slate-500'
+                        }`}
+                      />
+                    </span>
+                    <span className="font-medium text-slate-300">
+                      {t('dashboard.hideTestnets', { defaultValue: 'Hide testnets' })}
+                    </span>
+                  </button>
+
                   <div className="flex rounded-lg border border-white/10 bg-navy-800/50 p-1">
                     <button
                       type="button"
@@ -316,7 +375,7 @@ export default function Dashboard() {
                 {/* By Token / By Chain breakdown */}
                 {viewMode === 'byToken' && (
               <div className="space-y-2">
-                {tokenSymbols.length === 0 && totalUsd === 0 && (
+                {tokenSummaries.length === 0 && visibleTotalUsd === 0 && (
                   <div className="rounded-xl border border-dashed border-white/10 bg-navy-900/30 p-2.5 sm:p-3">
                     <div className="flex flex-col sm:flex-row sm:items-baseline sm:justify-between gap-1.5 mb-2">
                       <div className="flex items-baseline gap-2">
@@ -329,13 +388,8 @@ export default function Dashboard() {
                     </div>
                   </div>
                 )}
-                {tokenSymbols.map((symbol) => {
-                  const tokenTotals = byToken[symbol];
-                  if (!tokenTotals) return null;
-                  const tokenTotal = Object.values(tokenTotals).reduce((a, b) => a + b, 0);
-                  if (tokenTotal <= 0) return null;
-                  const pct = totalUsd > 0 ? (tokenTotal / totalUsd) * 100 : 0;
-                  const entries = Object.entries(tokenTotals).filter(([, v]) => v > 0);
+                {tokenSummaries.map(({ symbol, total: tokenTotal, entries }) => {
+                  const pct = visibleTotalUsd > 0 ? (tokenTotal / visibleTotalUsd) * 100 : 0;
                   return (
                     <div
                       key={symbol}
@@ -349,8 +403,7 @@ export default function Dashboard() {
                         <p className="text-xs text-slate-500">{pct.toFixed(1)}% {t('dashboard.ofTreasury')}</p>
                       </div>
                       <div className="flex gap-0.5 h-8 sm:h-9 rounded-lg overflow-hidden bg-navy-800">
-                        {entries.map(([chainIdStr, balance]) => {
-                          const chainId = Number(chainIdStr);
+                        {entries.map(({ chainId, balance }) => {
                           const segmentPct = tokenTotal > 0 ? (balance / tokenTotal) * 100 : 0;
                           return (
                             <div
@@ -381,8 +434,7 @@ export default function Dashboard() {
                         })}
                       </div>
                       <div className="flex flex-wrap gap-1.5 mt-1.5 text-xs text-slate-500">
-                        {entries.map(([chainIdStr]) => {
-                          const chainId = Number(chainIdStr);
+                        {entries.map(({ chainId }) => {
                           return (
                             <div key={chainId} className="flex items-center gap-1">
                               <div
@@ -402,7 +454,7 @@ export default function Dashboard() {
 
             {viewMode === 'byChain' && (
               <div className="space-y-2">
-                {chainIdsWithBalances.length === 0 && totalUsd === 0 && (
+                {chainSummaries.length === 0 && visibleTotalUsd === 0 && (
                   <div className="rounded-xl border border-dashed border-white/10 bg-navy-900/30 p-2.5 sm:p-3">
                     <div className="flex flex-col sm:flex-row sm:items-baseline sm:justify-between gap-1.5 mb-2">
                       <div className="flex items-baseline gap-2">
@@ -415,13 +467,11 @@ export default function Dashboard() {
                     </div>
                   </div>
                 )}
-                {chainIdsWithBalances.map((chainId) => {
-                  const chainTotals = byChain[chainId];
-                  if (!chainTotals) return null;
-                  const chainTotal = Object.values(chainTotals).reduce((a, b) => a + b, 0);
-                  if (chainTotal <= 0) return null;
-                  const pct = totalUsd > 0 ? (chainTotal / totalUsd) * 100 : 0;
-                  const entries = Object.entries(chainTotals).filter(([, v]) => v > 0);
+                {chainSummaries.map(({ chainId, total: chainTotal, tokenTotals }) => {
+                  const pct = visibleTotalUsd > 0 ? (chainTotal / visibleTotalUsd) * 100 : 0;
+                  const entries = Object.entries(tokenTotals)
+                    .filter(([, v]) => v > 0)
+                    .sort(([, a], [, b]) => b - a);
                   return (
                     <div
                       key={chainId}
