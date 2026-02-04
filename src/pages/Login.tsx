@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react';
+import { useCallback, useEffect, useState, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { ConnectButton } from '@rainbow-me/rainbowkit';
 import { useAccount, useSignMessage } from 'wagmi';
@@ -30,22 +30,7 @@ export default function Login() {
     }
   }, [session, navigate]);
 
-  // When wallet connects, start SIWE flow (with guard against double-execution)
-  useEffect(() => {
-    if (isConnected && address && !session && !isSigningIn && !signInAttemptedRef.current) {
-      signInAttemptedRef.current = true;
-      handleSignIn();
-    }
-  }, [isConnected, address, session, isSigningIn]);
-
-  // Reset the sign-in attempt flag when wallet disconnects
-  useEffect(() => {
-    if (!isConnected) {
-      signInAttemptedRef.current = false;
-    }
-  }, [isConnected]);
-
-  const handleSignIn = async () => {
+  const handleSignIn = useCallback(async () => {
     if (!address || isSigningIn) return;
     setIsSigningIn(true);
 
@@ -74,7 +59,22 @@ export default function Login() {
     } finally {
       setIsSigningIn(false);
     }
-  };
+  }, [address, isSigningIn, generateNonce, signMessageAsync, verifySignature]);
+
+  // When wallet connects, start SIWE flow (with guard against double-execution)
+  useEffect(() => {
+    if (isConnected && address && !session && !isSigningIn && !signInAttemptedRef.current) {
+      signInAttemptedRef.current = true;
+      handleSignIn();
+    }
+  }, [isConnected, address, session, isSigningIn, handleSignIn]);
+
+  // Reset the sign-in attempt flag when wallet disconnects
+  useEffect(() => {
+    if (!isConnected) {
+      signInAttemptedRef.current = false;
+    }
+  }, [isConnected]);
 
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-navy-950 px-6">

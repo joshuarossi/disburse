@@ -127,7 +127,7 @@ describe("Orgs", () => {
 
       await t.run(async (ctx) => {
         const userId = await createTestUser(ctx, { walletAddress: TEST_WALLETS.admin });
-        const { orgId } = await createTestOrg(ctx, userId, { name: "Active Org" });
+        await createTestOrg(ctx, userId, { name: "Active Org" });
 
         // Create another org where user is removed
         const otherUserId = await createTestUser(ctx);
@@ -317,7 +317,6 @@ describe("Orgs", () => {
       const t = convexTest(schema);
 
       let orgId: string;
-      let membershipId: string;
       await t.run(async (ctx) => {
         const setup = await createFullOrgSetup(ctx, {
           walletAddress: TEST_WALLETS.admin,
@@ -327,7 +326,7 @@ describe("Orgs", () => {
 
         // Add and remove a member
         const viewerId = await createTestUser(ctx, { walletAddress: TEST_WALLETS.viewer });
-        membershipId = await createTestMembership(ctx, orgId as any, viewerId, {
+        await createTestMembership(ctx, orgId as any, viewerId, {
           role: "viewer",
           status: "removed",
         });

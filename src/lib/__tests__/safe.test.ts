@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { createTransferTx, createBatchTransferTxs } from '../safe';
 
 // Use a valid checksummed address for tests
@@ -139,7 +139,7 @@ describe('Safe library', () => {
       const transactions = createBatchTransferTxs(11155111, 'USDC', recipients);
 
       expect(transactions.length).toBe(3);
-      transactions.forEach((tx, index) => {
+      transactions.forEach((tx) => {
         expect(tx.to).toBe('0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238'); // USDC address
         expect(tx.value).toBe('0');
         expect(tx.operation).toBe(0);

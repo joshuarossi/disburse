@@ -104,7 +104,7 @@ export function ScreeningDetailModal({
             <div className="rounded-lg bg-navy-800/50 p-4">
               <p className="text-sm text-slate-400 mb-3">{t('screening.matches')}</p>
               <div className="space-y-3">
-                {result.matches.map((match: any, idx: number) => (
+                {result.matches.map((match: { matchedName: string; matchScore: number; sdnId: number }, idx: number) => (
                   <div key={idx} className="rounded-lg border border-white/5 bg-navy-900/50 p-3">
                     <div className="flex items-center justify-between">
                       <p className="text-white font-medium">{match.matchedName}</p>

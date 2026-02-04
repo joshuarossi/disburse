@@ -251,16 +251,19 @@ export default function Dashboard() {
     const now = new Date();
     const year = now.getFullYear();
     const month = now.getMonth();
+    type ScheduledItem = { scheduledAt?: number };
     return items.filter((item) => {
-      if (!(item as any).scheduledAt) return false;
-      const d = new Date((item as any).scheduledAt);
+      const scheduledAt = (item as ScheduledItem).scheduledAt;
+      if (!scheduledAt) return false;
+      const d = new Date(scheduledAt);
       return d.getFullYear() === year && d.getMonth() === month;
     });
   }, [scheduledDisbursements]);
 
+  type DisplayItem = { displayAmount?: string; amount?: string };
   const monthlyTotal = useMemo(() => {
     return thisMonthScheduled.reduce((sum, item) => {
-      return sum + parseFloat((item as any).displayAmount ?? item.amount ?? '0');
+      return sum + parseFloat((item as DisplayItem).displayAmount ?? (item as DisplayItem).amount ?? '0');
     }, 0);
   }, [thisMonthScheduled]);
 
@@ -268,7 +271,7 @@ export default function Dashboard() {
     const map = new Map<string, number>();
     for (const item of thisMonthScheduled) {
       const token = item.token;
-      const amount = parseFloat((item as any).displayAmount ?? item.amount ?? '0');
+      const amount = parseFloat((item as DisplayItem).displayAmount ?? (item as DisplayItem).amount ?? '0');
       map.set(token, (map.get(token) ?? 0) + amount);
     }
     return Array.from(map.entries())
@@ -603,9 +606,9 @@ export default function Dashboard() {
                       <div className="flex items-center gap-3 min-w-0 flex-1">
                         <Send className="h-5 w-5 text-slate-400 shrink-0" />
                         <div className="min-w-0">
-                          <p className="font-medium text-white truncate">{d.beneficiary?.name ?? (d as any).displayAmount ?? '—'}</p>
+                          <p className="font-medium text-white truncate">{d.beneficiary?.name ?? (d as DisplayItem).displayAmount ?? '—'}</p>
                           <p className="text-sm text-slate-500">
-                            {(d as any).displayAmount ?? d.amount} {d.token}
+                            {(d as DisplayItem).displayAmount ?? d.amount} {d.token}
                             {d.chainId != null && ` · ${getChainName(d.chainId)}`}
                           </p>
                         </div>
@@ -684,7 +687,7 @@ export default function Dashboard() {
                         <div className="min-w-0">
                           <p className="font-medium text-white truncate">{d.beneficiary?.name ?? 'Unknown'}</p>
                           <p className="text-sm text-slate-500">
-                            {(d as any).displayAmount ?? d.amount} {d.token}
+                            {(d as DisplayItem).displayAmount ?? d.amount} {d.token}
                             {d.chainId != null && ` · ${getChainName(d.chainId)}`}
                           </p>
                         </div>

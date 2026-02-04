@@ -3,7 +3,6 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { useAccount } from 'wagmi';
 import { useQuery } from 'convex/react';
 import { api } from '../../convex/_generated/api';
-import { Id } from '../../convex/_generated/dataModel';
 import { Loader2 } from 'lucide-react';
 
 interface ProtectedRouteProps {

@@ -654,7 +654,7 @@ describe("Disbursements", () => {
       const t = convexTest(schema);
 
       let orgId: string;
-      let beneficiaryIds: string[] = [];
+      const beneficiaryIds: string[] = [];
       await t.run(async (ctx) => {
         const setup = await createFullOrgSetup(ctx, {
           walletAddress: TEST_WALLETS.admin,
@@ -760,7 +760,7 @@ describe("Disbursements", () => {
       const t = convexTest(schema);
 
       let orgId: string;
-      let beneficiaryIds: string[] = [];
+      const beneficiaryIds: string[] = [];
       await t.run(async (ctx) => {
         const setup = await createFullOrgSetup(ctx, {
           walletAddress: TEST_WALLETS.admin,
@@ -854,7 +854,7 @@ describe("Disbursements", () => {
       const t = convexTest(schema);
 
       let orgId: string;
-      let beneficiaryIds: string[] = [];
+      const beneficiaryIds: string[] = [];
       await t.run(async (ctx) => {
         const setup = await createFullOrgSetup(ctx, {
           walletAddress: TEST_WALLETS.admin,

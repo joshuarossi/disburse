@@ -18,7 +18,6 @@ import {
   Copy,
   Check,
   ChevronUp,
-  Languages,
   Menu,
   X,
 } from 'lucide-react';

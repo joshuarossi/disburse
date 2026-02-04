@@ -1,6 +1,5 @@
 import { convexTest } from "convex-test";
 import { describe, it, expect } from "vitest";
-import { api, internal } from "../../_generated/api";
 import schema from "../../schema";
 import {
   createTestUser,
@@ -60,7 +59,7 @@ describe("RBAC", () => {
       await t.run(async (ctx) => {
         // Create an org without the querying user
         const adminId = await createTestUser(ctx, { walletAddress: TEST_WALLETS.admin });
-        const { orgId } = await createTestOrg(ctx, adminId);
+        await createTestOrg(ctx, adminId);
 
         // Try to access with non-existent wallet
         await expect(
@@ -127,7 +126,7 @@ describe("RBAC", () => {
       await t.run(async (ctx) => {
         // Create org with admin
         const adminId = await createTestUser(ctx, { walletAddress: TEST_WALLETS.admin });
-        const { orgId, membershipId } = await createTestOrg(ctx, adminId);
+        const { membershipId } = await createTestOrg(ctx, adminId);
 
         // Verify admin can access
         const membership = await ctx.db.get(membershipId);

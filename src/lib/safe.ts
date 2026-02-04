@@ -70,7 +70,8 @@ export function getSafeApiKit(chainId: number): SafeApiKit {
 export async function getSafeProtocolKit(
   safeAddress: string,
   signer: string,
-  chainId: number
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars -- reserved for future network-specific config
+  _chainId: number
 ): Promise<Safe> {
   const checksummedSafeAddress = getAddress(safeAddress);
   const checksummedSigner = getAddress(signer);

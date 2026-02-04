@@ -47,32 +47,53 @@ function getSafeTxServiceUrl(chainId: number): string {
   return url;
 }
 
-function encodeExecTransaction(safeTx: any): string {
+interface SafeConfirmation {
+  owner: string;
+  signature: string;
+}
+
+interface SafeTxPayload {
+  to: string;
+  value?: string | number;
+  data?: string;
+  operation?: string | number;
+  safeTxGas?: string | number;
+  baseGas?: string | number;
+  gasPrice?: string | number;
+  gasToken?: string;
+  refundReceiver?: string;
+  confirmations?: SafeConfirmation[];
+}
+
+function encodeExecTransaction(safeTx: SafeTxPayload): string {
   const confirmations = [...(safeTx.confirmations || [])];
-  confirmations.sort((a: any, b: any) =>
+  confirmations.sort((a: SafeConfirmation, b: SafeConfirmation) =>
     getAddress(a.owner).localeCompare(getAddress(b.owner))
   );
   const signaturesHex = "0x" + confirmations
-    .map((c: any) => c.signature.replace("0x", ""))
+    .map((c: SafeConfirmation) => c.signature.replace("0x", ""))
     .join("");
 
   const operation = typeof safeTx.operation === "string"
     ? Number(safeTx.operation)
     : safeTx.operation ?? 0;
 
+  const dataHex = (safeTx.data || "0x") as `0x${string}`;
+  const gasToken = (safeTx.gasToken || ZERO_ADDRESS) as `0x${string}`;
+  const refundReceiver = (safeTx.refundReceiver || ZERO_ADDRESS) as `0x${string}`;
   return encodeFunctionData({
     abi: SAFE_EXEC_TX_ABI,
     functionName: "execTransaction",
     args: [
-      safeTx.to,
+      safeTx.to as `0x${string}`,
       BigInt(safeTx.value ?? 0),
-      safeTx.data || "0x",
+      dataHex,
       operation,
       BigInt(safeTx.safeTxGas ?? 0),
       BigInt(safeTx.baseGas ?? 0),
       BigInt(safeTx.gasPrice ?? 0),
-      safeTx.gasToken || ZERO_ADDRESS,
-      safeTx.refundReceiver || ZERO_ADDRESS,
+      gasToken,
+      refundReceiver,
       signaturesHex as `0x${string}`,
     ],
   });

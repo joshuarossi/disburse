@@ -430,7 +430,7 @@ export const createBulk = mutation({
     }
 
     // Create all beneficiaries
-    const createdIds: string[] = [];
+    const createdIds: Id<"beneficiaries">[] = [];
     for (const beneficiary of args.beneficiaries) {
       const beneficiaryId = await ctx.db.insert("beneficiaries", {
         orgId: args.orgId,
@@ -467,7 +467,7 @@ export const createBulk = mutation({
     // Schedule async SDN screening for all created beneficiaries
     for (const id of createdIds) {
       await ctx.scheduler.runAfter(0, internal.screening.screenBeneficiary, {
-        beneficiaryId: id as any,
+        beneficiaryId: id,
         orgId: args.orgId,
         walletAddress: args.walletAddress,
       });

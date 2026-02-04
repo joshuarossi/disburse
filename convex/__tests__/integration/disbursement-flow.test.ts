@@ -205,7 +205,7 @@ describe("Integration: Disbursement Flow", () => {
       amount: "100",
     });
 
-    const draft2 = await t.mutation(api.disbursements.create, {
+    await t.mutation(api.disbursements.create, {
       orgId: orgId! as any,
       walletAddress: TEST_WALLETS.admin,
       chainId: 11155111,

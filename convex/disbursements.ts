@@ -1,5 +1,6 @@
 import { v } from "convex/values";
 import { internalMutation, internalQuery, mutation, query } from "./_generated/server";
+import { Id } from "./_generated/dataModel";
 import { requireOrgAccess } from "./lib/rbac";
 import { internal } from "./_generated/api";
 
@@ -152,7 +153,7 @@ export const list = query({
       filtered = filtered.filter((d) => {
         const beneficiaryMatch = d.beneficiary?.name?.toLowerCase().includes(searchLower);
         // For batch disbursements, also search through all recipient names
-        const recipientMatch = (d as any).recipientNames?.some((name: string) => 
+        const recipientMatch = (d as { recipientNames?: string[] }).recipientNames?.some((name: string) => 
           name.toLowerCase().includes(searchLower)
         );
         const memoMatch = d.memo?.toLowerCase().includes(searchLower);
@@ -168,11 +169,12 @@ export const list = query({
         case "createdAt":
           comparison = a.createdAt - b.createdAt;
           break;
-        case "amount":
+        case "amount": {
           const aAmount = parseFloat(a.displayAmount || a.amount || "0");
           const bAmount = parseFloat(b.displayAmount || b.amount || "0");
           comparison = aAmount - bAmount;
           break;
+        }
         case "status":
           comparison = a.status.localeCompare(b.status);
           break;
@@ -329,7 +331,7 @@ export const updateStatus = mutation({
     // SDN screening check when moving to pending/proposed
     if (args.status === "pending" || args.status === "proposed") {
       const org = await ctx.db.get(disbursement.orgId);
-      const enforcement = (org as any)?.screeningEnforcement ?? "off";
+      const enforcement = org?.screeningEnforcement ?? "off";
 
       if (enforcement === "block") {
         // Collect beneficiary IDs
@@ -624,7 +626,7 @@ export const createBatch = mutation({
     // Validate all beneficiaries and calculate total
     let totalAmount = 0;
     const recipientData: Array<{
-      beneficiaryId: string;
+      beneficiaryId: Id<"beneficiaries">;
       recipientAddress: string;
       amount: string;
     }> = [];
@@ -674,7 +676,7 @@ export const createBatch = mutation({
     for (const recipient of recipientData) {
       await ctx.db.insert("disbursementRecipients", {
         disbursementId,
-        beneficiaryId: recipient.beneficiaryId as any,
+        beneficiaryId: recipient.beneficiaryId,
         recipientAddress: recipient.recipientAddress,
         amount: recipient.amount,
         createdAt: now,

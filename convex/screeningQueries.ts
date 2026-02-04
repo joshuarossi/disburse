@@ -1,5 +1,6 @@
 import { v } from "convex/values";
 import { internalQuery, query } from "./_generated/server";
+import { Id } from "./_generated/dataModel";
 import { requireOrgAccess } from "./lib/rbac";
 
 // ─── Internal queries (used by screening actions) ───────────────────────────────
@@ -70,7 +71,7 @@ export const verifyBeneficiaryAccess = internalQuery({
       )
     ),
   },
-  handler: async (ctx, args): Promise<{ orgId: any }> => {
+  handler: async (ctx, args): Promise<{ orgId: Id<"orgs"> }> => {
     const walletAddress = args.walletAddress.toLowerCase();
     const beneficiary = await ctx.db.get(args.beneficiaryId);
     if (!beneficiary) throw new Error("Beneficiary not found");

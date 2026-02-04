@@ -108,7 +108,7 @@ export default function Disbursements() {
   const [screeningWarning, setScreeningWarning] = useState<{
     flagged: Array<{ beneficiaryId: string; beneficiaryName: string; status: string }>;
     action: 'create' | 'propose' | 'execute';
-    data: any;
+    data: unknown;
   } | null>(null);
 
   // Screening block state
@@ -528,7 +528,8 @@ export default function Disbursements() {
     setRecipients(prev => prev.map((r, i) => i === index ? { ...r, amount: newAmount } : r));
   };
 
-  // Update recipient beneficiary
+  // Update recipient beneficiary (reserved for future UI)
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars -- may be wired to UI later
   const updateRecipientBeneficiary = (index: number, beneficiaryId: string) => {
     setRecipients(prev => prev.map((r, i) => i === index ? { ...r, beneficiaryId } : r));
   };
@@ -767,7 +768,7 @@ export default function Disbursements() {
         transactions = createBatchTransferTxs(
           chainId,
           disbursement.token,
-          batchData.recipients.map((r: any) => ({ to: r.recipientAddress, amount: r.amount }))
+          batchData.recipients.map((r: { recipientAddress: string; amount: string }) => ({ to: r.recipientAddress, amount: r.amount }))
         );
       } else {
         const singleAmount = disbursement.amount;

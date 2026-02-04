@@ -51,4 +51,6 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
 )
 Button.displayName = "Button"
 
+// buttonVariants is shared for custom buttons using the same styles
+// eslint-disable-next-line react-refresh/only-export-components -- intentional API
 export { Button, buttonVariants }

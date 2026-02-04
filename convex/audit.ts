@@ -19,12 +19,12 @@ export const list = query({
     // Any member can view audit logs
     await requireOrgAccess(ctx, args.orgId, walletAddress, ["admin", "approver", "initiator", "clerk", "viewer"]);
 
-    let query = ctx.db
+    const auditQuery = ctx.db
       .query("auditLog")
       .withIndex("by_org_timestamp", (q) => q.eq("orgId", args.orgId))
       .order("desc");
 
-    const logs = await query.collect();
+    const logs = await auditQuery.collect();
 
     // Apply filters
     let filtered = logs;

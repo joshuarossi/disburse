@@ -30,7 +30,7 @@ import {
   Eye,
   EyeOff,
 } from 'lucide-react';
-import { CHAINS_LIST, getChainName } from '@/lib/chains';
+import { CHAINS_LIST } from '@/lib/chains';
 
 type BeneficiaryType = 'individual' | 'business';
 type SortField = 'name' | 'createdAt' | 'walletAddress';
