@@ -22,98 +22,165 @@ export const getTransactionReport = query({
     // Any member can view reports
     await requireOrgAccess(ctx, args.orgId, walletAddress, ["admin", "approver", "initiator", "clerk", "viewer"]);
 
+    const statusFilter = args.status && args.status.length > 0 ? args.status : null;
+    const includeDeposits = !statusFilter || statusFilter.includes("received");
+    const includeDisbursements = !statusFilter || statusFilter.includes("executed");
+
+    const endOfDay = args.endDate ? args.endDate + 24 * 60 * 60 * 1000 : null;
+
     // Fetch all disbursements for the org
     const allDisbursements = await ctx.db
       .query("disbursements")
       .withIndex("by_org", (q) => q.eq("orgId", args.orgId))
       .collect();
 
-    // Enrich with beneficiary data
-    const enriched = await Promise.all(
-      allDisbursements.map(async (d) => {
-        // Handle batch disbursements - get first beneficiary name and count
-        if (d.type === "batch") {
-          const recipients = await ctx.db
-            .query("disbursementRecipients")
-            .withIndex("by_disbursement", (q) => q.eq("disbursementId", d._id))
-            .collect();
-          
-          let batchDisplayName = "Batch";
-          if (recipients.length > 0) {
-            const firstRecipient = recipients[0];
-            const firstBeneficiary = await ctx.db.get(firstRecipient.beneficiaryId);
-            if (firstBeneficiary) {
-              const otherCount = recipients.length - 1;
-              if (otherCount > 0) {
-                batchDisplayName = `${firstBeneficiary.name} +${otherCount}`;
-              } else {
-                batchDisplayName = firstBeneficiary.name;
-              }
-            }
-          }
-          
-          return {
-            ...d,
-            beneficiaryName: batchDisplayName,
+    const disbursementRows: Array<{
+      _id: Id<"disbursements">;
+      createdAt: number;
+      amount: string;
+      token: string;
+      chainId: number | undefined;
+      status: string;
+      memo: string | undefined;
+      txHash: string | undefined;
+      beneficiaryName: string;
+      beneficiaryWallet: string;
+      direction: "outflow";
+    }> = [];
+
+    for (const d of allDisbursements) {
+      const eventTimestamp = d.executedAt ?? d.updatedAt ?? d.createdAt;
+
+      if (args.startDate && eventTimestamp < args.startDate) continue;
+      if (endOfDay && eventTimestamp > endOfDay) continue;
+
+      if (!includeDisbursements) continue;
+      if (d.status !== "executed") continue;
+
+      if (args.chainId !== undefined && d.chainId !== args.chainId) continue;
+      if (args.chainIds && args.chainIds.length > 0) {
+        if (d.chainId === undefined || !args.chainIds.includes(d.chainId)) continue;
+      }
+
+      if (args.token && args.token.length > 0 && !args.token.includes(d.token)) continue;
+
+      if (d.type === "batch") {
+        const recipients = await ctx.db
+          .query("disbursementRecipients")
+          .withIndex("by_disbursement", (q) => q.eq("disbursementId", d._id))
+          .collect();
+
+        if (recipients.length === 0) {
+          if (args.beneficiaryId) continue;
+          disbursementRows.push({
+            _id: d._id,
+            createdAt: eventTimestamp,
+            amount: d.totalAmount || d.amount || "0",
+            token: d.token,
+            chainId: d.chainId,
+            status: d.status,
+            memo: d.memo,
+            txHash: d.txHash,
+            beneficiaryName: "Batch",
             beneficiaryWallet: "",
-            displayAmount: d.totalAmount || d.amount || "0",
-          };
+            direction: "outflow",
+          });
+          continue;
         }
-        
+
+        for (const recipient of recipients) {
+          if (args.beneficiaryId && recipient.beneficiaryId !== args.beneficiaryId) {
+            continue;
+          }
+          const beneficiary = await ctx.db.get(recipient.beneficiaryId);
+          disbursementRows.push({
+            _id: d._id,
+            createdAt: eventTimestamp,
+            amount: recipient.amount || "0",
+            token: d.token,
+            chainId: d.chainId,
+            status: d.status,
+            memo: d.memo,
+            txHash: d.txHash,
+            beneficiaryName: beneficiary?.name || "Unknown",
+            beneficiaryWallet: beneficiary?.walletAddress || "",
+            direction: "outflow",
+          });
+        }
+      } else {
+        if (args.beneficiaryId && d.beneficiaryId !== args.beneficiaryId) continue;
         const beneficiary = d.beneficiaryId ? await ctx.db.get(d.beneficiaryId) : null;
-        return {
-          ...d,
+        disbursementRows.push({
+          _id: d._id,
+          createdAt: eventTimestamp,
+          amount: d.amount || "0",
+          token: d.token,
+          chainId: d.chainId,
+          status: d.status,
+          memo: d.memo,
+          txHash: d.txHash,
           beneficiaryName: beneficiary?.name || "Unknown",
           beneficiaryWallet: beneficiary?.walletAddress || "",
-          displayAmount: d.amount || "0",
-        };
-      })
-    );
-
-    // Apply filters
-    let filtered = enriched;
-
-    // Date range filter
-    if (args.startDate) {
-      filtered = filtered.filter((d) => d.createdAt >= args.startDate!);
-    }
-    if (args.endDate) {
-      // Add one day to include the end date fully
-      const endOfDay = args.endDate + 24 * 60 * 60 * 1000;
-      filtered = filtered.filter((d) => d.createdAt <= endOfDay);
+          direction: "outflow",
+        });
+      }
     }
 
-    // Status filter
-    if (args.status && args.status.length > 0) {
-      filtered = filtered.filter((d) => args.status!.includes(d.status));
+    const depositRows: Array<{
+      _id: Id<"deposits">;
+      createdAt: number;
+      amount: string;
+      token: string;
+      chainId: number | undefined;
+      status: "received";
+      memo: string | undefined;
+      txHash: string | undefined;
+      beneficiaryName: string;
+      beneficiaryWallet: string;
+      direction: "inflow";
+    }> = [];
+
+    if (includeDeposits) {
+      const deposits = await ctx.db
+        .query("deposits")
+        .withIndex("by_org", (q) => q.eq("orgId", args.orgId))
+        .collect();
+
+      for (const deposit of deposits) {
+        const eventTimestamp = deposit.timestamp;
+        if (args.startDate && eventTimestamp < args.startDate) continue;
+        if (endOfDay && eventTimestamp > endOfDay) continue;
+
+        if (args.chainId !== undefined && deposit.chainId !== args.chainId) continue;
+        if (args.chainIds && args.chainIds.length > 0 && !args.chainIds.includes(deposit.chainId)) continue;
+        if (args.token && args.token.length > 0 && !args.token.includes(deposit.tokenSymbol)) continue;
+
+        if (args.beneficiaryId) continue;
+
+        depositRows.push({
+          _id: deposit._id,
+          createdAt: eventTimestamp,
+          amount: deposit.amount || "0",
+          token: deposit.tokenSymbol,
+          chainId: deposit.chainId,
+          status: "received",
+          memo: undefined,
+          txHash: deposit.txHash,
+          beneficiaryName: "External",
+          beneficiaryWallet: deposit.fromAddress || "",
+          direction: "inflow",
+        });
+      }
     }
 
-    // Beneficiary filter (only applies to single disbursements)
-    if (args.beneficiaryId) {
-      filtered = filtered.filter((d) => d.beneficiaryId === args.beneficiaryId);
-    }
+    const filtered = [...disbursementRows, ...depositRows];
 
-    // Token filter
-    if (args.token && args.token.length > 0) {
-      filtered = filtered.filter((d) => args.token!.includes(d.token));
-    }
-
-    // Chain filter
-    if (args.chainId !== undefined) {
-      filtered = filtered.filter((d) => d.chainId === args.chainId);
-    }
-    if (args.chainIds && args.chainIds.length > 0) {
-      filtered = filtered.filter((d) => d.chainId !== undefined && args.chainIds!.includes(d.chainId));
-    }
-
-    // Sort by createdAt descending
     filtered.sort((a, b) => b.createdAt - a.createdAt);
 
-    // Calculate totals by token
     const totalsMap = new Map<string, number>();
     filtered.forEach((d) => {
       const current = totalsMap.get(d.token) || 0;
-      const amount = parseFloat(d.displayAmount || d.amount || "0");
+      const amount = parseFloat(d.amount || "0");
       totalsMap.set(d.token, current + (isNaN(amount) ? 0 : amount));
     });
 
@@ -122,12 +189,11 @@ export const getTransactionReport = query({
       amount: amount.toFixed(2),
     }));
 
-    // Return items with beneficiary data (include chainId for UI)
     return {
       items: filtered.map((d) => ({
         _id: d._id,
         createdAt: d.createdAt,
-        amount: d.displayAmount || d.amount || "0",
+        amount: d.amount,
         token: d.token,
         chainId: d.chainId,
         status: d.status,
@@ -135,6 +201,7 @@ export const getTransactionReport = query({
         txHash: d.txHash,
         beneficiaryName: d.beneficiaryName,
         beneficiaryWallet: d.beneficiaryWallet,
+        direction: d.direction,
       })),
       totals,
     };

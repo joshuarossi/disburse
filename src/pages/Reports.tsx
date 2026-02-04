@@ -1,8 +1,8 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { useParams } from 'react-router-dom';
 import { useAccount } from 'wagmi';
 import { useTranslation } from 'react-i18next';
-import { useQuery } from 'convex/react';
+import { useQuery, useAction } from 'convex/react';
 import { api } from '../../convex/_generated/api';
 import { Id } from '../../convex/_generated/dataModel';
 import { AppLayout } from '@/components/layout/AppLayout';
@@ -98,6 +98,8 @@ interface TransactionsTabProps {
 
 function TransactionsTab({ orgId, address }: TransactionsTabProps) {
   const { t } = useTranslation();
+  const syncDeposits = useAction(api.deposits.syncForOrg);
+  const hasSyncedDeposits = useRef(false);
 
   // Filter state
   const [showFilters, setShowFilters] = useState(false);
@@ -110,11 +112,7 @@ function TransactionsTab({ orgId, address }: TransactionsTabProps) {
 
   const STATUS_OPTIONS = [
     { value: 'executed', label: t('status.executed') },
-    { value: 'failed', label: t('status.failed') },
-    { value: 'cancelled', label: t('status.cancelled') },
-    { value: 'pending', label: t('status.pending') },
-    { value: 'proposed', label: t('status.proposed') },
-    { value: 'draft', label: t('status.draft') },
+    { value: 'received', label: t('status.received', { defaultValue: 'Received' }) },
   ];
 
   const TOKEN_OPTIONS = [
@@ -148,6 +146,15 @@ function TransactionsTab({ orgId, address }: TransactionsTabProps) {
       ? { orgId: orgId as Id<'orgs'>, walletAddress: address, activeOnly: false }
       : 'skip'
   );
+
+  useEffect(() => {
+    if (!orgId || !address) return;
+    if (hasSyncedDeposits.current) return;
+    hasSyncedDeposits.current = true;
+    void syncDeposits({ orgId: orgId as Id<'orgs'>, walletAddress: address }).catch(() => {
+      hasSyncedDeposits.current = true;
+    });
+  }, [address, orgId, syncDeposits]);
 
   const isLoading = reportData === undefined;
   const activeFilterCount = [
@@ -184,8 +191,9 @@ function TransactionsTab({ orgId, address }: TransactionsTabProps) {
 
     const columns = [
       { key: 'date', label: t('reports.export.date') },
-      { key: 'beneficiary', label: t('reports.export.beneficiary') },
-      { key: 'walletAddress', label: t('reports.export.walletAddress') },
+      { key: 'direction', label: t('reports.export.direction', { defaultValue: 'Direction' }) },
+      { key: 'beneficiary', label: t('reports.export.beneficiary', { defaultValue: 'Counterparty' }) },
+      { key: 'walletAddress', label: t('reports.export.walletAddress', { defaultValue: 'Wallet Address' }) },
       { key: 'amount', label: t('reports.export.amount') },
       { key: 'token', label: t('reports.export.token') },
       { key: 'chain', label: t('reports.export.chain') },
@@ -196,6 +204,7 @@ function TransactionsTab({ orgId, address }: TransactionsTabProps) {
 
     const rows = reportData.items.map((item) => ({
       date: new Date(item.createdAt).toLocaleDateString(),
+      direction: item.direction === 'inflow' ? t('reports.direction.inflow', { defaultValue: 'Inflow' }) : t('reports.direction.outflow', { defaultValue: 'Outflow' }),
       beneficiary: item.beneficiaryName,
       walletAddress: item.beneficiaryWallet,
       amount: item.amount,
@@ -389,7 +398,10 @@ function TransactionsTab({ orgId, address }: TransactionsTabProps) {
                     {t('reports.table.date')}
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-400">
-                    {t('reports.table.beneficiary')}
+                    {t('reports.table.direction', { defaultValue: 'Direction' })}
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-400">
+                    {t('reports.table.counterparty', { defaultValue: 'Counterparty' })}
                   </th>
                   <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-slate-400">
                     {t('reports.table.amount')}
@@ -417,7 +429,19 @@ function TransactionsTab({ orgId, address }: TransactionsTabProps) {
                     <td className="whitespace-nowrap px-4 py-3 text-sm text-white">
                       {new Date(item.createdAt).toLocaleDateString()}
                     </td>
-                    <td className="px-4 py-3 text-sm text-white">{item.beneficiaryName}</td>
+                    <td className="whitespace-nowrap px-4 py-3 text-sm">
+                      <DirectionBadge direction={item.direction} />
+                    </td>
+                    <td className="px-4 py-3 text-sm text-white">
+                      <div>
+                        <p className="text-white">{item.beneficiaryName}</p>
+                        {item.beneficiaryWallet && (
+                          <p className="text-xs text-slate-500 font-mono">
+                            {item.beneficiaryWallet.slice(0, 6)}...{item.beneficiaryWallet.slice(-4)}
+                          </p>
+                        )}
+                      </div>
+                    </td>
                     <td className="whitespace-nowrap px-4 py-3 text-right text-sm font-medium text-white">
                       {Number(item.amount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </td>
@@ -459,11 +483,19 @@ function TransactionsTab({ orgId, address }: TransactionsTabProps) {
                 <div className="flex items-start justify-between">
                   <div>
                     <p className="font-medium text-white">{item.beneficiaryName}</p>
+                    {item.beneficiaryWallet && (
+                      <p className="text-xs text-slate-500 font-mono">
+                        {item.beneficiaryWallet.slice(0, 6)}...{item.beneficiaryWallet.slice(-4)}
+                      </p>
+                    )}
                     <p className="text-sm text-slate-400">
                       {new Date(item.createdAt).toLocaleDateString()}
                     </p>
                   </div>
-                  <StatusBadge status={item.status} />
+                  <div className="flex items-center gap-2">
+                    <DirectionBadge direction={item.direction} />
+                    <StatusBadge status={item.status} />
+                  </div>
                 </div>
                 <div className="mt-3 flex items-center justify-between">
                   <span className="text-lg font-bold text-white">
@@ -1213,6 +1245,8 @@ function StatusBadge({ status }: { status: string }) {
 
   const getStatusStyles = (status: string) => {
     switch (status) {
+      case 'received':
+        return 'bg-emerald-500/10 text-emerald-400';
       case 'executed':
         return 'bg-green-500/10 text-green-400';
       case 'failed':
@@ -1233,7 +1267,24 @@ function StatusBadge({ status }: { status: string }) {
       'inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium',
       getStatusStyles(status)
     )}>
-      {t(`status.${status}`)}
+      {status === 'received' ? t('status.received', { defaultValue: 'Received' }) : t(`status.${status}`)}
+    </span>
+  );
+}
+
+function DirectionBadge({ direction }: { direction: 'inflow' | 'outflow' }) {
+  const { t } = useTranslation();
+  const label =
+    direction === 'inflow'
+      ? t('reports.direction.inflow', { defaultValue: 'Inflow' })
+      : t('reports.direction.outflow', { defaultValue: 'Outflow' });
+  const style =
+    direction === 'inflow'
+      ? 'bg-emerald-500/10 text-emerald-400'
+      : 'bg-rose-500/10 text-rose-400';
+  return (
+    <span className={cn('inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium', style)}>
+      {label}
     </span>
   );
 }

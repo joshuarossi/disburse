@@ -13,6 +13,8 @@ import type * as audit from "../audit.js";
 import type * as auth from "../auth.js";
 import type * as beneficiaries from "../beneficiaries.js";
 import type * as billing from "../billing.js";
+import type * as deposits from "../deposits.js";
+import type * as depositsData from "../depositsData.js";
 import type * as disbursements from "../disbursements.js";
 import type * as lib_rbac from "../lib/rbac.js";
 import type * as lib_tags from "../lib/tags.js";
@@ -40,6 +42,8 @@ declare const fullApi: ApiFromModules<{
   auth: typeof auth;
   beneficiaries: typeof beneficiaries;
   billing: typeof billing;
+  deposits: typeof deposits;
+  depositsData: typeof depositsData;
   disbursements: typeof disbursements;
   "lib/rbac": typeof lib_rbac;
   "lib/tags": typeof lib_tags;

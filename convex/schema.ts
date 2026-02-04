@@ -159,6 +159,7 @@ export default defineSchema({
     scheduledAt: v.optional(v.number()), // epoch ms when relay should fire
     scheduledJobId: v.optional(v.string()), // "sched_{disbursementId}_{version}" - audit trail only
     scheduledVersion: v.optional(v.number()), // increments on reschedule/cancel for idempotency
+    executedAt: v.optional(v.number()), // epoch ms when disbursement executed
     createdBy: v.id("users"),
     createdAt: v.number(),
     updatedAt: v.number(),
@@ -168,6 +169,31 @@ export default defineSchema({
     .index("by_org_chain", ["orgId", "chainId"])
     .index("by_safe", ["safeId"])
     .index("by_org_scheduledAt", ["orgId", "scheduledAt"]),
+
+  // Deposits (incoming transfers into a Safe)
+  deposits: defineTable({
+    orgId: v.id("orgs"),
+    safeId: v.id("safes"),
+    chainId: v.number(),
+    safeAddress: v.string(),
+    tokenAddress: v.string(),
+    tokenSymbol: v.string(),
+    decimals: v.number(),
+    amountRaw: v.string(),
+    amount: v.string(),
+    txHash: v.string(),
+    blockNumber: v.optional(v.number()),
+    timestamp: v.number(), // epoch ms when transfer was recorded
+    fromAddress: v.optional(v.string()),
+    toAddress: v.string(),
+    source: v.literal("safe_tx_service"),
+    createdAt: v.number(),
+  })
+    .index("by_org", ["orgId"])
+    .index("by_org_time", ["orgId", "timestamp"])
+    .index("by_safe", ["safeId"])
+    .index("by_safe_time", ["safeId", "timestamp"])
+    .index("by_tx", ["chainId", "txHash", "tokenAddress", "toAddress"]),
 
   // Disbursement recipients (for batch disbursements)
   disbursementRecipients: defineTable({

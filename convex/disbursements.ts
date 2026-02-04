@@ -381,6 +381,9 @@ export const updateStatus = mutation({
     if (args.status === "cancelled") {
       updates.scheduledVersion = (disbursement.scheduledVersion ?? 0) + 1;
     }
+    if (args.status === "executed" && !disbursement.executedAt) {
+      updates.executedAt = now;
+    }
 
     if (args.relayTaskId || args.relayStatus || args.relayError) {
       console.info("[Relay] Disbursement status update", {

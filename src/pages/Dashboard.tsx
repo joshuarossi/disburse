@@ -311,7 +311,7 @@ export default function Dashboard() {
           walletAddress: address,
           startDate: chartRange.start.getTime(),
           endDate: chartRange.end.getTime(),
-          status: ['executed'],
+          status: ['executed', 'received'],
         }
       : 'skip'
   );
@@ -331,7 +331,11 @@ export default function Dashboard() {
       const key = new Date(item.createdAt).toLocaleDateString('en-CA');
       const amount = parseFloat(item.amount ?? '0');
       if (!Number.isFinite(amount)) continue;
-      outflowByDay.set(key, (outflowByDay.get(key) ?? 0) + amount);
+      if (item.direction === 'inflow') {
+        inflowByDay.set(key, (inflowByDay.get(key) ?? 0) + amount);
+      } else {
+        outflowByDay.set(key, (outflowByDay.get(key) ?? 0) + amount);
+      }
     }
 
     return chartDays.map((day) => {
@@ -357,13 +361,13 @@ export default function Dashboard() {
   }, [inflowOutflowData]);
 
   const balanceTrend = useMemo(() => {
-    const startingBalance = visibleTotalUsd + chartTotals.outflow;
+    const startingBalance = visibleTotalUsd - (chartTotals.inflow - chartTotals.outflow);
     let running = startingBalance;
     return inflowOutflowData.map((day) => {
-      running -= day.outflow;
+      running += day.inflow - day.outflow;
       return Math.max(running, 0);
     });
-  }, [chartTotals.outflow, inflowOutflowData, visibleTotalUsd]);
+  }, [chartTotals.inflow, chartTotals.outflow, inflowOutflowData, visibleTotalUsd]);
 
   const compactCurrency = useMemo(
     () => new Intl.NumberFormat(undefined, { notation: 'compact', maximumFractionDigits: 1 }),
@@ -914,7 +918,7 @@ export default function Dashboard() {
                   footnote={
                     chartTotals.inflow === 0 && chartTotals.outflow === 0
                       ? t('dashboard.charts.noActivity', { defaultValue: 'No executed disbursements in the last 7 days.' })
-                      : t('dashboard.charts.executedOnly', { defaultValue: 'Based on executed disbursements.' })
+                      : t('dashboard.charts.executedOnly', { defaultValue: 'Based on executed disbursements and received deposits.' })
                   }
                 >
                   {chartLoading ? (
