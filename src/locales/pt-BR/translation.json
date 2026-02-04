@@ -234,6 +234,13 @@
       "newPayment": "Novo Pagamento",
       "createDisbursement": "Criar Desembolso"
     },
+    "scheduled": {
+      "title": "Pagamentos Agendados",
+      "openCalendar": "Abrir calendário de pagamentos",
+      "none": "Nenhum pagamento agendado este mês",
+      "count": "{{count}} pagamento agendado este mês",
+      "countPlural": "{{count}} pagamentos agendados este mês"
+    },
     "recent": {
       "title": "Desembolsos Recentes",
       "none": "Ainda não há desembolsos"

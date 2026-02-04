@@ -15,7 +15,11 @@ import {
   Plus,
   Copy,
   Check,
+  Calendar,
+  ChevronDown,
+  ChevronUp,
 } from 'lucide-react';
+import { ScheduledPaymentsCalendar } from '@/components/disbursements/ScheduledPaymentsCalendar';
 import { getTokensForChain, getChainName, getSafeAppUrl } from '@/lib/chains';
 import { QRCodeSVG } from 'qrcode.react';
 
@@ -69,6 +73,8 @@ export default function Dashboard() {
     return window.localStorage.getItem('disburse.dashboard.hideTestnets') === 'true';
   });
   const [qrSize, setQrSize] = useState(180);
+  const [showCalendarModal, setShowCalendarModal] = useState(false);
+  const [showTokenBreakdown, setShowTokenBreakdown] = useState(false);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -101,6 +107,20 @@ export default function Dashboard() {
     api.disbursements.list,
     orgId && address
       ? { orgId: orgId as Id<'orgs'>, walletAddress: address, limit: 20 }
+      : 'skip'
+  );
+
+  const scheduledDisbursements = useQuery(
+    api.disbursements.list,
+    orgId && address
+      ? {
+          orgId: orgId as Id<'orgs'>,
+          walletAddress: address,
+          status: ['scheduled'],
+          sortBy: 'scheduledAt',
+          sortOrder: 'asc',
+          limit: 100,
+        }
       : 'skip'
   );
 
@@ -225,6 +245,36 @@ export default function Dashboard() {
 
   const formatBalance = (balance: number) =>
     balance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+  const thisMonthScheduled = useMemo(() => {
+    const items = scheduledDisbursements?.items ?? [];
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = now.getMonth();
+    return items.filter((item) => {
+      if (!(item as any).scheduledAt) return false;
+      const d = new Date((item as any).scheduledAt);
+      return d.getFullYear() === year && d.getMonth() === month;
+    });
+  }, [scheduledDisbursements]);
+
+  const monthlyTotal = useMemo(() => {
+    return thisMonthScheduled.reduce((sum, item) => {
+      return sum + parseFloat((item as any).displayAmount ?? item.amount ?? '0');
+    }, 0);
+  }, [thisMonthScheduled]);
+
+  const tokenBreakdown = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const item of thisMonthScheduled) {
+      const token = item.token;
+      const amount = parseFloat((item as any).displayAmount ?? item.amount ?? '0');
+      map.set(token, (map.get(token) ?? 0) + amount);
+    }
+    return Array.from(map.entries())
+      .map(([token, total]) => ({ token, total }))
+      .sort((a, b) => b.total - a.total);
+  }, [thisMonthScheduled]);
 
   const depositAddress = safes?.[0]?.safeAddress;
   const pendingItems = disbursementsList?.items?.filter(
@@ -569,6 +619,54 @@ export default function Dashboard() {
               )}
             </div>
 
+            {/* Scheduled Payments section */}
+            <div className="rounded-2xl border border-white/10 bg-navy-900/50 p-3 sm:p-4">
+              <div className="flex items-center justify-between">
+                <h2 className="text-sm font-semibold text-white">{t('dashboard.scheduled.title')}</h2>
+                <button
+                  onClick={() => setShowCalendarModal(true)}
+                  className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 hover:text-white hover:bg-navy-800 transition-colors"
+                  title={t('dashboard.scheduled.openCalendar')}
+                >
+                  <Calendar className="h-4 w-4" />
+                </button>
+              </div>
+
+              {thisMonthScheduled.length === 0 ? (
+                <p className="mt-3 text-center text-sm text-slate-500 py-4">{t('dashboard.scheduled.none')}</p>
+              ) : (
+                <div className="mt-3 space-y-2">
+                  <p className="text-2xl font-bold text-white">${formatBalance(monthlyTotal)}</p>
+
+                  <button
+                    type="button"
+                    onClick={() => setShowTokenBreakdown((prev) => !prev)}
+                    className="flex items-center gap-1 text-xs text-slate-400 hover:text-slate-300 transition-colors"
+                  >
+                    {showTokenBreakdown ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
+                    <span>
+                      {tokenBreakdown.map((tb) => `${tb.total.toLocaleString('en-US', { maximumFractionDigits: 0 })} ${tb.token}`).join(' · ')}
+                    </span>
+                  </button>
+
+                  {showTokenBreakdown && (
+                    <div className="space-y-1.5 pl-4">
+                      {tokenBreakdown.map((tb) => (
+                        <div key={tb.token} className="flex items-baseline justify-between">
+                          <span className="text-xs text-slate-300 font-medium">{tb.token}</span>
+                          <span className="text-xs font-mono text-accent-400">${formatBalance(tb.total)}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  <p className="text-xs text-slate-500">
+                    {t(thisMonthScheduled.length === 1 ? 'dashboard.scheduled.count' : 'dashboard.scheduled.countPlural', { count: thisMonthScheduled.length })}
+                  </p>
+                </div>
+              )}
+            </div>
+
             {/* Recent activity */}
             <div className="rounded-2xl border border-white/10 bg-navy-900/50 p-3 sm:p-4">
               <h2 className="text-sm font-semibold text-white">{t('dashboard.recent.title')}</h2>
@@ -610,6 +708,14 @@ export default function Dashboard() {
           </>
         )}
       </div>
+
+      {/* Scheduled Payments Calendar Modal */}
+      {showCalendarModal && (
+        <ScheduledPaymentsCalendar
+          payments={scheduledDisbursements?.items ?? []}
+          onClose={() => setShowCalendarModal(false)}
+        />
+      )}
     </AppLayout>
   );
 }

@@ -234,6 +234,13 @@
       "newPayment": "New Payment",
       "createDisbursement": "Create Disbursement"
     },
+    "scheduled": {
+      "title": "Scheduled Payments",
+      "openCalendar": "Open payment calendar",
+      "none": "No scheduled payments this month",
+      "count": "{{count}} payment scheduled this month",
+      "countPlural": "{{count}} payments scheduled this month"
+    },
     "recent": {
       "title": "Recent Disbursements",
       "none": "No disbursements yet"
