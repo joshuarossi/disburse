@@ -151,3 +151,33 @@ export const upsertDeposit = mutation({
     return { inserted: true };
   },
 });
+
+export const listRecent = query({
+  args: {
+    orgId: v.id("orgs"),
+    walletAddress: v.string(),
+    limit: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    const walletAddress = args.walletAddress.toLowerCase();
+
+    await requireOrgAccess(ctx, args.orgId, walletAddress, ["admin", "approver", "initiator", "clerk", "viewer"]);
+
+    const deposits = await ctx.db
+      .query("deposits")
+      .withIndex("by_org_time", (q) => q.eq("orgId", args.orgId))
+      .order("desc")
+      .collect();
+
+    const limit = args.limit ?? 5;
+    return deposits.slice(0, limit).map((d) => ({
+      _id: d._id,
+      timestamp: d.timestamp,
+      amount: d.amount,
+      tokenSymbol: d.tokenSymbol,
+      chainId: d.chainId,
+      fromAddress: d.fromAddress,
+      txHash: d.txHash,
+    }));
+  },
+});

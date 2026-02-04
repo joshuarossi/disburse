@@ -12,6 +12,7 @@ import {
   Wallet,
   Send,
   ArrowUpRight,
+  ArrowDownLeft,
   Plus,
   Copy,
   Check,
@@ -125,6 +126,17 @@ export default function Dashboard() {
           sortBy: 'scheduledAt',
           sortOrder: 'asc',
           limit: 100,
+        }
+      : 'skip'
+  );
+
+  const recentDeposits = useQuery(
+    api.depositsData.listRecent,
+    orgId && address
+      ? {
+          orgId: orgId as Id<'orgs'>,
+          walletAddress: address,
+          limit: hideTestnets ? 10 : 5,
         }
       : 'skip'
   );
@@ -250,6 +262,19 @@ export default function Dashboard() {
 
   const formatBalance = (balance: number) =>
     balance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+  const formatTokenAmount = (value?: string) => {
+    const parsed = Number(value ?? 0);
+    if (!Number.isFinite(parsed)) {
+      return value ?? '0';
+    }
+    return formatBalance(parsed);
+  };
+
+  const truncateAddress = (value?: string) => {
+    if (!value) return '';
+    return `${value.slice(0, 6)}...${value.slice(-4)}`;
+  };
 
   const thisMonthScheduled = useMemo(() => {
     const items = scheduledDisbursements?.items ?? [];
@@ -570,6 +595,15 @@ export default function Dashboard() {
     (d) => d.status === 'draft' || d.status === 'pending' || d.status === 'proposed'
   ) ?? [];
   const executedItems = disbursementsList?.items?.filter((d) => d.status === 'executed') ?? [];
+  const visibleDeposits = useMemo(() => {
+    const items = recentDeposits ?? [];
+    return items.filter((item) => {
+      if (hideTestnets && item.chainId != null && TESTNET_CHAIN_IDS.has(item.chainId)) {
+        return false;
+      }
+      return true;
+    });
+  }, [hideTestnets, recentDeposits]);
   const availabilityLoading = balancesLoading || scheduledDisbursements === undefined || disbursementsList === undefined;
 
   const pendingTotal = useMemo(() => {
@@ -1026,42 +1060,88 @@ export default function Dashboard() {
             </div>
 
             {/* Recent activity */}
-            <div className="rounded-2xl border border-white/10 bg-navy-900/50 p-3 sm:p-4">
-              <h2 className="text-sm font-semibold text-white">{t('dashboard.recent.title')}</h2>
-              {executedItems.length === 0 ? (
-                <p className="mt-3 text-center text-sm text-slate-500 py-5">{t('dashboard.recent.none')}</p>
-              ) : (
-                <div className="mt-3 space-y-2">
-                  {executedItems.slice(0, 5).map((d) => (
-                    <div
-                      key={d._id}
-                      className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 rounded-lg bg-navy-800/50 p-2.5 sm:p-3"
-                    >
-                      <div className="flex items-center gap-3 min-w-0 flex-1">
-                        <Send className="h-5 w-5 text-slate-400 shrink-0" />
-                        <div className="min-w-0">
-                          <p className="font-medium text-white truncate">{d.beneficiary?.name ?? 'Unknown'}</p>
-                          <p className="text-sm text-slate-500">
-                            {(d as DisplayItem).displayAmount ?? d.amount} {d.token}
-                            {d.chainId != null && ` · ${getChainName(d.chainId)}`}
-                          </p>
-                        </div>
-                      </div>
-                      <span
-                        className={`rounded-full px-3 py-1 text-xs font-medium shrink-0 ${
-                          d.status === 'executed'
-                            ? 'bg-green-500/10 text-green-400'
-                            : d.status === 'failed'
-                            ? 'bg-red-500/10 text-red-400'
-                            : 'bg-yellow-500/10 text-yellow-400'
-                        }`}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <div className="rounded-2xl border border-white/10 bg-navy-900/50 p-3 sm:p-4">
+                <h2 className="text-sm font-semibold text-white">
+                  {t('dashboard.recent.title', { defaultValue: 'Recent Disbursements' })}
+                </h2>
+                {executedItems.length === 0 ? (
+                  <p className="mt-3 text-center text-sm text-slate-500 py-5">{t('dashboard.recent.none')}</p>
+                ) : (
+                  <div className="mt-3 space-y-2">
+                    {executedItems.slice(0, 5).map((d) => (
+                      <div
+                        key={d._id}
+                        className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 rounded-lg bg-navy-800/50 p-2.5 sm:p-3"
                       >
-                        {d.status}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              )}
+                        <div className="flex items-center gap-3 min-w-0 flex-1">
+                          <Send className="h-5 w-5 text-slate-400 shrink-0" />
+                          <div className="min-w-0">
+                            <p className="font-medium text-white truncate">{d.beneficiary?.name ?? 'Unknown'}</p>
+                            <p className="text-sm text-slate-500">
+                              {(d as DisplayItem).displayAmount ?? d.amount} {d.token}
+                              {d.chainId != null && ` · ${getChainName(d.chainId)}`}
+                            </p>
+                          </div>
+                        </div>
+                        <span
+                          className={`rounded-full px-3 py-1 text-xs font-medium shrink-0 ${
+                            d.status === 'executed'
+                              ? 'bg-green-500/10 text-green-400'
+                              : d.status === 'failed'
+                              ? 'bg-red-500/10 text-red-400'
+                              : 'bg-yellow-500/10 text-yellow-400'
+                          }`}
+                        >
+                          {d.status}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div className="rounded-2xl border border-white/10 bg-navy-900/50 p-3 sm:p-4">
+                <h2 className="text-sm font-semibold text-white">
+                  {t('dashboard.deposits.recent', { defaultValue: 'Recent Deposits' })}
+                </h2>
+                {recentDeposits === undefined ? (
+                  <div className="mt-3 space-y-2">
+                    <div className="h-12 rounded-lg bg-navy-800/60 animate-pulse" />
+                    <div className="h-12 rounded-lg bg-navy-800/60 animate-pulse" />
+                    <div className="h-12 rounded-lg bg-navy-800/60 animate-pulse" />
+                  </div>
+                ) : visibleDeposits.length === 0 ? (
+                  <p className="mt-3 text-center text-sm text-slate-500 py-5">
+                    {t('dashboard.deposits.none', { defaultValue: 'No recent deposits' })}
+                  </p>
+                ) : (
+                  <div className="mt-3 space-y-2">
+                    {visibleDeposits.slice(0, 5).map((deposit) => (
+                      <div
+                        key={deposit._id}
+                        className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 rounded-lg bg-navy-800/50 p-2.5 sm:p-3"
+                      >
+                        <div className="flex items-center gap-3 min-w-0 flex-1">
+                          <ArrowDownLeft className="h-5 w-5 text-slate-400 shrink-0" />
+                          <div className="min-w-0">
+                            <p className="font-medium text-white truncate">
+                              {deposit.fromAddress ? truncateAddress(deposit.fromAddress) : t('dashboard.deposits.external', { defaultValue: 'External' })}
+                            </p>
+                            <p className="text-sm text-slate-500">
+                              {formatTokenAmount(deposit.amount)} {deposit.tokenSymbol}
+                              {deposit.chainId != null && ` · ${getChainName(deposit.chainId)}`}
+                            </p>
+                          </div>
+                        </div>
+                        <span className="rounded-full px-3 py-1 text-xs font-medium bg-green-500/10 text-green-400 shrink-0">
+                          {t('dashboard.deposits.received', { defaultValue: 'received' })}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
           </>
         )}
