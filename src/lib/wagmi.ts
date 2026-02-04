@@ -1,5 +1,5 @@
 import { getDefaultConfig } from '@rainbow-me/rainbowkit';
-import { fallback, http } from 'viem';
+import { fallback, http, webSocket } from 'viem';
 import { getTokensForChain, SUPPORTED_CHAINS } from './chains';
 
 // Backward compatibility: Sepolia tokens (existing Dashboard/Settings use TOKENS.USDC / TOKENS.USDT)
@@ -28,6 +28,18 @@ const ENV_RPC: Record<number, string | undefined> = {
   84532: import.meta.env.VITE_BASE_SEPOLIA_RPC_URL,
 };
 
+// Optional WebSocket RPC URLs. When set alongside the corresponding HTTP URL above,
+// WebSocket is tried first for that chain (better for real-time updates), then HTTP on failure.
+// Example (Infura mainnet): HTTP https://mainnet.infura.io/v3/KEY, WSS wss://mainnet.infura.io/ws/v3/KEY
+const ENV_RPC_WS: Record<number, string | undefined> = {
+  1: import.meta.env.VITE_ETHEREUM_RPC_WS_URL,
+  137: import.meta.env.VITE_POLYGON_RPC_WS_URL,
+  8453: import.meta.env.VITE_BASE_RPC_WS_URL,
+  42161: import.meta.env.VITE_ARBITRUM_RPC_WS_URL,
+  11155111: import.meta.env.VITE_SEPOLIA_RPC_WS_URL,
+  84532: import.meta.env.VITE_BASE_SEPOLIA_RPC_WS_URL,
+};
+
 // Fallback RPC lists (CORS-friendly). If one returns -32046 or fails, the next is tried.
 const FALLBACK_RPC_URLS: Record<number, string[]> = {
   1: [
@@ -48,6 +60,10 @@ const FALLBACK_RPC_URLS: Record<number, string[]> = {
 
 function transportForChain(chainId: number) {
   const envUrl = ENV_RPC[chainId];
+  const envWsUrl = ENV_RPC_WS[chainId];
+  if (envUrl && envWsUrl) {
+    return fallback([webSocket(envWsUrl), http(envUrl)]);
+  }
   if (envUrl) return http(envUrl);
   const urls = FALLBACK_RPC_URLS[chainId];
   if (!urls?.length) return undefined;
@@ -55,13 +71,14 @@ function transportForChain(chainId: number) {
   return fallback(urls.map((url) => http(url)));
 }
 
+type TransportType = ReturnType<typeof http> | ReturnType<typeof fallback>;
 const transports = SUPPORTED_CHAINS.reduce(
   (acc, chain) => {
     const transport = transportForChain(chain.id);
     if (transport) acc[chain.id] = transport;
     return acc;
   },
-  {} as Record<(typeof SUPPORTED_CHAINS)[number]['id'], ReturnType<typeof http>>
+  {} as Record<(typeof SUPPORTED_CHAINS)[number]['id'], TransportType>
 );
 
 export const config = getDefaultConfig({
