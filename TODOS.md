@@ -12,6 +12,7 @@
 - Calendar + Forecasted amount of required funds ✅
 - Improved Onboarding Experience, collect name, create team, setup safe ✅
 - Automatically add disburse as a business beneficiary, with a configurable address and chain ✅
+- Fix linting errors ✅
 - Charts showing balances over time, and disbursements and deposits by day (bar chart) for the dashboard
 - Fix MultiSig/Teams/Roles/Safe, right now our permissions do not match those of Safe, we need to align those
 - Emails
