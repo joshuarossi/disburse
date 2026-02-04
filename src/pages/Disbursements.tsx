@@ -1,5 +1,5 @@
 import { useState, useMemo, useRef, useEffect } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useSearchParams } from 'react-router-dom';
 import { useAccount, useReadContracts } from 'wagmi';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useMutation } from 'convex/react';
@@ -59,6 +59,7 @@ const MIN_SCHEDULE_OFFSET_MS = 60_000;
 
 export default function Disbursements() {
   const { orgId } = useParams<{ orgId: string }>();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { address } = useAccount();
   const { t } = useTranslation();
   const [isCreating, setIsCreating] = useState(false);
@@ -91,6 +92,8 @@ export default function Disbursements() {
   const [memo, setMemo] = useState('');
   const [scheduledAt, setScheduledAt] = useState<string>('');
   const [scheduledAtError, setScheduledAtError] = useState<string | null>(null);
+  const [beneficiarySearch, setBeneficiarySearch] = useState('');
+  const [beneficiaryTypeFilter, setBeneficiaryTypeFilter] = useState<'all' | 'individual' | 'business'>('all');
   const [processingId, setProcessingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [selectedDisbursementId, setSelectedDisbursementId] = useState<Id<'disbursements'> | null>(null);
@@ -124,6 +127,19 @@ export default function Disbursements() {
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
   const [showFilters, setShowFilters] = useState(false);
+
+  const focusedDisbursementId = searchParams.get('focus') as Id<'disbursements'> | null;
+  const prefillBeneficiaryId = searchParams.get('beneficiary') as Id<'beneficiaries'> | null;
+  const prefillToken = searchParams.get('token');
+  const prefillChainId = searchParams.get('chainId');
+  const prefillCreate = searchParams.get('create');
+  const [prefillApplied, setPrefillApplied] = useState(false);
+
+  useEffect(() => {
+    if (focusedDisbursementId) {
+      setSelectedDisbursementId(focusedDisbursementId);
+    }
+  }, [focusedDisbursementId]);
 
   // Sorting state
   const [sortBy, setSortBy] = useState<'createdAt' | 'amount' | 'status' | 'scheduledAt'>('createdAt');
@@ -192,6 +208,48 @@ export default function Disbursements() {
   );
   const switchChain = useSwitchChain();
   const relaySettings = resolveRelaySettings(org);
+
+  useEffect(() => {
+    if (prefillApplied) return;
+    if (!prefillBeneficiaryId && !prefillCreate) return;
+    if (!beneficiaries) return;
+
+    setIsCreating(true);
+
+    if (prefillBeneficiaryId && beneficiaries.some((b) => b._id === prefillBeneficiaryId)) {
+      setSelectedBeneficiary(prefillBeneficiaryId);
+    }
+
+    if (prefillChainId) {
+      const chainIdNum = Number(prefillChainId);
+      if (!Number.isNaN(chainIdNum) && safes?.some((s) => s.chainId === chainIdNum)) {
+        setCreateChainId(chainIdNum);
+        const availableTokens = getTokenSymbolsForChain(chainIdNum);
+        if (prefillToken && availableTokens.includes(prefillToken)) {
+          setToken(prefillToken);
+        } else if (!availableTokens.includes(token)) {
+          setToken(availableTokens[0] ?? 'USDC');
+        }
+      }
+    } else if (prefillToken) {
+      const availableTokens = getTokenSymbolsForChain(createChainId);
+      if (availableTokens.includes(prefillToken)) {
+        setToken(prefillToken);
+      }
+    }
+
+    setPrefillApplied(true);
+  }, [
+    beneficiaries,
+    createChainId,
+    prefillApplied,
+    prefillBeneficiaryId,
+    prefillChainId,
+    prefillCreate,
+    prefillToken,
+    safes,
+    token,
+  ]);
 
   // Fetch token balances for the selected chain
   const balanceContracts = useMemo(() => {
@@ -465,6 +523,49 @@ export default function Disbursements() {
     return beneficiaries.filter(b => !selectedIds.has(b._id));
   }, [beneficiaries, recipients]);
 
+  const beneficiaryOptions = useMemo(() => {
+    const baseOptions = (() => {
+      if (isBatchMode) {
+        const selectedBen = selectedBeneficiary
+          ? beneficiaries?.find((b) => b._id === selectedBeneficiary)
+          : null;
+        const allOptions =
+          selectedBen && !availableBeneficiaries?.some((b) => b._id === selectedBeneficiary)
+            ? [selectedBen, ...(availableBeneficiaries || [])]
+            : (availableBeneficiaries || []);
+        return allOptions;
+      }
+      return beneficiaries ?? [];
+    })();
+
+    const searchLower = beneficiarySearch.trim().toLowerCase();
+    const filtered = baseOptions.filter((b) => {
+      const type = b.type ?? 'individual';
+      if (beneficiaryTypeFilter !== 'all' && type !== beneficiaryTypeFilter) {
+        return false;
+      }
+      if (!searchLower) return true;
+      return (
+        b.name.toLowerCase().includes(searchLower) ||
+        b.walletAddress.toLowerCase().includes(searchLower)
+      );
+    });
+    if (selectedBeneficiary && !filtered.some((b) => b._id === selectedBeneficiary)) {
+      const selected = baseOptions.find((b) => b._id === selectedBeneficiary);
+      if (selected) {
+        return [selected, ...filtered];
+      }
+    }
+    return filtered;
+  }, [
+    availableBeneficiaries,
+    beneficiarySearch,
+    beneficiaryTypeFilter,
+    beneficiaries,
+    isBatchMode,
+    selectedBeneficiary,
+  ]);
+
   const beneficiariesByTag = useMemo(() => {
     if (!beneficiaries || selectedTags.length === 0) return [];
     const selected = new Set(selectedTags.map(normalizeTag));
@@ -546,6 +647,8 @@ export default function Disbursements() {
     setSelectedTags([]);
     setAddMode('beneficiary');
     setCreateChainId(11155111);
+    setBeneficiarySearch('');
+    setBeneficiaryTypeFilter('all');
     setIsCreating(false);
   };
 
@@ -1200,6 +1303,155 @@ export default function Disbursements() {
     }
   };
 
+  const closeDetailModal = () => {
+    setSelectedDisbursementId(null);
+    if (searchParams.has('focus')) {
+      const nextParams = new URLSearchParams(searchParams);
+      nextParams.delete('focus');
+      setSearchParams(nextParams, { replace: true });
+    }
+  };
+
+  const renderActionButtonsDetailed = (disbursement: {
+    _id: Id<'disbursements'>;
+    status: string;
+    chainId?: number;
+    safeTxHash?: string;
+    txHash?: string;
+    token: string;
+    amount?: string;
+    totalAmount?: string;
+    type?: 'single' | 'batch';
+    beneficiary?: { walletAddress: string } | null;
+    scheduledAt?: number;
+  }) => {
+    const isProcessing = processingId === disbursement._id;
+
+    if (isProcessing) {
+      return (
+        <div className="flex items-center gap-2 text-sm text-slate-400">
+          <Loader2 className="h-4 w-4 animate-spin" />
+          {t('common.loading')}
+        </div>
+      );
+    }
+
+    switch (disbursement.status) {
+      case 'draft':
+        return (
+          <>
+            <Button
+              onClick={() => handlePropose(disbursement)}
+              className="w-full sm:w-auto"
+            >
+              {t('disbursements.actions.propose')}
+            </Button>
+            <Button
+              variant="secondary"
+              onClick={() => {
+                closeDetailModal();
+                handleCancel(disbursement._id);
+              }}
+              className="w-full sm:w-auto border border-red-500/30 text-red-400 hover:text-red-300 hover:border-red-400/50"
+            >
+              {t('common.cancel')}
+            </Button>
+          </>
+        );
+      case 'pending':
+        return (
+          <Button
+            variant="secondary"
+            onClick={() => {
+              closeDetailModal();
+              handleCancel(disbursement._id);
+            }}
+            className="w-full sm:w-auto border border-red-500/30 text-red-400 hover:text-red-300 hover:border-red-400/50"
+          >
+            {t('common.cancel')}
+          </Button>
+        );
+      case 'proposed':
+        return (
+          <Button
+            onClick={() => handleExecute(disbursement)}
+            className="w-full sm:w-auto"
+          >
+            {t('disbursements.actions.execute')}
+          </Button>
+        );
+      case 'scheduled':
+        return (
+          <>
+            <Button
+              variant="secondary"
+              onClick={() => {
+                closeDetailModal();
+                setRescheduleDisbursementId(disbursement._id);
+                setNewScheduledAt(
+                  disbursement.scheduledAt
+                    ? toLocalDateTimeInputValue(new Date(disbursement.scheduledAt))
+                    : ''
+                );
+                setNewScheduledAtError(null);
+              }}
+              className="w-full sm:w-auto"
+            >
+              {t('disbursements.actions.reschedule')}
+            </Button>
+            <Button
+              variant="secondary"
+              onClick={() => {
+                closeDetailModal();
+                handleCancel(disbursement._id);
+              }}
+              className="w-full sm:w-auto border border-red-500/30 text-red-400 hover:text-red-300 hover:border-red-400/50"
+            >
+              {t('common.cancel')}
+            </Button>
+          </>
+        );
+      case 'failed':
+        return disbursement.safeTxHash ? (
+          <Button
+            variant="secondary"
+            onClick={() =>
+              handleRetryRelay({
+                _id: disbursement._id,
+                chainId: disbursement.chainId,
+                safeTxHash: disbursement.safeTxHash,
+              })
+            }
+            className="w-full sm:w-auto"
+          >
+            {t('disbursements.actions.retry', { defaultValue: 'Retry' })}
+          </Button>
+        ) : null;
+      case 'executed':
+        return disbursement.txHash ? (
+          <a
+            href={disbursement.chainId != null ? getBlockExplorerTxUrl(disbursement.chainId, disbursement.txHash) : `https://etherscan.io/tx/${disbursement.txHash}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex w-full sm:w-auto"
+          >
+            <Button variant="secondary" className="w-full sm:w-auto">
+              {t('common.view')}
+            </Button>
+          </a>
+        ) : null;
+      case 'relaying':
+        return (
+          <div className="flex items-center gap-2 text-sm text-slate-400">
+            <Loader2 className="h-4 w-4 animate-spin" />
+            {t('status.relaying')}
+          </div>
+        );
+      default:
+        return null;
+    }
+  };
+
   return (
     <AppLayout>
       <div className="space-y-8">
@@ -1521,6 +1773,36 @@ export default function Disbursements() {
                           <label className="mb-2 block text-sm font-medium text-slate-300">
                             {t('disbursements.form.beneficiary')}
                           </label>
+                          <div className="mb-2 flex flex-wrap items-center gap-2">
+                            <div className="flex rounded-lg border border-white/10 bg-navy-800/70 p-1 text-[11px]">
+                              {(['all', 'individual', 'business'] as const).map((type) => (
+                                <button
+                                  key={type}
+                                  type="button"
+                                  onClick={() => setBeneficiaryTypeFilter(type)}
+                                  className={cn(
+                                    'rounded-md px-2.5 py-1 transition-colors',
+                                    beneficiaryTypeFilter === type
+                                      ? 'bg-accent-500/20 text-accent-200'
+                                      : 'text-slate-400 hover:text-white'
+                                  )}
+                                >
+                                  {type === 'all'
+                                    ? t('common.all')
+                                    : type === 'individual'
+                                      ? t('beneficiaries.individual')
+                                      : t('beneficiaries.business')}
+                                </button>
+                              ))}
+                            </div>
+                            <input
+                              type="text"
+                              value={beneficiarySearch}
+                              onChange={(e) => setBeneficiarySearch(e.target.value)}
+                              placeholder={t('beneficiaries.searchPlaceholder')}
+                              className="flex-1 min-w-[180px] rounded-lg border border-white/10 bg-navy-800 px-3 py-2 text-sm text-white placeholder-slate-500 focus:border-accent-500 focus:outline-none focus:ring-1 focus:ring-accent-500"
+                            />
+                          </div>
                           <select
                             value={selectedBeneficiary}
                             onChange={(e) => setSelectedBeneficiary(e.target.value)}
@@ -1528,24 +1810,17 @@ export default function Disbursements() {
                             required={!isBatchMode}
                           >
                             <option value="">{t('disbursements.form.selectBeneficiary')}</option>
-                            {(() => {
-                              if (isBatchMode) {
-                                const selectedBen = selectedBeneficiary ? beneficiaries?.find(b => b._id === selectedBeneficiary) : null;
-                                const allOptions = selectedBen && !availableBeneficiaries?.some(b => b._id === selectedBeneficiary)
-                                  ? [selectedBen, ...(availableBeneficiaries || [])]
-                                  : (availableBeneficiaries || []);
-                                return allOptions.map((b) => (
-                                  <option key={b._id} value={b._id}>
-                                    {b.name} ({b.walletAddress.slice(0, 6)}...{b.walletAddress.slice(-4)})
-                                  </option>
-                                ));
-                              }
-                              return beneficiaries?.map((b) => (
+                            {beneficiaryOptions.length === 0 ? (
+                              <option value="" disabled>
+                                {t('common.noResults')}
+                              </option>
+                            ) : (
+                              beneficiaryOptions.map((b) => (
                                 <option key={b._id} value={b._id}>
                                   {b.name} ({b.walletAddress.slice(0, 6)}...{b.walletAddress.slice(-4)})
                                 </option>
-                              ));
-                            })()}
+                              ))
+                            )}
                           </select>
                         </div>
                         <div>
@@ -1899,7 +2174,7 @@ export default function Disbursements() {
                             {t(`status.${disbursement.status}`)}
                           </span>
                         </td>
-                        <td className="px-6 py-4 text-slate-400">
+                        <td className="px-6 py-4 text-slate-400 text-xs whitespace-nowrap">
                           {disbursement.scheduledAt
                             ? new Date(disbursement.scheduledAt).toLocaleString()
                             : <span className="text-slate-600">—</span>}
@@ -2033,7 +2308,8 @@ export default function Disbursements() {
         {selectedDisbursementId && (
           <BatchDetailModal
             disbursementId={selectedDisbursementId}
-            onClose={() => setSelectedDisbursementId(null)}
+            onClose={closeDetailModal}
+            renderActions={renderActionButtonsDetailed}
           />
         )}
 

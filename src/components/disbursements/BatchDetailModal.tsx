@@ -1,3 +1,4 @@
+import { ReactNode } from 'react';
 import { useQuery } from 'convex/react';
 import { api } from '../../../convex/_generated/api';
 import { Id } from '../../../convex/_generated/dataModel';
@@ -6,12 +7,35 @@ import { X, ArrowUpRight } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useAccount } from 'wagmi';
 
+interface DisbursementDetail {
+  _id: Id<'disbursements'>;
+  status: string;
+  chainId?: number;
+  token: string;
+  amount?: string;
+  totalAmount?: string;
+  type?: 'single' | 'batch';
+  memo?: string;
+  txHash?: string;
+  safeTxHash?: string;
+  scheduledAt?: number;
+  createdAt: number;
+  beneficiary?: { name: string; walletAddress: string } | null;
+  recipients?: Array<{
+    _id: Id<'disbursementRecipients'>;
+    recipientAddress: string;
+    amount: string;
+    beneficiary?: { name: string; walletAddress: string } | null;
+  }>;
+}
+
 interface BatchDetailModalProps {
   disbursementId: Id<'disbursements'>;
   onClose: () => void;
+  renderActions?: (disbursement: DisbursementDetail) => ReactNode;
 }
 
-export function BatchDetailModal({ disbursementId, onClose }: BatchDetailModalProps) {
+export function BatchDetailModal({ disbursementId, onClose, renderActions }: BatchDetailModalProps) {
   const { address } = useAccount();
   const { t } = useTranslation();
 
@@ -45,6 +69,7 @@ export function BatchDetailModal({ disbursementId, onClose }: BatchDetailModalPr
 
   const isBatch = disbursement.type === 'batch';
   const recipients = disbursement.recipients || [];
+  const actions = renderActions ? renderActions(disbursement as DisbursementDetail) : null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={onClose}>
@@ -194,8 +219,9 @@ export function BatchDetailModal({ disbursementId, onClose }: BatchDetailModalPr
           </div>
         )}
 
-        {/* Close Button */}
-        <div className="mt-6 flex justify-end">
+        {/* Actions + Close */}
+        <div className="mt-6 flex flex-col sm:flex-row gap-3 sm:justify-end">
+          {actions}
           <Button variant="secondary" onClick={onClose}>
             {t('common.close')}
           </Button>

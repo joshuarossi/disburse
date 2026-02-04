@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { useParams } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { useAccount } from 'wagmi';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useMutation } from 'convex/react';
@@ -19,6 +19,7 @@ import {
   Trash2, 
   User, 
   Building2,
+  Send,
   X,
   AlertCircle,
   RefreshCw,
@@ -29,6 +30,8 @@ import {
   Upload,
   Eye,
   EyeOff,
+  Copy,
+  Check,
 } from 'lucide-react';
 import { CHAINS_LIST } from '@/lib/chains';
 
@@ -81,6 +84,7 @@ function BeneficiarySection({
   beneficiaries,
   availableTags,
   walletAddress,
+  orgId,
   onEdit,
   onToggleActive,
 }: {
@@ -90,11 +94,14 @@ function BeneficiarySection({
   beneficiaries: Beneficiary[];
   availableTags: { name: string; normalizedName?: string }[];
   walletAddress: string;
+  orgId?: string;
   onEdit: (b: Beneficiary) => void;
   onToggleActive: (id: Id<'beneficiaries'>, isActive: boolean) => void;
 }) {
   const { t } = useTranslation();
+  const navigate = useNavigate();
   const [screeningDetailId, setScreeningDetailId] = useState<{ id: Id<'beneficiaries'>; name: string } | null>(null);
+  const [copiedId, setCopiedId] = useState<Id<'beneficiaries'> | null>(null);
   const [state, setState] = useState<SectionState>({
     search: '',
     sortField: 'name',
@@ -103,6 +110,34 @@ function BeneficiarySection({
     tagFilter: [],
     showFilters: false,
   });
+
+  const buildDisbursementLink = (beneficiary: Beneficiary) => {
+    if (!orgId) return `/org/`;
+    const params = new URLSearchParams();
+    params.set('create', '1');
+    params.set('beneficiary', beneficiary._id);
+    if (beneficiary.preferredToken) {
+      params.set('token', beneficiary.preferredToken);
+    }
+    if (beneficiary.preferredChainId != null) {
+      params.set('chainId', String(beneficiary.preferredChainId));
+    }
+    return `/org/${orgId}/disbursements?${params.toString()}`;
+  };
+
+  const handleStartDisbursement = (beneficiary: Beneficiary) => {
+    navigate(buildDisbursementLink(beneficiary));
+  };
+
+  const handleCopyAddress = async (beneficiary: Beneficiary) => {
+    try {
+      await navigator.clipboard.writeText(beneficiary.walletAddress);
+      setCopiedId(beneficiary._id);
+      setTimeout(() => setCopiedId(null), 1500);
+    } catch {
+      setCopiedId(null);
+    }
+  };
 
   // Filter and sort beneficiaries
   const filteredAndSorted = useMemo(() => {
@@ -388,10 +423,22 @@ function BeneficiarySection({
                       </div>
                     </td>
                     <td className="px-6 py-4">
-                      <code className="text-sm text-slate-400">
-                        {beneficiary.walletAddress.slice(0, 6)}...
-                        {beneficiary.walletAddress.slice(-4)}
-                      </code>
+                      <button
+                        type="button"
+                        onClick={() => handleCopyAddress(beneficiary)}
+                        className="inline-flex items-center gap-2 text-sm text-slate-400 hover:text-white transition-colors"
+                        title={t('common.copyAddress')}
+                      >
+                        <code className="font-mono">
+                          {beneficiary.walletAddress.slice(0, 6)}...
+                          {beneficiary.walletAddress.slice(-4)}
+                        </code>
+                        {copiedId === beneficiary._id ? (
+                          <Check className="h-3.5 w-3.5 text-green-400" />
+                        ) : (
+                          <Copy className="h-3.5 w-3.5 text-slate-500" />
+                        )}
+                      </button>
                     </td>
                     <td className="px-6 py-4">
                       <span
@@ -416,6 +463,16 @@ function BeneficiarySection({
                     </td>
                     <td className="px-6 py-4 text-right">
                       <div className="flex items-center justify-end gap-2">
+                        {orgId && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleStartDisbursement(beneficiary)}
+                            title={t('disbursements.newDisbursement')}
+                          >
+                            <Send className="h-4 w-4 text-accent-400" />
+                          </Button>
+                        )}
                         <Button
                           variant="ghost"
                           size="icon"
@@ -493,7 +550,19 @@ function BeneficiarySection({
                 <div className="space-y-2 text-sm">
                   <div>
                     <p className="text-xs text-slate-500 mb-1">Wallet Address</p>
-                    <code className="text-slate-400 break-all">{beneficiary.walletAddress}</code>
+                    <button
+                      type="button"
+                      onClick={() => handleCopyAddress(beneficiary)}
+                      className="flex items-center gap-2 text-slate-400 break-all hover:text-white transition-colors text-left"
+                      title={t('common.copyAddress')}
+                    >
+                      <code className="font-mono">{beneficiary.walletAddress}</code>
+                      {copiedId === beneficiary._id ? (
+                        <Check className="h-3.5 w-3.5 text-green-400" />
+                      ) : (
+                        <Copy className="h-3.5 w-3.5 text-slate-500" />
+                      )}
+                    </button>
                   </div>
                   <div>
                     <p className="text-xs text-slate-500 mb-1">{t('beneficiaries.table.added')}</p>
@@ -502,11 +571,22 @@ function BeneficiarySection({
                 </div>
 
                 <div className="flex items-center gap-2 pt-2 border-t border-white/5">
+                  {orgId && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleStartDisbursement(beneficiary)}
+                      className="flex-1 h-11 w-full text-accent-400"
+                    >
+                      <Send className="h-4 w-4 mr-2" />
+                      {t('disbursements.newDisbursement')}
+                    </Button>
+                  )}
                   <Button
                     variant="ghost"
                     size="sm"
                     onClick={() => onEdit(beneficiary)}
-                    className="flex-1 h-11"
+                    className={cn("flex-1 h-11", orgId ? "" : "w-full")}
                   >
                     <Edit className="h-4 w-4 mr-2" />
                     {t('beneficiaries.table.edit')}
@@ -985,6 +1065,7 @@ export default function Beneficiaries() {
             beneficiaries={individuals as Beneficiary[]}
             availableTags={availableTags ?? []}
             walletAddress={address!}
+            orgId={orgId}
             onEdit={handleOpenEdit}
             onToggleActive={handleToggleActive}
           />
@@ -999,6 +1080,7 @@ export default function Beneficiaries() {
             beneficiaries={businesses as Beneficiary[]}
             availableTags={availableTags ?? []}
             walletAddress={address!}
+            orgId={orgId}
             onEdit={handleOpenEdit}
             onToggleActive={handleToggleActive}
           />

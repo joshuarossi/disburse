@@ -125,7 +125,7 @@ export function AppLayout({ children }: AppLayoutProps) {
       {/* Sidebar */}
       <aside
         className={cn(
-          'fixed left-0 top-0 z-40 flex h-screen w-64 flex-col border-r border-white/5 bg-navy-900/50 transition-transform duration-300 ease-in-out lg:translate-x-0',
+          'fixed left-0 top-0 z-40 flex h-screen w-52 flex-col border-r border-white/5 bg-navy-900/50 transition-transform duration-300 ease-in-out lg:translate-x-0',
           isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
         )}
       >
@@ -297,7 +297,7 @@ export function AppLayout({ children }: AppLayoutProps) {
       )}
 
       {/* Main Content */}
-      <main className="ml-0 lg:ml-64 flex-1 min-w-0 overflow-x-hidden">
+      <main className="ml-0 lg:ml-52 flex-1 min-w-0 overflow-x-hidden">
         <div className="min-h-screen pt-20 lg:pt-8 p-4 sm:p-6 lg:p-8 max-w-full">{children}</div>
       </main>
     </div>
