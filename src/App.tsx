@@ -2,6 +2,7 @@ import { Routes, Route } from 'react-router-dom'
 import Landing from './pages/Landing'
 import Login from './pages/Login'
 import SelectOrg from './pages/SelectOrg'
+import Onboarding from './pages/Onboarding'
 import Dashboard from './pages/Dashboard'
 import Beneficiaries from './pages/Beneficiaries'
 import Disbursements from './pages/Disbursements'
@@ -23,6 +24,14 @@ function App() {
         element={
           <AuthRequired>
             <SelectOrg />
+          </AuthRequired>
+        }
+      />
+      <Route
+        path="/onboarding"
+        element={
+          <AuthRequired>
+            <Onboarding />
           </AuthRequired>
         }
       />

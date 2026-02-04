@@ -1,8 +1,7 @@
-import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAccount } from 'wagmi';
 import { useTranslation } from 'react-i18next';
-import { useQuery, useMutation } from 'convex/react';
+import { useQuery } from 'convex/react';
 import { api } from '../../convex/_generated/api';
 import { Button } from '@/components/ui/button';
 import { Plus, Building2, ChevronRight } from 'lucide-react';
@@ -11,30 +10,11 @@ export default function SelectOrg() {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const { address } = useAccount();
-  const [isCreating, setIsCreating] = useState(false);
-  const [newOrgName, setNewOrgName] = useState('');
 
   const orgs = useQuery(
     api.orgs.listForUser,
     address ? { walletAddress: address } : 'skip'
   );
-
-  const createOrg = useMutation(api.orgs.create);
-
-  const handleCreateOrg = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!address || !newOrgName.trim()) return;
-
-    try {
-      const { orgId } = await createOrg({
-        name: newOrgName.trim(),
-        walletAddress: address,
-      });
-      navigate(`/org/${orgId}/dashboard`);
-    } catch (error) {
-      console.error('Failed to create org:', error);
-    }
-  };
 
   const handleSelectOrg = (orgId: string) => {
     navigate(`/org/${orgId}/dashboard`);
@@ -68,7 +48,7 @@ export default function SelectOrg() {
 
         {/* Org List */}
         <div className="space-y-3">
-          {orgs?.map((org) => (
+          {orgs?.filter((o): o is NonNullable<typeof o> => !!o).map((org) => (
             <button
               key={org._id}
               onClick={() => handleSelectOrg(org._id)}
@@ -87,55 +67,22 @@ export default function SelectOrg() {
             </button>
           ))}
 
-          {orgs?.length === 0 && !isCreating && (
+          {orgs?.length === 0 && (
             <p className="text-center text-slate-500 py-4">
               {t('auth.selectOrg.noOrgs')}
             </p>
           )}
         </div>
 
-        {/* Create New Org */}
-        {isCreating ? (
-          <form onSubmit={handleCreateOrg} className="mt-6">
-            <div className="rounded-xl border border-accent-500/30 bg-navy-900/50 p-4">
-              <label className="mb-2 block text-sm font-medium text-white">
-                {t('auth.selectOrg.orgName')}
-              </label>
-              <input
-                type="text"
-                value={newOrgName}
-                onChange={(e) => setNewOrgName(e.target.value)}
-                placeholder={t('auth.selectOrg.orgNamePlaceholder')}
-                className="w-full rounded-lg border border-white/10 bg-navy-800 px-4 py-2 text-white placeholder-slate-500 focus:border-accent-500 focus:outline-none focus:ring-1 focus:ring-accent-500"
-                autoFocus
-              />
-              <div className="mt-4 flex gap-3">
-                <Button type="submit" className="flex-1">
-                  {t('auth.selectOrg.createOrg')}
-                </Button>
-                <Button
-                  type="button"
-                  variant="secondary"
-                  onClick={() => {
-                    setIsCreating(false);
-                    setNewOrgName('');
-                  }}
-                >
-                  {t('common.cancel')}
-                </Button>
-              </div>
-            </div>
-          </form>
-        ) : (
-          <Button
-            onClick={() => setIsCreating(true)}
-            variant="secondary"
-            className="mt-6 w-full"
-          >
-            <Plus className="h-4 w-4" />
-            {t('auth.selectOrg.createNew')}
-          </Button>
-        )}
+        {/* Create New Org — routes to the onboarding wizard */}
+        <Button
+          onClick={() => navigate('/onboarding')}
+          variant="secondary"
+          className="mt-6 w-full"
+        >
+          <Plus className="h-4 w-4" />
+          {t('auth.selectOrg.createNew')}
+        </Button>
       </div>
     </div>
   );

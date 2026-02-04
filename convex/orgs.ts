@@ -21,6 +21,25 @@ const DEFAULT_RELAY_FEE_MODE: RelayFeeMode =
     ? "stablecoin_only"
     : "stablecoin_preferred";
 
+// Disburse subscription beneficiary — auto-added to every new org.
+// All three must be valid for the beneficiary to be created; if any is missing
+// the insert is silently skipped and org creation proceeds normally.
+const DISBURSE_BENEFICIARY_ADDRESS: string | null = (() => {
+  const raw = (process.env.VITE_DISBURSE_BENEFICIARY_ADDRESS ?? "").toString().trim();
+  return raw.startsWith("0x") && raw.length === 42 ? raw.toLowerCase() : null;
+})();
+
+const DISBURSE_BENEFICIARY_TOKEN: string | null = (() => {
+  const raw = (process.env.VITE_DISBURSE_BENEFICIARY_TOKEN ?? "").toString().trim();
+  return raw.length > 0 ? raw.toUpperCase() : null;
+})();
+
+const DISBURSE_BENEFICIARY_CHAIN_ID: number | null = (() => {
+  const raw = (process.env.VITE_DISBURSE_BENEFICIARY_CHAIN_ID ?? "").toString().trim();
+  const n = Number(raw);
+  return Number.isInteger(n) && n > 0 ? n : null;
+})();
+
 function normalizeRelayFeeMode(value?: string | null): RelayFeeMode {
   return value === "stablecoin_only" ? "stablecoin_only" : "stablecoin_preferred";
 }
@@ -83,6 +102,36 @@ export const create = mutation({
       createdAt: now,
       updatedAt: now,
     });
+
+    // Auto-add Disburse subscription beneficiary (silently skipped if env vars are missing)
+    if (DISBURSE_BENEFICIARY_ADDRESS && DISBURSE_BENEFICIARY_TOKEN && DISBURSE_BENEFICIARY_CHAIN_ID) {
+      const disburseBeneficiaryId = await ctx.db.insert("beneficiaries", {
+        orgId,
+        type: "business",
+        name: "Disburse",
+        walletAddress: DISBURSE_BENEFICIARY_ADDRESS,
+        notes: "Subscription payments for Disburse",
+        preferredToken: DISBURSE_BENEFICIARY_TOKEN,
+        preferredChainId: DISBURSE_BENEFICIARY_CHAIN_ID,
+        isActive: true,
+        createdAt: now,
+        updatedAt: now,
+      });
+
+      await ctx.db.insert("auditLog", {
+        orgId,
+        actorUserId: user._id,
+        action: "beneficiary.created",
+        objectType: "beneficiary",
+        objectId: disburseBeneficiaryId,
+        metadata: {
+          autoCreated: true,
+          name: "Disburse",
+          walletAddress: DISBURSE_BENEFICIARY_ADDRESS,
+        },
+        timestamp: now,
+      });
+    }
 
     // Audit log
     await ctx.db.insert("auditLog", {
@@ -242,6 +291,51 @@ export const updateRelaySettings = mutation({
       metadata: { relayFeeTokenSymbol, relayFeeMode },
       timestamp: Date.now(),
     });
+
+    return { success: true };
+  },
+});
+
+// Update the calling user's own membership name and/or email within an org.
+// Used during onboarding to persist profile info right after org creation
+// without needing to first fetch the membershipId.
+export const updateOwnProfile = mutation({
+  args: {
+    orgId: v.id("orgs"),
+    walletAddress: v.string(),
+    name: v.optional(v.string()),
+    email: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const walletAddress = args.walletAddress.toLowerCase();
+
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_wallet", (q) => q.eq("walletAddress", walletAddress))
+      .first();
+
+    if (!user) {
+      throw new Error("User not found");
+    }
+
+    const membership = await ctx.db
+      .query("orgMemberships")
+      .withIndex("by_org_and_user", (q) =>
+        q.eq("orgId", args.orgId).eq("userId", user._id)
+      )
+      .first();
+
+    if (!membership || membership.status !== "active") {
+      throw new Error("Not a member of this organization");
+    }
+
+    const patch: Record<string, string | undefined> = {};
+    if (args.name !== undefined) patch.name = args.name;
+    if (args.email !== undefined) patch.email = args.email;
+
+    if (Object.keys(patch).length > 0) {
+      await ctx.db.patch(membership._id, patch);
+    }
 
     return { success: true };
   },
