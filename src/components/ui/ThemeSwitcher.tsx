@@ -2,10 +2,12 @@ import { useState } from 'react';
 import { Sun, Moon, Check } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useTheme } from '@/lib/theme';
-import { Button } from './button';
+import { Button, type ButtonProps } from './button';
 import { cn } from '@/lib/utils';
 
-export function ThemeSwitcher({ variant = 'ghost', size = 'sm' }: { variant?: 'default' | 'ghost' | 'secondary', size?: 'sm' | 'md' | 'lg' }) {
+type SwitcherProps = { variant?: ButtonProps['variant']; size?: ButtonProps['size'] };
+
+export function ThemeSwitcher({ variant = 'ghost', size = 'sm' }: SwitcherProps) {
   const { theme, setTheme } = useTheme();
   const { t } = useTranslation();
   const [isOpen, setIsOpen] = useState(false);

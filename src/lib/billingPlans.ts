@@ -6,6 +6,7 @@ export const PLANS = {
     price: 25,
     description: 'For individuals',
     icon: User,
+    popular: false,
     features: [
       '1 user',
       '1 Safe per chain',
@@ -43,6 +44,7 @@ export const PLANS = {
     price: 99,
     description: 'For growing teams',
     icon: Building2,
+    popular: false,
     features: [
       'Unlimited users',
       '1 Safe per chain',

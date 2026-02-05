@@ -41,7 +41,9 @@ export async function selectRelayFeeToken(args: {
     ? args.feeTokenSymbol
     : 'USDC';
 
-  const client = getPublicClient(config, { chainId: args.chainId });
+  const client = getPublicClient(config, {
+    chainId: args.chainId as (typeof config)['chains'][number]['id'],
+  });
   if (!client) {
     throw new Error('No public client available for selected chain.');
   }

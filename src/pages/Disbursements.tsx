@@ -1,6 +1,6 @@
 import { useState, useMemo, useRef, useEffect } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
-import { useAccount, useReadContracts } from 'wagmi';
+import { useAccount, useReadContracts, useChainId } from 'wagmi';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useMutation } from 'convex/react';
 import { api } from '../../convex/_generated/api';
@@ -23,7 +23,7 @@ import {
 } from '@/lib/safe';
 import { executeTransactionViaGelato, proposeTransactionViaGelato } from '@/lib/safeRelay';
 import { selectRelayFeeToken } from '@/lib/relayFee';
-import { RELAY_FEATURE_ENABLED, resolveRelaySettings } from '@/lib/relayConfig';
+import { RELAY_FEATURE_ENABLED, resolveRelaySettings, type RelayFeeMode } from '@/lib/relayConfig';
 import {
   CHAINS_LIST,
   getChainName,
@@ -56,6 +56,39 @@ const toLocalDateTimeInputValue = (date: Date) => {
   return `${year}-${month}-${day}T${hours}:${minutes}`;
 };
 const MIN_SCHEDULE_OFFSET_MS = 60_000;
+
+type DisbursementSummary = {
+  _id: Id<'disbursements'>;
+  chainId?: number;
+  beneficiary?: { walletAddress: string } | null;
+  token: string;
+  amount?: string;
+  type?: 'single' | 'batch';
+  totalAmount?: string;
+};
+
+type DisbursementExecuteRef = {
+  _id: Id<'disbursements'>;
+  chainId?: number;
+  safeTxHash?: string;
+};
+
+type ScreeningWarningState =
+  | {
+      flagged: Array<{ beneficiaryId: string; beneficiaryName: string; status: string }>;
+      action: 'create';
+      data: { isBatch: boolean };
+    }
+  | {
+      flagged: Array<{ beneficiaryId: string; beneficiaryName: string; status: string }>;
+      action: 'propose';
+      data: { disbursement: DisbursementSummary };
+    }
+  | {
+      flagged: Array<{ beneficiaryId: string; beneficiaryName: string; status: string }>;
+      action: 'execute';
+      data: { disbursement: DisbursementExecuteRef };
+    };
 
 export default function Disbursements() {
   const { orgId } = useParams<{ orgId: string }>();
@@ -112,11 +145,7 @@ export default function Disbursements() {
   const [addMode, setAddMode] = useState<'beneficiary' | 'tag'>('beneficiary');
 
   // Screening warning state
-  const [screeningWarning, setScreeningWarning] = useState<{
-    flagged: Array<{ beneficiaryId: string; beneficiaryName: string; status: string }>;
-    action: 'create' | 'propose' | 'execute';
-    data: unknown;
-  } | null>(null);
+  const [screeningWarning, setScreeningWarning] = useState<ScreeningWarningState | null>(null);
 
   // Screening block state
   const [screeningBlock, setScreeningBlock] = useState<{
@@ -241,7 +270,8 @@ export default function Disbursements() {
     orgId ? { orgId: orgId as Id<'orgs'> } : 'skip'
   );
   const switchChain = useSwitchChain();
-  const relaySettings = resolveRelaySettings(org);
+  const currentChainId = useChainId();
+  const relaySettings = resolveRelaySettings(org ?? undefined);
 
   useEffect(() => {
     if (prefillApplied) return;
@@ -652,7 +682,7 @@ export default function Disbursements() {
     if (!beneficiaries || selectedTags.length === 0) return [];
     const selected = new Set(selectedTags.map(normalizeTag));
     return beneficiaries.filter((b) =>
-      b.tags?.some((tag) => selected.has(normalizeTag(tag)))
+      b.tags?.some((tag: string) => selected.has(normalizeTag(tag)))
     );
   }, [beneficiaries, selectedTags]);
 
@@ -797,7 +827,7 @@ export default function Disbursements() {
           setScreeningWarning({
             flagged: screeningCheck.flagged,
             action: 'create',
-            data: { allRecipients, isBatch: true },
+            data: { isBatch: true },
           });
           return;
         }
@@ -874,7 +904,7 @@ export default function Disbursements() {
     disbursement: {
       _id: Id<'disbursements'>;
       chainId?: number;
-      beneficiary: { walletAddress: string } | null;
+      beneficiary?: { walletAddress: string } | null;
       token: string;
       amount?: string;
       type?: 'single' | 'batch';
@@ -921,13 +951,13 @@ export default function Disbursements() {
         }
       }
 
-      if (switchChain && switchChain.switchChainAsync && switchChain.chain?.id !== chainId) {
+      if (switchChain && switchChain.switchChainAsync && currentChainId !== chainId) {
         await switchChain.switchChainAsync({ chainId });
       }
 
       let relayFeeToken: string | undefined;
       let relayFeeTokenSymbol: string | undefined;
-      let relayFeeMode: string | undefined;
+      let relayFeeMode: RelayFeeMode | undefined;
 
       if (RELAY_FEATURE_ENABLED) {
         const feeSelection = await selectRelayFeeToken({
@@ -1077,7 +1107,7 @@ export default function Disbursements() {
         }
       }
 
-      if (switchChain && switchChain.switchChainAsync && switchChain.chain?.id !== chainId) {
+      if (switchChain && switchChain.switchChainAsync && currentChainId !== chainId) {
         await switchChain.switchChainAsync({ chainId });
       }
 
@@ -2615,6 +2645,7 @@ export default function Disbursements() {
                   onClick={async () => {
                     const warning = screeningWarning;
                     setScreeningWarning(null);
+                    if (!warning) return;
 
                     if (warning.action === 'create') {
                       // Re-create the form event and call handleCreate with skipScreening=true

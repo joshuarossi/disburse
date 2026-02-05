@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { useMutation } from 'convex/react';
 import { api } from '../../../convex/_generated/api';
 import { Languages, Check } from 'lucide-react';
-import { Button } from './button';
+import { Button, type ButtonProps } from './button';
 import { cn } from '@/lib/utils';
 
 const languages = [
@@ -13,7 +13,9 @@ const languages = [
   { code: 'pt-BR', label: 'Português (Brasil)', flag: '🇧🇷' },
 ] as const;
 
-export function LanguageSwitcher({ variant = 'ghost', size = 'sm' }: { variant?: 'default' | 'ghost' | 'secondary', size?: 'sm' | 'md' | 'lg' }) {
+type SwitcherProps = { variant?: ButtonProps['variant']; size?: ButtonProps['size'] };
+
+export function LanguageSwitcher({ variant = 'ghost', size = 'sm' }: SwitcherProps) {
   const { i18n } = useTranslation();
   const { address } = useAccount();
   const [isOpen, setIsOpen] = useState(false);

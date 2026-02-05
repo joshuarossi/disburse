@@ -159,7 +159,7 @@ export default function Settings() {
     setOrgName(org.name);
   }
 
-  const resolvedRelaySettings = resolveRelaySettings(org);
+  const resolvedRelaySettings = resolveRelaySettings(org ?? undefined);
   if (org && !relaySettingsLoaded) {
     setRelayFeeTokenSymbol(resolvedRelaySettings.relayFeeTokenSymbol);
     setRelayFeeMode(resolvedRelaySettings.relayFeeMode);
