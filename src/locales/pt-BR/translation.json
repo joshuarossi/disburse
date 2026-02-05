@@ -64,7 +64,7 @@
       "badge": "Não custodial e com Safe",
       "title": "Gestão de Tesouraria para",
       "titleHighlight": "Equipes Web3",
-      "subtitle": "Simplifique os desembolsos de stablecoins com segurança de nível empresarial. Gerencie beneficiários, rastreie pagamentos e mantenha trilhas de auditoria completas—tudo sem nunca abrir mão do controle das suas chaves.",
+      "subtitle": "Simplifique os desembolsos de stablecoins com segurança de nível empresarial. Programe pagamentos, execute transações sem gas e mantenha trilhas de auditoria completas—tudo sem nunca abrir mão do controle das suas chaves.",
       "tryForFree": "Experimentar grátis",
       "learnMore": "Saber mais",
       "trustIndicators": "Alimentado por segurança líder da indústria"
@@ -72,7 +72,7 @@
     "features": {
       "title": "Recursos",
       "subtitle": "Tudo que você precisa para gerenciar operações de tesouraria",
-      "description": "Construído para equipes Web3 que precisam de segurança, transparência e controle sobre seus fundos.",
+      "description": "Construído para equipes de finanças que precisam de conformidade, automação e controle sobre a tesouraria.",
       "nonCustodial": {
         "title": "Não Custodial",
         "description": "Suas chaves, seus fundos. Nunca temos acesso às suas chaves privadas ou ativos."
@@ -89,9 +89,29 @@
         "title": "Trilha de Auditoria",
         "description": "Histórico completo de transações com registros imutáveis na blockchain para conformidade."
       },
+      "scheduledPayments": {
+        "title": "Pagamentos Agendados",
+        "description": "Agende, reagende e cancele desembolsos com antecedência com aprovações claras e visibilidade."
+      },
+      "gaslessTransactions": {
+        "title": "Transações Sem Gas",
+        "description": "Pague as taxas de rede com stablecoins para que os operadores não precisem de tokens nativos."
+      },
       "batchTransactions": {
         "title": "Transações em Lote",
         "description": "Envie pagamentos para múltiplos destinatários em uma única transação. Reduza os custos de gas e agilize desembolsos estilo folha de pagamento."
+      },
+      "bulkImport": {
+        "title": "Importação em Massa",
+        "description": "Envie beneficiários via CSV com validação, campos obrigatórios e verificação de duplicados."
+      },
+      "beneficiaryTags": {
+        "title": "Tags de Beneficiários",
+        "description": "Crie coortes com tags e execute desembolsos recorrentes em segundos."
+      },
+      "reporting": {
+        "title": "Relatórios e Exportações",
+        "description": "Gere relatórios prontos para finanças e exporte registros para conciliação."
       },
       "stablecoinNative": {
         "title": "Nativo de Stablecoins",
@@ -112,15 +132,18 @@
       },
       "section2": {
         "title": "Operações poderosas,",
-        "titleHighlight": "simplificadas"
+        "titleHighlight": "simplificadas",
+        "description": "Automatize pagamentos, reduza custos de gas e execute desembolsos em alto volume com confiança."
       },
       "section3": {
         "title": "Tudo que você precisa",
-        "description": "Construído para equipes que exigem o melhor"
+        "description": "Construído para equipes de finanças que exigem clareza e controle"
       },
       "badges": {
         "compliance": "Conformidade",
-        "efficient": "Eficiente"
+        "efficient": "Eficiente",
+        "automation": "Automação",
+        "gasless": "Sem gas"
       }
     },
     "howItWorks": {
@@ -139,9 +162,17 @@
       },
       "step3": {
         "number": "03",
-        "title": "Envie Pagamentos",
-        "description": "Execute desembolsos de stablecoins com trilhas de auditoria completas e rastreamento de transações."
+        "title": "Enviar ou Agendar",
+        "description": "Execute ou agende desembolsos de stablecoins com opções sem gas e trilhas de auditoria completas."
       }
+    },
+    "pricing": {
+      "badge": "Preços",
+      "title": "Preços transparentes que escalam",
+      "subtitle": "Escolha um plano que se adapte à sua equipe e pague em stablecoins.",
+      "popular": "Mais popular",
+      "cta": "Iniciar teste grátis",
+      "note": "Todos os planos incluem ferramentas básicas de tesouraria, trilhas de auditoria e fluxos de conformidade."
     },
     "cta": {
       "badge": "Teste gratuito de 30 dias",
@@ -164,6 +195,92 @@
       "privacy": "Privacidade",
       "terms": "Termos",
       "copyright": "© {{year}} Disburse. Todos os direitos reservados."
+    }
+  },
+  "marketingPages": {
+    "docs": {
+      "title": "Documentação",
+      "subtitle": "Guias de configuração, conexões de carteira e fluxos de pagamento.",
+      "sections": {
+        "gettingStarted": {
+          "title": "Primeiros passos",
+          "body": "Conecte seu Safe, adicione beneficiários e execute um desembolso de teste em minutos."
+        },
+        "workflows": {
+          "title": "Pagamentos e relatórios",
+          "body": "Agende, agrupe e aprove desembolsos com exportações prontas para finanças."
+        }
+      }
+    },
+    "about": {
+      "title": "Sobre a Disburse",
+      "subtitle": "Ajudamos equipes de finanças a operar stablecoins com confiança.",
+      "sections": {
+        "mission": {
+          "title": "Nossa missão",
+          "body": "Tornar as operações de tesouraria mais seguras, rápidas e totalmente auditáveis para equipes de ativos digitais."
+        },
+        "principles": {
+          "title": "Feito para finanças modernas",
+          "body": "Não custodial por design, construído sobre Safe e focado em fluxos prontos para conformidade."
+        }
+      }
+    },
+    "blog": {
+      "title": "Blog",
+      "subtitle": "Atualizações de produto e insights de operações de tesouraria.",
+      "sections": {
+        "updates": {
+          "title": "Atualizações do produto",
+          "body": "Notas de lançamento, novas funcionalidades e melhorias da plataforma."
+        },
+        "insights": {
+          "title": "Insights de operações financeiras",
+          "body": "Guias sobre operações com stablecoins, conformidade e melhores práticas de tesouraria."
+        }
+      }
+    },
+    "contact": {
+      "title": "Contato",
+      "subtitle": "Fale com vendas ou suporte.",
+      "sections": {
+        "sales": {
+          "title": "Vendas",
+          "body": "Conte-nos sobre seus fluxos de tesouraria e organizaremos uma demo. Escreva para {{salesEmail}}."
+        },
+        "support": {
+          "title": "Suporte",
+          "body": "Para clientes atuais, escreva para {{supportEmail}} para ajuda com faturamento, onboarding ou resolução de problemas."
+        }
+      }
+    },
+    "privacy": {
+      "title": "Política de Privacidade",
+      "subtitle": "Como coletamos, usamos e protegemos dados.",
+      "sections": {
+        "collection": {
+          "title": "Informações que coletamos",
+          "body": "Coletamos dados de conta, configurações da organização e uso necessários para prestar o serviço."
+        },
+        "usage": {
+          "title": "Como usamos as informações",
+          "body": "Usamos dados para operar a plataforma, melhorar desempenho e apoiar fluxos de conformidade."
+        }
+      }
+    },
+    "terms": {
+      "title": "Termos de Serviço",
+      "subtitle": "Termos que regem seu uso da Disburse.",
+      "sections": {
+        "service": {
+          "title": "Uso do serviço",
+          "body": "Use o serviço em conformidade com as leis aplicáveis e as políticas da sua organização."
+        },
+        "billing": {
+          "title": "Faturamento e pagamentos",
+          "body": "As assinaturas são renovadas mensalmente, salvo cancelamento. Você é responsável por autorizações e taxas de pagamento."
+        }
+      }
     }
   },
   "auth": {
@@ -367,11 +484,16 @@
     "form": {
       "beneficiary": "Beneficiário",
       "selectBeneficiary": "Selecione um beneficiário...",
+      "selectedBeneficiary": "Selecionado",
+      "preferred": "Preferido",
+      "filterBy": "Filtrar",
       "selectByTag": "Selecionar por tag",
       "selectTagsPlaceholder": "Escolha tags...",
       "addTaggedBeneficiaries": "Adicionar beneficiários com tag",
       "tagMatches": "{{count}} correspondência{{count, plural, one {} other {s}}}",
       "noTaggedBeneficiaries": "Nenhum beneficiário corresponde às tags selecionadas",
+      "paymentSettings": "Configurações de pagamento",
+      "paymentLocked": "A rede e o token ficam bloqueados ao primeiro destinatário do lote.",
       "amount": "Quantia",
       "token": "Token",
       "memo": "Memo",
@@ -381,10 +503,12 @@
       "scheduleInvalid": "Por favor, insira uma data e hora válidas.",
       "scheduleTooSoon": "O horário agendado deve ser pelo menos 1 minuto no futuro.",
       "duplicateBeneficiary": "Este beneficiário já foi adicionado",
-      "invalidAmount": "A quantia deve ser maior que 0"
+      "invalidAmount": "A quantia deve ser maior que 0",
+      "batchHint": "Opcional: adicione mais beneficiários para criar um lote."
     },
     "batch": {
-      "addAnother": "+ Adicionar outro beneficiário",
+      "addAnother": "Adicionar outro beneficiário",
+      "startBatch": "Adicionar ao lote",
       "remove": "Remover",
       "total": "Total: {{total}} {{token}} para {{count}} {{count, plural, one {beneficiário} other {beneficiários}}}",
       "breakdown": "{{names}} = {{total}} {{token}}",

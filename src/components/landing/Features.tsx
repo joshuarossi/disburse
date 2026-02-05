@@ -1,15 +1,19 @@
 import { motion } from 'framer-motion'
 import { useTranslation } from 'react-i18next'
-import { 
-  Shield, 
-  Lock, 
-  FileText, 
-  Coins, 
-  Users, 
-  CreditCard,
+import {
+  Shield,
+  Lock,
+  FileText,
+  FileUp,
+  Tags,
+  CalendarClock,
+  Zap,
+  Coins,
+  Users,
+  BarChart3,
   ShieldCheck,
   Layers,
-  CheckCircle2
+  CheckCircle2,
 } from 'lucide-react'
 
 const containerVariants = {
@@ -31,31 +35,17 @@ const itemVariants = {
   },
 }
 
-const slideInLeft = {
-  hidden: { opacity: 0, x: -50 },
-  visible: {
-    opacity: 1,
-    x: 0,
-    transition: { duration: 0.7, ease: [0.22, 1, 0.36, 1] },
-  },
-}
-
-const slideInRight = {
-  hidden: { opacity: 0, x: 50 },
-  visible: {
-    opacity: 1,
-    x: 0,
-    transition: { duration: 0.7, ease: [0.22, 1, 0.36, 1] },
-  },
-}
-
 export function Features() {
-  const { t } = useTranslation();
-  
+  const { t } = useTranslation()
+
   return (
     <>
       {/* Section 1: Security & Compliance Hero Section */}
-      <section className="relative py-24 sm:py-32 overflow-hidden">
+      <section
+        id="features"
+        className="relative py-24 sm:py-32 overflow-hidden"
+        style={{ scrollMarginTop: '96px' }}
+      >
         {/* Background effects */}
         <div className="absolute inset-0 -z-10">
           <div className="absolute left-1/4 top-1/4 h-[600px] w-[600px] rounded-full bg-accent-500/10 blur-[120px]" />
@@ -66,7 +56,7 @@ export function Features() {
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true, margin: "-100px" }}
+            viewport={{ once: true, margin: '-100px' }}
             transition={{ duration: 0.6 }}
             className="mx-auto max-w-3xl text-center mb-16"
           >
@@ -89,7 +79,7 @@ export function Features() {
             variants={containerVariants}
             initial="hidden"
             whileInView="visible"
-            viewport={{ once: true, margin: "-100px" }}
+            viewport={{ once: true, margin: '-100px' }}
             className="grid grid-cols-1 gap-8 lg:grid-cols-3 lg:gap-6"
           >
             {/* Non-Custodial - Large Card */}
@@ -146,15 +136,15 @@ export function Features() {
         </div>
       </section>
 
-      {/* Section 2: Operations - Split Layout */}
+      {/* Section 2: Operations - Automation */}
       <section className="relative py-24 sm:py-32 overflow-hidden">
         <div className="absolute inset-0 -z-10 bg-gradient-to-b from-navy-950 via-navy-900/30 to-navy-950" />
-        
+
         <div className="mx-auto max-w-7xl px-6 lg:px-8">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true, margin: "-100px" }}
+            viewport={{ once: true, margin: '-100px' }}
             transition={{ duration: 0.6 }}
             className="mx-auto max-w-3xl text-center mb-16"
           >
@@ -164,33 +154,60 @@ export function Features() {
                 {t('landing.features.section2.titleHighlight')}
               </span>
             </h2>
+            <p className="mt-4 text-lg text-slate-400">
+              {t('landing.features.section2.description')}
+            </p>
           </motion.div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 max-w-6xl mx-auto">
-            {/* Audit Trail */}
+          <motion.div
+            variants={containerVariants}
+            initial="hidden"
+            whileInView="visible"
+            viewport={{ once: true, margin: '-100px' }}
+            className="grid grid-cols-1 gap-8 lg:grid-cols-3 max-w-6xl mx-auto"
+          >
+            {/* Scheduled Payments */}
             <motion.div
-              initial="hidden"
-              whileInView="visible"
-              viewport={{ once: true, margin: "-100px" }}
-              variants={slideInLeft}
+              variants={itemVariants}
               className="group relative rounded-3xl border border-white/10 bg-navy-900/50 p-10 backdrop-blur-sm transition-all duration-500 hover:border-accent-500/40 hover:bg-navy-800/60 hover:shadow-xl hover:shadow-accent-500/5"
             >
               <div className="mb-6 inline-flex h-16 w-16 items-center justify-center rounded-2xl bg-accent-500/10 text-accent-400 transition-colors group-hover:bg-accent-500/20 group-hover:scale-110">
-                <FileText className="h-8 w-8" />
+                <CalendarClock className="h-8 w-8" />
               </div>
-              <h3 className="text-2xl font-bold text-white mb-4">{t('landing.features.auditTrail.title')}</h3>
-              <p className="text-lg text-slate-300 leading-relaxed">{t('landing.features.auditTrail.description')}</p>
+              <div className="flex items-center gap-3 mb-4">
+                <h3 className="text-2xl font-bold text-white">{t('landing.features.scheduledPayments.title')}</h3>
+                <span className="inline-flex items-center gap-1 rounded-full bg-accent-500/10 px-3 py-1 text-xs font-medium text-accent-400 border border-accent-500/20">
+                  <CheckCircle2 className="h-3 w-3" />
+                  {t('landing.features.badges.automation')}
+                </span>
+              </div>
+              <p className="text-lg text-slate-300 leading-relaxed">{t('landing.features.scheduledPayments.description')}</p>
+            </motion.div>
+
+            {/* Gasless Transactions */}
+            <motion.div
+              variants={itemVariants}
+              className="group relative rounded-3xl border border-white/10 bg-gradient-to-br from-navy-900/60 to-navy-950/60 p-10 backdrop-blur-sm transition-all duration-500 hover:border-accent-500/40 hover:shadow-xl hover:shadow-accent-500/5"
+            >
+              <div className="mb-6 inline-flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-accent-500/20 to-accent-600/10 text-accent-400 border border-accent-500/20 transition-transform group-hover:scale-110">
+                <Zap className="h-8 w-8" />
+              </div>
+              <div className="flex items-center gap-3 mb-4">
+                <h3 className="text-2xl font-bold text-white">{t('landing.features.gaslessTransactions.title')}</h3>
+                <span className="inline-flex items-center gap-1 rounded-full bg-accent-500/10 px-3 py-1 text-xs font-medium text-accent-400 border border-accent-500/20">
+                  <CheckCircle2 className="h-3 w-3" />
+                  {t('landing.features.badges.gasless')}
+                </span>
+              </div>
+              <p className="text-lg text-slate-300 leading-relaxed">{t('landing.features.gaslessTransactions.description')}</p>
             </motion.div>
 
             {/* Batch Transactions */}
             <motion.div
-              initial="hidden"
-              whileInView="visible"
-              viewport={{ once: true, margin: "-100px" }}
-              variants={slideInRight}
-              className="group relative rounded-3xl border border-white/10 bg-gradient-to-br from-navy-900/60 to-navy-950/60 p-10 backdrop-blur-sm transition-all duration-500 hover:border-accent-500/40 hover:shadow-xl hover:shadow-accent-500/5"
+              variants={itemVariants}
+              className="group relative rounded-3xl border border-white/10 bg-navy-900/50 p-10 backdrop-blur-sm transition-all duration-500 hover:border-accent-500/40 hover:bg-navy-800/60 hover:shadow-xl hover:shadow-accent-500/5"
             >
-              <div className="mb-6 inline-flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-accent-500/20 to-accent-600/10 text-accent-400 border border-accent-500/20 transition-transform group-hover:scale-110">
+              <div className="mb-6 inline-flex h-16 w-16 items-center justify-center rounded-2xl bg-accent-500/10 text-accent-400 transition-colors group-hover:bg-accent-500/20 group-hover:scale-110">
                 <Layers className="h-8 w-8" />
               </div>
               <div className="flex items-center gap-3 mb-4">
@@ -202,12 +219,12 @@ export function Features() {
               </div>
               <p className="text-lg text-slate-300 leading-relaxed">{t('landing.features.batchTransactions.description')}</p>
             </motion.div>
-          </div>
+          </motion.div>
         </div>
       </section>
 
       {/* Section 3: Platform Features - Grid */}
-      <section id="features" className="relative py-24 sm:py-32 overflow-hidden">
+      <section className="relative py-24 sm:py-32 overflow-hidden">
         <div className="absolute inset-0 -z-10">
           <div className="absolute right-0 top-1/2 h-[500px] w-[500px] -translate-y-1/2 rounded-full bg-accent-500/5 blur-[120px]" />
         </div>
@@ -216,7 +233,7 @@ export function Features() {
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true, margin: "-100px" }}
+            viewport={{ once: true, margin: '-100px' }}
             transition={{ duration: 0.6 }}
             className="mx-auto max-w-3xl text-center mb-16"
           >
@@ -232,7 +249,7 @@ export function Features() {
             variants={containerVariants}
             initial="hidden"
             whileInView="visible"
-            viewport={{ once: true, margin: "-100px" }}
+            viewport={{ once: true, margin: '-100px' }}
             className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 max-w-6xl mx-auto"
           >
             {/* Stablecoin Native */}
@@ -259,16 +276,52 @@ export function Features() {
               <p className="text-slate-400">{t('landing.features.roleBasedAccess.description')}</p>
             </motion.div>
 
-            {/* Simple Billing */}
+            {/* Audit Trail */}
             <motion.div
               variants={itemVariants}
               className="group relative rounded-2xl border border-white/5 bg-navy-900/50 p-8 transition-all duration-300 hover:border-accent-500/30 hover:bg-navy-800/50 hover:shadow-lg hover:shadow-accent-500/5"
             >
               <div className="mb-4 inline-flex h-12 w-12 items-center justify-center rounded-xl bg-accent-500/10 text-accent-400 transition-colors group-hover:bg-accent-500/20 group-hover:scale-110">
-                <CreditCard className="h-6 w-6" />
+                <FileText className="h-6 w-6" />
               </div>
-              <h3 className="text-lg font-semibold text-white mb-2">{t('landing.features.simpleBilling.title')}</h3>
-              <p className="text-slate-400">{t('landing.features.simpleBilling.description')}</p>
+              <h3 className="text-lg font-semibold text-white mb-2">{t('landing.features.auditTrail.title')}</h3>
+              <p className="text-slate-400">{t('landing.features.auditTrail.description')}</p>
+            </motion.div>
+
+            {/* Bulk Import */}
+            <motion.div
+              variants={itemVariants}
+              className="group relative rounded-2xl border border-white/5 bg-navy-900/50 p-8 transition-all duration-300 hover:border-accent-500/30 hover:bg-navy-800/50 hover:shadow-lg hover:shadow-accent-500/5"
+            >
+              <div className="mb-4 inline-flex h-12 w-12 items-center justify-center rounded-xl bg-accent-500/10 text-accent-400 transition-colors group-hover:bg-accent-500/20 group-hover:scale-110">
+                <FileUp className="h-6 w-6" />
+              </div>
+              <h3 className="text-lg font-semibold text-white mb-2">{t('landing.features.bulkImport.title')}</h3>
+              <p className="text-slate-400">{t('landing.features.bulkImport.description')}</p>
+            </motion.div>
+
+            {/* Beneficiary Tags */}
+            <motion.div
+              variants={itemVariants}
+              className="group relative rounded-2xl border border-white/5 bg-navy-900/50 p-8 transition-all duration-300 hover:border-accent-500/30 hover:bg-navy-800/50 hover:shadow-lg hover:shadow-accent-500/5"
+            >
+              <div className="mb-4 inline-flex h-12 w-12 items-center justify-center rounded-xl bg-accent-500/10 text-accent-400 transition-colors group-hover:bg-accent-500/20 group-hover:scale-110">
+                <Tags className="h-6 w-6" />
+              </div>
+              <h3 className="text-lg font-semibold text-white mb-2">{t('landing.features.beneficiaryTags.title')}</h3>
+              <p className="text-slate-400">{t('landing.features.beneficiaryTags.description')}</p>
+            </motion.div>
+
+            {/* Reporting & Exports */}
+            <motion.div
+              variants={itemVariants}
+              className="group relative rounded-2xl border border-white/5 bg-navy-900/50 p-8 transition-all duration-300 hover:border-accent-500/30 hover:bg-navy-800/50 hover:shadow-lg hover:shadow-accent-500/5"
+            >
+              <div className="mb-4 inline-flex h-12 w-12 items-center justify-center rounded-xl bg-accent-500/10 text-accent-400 transition-colors group-hover:bg-accent-500/20 group-hover:scale-110">
+                <BarChart3 className="h-6 w-6" />
+              </div>
+              <h3 className="text-lg font-semibold text-white mb-2">{t('landing.features.reporting.title')}</h3>
+              <p className="text-slate-400">{t('landing.features.reporting.description')}</p>
             </motion.div>
           </motion.div>
         </div>

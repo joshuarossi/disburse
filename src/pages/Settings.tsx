@@ -12,7 +12,6 @@ import { ThemeSwitcher } from '@/components/ui/ThemeSwitcher';
 import {
   Wallet,
   Building2,
-  Users,
   ArrowUpRight,
   Loader2,
   Save,
@@ -23,7 +22,6 @@ import {
   Copy,
   ExternalLink,
   CheckCircle,
-  User,
   SlidersHorizontal,
   Shield,
   Rocket,
@@ -32,6 +30,7 @@ import { validateSafeAddress, isOwner } from '@/lib/safe';
 import { TOKENS } from '@/lib/wagmi';
 import { encodeFunctionData, parseUnits } from 'viem';
 import { CHAINS_LIST, getChainName, getSafeAppUrl } from '@/lib/chains';
+import { getPlanFeatureKey, PLANS, type PlanKey } from '@/lib/billingPlans';
 import {
   DEFAULT_RELAY_FEE_MODE,
   DEFAULT_RELAY_FEE_TOKEN_SYMBOL,
@@ -47,66 +46,6 @@ const SEPOLIA_CHAIN_ID = 11155111;
 // Platform wallet address for receiving payments (Sepolia testnet)
 const PLATFORM_WALLET = '0x742d35Cc6634C0532925a3b844Bc9e7595f7aa22' as const;
 
-// Plan configurations
-const PLANS = {
-  starter: {
-    name: 'Starter',
-    price: 25,
-    description: 'For individuals',
-    icon: User,
-    features: [
-      '1 user',
-      '1 Safe per chain',
-      '25 beneficiaries',
-      'One-time disbursements',
-      'Audit logs',
-      'CSV export',
-    ],
-    limits: {
-      users: 1,
-      beneficiaries: 25,
-    },
-  },
-  team: {
-    name: 'Team',
-    price: 50,
-    description: 'For small teams',
-    icon: Users,
-    popular: true,
-    features: [
-      '5 users',
-      '1 Safe per chain',
-      '100 beneficiaries',
-      'All 5 roles',
-      'Multi-sig approval',
-      'Everything in Starter',
-    ],
-    limits: {
-      users: 5,
-      beneficiaries: 100,
-    },
-  },
-  pro: {
-    name: 'Pro',
-    price: 99,
-    description: 'For growing teams',
-    icon: Building2,
-    features: [
-      'Unlimited users',
-      '1 Safe per chain',
-      'Unlimited beneficiaries',
-      'Professional reports',
-      'Priority support',
-      'Everything in Team',
-    ],
-    limits: {
-      users: Infinity,
-      beneficiaries: Infinity,
-    },
-  },
-} as const;
-
-type PlanKey = keyof typeof PLANS;
 
 // ERC20 ABI for transfer
 const erc20Abi = [
@@ -1014,8 +953,7 @@ export default function Settings() {
 
                   <ul className="space-y-1 mb-4 text-xs">
                     {plan.features.slice(0, 3).map((feature, idx) => {
-                      const featureKeys = ['users', 'safe', 'beneficiaries', 'disbursements', 'audit', 'export', 'roles', 'multisig', 'everything', 'reports', 'support'];
-                      const featureKey = featureKeys[idx] || `feature${idx}`;
+                      const featureKey = getPlanFeatureKey(idx);
                       return (
                         <li key={idx} className="flex items-center gap-2 text-slate-300">
                           <Check className={`h-3 w-3 ${plan.popular ? 'text-accent-400' : 'text-green-400'}`} />

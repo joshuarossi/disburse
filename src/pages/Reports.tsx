@@ -598,23 +598,80 @@ function SpendingTab({ orgId, address }: SpendingTabProps) {
   const isLoading = reportData === undefined;
   const activeFilterCount = [dateFrom || dateTo, typeFilter, chainFilter !== ''].filter(Boolean).length;
 
+  const aggregatedData = useMemo(() => {
+    if (!reportData) return [];
+
+    const grouped = new Map<string, {
+      beneficiaryId: string;
+      beneficiaryName: string;
+      beneficiaryType: string;
+      beneficiaryWallet: string;
+      transactionCount: number;
+      totalsByToken: Map<string, number>;
+    }>();
+
+    reportData.forEach((item) => {
+      const key = item.beneficiaryId;
+      const existing = grouped.get(key);
+      if (existing) {
+        existing.transactionCount += item.transactionCount;
+        const currentTotal = existing.totalsByToken.get(item.token) || 0;
+        existing.totalsByToken.set(item.token, currentTotal + Number(item.totalPaid));
+      } else {
+        const totalsByToken = new Map<string, number>();
+        totalsByToken.set(item.token, Number(item.totalPaid));
+        grouped.set(key, {
+          beneficiaryId: item.beneficiaryId,
+          beneficiaryName: item.beneficiaryName,
+          beneficiaryType: item.beneficiaryType,
+          beneficiaryWallet: item.beneficiaryWallet,
+          transactionCount: item.transactionCount,
+          totalsByToken,
+        });
+      }
+    });
+
+    return Array.from(grouped.values()).map((group) => {
+      const totals = Array.from(group.totalsByToken.entries()).map(([token, amount]) => ({
+        token,
+        amount,
+      }));
+      const totalPaidNumeric = totals.reduce((sum, entry) => sum + entry.amount, 0);
+      const totalPaidDisplay = totals
+        .map((entry) => `${entry.amount.toFixed(2)} ${entry.token}`)
+        .join(' · ');
+
+      return {
+        beneficiaryId: group.beneficiaryId,
+        beneficiaryName: group.beneficiaryName,
+        beneficiaryType: group.beneficiaryType,
+        beneficiaryWallet: group.beneficiaryWallet,
+        transactionCount: group.transactionCount,
+        totals,
+        totalPaidNumeric,
+        totalPaidDisplay,
+        tokensDisplay: totals.map((entry) => entry.token).join(', '),
+      };
+    });
+  }, [reportData]);
+
   // Sort data client-side
   const sortedData = useMemo(() => {
-    if (!reportData) return [];
-    const sorted = [...reportData];
+    if (!aggregatedData.length) return [];
+    const sorted = [...aggregatedData];
     sorted.sort((a, b) => {
       let comparison = 0;
       if (sortBy === 'name') {
         comparison = a.beneficiaryName.localeCompare(b.beneficiaryName);
       } else if (sortBy === 'totalPaid') {
-        comparison = Number(a.totalPaid) - Number(b.totalPaid);
+        comparison = a.totalPaidNumeric - b.totalPaidNumeric;
       } else if (sortBy === 'transactionCount') {
         comparison = a.transactionCount - b.transactionCount;
       }
       return sortOrder === 'asc' ? comparison : -comparison;
     });
     return sorted;
-  }, [reportData, sortBy, sortOrder]);
+  }, [aggregatedData, sortBy, sortOrder]);
 
   const clearFilters = () => {
     setDateFrom('');
@@ -649,8 +706,8 @@ function SpendingTab({ orgId, address }: SpendingTabProps) {
       type: item.beneficiaryType,
       walletAddress: item.beneficiaryWallet,
       transactions: item.transactionCount,
-      totalPaid: item.totalPaid,
-      token: item.token,
+      totalPaid: item.totalPaidDisplay,
+      token: item.tokensDisplay,
     }));
 
     exportToCsv(generateFilename('spending_by_beneficiary'), rows, columns);
@@ -853,7 +910,7 @@ function SpendingTab({ orgId, address }: SpendingTabProps) {
                       {item.transactionCount}
                     </td>
                     <td className="whitespace-nowrap px-4 py-3 text-right text-sm font-medium text-white">
-                      {Number(item.totalPaid).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {item.token}
+                      {item.totalPaidDisplay}
                     </td>
                   </tr>
                 ))}
@@ -888,7 +945,7 @@ function SpendingTab({ orgId, address }: SpendingTabProps) {
                     {item.transactionCount} {t('reports.table.transactions').toLowerCase()}
                   </span>
                   <span className="text-lg font-bold text-white">
-                    {Number(item.totalPaid).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {item.token}
+                    {item.totalPaidDisplay}
                   </span>
                 </div>
               </div>

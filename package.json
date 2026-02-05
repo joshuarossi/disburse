@@ -7,6 +7,7 @@
   "scripts": {
     "dev": "vite",
     "dev:convex": "convex dev",
+    "deploy": "convex deploy",
     "build": "vite build",
     "build:check": "tsc -b && vite build",
     "lint": "eslint .",

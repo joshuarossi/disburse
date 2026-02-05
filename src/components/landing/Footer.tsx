@@ -1,24 +1,91 @@
-import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
+import { LANDING_FOOTER_LINKS, type LandingLink } from '@/lib/landingLinks'
+
+const HASH_SCROLL_ATTEMPTS = 8
 
 export function Footer() {
   const { t } = useTranslation();
-  
-  const footerLinks = {
-    product: [
-      { name: t('landing.footer.features'), href: '#features' },
-      { name: t('landing.footer.pricing'), href: '#' },
-      { name: t('landing.footer.documentation'), href: '#' },
-    ],
-    company: [
-      { name: t('landing.footer.about'), href: '#' },
-      { name: t('landing.footer.blog'), href: '#' },
-      { name: t('landing.footer.contact'), href: '#' },
-    ],
-    legal: [
-      { name: t('landing.footer.privacy'), href: '#' },
-      { name: t('landing.footer.terms'), href: '#' },
-    ],
+  const location = useLocation()
+  const navigate = useNavigate()
+
+  const scrollToHash = (hash: string) => {
+    const id = decodeURIComponent(hash.replace('#', ''))
+    let attempts = 0
+
+    const tryScroll = () => {
+      const element = document.getElementById(id)
+      if (element) {
+        element.scrollIntoView({ behavior: 'smooth', block: 'start' })
+        return
+      }
+
+      attempts += 1
+      if (attempts < HASH_SCROLL_ATTEMPTS) {
+        window.setTimeout(tryScroll, 150)
+      }
+    }
+
+    tryScroll()
+  }
+
+  const renderLink = (link: LandingLink) => {
+    const isExternal = link.external || /^https?:\/\//.test(link.href) || link.href.startsWith('mailto:')
+
+    if (isExternal) {
+      return (
+        <a
+          href={link.href}
+          className="text-sm text-slate-400 transition-colors hover:text-white"
+          target="_blank"
+          rel="noreferrer"
+        >
+          {t(link.nameKey)}
+        </a>
+      )
+    }
+
+    const hashIndex = link.href.indexOf('#')
+    if (hashIndex >= 0) {
+      const targetPathRaw = link.href.slice(0, hashIndex)
+      const targetPath = targetPathRaw || '/'
+      const hash = link.href.slice(hashIndex)
+      const fullHref = `${targetPath}${hash}`
+      const isOnTarget = location.pathname === targetPath
+
+      return (
+        <a
+          href={fullHref}
+          className="text-sm text-slate-400 transition-colors hover:text-white"
+          onClick={(event) => {
+            if (isOnTarget) {
+              event.preventDefault()
+              if (location.hash !== hash) {
+                window.location.hash = hash
+              }
+              window.setTimeout(() => scrollToHash(hash), 0)
+              return
+            }
+
+            event.preventDefault()
+            navigate({ pathname: targetPath, hash })
+          }}
+        >
+          {t(link.nameKey)}
+        </a>
+      )
+    }
+
+    const linkTo = link.href.startsWith('/') ? link.href : `/${link.href}`
+
+    return (
+      <Link
+        to={linkTo}
+        className="text-sm text-slate-400 transition-colors hover:text-white"
+      >
+        {t(link.nameKey)}
+      </Link>
+    )
   }
   return (
     <footer className="border-t border-white/5 bg-navy-950">
@@ -53,14 +120,9 @@ export function Footer() {
           <div>
             <h3 className="text-sm font-semibold text-white">{t('landing.footer.product')}</h3>
             <ul className="mt-4 space-y-3">
-              {footerLinks.product.map((link) => (
-                <li key={link.name}>
-                  <a
-                    href={link.href}
-                    className="text-sm text-slate-400 transition-colors hover:text-white"
-                  >
-                    {link.name}
-                  </a>
+              {LANDING_FOOTER_LINKS.product.map((link) => (
+                <li key={link.nameKey}>
+                  {renderLink(link)}
                 </li>
               ))}
             </ul>
@@ -70,14 +132,9 @@ export function Footer() {
           <div>
             <h3 className="text-sm font-semibold text-white">{t('landing.footer.company')}</h3>
             <ul className="mt-4 space-y-3">
-              {footerLinks.company.map((link) => (
-                <li key={link.name}>
-                  <a
-                    href={link.href}
-                    className="text-sm text-slate-400 transition-colors hover:text-white"
-                  >
-                    {link.name}
-                  </a>
+              {LANDING_FOOTER_LINKS.company.map((link) => (
+                <li key={link.nameKey}>
+                  {renderLink(link)}
                 </li>
               ))}
             </ul>
@@ -87,14 +144,9 @@ export function Footer() {
           <div>
             <h3 className="text-sm font-semibold text-white">{t('landing.footer.legal')}</h3>
             <ul className="mt-4 space-y-3">
-              {footerLinks.legal.map((link) => (
-                <li key={link.name}>
-                  <a
-                    href={link.href}
-                    className="text-sm text-slate-400 transition-colors hover:text-white"
-                  >
-                    {link.name}
-                  </a>
+              {LANDING_FOOTER_LINKS.legal.map((link) => (
+                <li key={link.nameKey}>
+                  {renderLink(link)}
                 </li>
               ))}
             </ul>

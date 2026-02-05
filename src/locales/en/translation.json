@@ -64,7 +64,7 @@
       "badge": "Non-custodial & Safe-powered",
       "title": "Treasury Management for",
       "titleHighlight": "Web3 Teams",
-      "subtitle": "Streamline stablecoin disbursements with enterprise-grade security. Manage beneficiaries, track payments, and maintain complete audit trails—all without ever giving up control of your keys.",
+      "subtitle": "Streamline stablecoin disbursements with enterprise-grade security. Schedule payments, run gasless transactions, and maintain complete audit trails—all without ever giving up control of your keys.",
       "tryForFree": "Try For Free",
       "learnMore": "Learn More",
       "trustIndicators": "Powered by industry-leading security"
@@ -72,7 +72,7 @@
     "features": {
       "title": "Features",
       "subtitle": "Everything you need to manage treasury operations",
-      "description": "Built for Web3 teams who need security, transparency, and control over their funds.",
+      "description": "Built for finance teams who need compliance, automation, and control over their treasury.",
       "nonCustodial": {
         "title": "Non-Custodial",
         "description": "Your keys, your funds. We never have access to your private keys or assets."
@@ -89,9 +89,29 @@
         "title": "Audit Trail",
         "description": "Complete transaction history with immutable on-chain records for compliance."
       },
+      "scheduledPayments": {
+        "title": "Scheduled Payments",
+        "description": "Schedule, reschedule, and cancel disbursements ahead of time with clear approvals and visibility."
+      },
+      "gaslessTransactions": {
+        "title": "Gasless Transactions",
+        "description": "Pay network fees using stablecoins so operators never need to hold native tokens."
+      },
       "batchTransactions": {
         "title": "Batch Transactions",
         "description": "Send payments to multiple recipients in a single transaction. Reduce gas costs and streamline payroll-style disbursements."
+      },
+      "bulkImport": {
+        "title": "Bulk Import",
+        "description": "Upload beneficiaries via CSV with validation, required fields, and duplicate checks."
+      },
+      "beneficiaryTags": {
+        "title": "Beneficiary Tags",
+        "description": "Create tagged cohorts and launch repeat disbursement runs in seconds."
+      },
+      "reporting": {
+        "title": "Reporting & Exports",
+        "description": "Generate finance-ready reports and export records for reconciliation."
       },
       "stablecoinNative": {
         "title": "Stablecoin Native",
@@ -112,15 +132,18 @@
       },
       "section2": {
         "title": "Powerful operations,",
-        "titleHighlight": "simplified"
+        "titleHighlight": "simplified",
+        "description": "Automate payouts, reduce gas overhead, and run high-volume disbursements with confidence."
       },
       "section3": {
         "title": "Everything you need",
-        "description": "Built for teams who demand the best"
+        "description": "Built for finance teams who demand clarity and control"
       },
       "badges": {
         "compliance": "Compliance",
-        "efficient": "Efficient"
+        "efficient": "Efficient",
+        "automation": "Automation",
+        "gasless": "Gasless"
       }
     },
     "howItWorks": {
@@ -139,9 +162,17 @@
       },
       "step3": {
         "number": "03",
-        "title": "Send Payments",
-        "description": "Execute stablecoin disbursements with full audit trails and transaction tracking."
+        "title": "Send or Schedule",
+        "description": "Execute or schedule stablecoin disbursements with gasless options and full audit trails."
       }
+    },
+    "pricing": {
+      "badge": "Pricing",
+      "title": "Transparent pricing that scales",
+      "subtitle": "Pick a plan that fits your team and pay in stablecoins.",
+      "popular": "Most popular",
+      "cta": "Start free trial",
+      "note": "All plans include core treasury tools, audit trails, and compliance workflows."
     },
     "cta": {
       "badge": "30-day free trial",
@@ -164,6 +195,92 @@
       "privacy": "Privacy",
       "terms": "Terms",
       "copyright": "© {{year}} Disburse. All rights reserved."
+    }
+  },
+  "marketingPages": {
+    "docs": {
+      "title": "Documentation",
+      "subtitle": "Setup guides, wallet connections, and payout workflows.",
+      "sections": {
+        "gettingStarted": {
+          "title": "Getting started",
+          "body": "Connect your Safe, add beneficiaries, and run a test disbursement in minutes."
+        },
+        "workflows": {
+          "title": "Payments & reporting",
+          "body": "Schedule, batch, and approve disbursements with audit-ready exports for finance teams."
+        }
+      }
+    },
+    "about": {
+      "title": "About Disburse",
+      "subtitle": "We help finance teams run stablecoin operations with confidence.",
+      "sections": {
+        "mission": {
+          "title": "Our mission",
+          "body": "Make treasury operations safer, faster, and fully auditable for digital asset teams."
+        },
+        "principles": {
+          "title": "Built for modern finance",
+          "body": "Non-custodial by design, built on Safe, and focused on compliance-ready workflows."
+        }
+      }
+    },
+    "blog": {
+      "title": "Blog",
+      "subtitle": "Product updates and treasury operations insights.",
+      "sections": {
+        "updates": {
+          "title": "Product updates",
+          "body": "Release notes, feature launches, and platform improvements."
+        },
+        "insights": {
+          "title": "Finance ops insights",
+          "body": "Guides on stablecoin operations, compliance, and treasury best practices."
+        }
+      }
+    },
+    "contact": {
+      "title": "Contact",
+      "subtitle": "Talk to sales or reach support.",
+      "sections": {
+        "sales": {
+          "title": "Sales",
+          "body": "Tell us about your treasury workflows and we'll set up a demo. Reach us at {{salesEmail}}."
+        },
+        "support": {
+          "title": "Support",
+          "body": "For existing customers, reach out to {{supportEmail}} for help with billing, onboarding, or troubleshooting."
+        }
+      }
+    },
+    "privacy": {
+      "title": "Privacy Policy",
+      "subtitle": "How we collect, use, and protect data.",
+      "sections": {
+        "collection": {
+          "title": "Information we collect",
+          "body": "We collect account details, organization settings, and usage data needed to provide the service."
+        },
+        "usage": {
+          "title": "How we use information",
+          "body": "We use data to operate the platform, improve performance, and support compliance workflows."
+        }
+      }
+    },
+    "terms": {
+      "title": "Terms of Service",
+      "subtitle": "Terms that govern your use of Disburse.",
+      "sections": {
+        "service": {
+          "title": "Using the service",
+          "body": "Use the service in compliance with applicable laws and your organization's policies."
+        },
+        "billing": {
+          "title": "Billing and payments",
+          "body": "Subscriptions renew monthly unless canceled. You are responsible for payment authorizations and fees."
+        }
+      }
     }
   },
   "auth": {
@@ -369,11 +486,16 @@
     "form": {
       "beneficiary": "Beneficiary",
       "selectBeneficiary": "Select a beneficiary...",
+      "selectedBeneficiary": "Selected",
+      "preferred": "Preferred",
+      "filterBy": "Filter",
       "selectByTag": "Select by tag",
       "selectTagsPlaceholder": "Choose tags...",
       "addTaggedBeneficiaries": "Add tagged beneficiaries",
       "tagMatches": "{{count}} match{{count, plural, one {} other {es}}}",
       "noTaggedBeneficiaries": "No beneficiaries match the selected tags",
+      "paymentSettings": "Payment settings",
+      "paymentLocked": "Chain and token are locked to the first recipient in the batch.",
       "amount": "Amount",
       "token": "Token",
       "memo": "Memo",
@@ -383,10 +505,12 @@
       "scheduleInvalid": "Please enter a valid date and time.",
       "scheduleTooSoon": "Scheduled time must be at least 1 minute in the future.",
       "duplicateBeneficiary": "This beneficiary is already added",
-      "invalidAmount": "Amount must be greater than 0"
+      "invalidAmount": "Amount must be greater than 0",
+      "batchHint": "Optional: add more beneficiaries to create a batch."
     },
     "batch": {
-      "addAnother": "+ Add another beneficiary",
+      "addAnother": "Add another beneficiary",
+      "startBatch": "Add to batch",
       "remove": "Remove",
       "total": "Total: {{total}} {{token}} to {{count}} {{count, plural, one {beneficiary} other {beneficiaries}}}",
       "breakdown": "{{names}} = {{total}} {{token}}",
