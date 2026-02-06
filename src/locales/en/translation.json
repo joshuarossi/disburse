@@ -323,6 +323,7 @@
     "title": "Dashboard",
     "subtitle": "Overview of your treasury operations",
     "totalTreasuryValue": "Total Treasury Value",
+    "available": "Total Available",
     "byToken": "By Token",
     "byChain": "By Chain",
     "ofTreasury": "of total treasury",

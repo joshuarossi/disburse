@@ -323,6 +323,7 @@
     "title": "Painel",
     "subtitle": "Visão geral das suas operações de tesouraria",
     "totalTreasuryValue": "Valor Total da Tesouraria",
+    "available": "Total Disponível",
     "byToken": "Por Token",
     "byChain": "Por Cadeia",
     "ofTreasury": "do total da tesouraria",
