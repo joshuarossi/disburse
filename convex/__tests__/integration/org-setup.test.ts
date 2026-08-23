@@ -2,33 +2,38 @@ import { convexTest } from "convex-test";
 import { describe, it, expect } from "vitest";
 import { api } from "../../_generated/api";
 import schema from "../../schema";
-import { TEST_WALLETS } from "../factories";
+import { signIn, TEST_ACCOUNTS, TEST_WALLETS } from "../factories";
+
+// billing.subscribe only activates plans backed by a server-verified payment
+const TEAM_PAYMENT_TX = "0x" + "ab".repeat(32);
 
 describe("Integration: Organization Setup Flow", () => {
   it("complete org setup: auth -> create org -> link safe", async () => {
     const t = convexTest(schema);
 
-    // Step 1: Generate nonce (creates user)
-    const { nonce } = await t.mutation(api.auth.generateNonce, {
+    // Step 1: Generate nonce (creates user, returns server-built SIWE message)
+    const { nonce, message } = await t.mutation(api.auth.generateNonce, {
       walletAddress: TEST_WALLETS.admin,
     });
 
     expect(nonce).toBeDefined();
 
-    // Step 2: Verify signature (authenticates)
+    // Step 2: Verify signature (authenticates — signature is verified cryptographically)
+    const signature = await TEST_ACCOUNTS.admin.signMessage({ message });
     const authResult = await t.mutation(api.auth.verifySignature, {
       walletAddress: TEST_WALLETS.admin,
-      signature: "0xfakesig",
-      message: `Sign in with nonce: ${nonce}`,
+      signature,
+      message,
     });
 
-    expect(authResult.sessionId).toBeDefined();
+    expect(authResult.token).toBeDefined();
     expect(authResult.userId).toBeDefined();
+    const sessionToken = authResult.token;
 
     // Step 3: Create organization
     const orgResult = await t.mutation(api.orgs.create, {
       name: "Acme Corporation",
-      walletAddress: TEST_WALLETS.admin,
+      sessionToken,
     });
 
     expect(orgResult.orgId).toBeDefined();
@@ -36,7 +41,7 @@ describe("Integration: Organization Setup Flow", () => {
     // Step 4: Verify billing record (trial) was created
     const billing = await t.query(api.billing.get, {
       orgId: orgResult.orgId as any,
-      walletAddress: TEST_WALLETS.admin,
+      sessionToken,
     });
 
     expect(billing?.plan).toBe("trial");
@@ -48,7 +53,7 @@ describe("Integration: Organization Setup Flow", () => {
     const safeAddress = "0x1234567890123456789012345678901234567890";
     const safeResult = await t.mutation(api.safes.link, {
       orgId: orgResult.orgId as any,
-      walletAddress: TEST_WALLETS.admin,
+      sessionToken,
       chainId: 11155111, // Sepolia
       safeAddress,
     });
@@ -58,7 +63,7 @@ describe("Integration: Organization Setup Flow", () => {
     // Step 6: Verify Safe is retrievable (getForOrg returns array of safes, one per chain)
     const safes = await t.query(api.safes.getForOrg, {
       orgId: orgResult.orgId as any,
-      walletAddress: TEST_WALLETS.admin,
+      sessionToken,
     });
 
     expect(Array.isArray(safes)).toBe(true);
@@ -83,28 +88,39 @@ describe("Integration: Organization Setup Flow", () => {
     const t = convexTest(schema);
 
     // Admin sets up org
-    await t.mutation(api.auth.generateNonce, {
-      walletAddress: TEST_WALLETS.admin,
-    });
+    const admin = await signIn(t, "admin");
 
     const orgResult = await t.mutation(api.orgs.create, {
       name: "Team Org",
-      walletAddress: TEST_WALLETS.admin,
+      sessionToken: admin.sessionToken,
     });
 
-    // Upgrade to team plan for more users
+    // Upgrade to team plan for more users (requires a pre-verified payment row;
+    // subscribe no longer accepts a client-declared paidThroughAt)
+    await t.run(async (ctx) => {
+      await ctx.db.insert("billingPayments", {
+        orgId: orgResult.orgId as any,
+        txHash: TEAM_PAYMENT_TX,
+        chainId: 1,
+        plan: "team",
+        tokenAddress: "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+        amountRaw: "50000000",
+        paidThroughAt: Date.now() + 30 * 24 * 60 * 60 * 1000,
+        verifiedAt: Date.now(),
+      });
+    });
+
     await t.mutation(api.billing.subscribe, {
       orgId: orgResult.orgId as any,
-      walletAddress: TEST_WALLETS.admin,
+      sessionToken: admin.sessionToken,
       plan: "team",
-      txHash: "0xtxhash",
-      paidThroughAt: Date.now() + 30 * 24 * 60 * 60 * 1000,
+      txHash: TEAM_PAYMENT_TX,
     });
 
     // Invite approver
     const approverResult = await t.mutation(api.orgs.inviteMember, {
       orgId: orgResult.orgId as any,
-      walletAddress: TEST_WALLETS.admin,
+      sessionToken: admin.sessionToken,
       memberWalletAddress: TEST_WALLETS.approver,
       role: "approver",
     });
@@ -113,7 +129,7 @@ describe("Integration: Organization Setup Flow", () => {
     // Invite initiator
     const initiatorResult = await t.mutation(api.orgs.inviteMember, {
       orgId: orgResult.orgId as any,
-      walletAddress: TEST_WALLETS.admin,
+      sessionToken: admin.sessionToken,
       memberWalletAddress: TEST_WALLETS.initiator,
       role: "initiator",
     });
@@ -122,16 +138,17 @@ describe("Integration: Organization Setup Flow", () => {
     // Invite clerk
     const clerkResult = await t.mutation(api.orgs.inviteMember, {
       orgId: orgResult.orgId as any,
-      walletAddress: TEST_WALLETS.admin,
+      sessionToken: admin.sessionToken,
       memberWalletAddress: TEST_WALLETS.clerk,
       role: "clerk",
     });
     expect(clerkResult.membershipId).toBeDefined();
 
-    // Verify all members
+    // Verify all members (invitees are listed; their memberships are pending
+    // acceptance and therefore have status "invited")
     const members = await t.query(api.orgs.listMembers, {
       orgId: orgResult.orgId as any,
-      walletAddress: TEST_WALLETS.admin,
+      sessionToken: admin.sessionToken,
     });
 
     expect(members.length).toBe(4);
@@ -139,29 +156,28 @@ describe("Integration: Organization Setup Flow", () => {
     expect(members.filter((m) => m?.role === "approver").length).toBe(1);
     expect(members.filter((m) => m?.role === "initiator").length).toBe(1);
     expect(members.filter((m) => m?.role === "clerk").length).toBe(1);
+    expect(members.filter((m) => m?.status === "invited").length).toBe(3);
   });
 
   it("org is visible in user's org list", async () => {
     const t = convexTest(schema);
 
-    await t.mutation(api.auth.generateNonce, {
-      walletAddress: TEST_WALLETS.admin,
-    });
+    const admin = await signIn(t, "admin");
 
     // Create multiple orgs
     await t.mutation(api.orgs.create, {
       name: "Org A",
-      walletAddress: TEST_WALLETS.admin,
+      sessionToken: admin.sessionToken,
     });
 
     await t.mutation(api.orgs.create, {
       name: "Org B",
-      walletAddress: TEST_WALLETS.admin,
+      sessionToken: admin.sessionToken,
     });
 
     // List orgs
     const orgs = await t.query(api.orgs.listForUser, {
-      walletAddress: TEST_WALLETS.admin,
+      sessionToken: admin.sessionToken,
     });
 
     expect(orgs.length).toBe(2);

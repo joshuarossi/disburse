@@ -5,22 +5,28 @@ import schema from "../schema";
 import {
   createTestUser,
   createTestSession,
+  signIn,
   TEST_WALLETS,
 } from "./factories";
+
+// NOTE: These tests exercise the REAL cryptographic auth path — messages are
+// signed by deterministic viem accounts and verified server-side.
 
 describe("Auth", () => {
   describe("generateNonce", () => {
     it("creates user if not exists", async () => {
       const t = convexTest(schema);
 
-      // Generate nonce for new wallet
       const result = await t.mutation(api.auth.generateNonce, {
         walletAddress: TEST_WALLETS.admin,
       });
 
       expect(result.nonce).toBeDefined();
       expect(typeof result.nonce).toBe("string");
-      expect(result.nonce.length).toBeGreaterThan(0);
+      expect(result.nonce.length).toBeGreaterThanOrEqual(32);
+
+      // Server-authored SIWE message must embed the nonce
+      expect(result.message).toContain(`Nonce: ${result.nonce}`);
 
       // Verify user was created
       await t.run(async (ctx) => {
@@ -34,206 +40,174 @@ describe("Auth", () => {
       });
     });
 
-    it("deletes existing sessions when generating new nonce", async () => {
+    it("clears stale pending nonces but keeps live sessions", async () => {
       const t = convexTest(schema);
 
-      // Create user with existing session
+      // Create user with an existing authenticated session
       await t.run(async (ctx) => {
         const userId = await createTestUser(ctx, { walletAddress: TEST_WALLETS.admin });
         await createTestSession(ctx, userId, TEST_WALLETS.admin);
       });
 
-      // Generate new nonce (should delete old session)
-      const result = await t.mutation(api.auth.generateNonce, {
+      await t.mutation(api.auth.generateNonce, {
         walletAddress: TEST_WALLETS.admin,
       });
 
-      expect(result.nonce).toBeDefined();
-
-      // Verify only one session exists
       await t.run(async (ctx) => {
         const sessions = await ctx.db
           .query("sessions")
           .withIndex("by_wallet", (q) => q.eq("walletAddress", TEST_WALLETS.admin.toLowerCase()))
           .collect();
 
-        expect(sessions.length).toBe(1);
-        expect(sessions[0].nonce).toBe(result.nonce);
+        // One pending nonce row + the pre-existing authenticated session
+        expect(sessions.filter((s) => s.nonce && !s.tokenHash).length).toBe(1);
+        expect(sessions.filter((s) => s.tokenHash).length).toBe(1);
       });
     });
 
-    it("returns valid UUID format nonce", async () => {
+    it("returns a high-entropy hex nonce", async () => {
       const t = convexTest(schema);
 
       const result = await t.mutation(api.auth.generateNonce, {
         walletAddress: TEST_WALLETS.admin,
       });
 
-      // UUID format: 8-4-4-4-12
-      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-      expect(result.nonce).toMatch(uuidRegex);
+      expect(result.nonce).toMatch(/^[0-9a-f]{63,64}$/);
     });
 
-    it("normalizes wallet address to lowercase", async () => {
+    it("rejects malformed wallet addresses", async () => {
       const t = convexTest(schema);
-      const mixedCaseAddress = "0xABCDef1234567890123456789012345678901234";
 
-      await t.mutation(api.auth.generateNonce, {
-        walletAddress: mixedCaseAddress,
-      });
-
-      await t.run(async (ctx) => {
-        const user = await ctx.db
-          .query("users")
-          .withIndex("by_wallet", (q) => q.eq("walletAddress", mixedCaseAddress.toLowerCase()))
-          .first();
-
-        expect(user).not.toBeNull();
-        expect(user?.walletAddress).toBe(mixedCaseAddress.toLowerCase());
-      });
+      await expect(
+        t.mutation(api.auth.generateNonce, { walletAddress: "0x123" })
+      ).rejects.toThrow();
     });
   });
 
-  describe("verifySignature", () => {
-    it("throws for missing session", async () => {
+  describe("verifySignature (cryptographic)", () => {
+    it("issues a session token for a correctly signed SIWE message", async () => {
       const t = convexTest(schema);
+
+      const { sessionToken, userId } = await signIn(t, "admin");
+
+      expect(sessionToken).toBeDefined();
+      expect(sessionToken.length).toBeGreaterThanOrEqual(64);
+      expect(userId).toBeDefined();
+    });
+
+    it("rejects a signature that does not match the claimed wallet", async () => {
+      const t = convexTest(schema);
+
+      const { message } = await t.mutation(api.auth.generateNonce, {
+        walletAddress: TEST_WALLETS.admin,
+      });
+
+      // Sign with the WRONG account (nonMember) but claim admin's address
+      const wrongAccount = (await import("./factories")).TEST_ACCOUNTS.nonMember;
+      const signature = await wrongAccount.signMessage({ message });
 
       await expect(
         t.mutation(api.auth.verifySignature, {
           walletAddress: TEST_WALLETS.admin,
-          signature: "0xfakesig",
+          signature,
+          message,
+        })
+      ).rejects.toThrow(/verification failed/i);
+    });
+
+    it("consumes the nonce exactly once (replay rejected)", async () => {
+      const t = convexTest(schema);
+
+      const account = (await import("./factories")).TEST_ACCOUNTS.admin;
+      const { message } = await t.mutation(api.auth.generateNonce, {
+        walletAddress: account.address,
+      });
+      const signature = await account.signMessage({ message });
+
+      const first = await t.mutation(api.auth.verifySignature, {
+        walletAddress: account.address,
+        signature,
+        message,
+      });
+      expect(first.token).toBeDefined();
+
+      // Replay of the same signed message must fail
+      await expect(
+        t.mutation(api.auth.verifySignature, {
+          walletAddress: account.address,
+          signature,
+          message,
+        })
+      ).rejects.toThrow(/nonce/i);
+    });
+
+    it("rejects a message whose address line differs from the claimed wallet", async () => {
+      const t = convexTest(schema);
+
+      const account = (await import("./factories")).TEST_ACCOUNTS.admin;
+      const { message } = await t.mutation(api.auth.generateNonce, {
+        walletAddress: account.address,
+      });
+      const forgedMessage = message.replace(account.address, TEST_WALLETS.nonMember);
+      const signature = await account.signMessage({ message: forgedMessage });
+
+      await expect(
+        t.mutation(api.auth.verifySignature, {
+          walletAddress: TEST_WALLETS.nonMember,
+          signature,
+          message: forgedMessage,
+        })
+      ).rejects.toThrow(/does not match|malformed|invalid/i);
+    });
+
+    it("rejects structurally malformed messages", async () => {
+      const t = convexTest(schema);
+
+      await t.mutation(api.auth.generateNonce, { walletAddress: TEST_WALLETS.admin });
+
+      await expect(
+        t.mutation(api.auth.verifySignature, {
+          walletAddress: TEST_WALLETS.admin,
+          signature:
+            "0x0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001b",
           message: "Sign in",
         })
-      ).rejects.toThrow("No pending session found");
-    });
-
-    it("throws for expired session", async () => {
-      const t = convexTest(schema);
-
-      // Create user with expired session
-      await t.run(async (ctx) => {
-        const userId = await createTestUser(ctx, { walletAddress: TEST_WALLETS.admin });
-        await createTestSession(ctx, userId, TEST_WALLETS.admin, {
-          nonce: "test-nonce",
-          expiresAt: Date.now() - 1000, // Expired 1 second ago
-        });
-      });
-
-      await expect(
-        t.mutation(api.auth.verifySignature, {
-          walletAddress: TEST_WALLETS.admin,
-          signature: "0xfakesig",
-          message: "Sign in with nonce: test-nonce",
-        })
-      ).rejects.toThrow("Session expired");
-    });
-
-    it("throws for invalid nonce in message", async () => {
-      const t = convexTest(schema);
-
-      // Create user with session
-      await t.run(async (ctx) => {
-        const userId = await createTestUser(ctx, { walletAddress: TEST_WALLETS.admin });
-        await createTestSession(ctx, userId, TEST_WALLETS.admin, {
-          nonce: "correct-nonce",
-          expiresAt: Date.now() + 60000,
-        });
-      });
-
-      await expect(
-        t.mutation(api.auth.verifySignature, {
-          walletAddress: TEST_WALLETS.admin,
-          signature: "0xfakesig",
-          message: "Sign in with nonce: wrong-nonce",
-        })
-      ).rejects.toThrow("Invalid nonce in message");
-    });
-
-    it("extends session on successful verification", async () => {
-      const t = convexTest(schema);
-      const nonce = "valid-nonce";
-
-      // Create user with session
-      await t.run(async (ctx) => {
-        const userId = await createTestUser(ctx, { walletAddress: TEST_WALLETS.admin });
-        await createTestSession(ctx, userId, TEST_WALLETS.admin, {
-          nonce,
-          expiresAt: Date.now() + 60000, // 1 minute
-        });
-      });
-
-      const beforeVerify = Date.now();
-
-      const result = await t.mutation(api.auth.verifySignature, {
-        walletAddress: TEST_WALLETS.admin,
-        signature: "0xfakesig",
-        message: `Sign in with nonce: ${nonce}`,
-      });
-
-      expect(result.sessionId).toBeDefined();
-      expect(result.userId).toBeDefined();
-      expect(result.walletAddress).toBe(TEST_WALLETS.admin.toLowerCase());
-
-      // Verify session was extended to 7 days
-      await t.run(async (ctx) => {
-        const session = await ctx.db
-          .query("sessions")
-          .withIndex("by_wallet", (q) => q.eq("walletAddress", TEST_WALLETS.admin.toLowerCase()))
-          .first();
-
-        expect(session).not.toBeNull();
-        // Session should be extended to ~7 days from now
-        const sevenDaysInMs = 7 * 24 * 60 * 60 * 1000;
-        expect(session!.expiresAt).toBeGreaterThan(beforeVerify + sevenDaysInMs - 1000);
-      });
+      ).rejects.toThrow(/malformed/i);
     });
   });
 
-  describe("getSession", () => {
-    it("returns null for non-existent session", async () => {
+  describe("validateSession", () => {
+    it("returns null for unknown tokens", async () => {
       const t = convexTest(schema);
 
-      const result = await t.query(api.auth.getSession, {
-        walletAddress: TEST_WALLETS.admin,
+      const result = await t.query(api.auth.validateSession, {
+        token: "0".repeat(64),
       });
 
       expect(result).toBeNull();
     });
 
-    it("returns null for expired session", async () => {
+    it("returns null for short garbage input", async () => {
       const t = convexTest(schema);
 
-      // Create user with expired session
-      await t.run(async (ctx) => {
-        const userId = await createTestUser(ctx, { walletAddress: TEST_WALLETS.admin });
-        await createTestSession(ctx, userId, TEST_WALLETS.admin, {
-          expiresAt: Date.now() - 1000,
-        });
-      });
-
-      const result = await t.query(api.auth.getSession, {
-        walletAddress: TEST_WALLETS.admin,
-      });
-
+      const result = await t.query(api.auth.validateSession, { token: "abc" });
       expect(result).toBeNull();
     });
 
-    it("returns session data for valid session", async () => {
+    it("returns session data for a token obtained via real sign-in", async () => {
       const t = convexTest(schema);
 
-      // Create user with valid session
       await t.run(async (ctx) => {
-        const userId = await createTestUser(ctx, { 
+        await createTestUser(ctx, {
           walletAddress: TEST_WALLETS.admin,
           email: "test@example.com",
         });
-        await createTestSession(ctx, userId, TEST_WALLETS.admin, {
-          expiresAt: Date.now() + 60000,
-        });
       });
 
-      const result = await t.query(api.auth.getSession, {
-        walletAddress: TEST_WALLETS.admin,
+      const { sessionToken } = await signIn(t, "admin");
+
+      const result = await t.query(api.auth.validateSession, {
+        token: sessionToken,
       });
 
       expect(result).not.toBeNull();
@@ -242,50 +216,46 @@ describe("Auth", () => {
       expect(result?.sessionId).toBeDefined();
       expect(result?.userId).toBeDefined();
     });
+
+    it("returns null after logout invalidates the token", async () => {
+      const t = convexTest(schema);
+
+      const { sessionToken } = await signIn(t, "admin");
+
+      await t.mutation(api.auth.logout, { token: sessionToken });
+
+      const result = await t.query(api.auth.validateSession, {
+        token: sessionToken,
+      });
+      expect(result).toBeNull();
+    });
   });
 
   describe("logout", () => {
-    it("deletes all sessions for wallet", async () => {
+    it("deletes only the session matching the provided token", async () => {
       const t = convexTest(schema);
 
-      // Create user with multiple sessions
-      await t.run(async (ctx) => {
-        const userId = await createTestUser(ctx, { walletAddress: TEST_WALLETS.admin });
-        await createTestSession(ctx, userId, TEST_WALLETS.admin);
-        await createTestSession(ctx, userId, TEST_WALLETS.admin);
-      });
+      const adminSession = await signIn(t, "admin");
+      const approverSession = await signIn(t, "approver");
 
-      // Verify sessions exist
-      await t.run(async (ctx) => {
-        const sessions = await ctx.db
-          .query("sessions")
-          .withIndex("by_wallet", (q) => q.eq("walletAddress", TEST_WALLETS.admin.toLowerCase()))
-          .collect();
-        expect(sessions.length).toBe(2);
-      });
+      await t.mutation(api.auth.logout, { token: adminSession.sessionToken });
 
-      // Logout
-      const result = await t.mutation(api.auth.logout, {
-        walletAddress: TEST_WALLETS.admin,
-      });
+      // Admin's token is dead...
+      expect(
+        await t.query(api.auth.validateSession, { token: adminSession.sessionToken })
+      ).toBeNull();
 
-      expect(result.success).toBe(true);
-
-      // Verify sessions deleted
-      await t.run(async (ctx) => {
-        const sessions = await ctx.db
-          .query("sessions")
-          .withIndex("by_wallet", (q) => q.eq("walletAddress", TEST_WALLETS.admin.toLowerCase()))
-          .collect();
-        expect(sessions.length).toBe(0);
-      });
+      // ...but approver's unrelated session survives
+      expect(
+        await t.query(api.auth.validateSession, { token: approverSession.sessionToken })
+      ).not.toBeNull();
     });
 
     it("succeeds even with no sessions", async () => {
       const t = convexTest(schema);
 
       const result = await t.mutation(api.auth.logout, {
-        walletAddress: TEST_WALLETS.admin,
+        token: "f".repeat(64),
       });
 
       expect(result.success).toBe(true);

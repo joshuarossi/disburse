@@ -1,26 +1,42 @@
 import { useNavigate } from 'react-router-dom';
 import { useAccount } from 'wagmi';
 import { useTranslation } from 'react-i18next';
-import { useQuery } from 'convex/react';
+import { useMutation, useQuery } from 'convex/react';
 import { api } from '../../convex/_generated/api';
+import { Id } from '../../convex/_generated/dataModel';
 import { Button } from '@/components/ui/button';
-import { Plus, Building2, ChevronRight } from 'lucide-react';
+import { Plus, Building2, ChevronRight, Mail } from 'lucide-react';
+import { getSessionToken, clearSessionToken } from '@/lib/session';
 
 export default function SelectOrg() {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const { address } = useAccount();
+  const token = getSessionToken();
 
+  // Token-based identity: lists active memberships AND pending invites
   const orgs = useQuery(
     api.orgs.listForUser,
-    address ? { walletAddress: address } : 'skip'
+    address && token ? { sessionToken: token } : 'skip'
   );
 
-  const handleSelectOrg = (orgId: string) => {
+  const acceptInvite = useMutation(api.orgs.acceptInvite);
+
+  const handleSelectOrg = (orgId: string | Id<'orgs'>) => {
     navigate(`/org/${orgId}/dashboard`);
   };
 
-  if (!address) {
+  const handleAcceptInvite = async (orgId: Id<'orgs'>) => {
+    if (!token) return;
+    try {
+      await acceptInvite({ orgId, sessionToken: token });
+    } catch (error) {
+      console.error('Failed to accept invite:', error);
+    }
+  };
+
+  if (!address || !token) {
+    clearSessionToken();
     navigate('/login');
     return null;
   }
@@ -48,24 +64,45 @@ export default function SelectOrg() {
 
         {/* Org List */}
         <div className="space-y-3">
-          {orgs?.filter((o): o is NonNullable<typeof o> => !!o).map((org) => (
-            <button
-              key={org._id}
-              onClick={() => handleSelectOrg(org._id)}
-              className="group flex w-full items-center justify-between rounded-xl border border-white/10 bg-navy-900/50 p-4 text-left transition-all hover:border-accent-500/30 hover:bg-navy-800/50"
-            >
-              <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-navy-800 text-slate-400 group-hover:bg-accent-500/20 group-hover:text-accent-400">
-                  <Building2 className="h-5 w-5" />
+          {orgs?.filter((o): o is NonNullable<typeof o> => !!o).map((org) =>
+            org.membershipStatus === 'invited' ? (
+              // Pending invite — must be accepted before access is granted
+              <div
+                key={org._id}
+                className="flex w-full items-center justify-between rounded-xl border border-accent-500/20 bg-navy-900/50 p-4"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-navy-800 text-slate-400">
+                    <Mail className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <p className="font-medium text-white">{org.name}</p>
+                    <p className="text-sm text-accent-400">Pending invite · {org.role}</p>
+                  </div>
                 </div>
-                <div>
-                  <p className="font-medium text-white">{org.name}</p>
-                  <p className="text-sm text-slate-500 capitalize">{org.role}</p>
-                </div>
+                <Button size="sm" onClick={() => handleAcceptInvite(org._id)}>
+                  Accept
+                </Button>
               </div>
-              <ChevronRight className="h-5 w-5 text-slate-500 transition-transform group-hover:translate-x-1 group-hover:text-accent-400" />
-            </button>
-          ))}
+            ) : (
+              <button
+                key={org._id}
+                onClick={() => handleSelectOrg(org._id)}
+                className="group flex w-full items-center justify-between rounded-xl border border-white/10 bg-navy-900/50 p-4 text-left transition-all hover:border-accent-500/30 hover:bg-navy-800/50"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-navy-800 text-slate-400 group-hover:bg-accent-500/20 group-hover:text-accent-400">
+                    <Building2 className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <p className="font-medium text-white">{org.name}</p>
+                    <p className="text-sm text-slate-500 capitalize">{org.role}</p>
+                  </div>
+                </div>
+                <ChevronRight className="h-5 w-5 text-slate-500 transition-transform group-hover:translate-x-1 group-hover:text-accent-400" />
+              </button>
+            )
+          )}
 
           {orgs?.length === 0 && (
             <p className="text-center text-slate-500 py-4">

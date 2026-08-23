@@ -2,13 +2,14 @@ import { v } from "convex/values";
 import { internalMutation, internalQuery, mutation, query } from "./_generated/server";
 import { Id } from "./_generated/dataModel";
 import { requireOrgAccess } from "./lib/rbac";
+import { assertValidAddress, assertValidAmount, assertValidTxHash, amountToBaseUnits, formatBaseUnits } from "./lib/validation";
 import { internal } from "./_generated/api";
 
 // List disbursements for an org with filtering, searching, sorting, and pagination
 export const list = query({
   args: {
     orgId: v.id("orgs"),
-    walletAddress: v.string(),
+    sessionToken: v.string(),
     // Filtering
     status: v.optional(v.array(v.string())),
     token: v.optional(v.string()),
@@ -31,13 +32,12 @@ export const list = query({
     limit: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
-    const walletAddress = args.walletAddress.toLowerCase();
     const limit = args.limit ?? 20;
     const sortBy = args.sortBy ?? "createdAt";
     const sortOrder = args.sortOrder ?? "desc";
 
     // Any member can view
-    await requireOrgAccess(ctx, args.orgId, walletAddress, ["admin", "approver", "initiator", "clerk", "viewer"]);
+    await requireOrgAccess(ctx, args.orgId, args.sessionToken, ["admin", "approver", "initiator", "clerk", "viewer"]);
 
     // Fetch all disbursements for the org (we need to filter in memory for search)
     const allDisbursements = await ctx.db
@@ -223,7 +223,7 @@ export const list = query({
 export const create = mutation({
   args: {
     orgId: v.id("orgs"),
-    walletAddress: v.string(),
+    sessionToken: v.string(),
     chainId: v.number(),
     beneficiaryId: v.id("beneficiaries"),
     token: v.string(),
@@ -232,10 +232,9 @@ export const create = mutation({
     scheduledAt: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
-    const walletAddress = args.walletAddress.toLowerCase();
     const now = Date.now();
 
-    const { user } = await requireOrgAccess(ctx, args.orgId, walletAddress, ["admin", "approver", "initiator"]);
+    const { user } = await requireOrgAccess(ctx, args.orgId, args.sessionToken, ["admin", "approver", "initiator"]);
 
     // Get safe for org on this chain
     const safe = await ctx.db
@@ -257,6 +256,10 @@ export const create = mutation({
     if (!beneficiary.isActive) {
       throw new Error("Beneficiary is not active");
     }
+
+    // H-02/H-03: server-side validation of money math and destination address
+    assertValidAmount(args.amount, args.token);
+    assertValidAddress(beneficiary.walletAddress, "beneficiary wallet address");
 
     const disbursementId = await ctx.db.insert("disbursements", {
       orgId: args.orgId,
@@ -290,10 +293,25 @@ export const create = mutation({
 });
 
 // Update disbursement status (after Safe tx proposed/executed)
+//
+// C-02 fix: enforce a strict state machine. Terminal states (executed,
+// cancelled) accept no further transitions, and hash-bearing states require
+// well-formed hashes so the audit trail cannot record fabricated values.
+const ALLOWED_TRANSITIONS: Record<string, string[]> = {
+  draft: ["pending", "proposed", "scheduled", "cancelled"],
+  pending: ["proposed", "scheduled", "cancelled"],
+  proposed: ["scheduled", "relaying", "executed", "failed", "cancelled"],
+  scheduled: ["relaying", "cancelled"],
+  relaying: ["executed", "failed"],
+  failed: ["proposed", "scheduled", "cancelled"],
+  executed: [],
+  cancelled: [],
+};
+
 export const updateStatus = mutation({
   args: {
     disbursementId: v.id("disbursements"),
-    walletAddress: v.string(),
+    sessionToken: v.string(),
     status: v.union(
       v.literal("draft"),
       v.literal("pending"),
@@ -317,7 +335,6 @@ export const updateStatus = mutation({
     relayError: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    const walletAddress = args.walletAddress.toLowerCase();
     const now = Date.now();
 
     const disbursement = await ctx.db.get(args.disbursementId);
@@ -326,10 +343,33 @@ export const updateStatus = mutation({
     }
 
     // Admin or initiator can update status
-    const { user } = await requireOrgAccess(ctx, disbursement.orgId, walletAddress, ["admin","approver", "initiator"]);
+    const { user } = await requireOrgAccess(ctx, disbursement.orgId, args.sessionToken, ["admin","approver", "initiator"]);
 
-    // SDN screening check when moving to pending/proposed
-    if (args.status === "pending" || args.status === "proposed") {
+    // C-02: validate the transition against the state machine
+    const allowed = ALLOWED_TRANSITIONS[disbursement.status] ?? [];
+    if (!allowed.includes(args.status)) {
+      throw new Error(
+        `Invalid status transition: ${disbursement.status} -> ${args.status}`
+      );
+    }
+
+    // Hash integrity: proposed/scheduled require a well-formed Safe tx hash;
+    // executed requires an on-chain transaction hash.
+    if (
+      (args.status === "proposed" || args.status === "scheduled") &&
+      !disbursement.safeTxHash &&
+      !args.safeTxHash
+    ) {
+      throw new Error(`${args.status} requires a safeTxHash`);
+    }
+    if (args.safeTxHash) assertValidTxHash(args.safeTxHash, "safeTxHash");
+    if (args.txHash) assertValidTxHash(args.txHash, "txHash");
+    if (args.status === "executed" && !disbursement.txHash && !args.txHash) {
+      throw new Error("Cannot mark executed without a transaction hash");
+    }
+
+    // SDN screening check when moving to pending/proposed/scheduled
+    if (args.status === "pending" || args.status === "proposed" || args.status === "scheduled") {
       const org = await ctx.db.get(disbursement.orgId);
       const enforcement = org?.screeningEnforcement ?? "off";
 
@@ -482,7 +522,7 @@ export const updateStatusInternal = internalMutation({
 export const schedule = mutation({
   args: {
     disbursementId: v.id("disbursements"),
-    walletAddress: v.string(),
+    sessionToken: v.string(),
     scheduledAt: v.number(),
     safeTxHash: v.string(),
     relayFeeToken: v.optional(v.string()),
@@ -490,12 +530,11 @@ export const schedule = mutation({
     relayFeeMode: v.optional(v.union(v.literal("stablecoin_preferred"), v.literal("stablecoin_only"))),
   },
   handler: async (ctx, args) => {
-    const walletAddress = args.walletAddress.toLowerCase();
     const now = Date.now();
     const disbursement = await ctx.db.get(args.disbursementId);
     if (!disbursement) throw new Error("Disbursement not found");
 
-    const { user } = await requireOrgAccess(ctx, disbursement.orgId, walletAddress, ["admin", "approver", "initiator"]);
+    const { user } = await requireOrgAccess(ctx, disbursement.orgId, args.sessionToken, ["admin", "approver", "initiator"]);
 
     const scheduledVersion = (disbursement.scheduledVersion ?? 0) + 1;
 
@@ -534,11 +573,10 @@ export const schedule = mutation({
 export const reschedule = mutation({
   args: {
     disbursementId: v.id("disbursements"),
-    walletAddress: v.string(),
+    sessionToken: v.string(),
     newScheduledAt: v.number(),
   },
   handler: async (ctx, args) => {
-    const walletAddress = args.walletAddress.toLowerCase();
     const now = Date.now();
     const disbursement = await ctx.db.get(args.disbursementId);
     if (!disbursement) throw new Error("Disbursement not found");
@@ -546,7 +584,7 @@ export const reschedule = mutation({
       throw new Error("Only scheduled disbursements can be rescheduled");
     }
 
-    const { user } = await requireOrgAccess(ctx, disbursement.orgId, walletAddress, ["admin", "approver", "initiator"]);
+    const { user } = await requireOrgAccess(ctx, disbursement.orgId, args.sessionToken, ["admin", "approver", "initiator"]);
 
     const scheduledVersion = (disbursement.scheduledVersion ?? 0) + 1;
 
@@ -584,7 +622,7 @@ export const reschedule = mutation({
 export const createBatch = mutation({
   args: {
     orgId: v.id("orgs"),
-    walletAddress: v.string(),
+    sessionToken: v.string(),
     chainId: v.number(),
     token: v.string(),
     recipients: v.array(
@@ -597,10 +635,9 @@ export const createBatch = mutation({
     scheduledAt: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
-    const walletAddress = args.walletAddress.toLowerCase();
     const now = Date.now();
 
-    const { user } = await requireOrgAccess(ctx, args.orgId, walletAddress, ["admin", "approver", "initiator"]);
+    const { user } = await requireOrgAccess(ctx, args.orgId, args.sessionToken, ["admin", "approver", "initiator"]);
 
     // Validate at least 1 recipient
     if (args.recipients.length === 0) {
@@ -626,8 +663,8 @@ export const createBatch = mutation({
       throw new Error("No Safe linked for this chain");
     }
 
-    // Validate all beneficiaries and calculate total
-    let totalAmount = 0;
+    // Validate all beneficiaries and calculate total in integer base units
+    let totalBaseUnits = 0n;
     const recipientData: Array<{
       beneficiaryId: Id<"beneficiaries">;
       recipientAddress: string;
@@ -645,19 +682,19 @@ export const createBatch = mutation({
         throw new Error(`Beneficiary is not active: ${beneficiary.name}`);
       }
 
-      // Validate amount is positive
-      const amountNum = parseFloat(recipient.amount);
-      if (isNaN(amountNum) || amountNum <= 0) {
-        throw new Error(`Invalid amount for beneficiary: ${beneficiary.name}`);
-      }
+      // H-02/H-03: strict amount + address validation (no float math)
+      assertValidAmount(recipient.amount, args.token);
+      assertValidAddress(beneficiary.walletAddress, "beneficiary wallet address");
 
-      totalAmount += amountNum;
+      totalBaseUnits += amountToBaseUnits(recipient.amount, args.token);
       recipientData.push({
         beneficiaryId: recipient.beneficiaryId,
         recipientAddress: beneficiary.walletAddress,
         amount: recipient.amount,
       });
     }
+
+    const totalAmount = formatBaseUnits(totalBaseUnits, args.token);
 
     // Create disbursement record
     const disbursementId = await ctx.db.insert("disbursements", {
@@ -666,7 +703,7 @@ export const createBatch = mutation({
       chainId: args.chainId,
       type: "batch",
       token: args.token,
-      totalAmount: totalAmount.toString(),
+      totalAmount,
       memo: args.memo,
       scheduledAt: args.scheduledAt,
       status: "draft",
@@ -710,10 +747,9 @@ export const createBatch = mutation({
 export const get = query({
   args: {
     disbursementId: v.id("disbursements"),
-    walletAddress: v.string(),
+    sessionToken: v.string(),
   },
   handler: async (ctx, args) => {
-    const walletAddress = args.walletAddress.toLowerCase();
 
     const disbursement = await ctx.db.get(args.disbursementId);
     if (!disbursement) {
@@ -721,7 +757,7 @@ export const get = query({
     }
 
     // Any member can view
-    await requireOrgAccess(ctx, disbursement.orgId, walletAddress, ["admin", "approver", "initiator", "clerk", "viewer"]);
+    await requireOrgAccess(ctx, disbursement.orgId, args.sessionToken, ["admin", "approver", "initiator", "clerk", "viewer"]);
 
     const beneficiary = disbursement.beneficiaryId
       ? await ctx.db.get(disbursement.beneficiaryId)
@@ -740,10 +776,9 @@ export const get = query({
 export const getWithRecipients = query({
   args: {
     disbursementId: v.id("disbursements"),
-    walletAddress: v.string(),
+    sessionToken: v.string(),
   },
   handler: async (ctx, args) => {
-    const walletAddress = args.walletAddress.toLowerCase();
 
     const disbursement = await ctx.db.get(args.disbursementId);
     if (!disbursement) {
@@ -751,7 +786,7 @@ export const getWithRecipients = query({
     }
 
     // Any member can view
-    await requireOrgAccess(ctx, disbursement.orgId, walletAddress, ["admin", "approver", "initiator", "clerk", "viewer"]);
+    await requireOrgAccess(ctx, disbursement.orgId, args.sessionToken, ["admin", "approver", "initiator", "clerk", "viewer"]);
 
     // Get single beneficiary if it's a single disbursement
     const beneficiary = disbursement.beneficiaryId

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { getSessionToken } from '@/lib/session';
 import { useNavigate } from 'react-router-dom';
 import { useAccount, useSendTransaction, useWaitForTransactionReceipt } from 'wagmi';
 import { useMutation } from 'convex/react';
@@ -102,7 +103,7 @@ export default function Onboarding() {
     try {
       const { orgId: newOrgId } = await createOrg({
         name: orgName.trim(),
-        walletAddress: address,
+        sessionToken: getSessionToken() ?? "",
       });
       setOrgId(newOrgId);
 
@@ -110,7 +111,7 @@ export default function Onboarding() {
       if (name.trim() || email.trim()) {
         await updateOwnProfile({
           orgId: newOrgId,
-          walletAddress: address,
+          sessionToken: getSessionToken() ?? "",
           name: name.trim() || undefined,
           email: email.trim() || undefined,
         });
@@ -155,7 +156,7 @@ export default function Onboarding() {
       for (const member of teamMembers) {
         await inviteMember({
           orgId: orgId as Id<'orgs'>,
-          walletAddress: address,
+          sessionToken: getSessionToken() ?? "",
           memberWalletAddress: member.walletAddress,
           memberName: member.name || undefined,
           memberEmail: member.email || undefined,
@@ -188,7 +189,7 @@ export default function Onboarding() {
 
       await linkSafe({
         orgId: orgId as Id<'orgs'>,
-        walletAddress: address,
+        sessionToken: getSessionToken() ?? "",
         safeAddress: existingSafeAddress.trim(),
         chainId: selectedChainId,
       });
@@ -227,7 +228,7 @@ export default function Onboarding() {
       // Link immediately — address is deterministic via CREATE2
       await linkSafe({
         orgId: orgId as Id<'orgs'>,
-        walletAddress: address,
+        sessionToken: getSessionToken() ?? "",
         safeAddress: predictedAddress,
         chainId: selectedChainId,
       });

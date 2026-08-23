@@ -57,13 +57,20 @@ export function exportToCsv<T extends Record<string, unknown>>(
  * Escape a value for CSV format
  * - Wraps in quotes if contains comma, quote, or newline
  * - Doubles any existing quotes
+ * - Neutralizes formula injection (H-01): leading = + - @ \t \r are prefixed
+ *   with a single quote so spreadsheet apps treat the cell as text
  */
 function escapeValue(value: unknown): string {
   if (value === null || value === undefined) {
     return '';
   }
 
-  const str = String(value);
+  let str = String(value);
+
+  // CSV injection defense: never allow cells to begin with a formula character
+  if (/^[=+\-@\t\r]/.test(str)) {
+    str = `'` + str;
+  }
 
   // If contains special characters, wrap in quotes and escape existing quotes
   if (str.includes(',') || str.includes('"') || str.includes('\n') || str.includes('\r')) {
@@ -286,9 +293,9 @@ export function validateCsvRow(
     errors.push('Wallet address is required');
   } else {
     const address = row.wallet_address.trim();
-    // Basic Ethereum address validation
-    if (!address.startsWith('0x') || address.length !== 42) {
-      errors.push(`Invalid wallet address format: must start with 0x and be 42 characters`);
+    // Full hex validation: 0x + 40 hexadecimal characters (H-03)
+    if (!/^0x[0-9a-fA-F]{40}$/.test(address)) {
+      errors.push(`Invalid wallet address format: must be 0x followed by 40 hexadecimal characters`);
     } else {
       // Check for duplicates within CSV
       const lowerAddress = address.toLowerCase();

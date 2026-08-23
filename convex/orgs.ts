@@ -1,6 +1,8 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import { getOrgLimits } from "./billing";
+import { requireOrgAccess, requireUser } from "./lib/rbac";
+import { assertValidAddress } from "./lib/validation";
 
 const SUPPORTED_RELAY_FEE_TOKENS = ["USDC", "USDT"] as const;
 type RelayFeeMode = "stablecoin_preferred" | "stablecoin_only";
@@ -59,21 +61,13 @@ function normalizeRelayFeeTokenSymbol(value?: string | null) {
 export const create = mutation({
   args: {
     name: v.string(),
-    walletAddress: v.string(),
+    sessionToken: v.string(),
   },
   handler: async (ctx, args) => {
-    const walletAddress = args.walletAddress.toLowerCase();
     const now = Date.now();
 
-    // Get user
-    const user = await ctx.db
-      .query("users")
-      .withIndex("by_wallet", (q) => q.eq("walletAddress", walletAddress))
-      .first();
-
-    if (!user) {
-      throw new Error("User not found");
-    }
+    // Resolve caller identity from session token
+    const { user } = await requireUser(ctx, args.sessionToken);
 
     // Create org
     const orgId = await ctx.db.insert("orgs", {
@@ -147,34 +141,26 @@ export const create = mutation({
   },
 });
 
-// Get orgs for a user
+// Get orgs for the authenticated user (includes pending invites)
 export const listForUser = query({
-  args: { walletAddress: v.string() },
+  args: { sessionToken: v.string() },
   handler: async (ctx, args) => {
-    const walletAddress = args.walletAddress.toLowerCase();
-
-    // Get user
-    const user = await ctx.db
-      .query("users")
-      .withIndex("by_wallet", (q) => q.eq("walletAddress", walletAddress))
-      .first();
-
-    if (!user) {
-      return [];
-    }
+    const { user } = await requireUser(ctx, args.sessionToken);
 
     // Get memberships
     const memberships = await ctx.db
       .query("orgMemberships")
       .withIndex("by_user", (q) => q.eq("userId", user._id))
-      .filter((q) => q.eq(q.field("status"), "active"))
+      .filter((q) => q.neq(q.field("status"), "removed"))
       .collect();
 
     // Get orgs
     const orgs = await Promise.all(
       memberships.map(async (m) => {
         const org = await ctx.db.get(m.orgId);
-        return org ? { ...org, role: m.role } : null;
+        return org
+          ? { ...org, role: m.role, membershipStatus: m.status }
+          : null;
       })
     );
 
@@ -182,10 +168,17 @@ export const listForUser = query({
   },
 });
 
-// Get single org by ID
+// Get single org by ID (members only)
 export const get = query({
-  args: { orgId: v.id("orgs") },
+  args: { orgId: v.id("orgs"), sessionToken: v.string() },
   handler: async (ctx, args) => {
+    await requireOrgAccess(ctx, args.orgId, args.sessionToken, [
+      "admin",
+      "approver",
+      "initiator",
+      "clerk",
+      "viewer",
+    ]);
     return await ctx.db.get(args.orgId);
   },
 });
@@ -195,31 +188,13 @@ export const updateName = mutation({
   args: {
     orgId: v.id("orgs"),
     name: v.string(),
-    walletAddress: v.string(),
+    sessionToken: v.string(),
   },
   handler: async (ctx, args) => {
-    const walletAddress = args.walletAddress.toLowerCase();
 
-    // Verify user has admin access
-    const user = await ctx.db
-      .query("users")
-      .withIndex("by_wallet", (q) => q.eq("walletAddress", walletAddress))
-      .first();
-
-    if (!user) {
-      throw new Error("User not found");
-    }
-
-    const membership = await ctx.db
-      .query("orgMemberships")
-      .withIndex("by_org_and_user", (q) =>
-        q.eq("orgId", args.orgId).eq("userId", user._id)
-      )
-      .first();
-
-    if (!membership || membership.role !== "admin") {
-      throw new Error("Not authorized");
-    }
+    // Admin-only, and the membership must be ACTIVE (requireOrgAccess
+    // enforces both — an unaccepted admin invite confers no power)
+    const { user } = await requireOrgAccess(ctx, args.orgId, args.sessionToken, ["admin"]);
 
     await ctx.db.patch(args.orgId, { name: args.name });
 
@@ -242,7 +217,7 @@ export const updateName = mutation({
 export const updateRelaySettings = mutation({
   args: {
     orgId: v.id("orgs"),
-    walletAddress: v.string(),
+    sessionToken: v.string(),
     relayFeeTokenSymbol: v.string(),
     relayFeeMode: v.union(
       v.literal("stablecoin_preferred"),
@@ -250,16 +225,8 @@ export const updateRelaySettings = mutation({
     ),
   },
   handler: async (ctx, args) => {
-    const walletAddress = args.walletAddress.toLowerCase();
 
-    const user = await ctx.db
-      .query("users")
-      .withIndex("by_wallet", (q) => q.eq("walletAddress", walletAddress))
-      .first();
-
-    if (!user) {
-      throw new Error("User not found");
-    }
+    const { user } = await requireUser(ctx, args.sessionToken);
 
     const membership = await ctx.db
       .query("orgMemberships")
@@ -302,21 +269,13 @@ export const updateRelaySettings = mutation({
 export const updateOwnProfile = mutation({
   args: {
     orgId: v.id("orgs"),
-    walletAddress: v.string(),
+    sessionToken: v.string(),
     name: v.optional(v.string()),
     email: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    const walletAddress = args.walletAddress.toLowerCase();
 
-    const user = await ctx.db
-      .query("users")
-      .withIndex("by_wallet", (q) => q.eq("walletAddress", walletAddress))
-      .first();
-
-    if (!user) {
-      throw new Error("User not found");
-    }
+    const { user } = await requireUser(ctx, args.sessionToken);
 
     const membership = await ctx.db
       .query("orgMemberships")
@@ -345,20 +304,12 @@ export const updateOwnProfile = mutation({
 export const listMembers = query({
   args: {
     orgId: v.id("orgs"),
-    walletAddress: v.string(),
+    sessionToken: v.string(),
   },
   handler: async (ctx, args) => {
-    const walletAddress = args.walletAddress.toLowerCase();
 
     // Verify user is a member
-    const user = await ctx.db
-      .query("users")
-      .withIndex("by_wallet", (q) => q.eq("walletAddress", walletAddress))
-      .first();
-
-    if (!user) {
-      throw new Error("User not found");
-    }
+    const { user } = await requireUser(ctx, args.sessionToken);
 
     const userMembership = await ctx.db
       .query("orgMemberships")
@@ -404,7 +355,7 @@ export const listMembers = query({
 export const inviteMember = mutation({
   args: {
     orgId: v.id("orgs"),
-    walletAddress: v.string(),
+    sessionToken: v.string(),
     memberWalletAddress: v.string(),
     memberName: v.optional(v.string()), // Optional display name
     memberEmail: v.optional(v.string()), // Optional email
@@ -417,30 +368,13 @@ export const inviteMember = mutation({
     ),
   },
   handler: async (ctx, args) => {
-    const walletAddress = args.walletAddress.toLowerCase();
     const memberWalletAddress = args.memberWalletAddress.toLowerCase();
     const now = Date.now();
 
-    // Verify user has admin access
-    const user = await ctx.db
-      .query("users")
-      .withIndex("by_wallet", (q) => q.eq("walletAddress", walletAddress))
-      .first();
+    assertValidAddress(args.memberWalletAddress, "member wallet address");
 
-    if (!user) {
-      throw new Error("User not found");
-    }
-
-    const userMembership = await ctx.db
-      .query("orgMemberships")
-      .withIndex("by_org_and_user", (q) =>
-        q.eq("orgId", args.orgId).eq("userId", user._id)
-      )
-      .first();
-
-    if (!userMembership || userMembership.role !== "admin") {
-      throw new Error("Only admins can invite members");
-    }
+    // Admin-only AND active (unaccepted invites confer no power)
+    const { user } = await requireOrgAccess(ctx, args.orgId, args.sessionToken, ["admin"]);
 
     // Check tier limits for users
     const limits = await getOrgLimits(ctx, args.orgId);
@@ -485,10 +419,10 @@ export const inviteMember = mutation({
       if (existingMembership.status === "active") {
         throw new Error("User is already a member of this organization");
       }
-      // Reactivate removed member
+      // Re-invite a previously removed member (stays inactive until accepted)
       await ctx.db.patch(existingMembership._id, {
         role: args.role,
-        status: "active",
+        status: "invited",
         name: args.memberName,
         email: args.memberEmail,
       });
@@ -507,14 +441,14 @@ export const inviteMember = mutation({
       return { membershipId: existingMembership._id };
     }
 
-    // Create new membership
+    // Create new membership — pending until the invitee accepts (C-06 fix)
     const membershipId = await ctx.db.insert("orgMemberships", {
       orgId: args.orgId,
       userId: memberUser._id,
       name: args.memberName,
       email: args.memberEmail,
       role: args.role,
-      status: "active",
+      status: "invited",
       createdAt: now,
     });
 
@@ -533,12 +467,57 @@ export const inviteMember = mutation({
   },
 });
 
+// Accept a pending invite. Only the invited wallet (authenticated via session
+// token) can activate their own membership — closing the C-06 gap where
+// admins could grant instant active access to arbitrary wallets.
+export const acceptInvite = mutation({
+  args: {
+    orgId: v.id("orgs"),
+    sessionToken: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const now = Date.now();
+    const { user } = await requireUser(ctx, args.sessionToken);
+
+    const membership = await ctx.db
+      .query("orgMemberships")
+      .withIndex("by_org_and_user", (q) =>
+        q.eq("orgId", args.orgId).eq("userId", user._id)
+      )
+      .first();
+
+    if (!membership) {
+      throw new Error("No membership found for this organization");
+    }
+    if (membership.status === "active") {
+      return { success: true };
+    }
+    if (membership.status !== "invited") {
+      throw new Error("No pending invitation for this organization");
+    }
+
+    await ctx.db.patch(membership._id, { status: "active" });
+
+    // Audit log
+    await ctx.db.insert("auditLog", {
+      orgId: args.orgId,
+      actorUserId: user._id,
+      action: "member.inviteAccepted",
+      objectType: "orgMembership",
+      objectId: membership._id,
+      metadata: { role: membership.role },
+      timestamp: now,
+    });
+
+    return { success: true };
+  },
+});
 // Update a member's role
 export const updateMemberRole = mutation({
   args: {
     orgId: v.id("orgs"),
     membershipId: v.id("orgMemberships"),
-    walletAddress: v.string(),
+    sessionToken: v.string(),
     newRole: v.union(
       v.literal("admin"),
       v.literal("approver"),
@@ -548,29 +527,10 @@ export const updateMemberRole = mutation({
     ),
   },
   handler: async (ctx, args) => {
-    const walletAddress = args.walletAddress.toLowerCase();
     const now = Date.now();
 
-    // Verify user has admin access
-    const user = await ctx.db
-      .query("users")
-      .withIndex("by_wallet", (q) => q.eq("walletAddress", walletAddress))
-      .first();
-
-    if (!user) {
-      throw new Error("User not found");
-    }
-
-    const userMembership = await ctx.db
-      .query("orgMemberships")
-      .withIndex("by_org_and_user", (q) =>
-        q.eq("orgId", args.orgId).eq("userId", user._id)
-      )
-      .first();
-
-    if (!userMembership || userMembership.role !== "admin") {
-      throw new Error("Only admins can update member roles");
-    }
+    // Admin-only AND active (unaccepted invites confer no power)
+    const { user } = await requireOrgAccess(ctx, args.orgId, args.sessionToken, ["admin"]);
 
     // Get target membership
     const membership = await ctx.db.get(args.membershipId);
@@ -616,22 +576,14 @@ export const updateMemberName = mutation({
   args: {
     orgId: v.id("orgs"),
     membershipId: v.id("orgMemberships"),
-    walletAddress: v.string(),
+    sessionToken: v.string(),
     name: v.optional(v.string()), // Can clear name by passing undefined
   },
   handler: async (ctx, args) => {
-    const walletAddress = args.walletAddress.toLowerCase();
     const now = Date.now();
 
     // Verify user is a member (any member can update their own name, admins can update anyone's)
-    const user = await ctx.db
-      .query("users")
-      .withIndex("by_wallet", (q) => q.eq("walletAddress", walletAddress))
-      .first();
-
-    if (!user) {
-      throw new Error("User not found");
-    }
+    const { user } = await requireUser(ctx, args.sessionToken);
 
     const userMembership = await ctx.db
       .query("orgMemberships")
@@ -681,22 +633,14 @@ export const updateMemberEmail = mutation({
   args: {
     orgId: v.id("orgs"),
     membershipId: v.id("orgMemberships"),
-    walletAddress: v.string(),
+    sessionToken: v.string(),
     email: v.optional(v.string()), // Can clear email by passing undefined
   },
   handler: async (ctx, args) => {
-    const walletAddress = args.walletAddress.toLowerCase();
     const now = Date.now();
 
     // Verify user is a member (any member can update their own email, admins can update anyone's)
-    const user = await ctx.db
-      .query("users")
-      .withIndex("by_wallet", (q) => q.eq("walletAddress", walletAddress))
-      .first();
-
-    if (!user) {
-      throw new Error("User not found");
-    }
+    const { user } = await requireUser(ctx, args.sessionToken);
 
     const userMembership = await ctx.db
       .query("orgMemberships")
@@ -746,32 +690,13 @@ export const removeMember = mutation({
   args: {
     orgId: v.id("orgs"),
     membershipId: v.id("orgMemberships"),
-    walletAddress: v.string(),
+    sessionToken: v.string(),
   },
   handler: async (ctx, args) => {
-    const walletAddress = args.walletAddress.toLowerCase();
     const now = Date.now();
 
-    // Verify user has admin access
-    const user = await ctx.db
-      .query("users")
-      .withIndex("by_wallet", (q) => q.eq("walletAddress", walletAddress))
-      .first();
-
-    if (!user) {
-      throw new Error("User not found");
-    }
-
-    const userMembership = await ctx.db
-      .query("orgMemberships")
-      .withIndex("by_org_and_user", (q) =>
-        q.eq("orgId", args.orgId).eq("userId", user._id)
-      )
-      .first();
-
-    if (!userMembership || userMembership.role !== "admin") {
-      throw new Error("Only admins can remove members");
-    }
+    // Admin-only AND active (unaccepted invites confer no power)
+    const { user } = await requireOrgAccess(ctx, args.orgId, args.sessionToken, ["admin"]);
 
     // Get target membership
     const membership = await ctx.db.get(args.membershipId);

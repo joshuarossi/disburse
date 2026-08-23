@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { getSessionToken } from '@/lib/session';
 import { useParams } from 'react-router-dom';
 import { useAccount } from 'wagmi';
 import { useTranslation } from 'react-i18next';
@@ -50,8 +51,8 @@ export default function Team() {
 
   const members = useQuery(
     api.orgs.listMembers,
-    orgId && address
-      ? { orgId: orgId as Id<'orgs'>, walletAddress: address }
+    orgId && address && getSessionToken()
+      ? { orgId: orgId as Id<'orgs'>, sessionToken: getSessionToken() ?? "" }
       : 'skip'
   );
 
@@ -75,7 +76,7 @@ export default function Team() {
     try {
       await inviteMember({
         orgId: orgId as Id<'orgs'>,
-        walletAddress: address,
+        sessionToken: getSessionToken() ?? "",
         memberWalletAddress: newMemberAddress.trim(),
         memberName: newMemberName.trim() || undefined,
         memberEmail: newMemberEmail.trim() || undefined,
@@ -130,7 +131,7 @@ export default function Team() {
         await updateMemberName({
           orgId: orgId as Id<'orgs'>,
           membershipId: editingMember.membershipId as Id<'orgMemberships'>,
-          walletAddress: address,
+          sessionToken: getSessionToken() ?? "",
           name: editingMember.name.trim() || undefined,
         });
       }
@@ -139,7 +140,7 @@ export default function Team() {
         await updateMemberEmail({
           orgId: orgId as Id<'orgs'>,
           membershipId: editingMember.membershipId as Id<'orgMemberships'>,
-          walletAddress: address,
+          sessionToken: getSessionToken() ?? "",
           email: editingMember.email.trim() || undefined,
         });
       }
@@ -148,7 +149,7 @@ export default function Team() {
         await updateMemberRole({
           orgId: orgId as Id<'orgs'>,
           membershipId: editingMember.membershipId as Id<'orgMemberships'>,
-          walletAddress: address,
+          sessionToken: getSessionToken() ?? "",
           newRole: editingMember.role,
         });
       }
@@ -187,7 +188,7 @@ export default function Team() {
       await removeMember({
         orgId: orgId as Id<'orgs'>,
         membershipId: memberToRemove.membershipId as Id<'orgMemberships'>,
-        walletAddress: address,
+        sessionToken: getSessionToken() ?? "",
       });
       handleCloseRemoveMember();
     } catch (error) {

@@ -7,7 +7,7 @@ import { requireOrgAccess } from "./lib/rbac";
 export const getTransactionReport = query({
   args: {
     orgId: v.id("orgs"),
-    walletAddress: v.string(),
+    sessionToken: v.string(),
     startDate: v.optional(v.number()),
     endDate: v.optional(v.number()),
     status: v.optional(v.array(v.string())),
@@ -17,10 +17,9 @@ export const getTransactionReport = query({
     chainIds: v.optional(v.array(v.number())),
   },
   handler: async (ctx, args) => {
-    const walletAddress = args.walletAddress.toLowerCase();
 
     // Any member can view reports
-    await requireOrgAccess(ctx, args.orgId, walletAddress, ["admin", "approver", "initiator", "clerk", "viewer"]);
+    await requireOrgAccess(ctx, args.orgId, args.sessionToken, ["admin", "approver", "initiator", "clerk", "viewer"]);
 
     const statusFilter = args.status && args.status.length > 0 ? args.status : null;
     const includeDeposits = !statusFilter || statusFilter.includes("received");
@@ -212,7 +211,7 @@ export const getTransactionReport = query({
 export const getSpendingByBeneficiary = query({
   args: {
     orgId: v.id("orgs"),
-    walletAddress: v.string(),
+    sessionToken: v.string(),
     startDate: v.optional(v.number()),
     endDate: v.optional(v.number()),
     type: v.optional(v.union(v.literal("individual"), v.literal("business"))),
@@ -220,10 +219,9 @@ export const getSpendingByBeneficiary = query({
     chainIds: v.optional(v.array(v.number())),
   },
   handler: async (ctx, args) => {
-    const walletAddress = args.walletAddress.toLowerCase();
 
     // Any member can view reports
-    await requireOrgAccess(ctx, args.orgId, walletAddress, ["admin", "approver", "initiator", "clerk", "viewer"]);
+    await requireOrgAccess(ctx, args.orgId, args.sessionToken, ["admin", "approver", "initiator", "clerk", "viewer"]);
 
     // Fetch all executed disbursements for the org
     const allDisbursements = await ctx.db

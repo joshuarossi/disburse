@@ -7,6 +7,7 @@ import { useMutation, useQuery } from 'convex/react';
 import { api } from '../../convex/_generated/api';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft } from 'lucide-react';
+import { getSessionToken, saveSessionToken, clearSessionToken } from '@/lib/session';
 
 export default function Login() {
   const { t } = useTranslation();
@@ -15,15 +16,16 @@ export default function Login() {
   const { signMessageAsync } = useSignMessage();
   const [isSigningIn, setIsSigningIn] = useState(false);
   const signInAttemptedRef = useRef(false);
-  
+
   const generateNonce = useMutation(api.auth.generateNonce);
   const verifySignature = useMutation(api.auth.verifySignature);
+  const existingToken = getSessionToken();
   const session = useQuery(
-    api.auth.getSession, 
-    address ? { walletAddress: address } : 'skip'
+    api.auth.validateSession,
+    existingToken ? { token: existingToken } : 'skip'
   );
 
-  // If already authenticated, redirect to select-org
+  // If already authenticated with a valid token, redirect to select-org
   useEffect(() => {
     if (session) {
       navigate('/select-org');
@@ -35,31 +37,35 @@ export default function Login() {
     setIsSigningIn(true);
 
     try {
-      // Generate nonce
-      const { nonce } = await generateNonce({ walletAddress: address });
+      clearSessionToken();
 
-      // Create SIWE message
-      const message = `Sign in to Disburse\n\nThis request will not trigger a blockchain transaction or cost any gas fees.\n\nWallet: ${address}\nNonce: ${nonce}`;
+      // Server builds the SIWE message and issues a single-use nonce
+      const { message } = await generateNonce({ walletAddress: address });
 
-      // Sign message
+      // User signs the server-authored message with their wallet
       const signature = await signMessageAsync({ message });
 
-      // Verify with backend
-      await verifySignature({
+      // Backend cryptographically verifies the signature against the claimed
+      // address, consumes the nonce, and returns a one-time opaque session token
+      const result = await verifySignature({
         walletAddress: address,
         signature,
         message,
       });
 
-      // Session query will update and trigger redirect
+      saveSessionToken(result.token);
+
+      // Redirect now that we hold a valid token
+      navigate('/select-org');
     } catch (error) {
       console.error('Sign in failed:', error);
+      clearSessionToken();
       // Reset the attempt flag so user can retry
       signInAttemptedRef.current = false;
     } finally {
       setIsSigningIn(false);
     }
-  }, [address, isSigningIn, generateNonce, signMessageAsync, verifySignature]);
+  }, [address, isSigningIn, navigate, generateNonce, signMessageAsync, verifySignature]);
 
   // When wallet connects, start SIWE flow (with guard against double-execution)
   useEffect(() => {

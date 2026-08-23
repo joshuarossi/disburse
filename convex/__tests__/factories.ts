@@ -1,9 +1,72 @@
 import { Id } from "../_generated/dataModel";
 import { MutationCtx } from "../_generated/server";
+import { api } from "../_generated/api";
+import { privateKeyToAccount, type PrivateKeyAccount } from "viem/accounts";
 
 type Role = "admin" | "approver" | "initiator" | "clerk" | "viewer";
 type Plan = "trial" | "starter" | "team" | "pro";
 type BeneficiaryType = "individual" | "business";
+
+// ─── Signed-auth helpers ─────────────────────────────────────────────────────
+// Backend identity now comes exclusively from server-verified SIWE sessions.
+// Tests therefore authenticate through the REAL crypto path: generateNonce →
+// sign message with a viem account → verifySignature → session token.
+
+const TEST_PRIVATE_KEYS = {
+  admin: "0x0000000000000000000000000000000000000000000000000000000000000001",
+  approver: "0x0000000000000000000000000000000000000000000000000000000000000002",
+  initiator: "0x0000000000000000000000000000000000000000000000000000000000000003",
+  clerk: "0x0000000000000000000000000000000000000000000000000000000000000004",
+  viewer: "0x0000000000000000000000000000000000000000000000000000000000000005",
+  nonMember: "0x0000000000000000000000000000000000000000000000000000000000000006",
+} as const;
+
+export type TestRoleName = keyof typeof TEST_PRIVATE_KEYS;
+
+/** viem accounts whose addresses match TEST_WALLETS below */
+export const TEST_ACCOUNTS: Record<TestRoleName, PrivateKeyAccount> =
+  Object.fromEntries(
+    Object.entries(TEST_PRIVATE_KEYS).map(([role, key]) => [
+      role,
+      privateKeyToAccount(key as `0x${string}`),
+    ])
+  ) as Record<TestRoleName, PrivateKeyAccount>;
+
+/**
+ * Perform a real signed sign-in for a deterministic test wallet and return
+ * the opaque session token issued by convex/auth.verifySignature.
+ * The nonce is consumed exactly as in production.
+ */
+export async function signIn(
+  t: {
+    mutation: (fnRef: unknown, args: unknown) => Promise<any>;
+  },
+  roleName: TestRoleName
+): Promise<{ sessionToken: string; userId: Id<"users">; walletAddress: string }> {
+  const account = TEST_ACCOUNTS[roleName];
+  const walletAddress = account.address;
+
+  // Server builds the SIWE message and registers a single-use nonce
+  const { message } = (await t.mutation(api.auth.generateNonce, {
+    walletAddress,
+  })) as { message: string };
+
+  // Sign it cryptographically (no network needed for EOA accounts)
+  const signature = await account.signMessage({ message });
+
+  // Server verifies signature, consumes nonce, issues token
+  const result = (await t.mutation(api.auth.verifySignature, {
+    walletAddress,
+    signature,
+    message,
+  })) as { token: string; userId: Id<"users"> };
+
+  return {
+    sessionToken: result.token,
+    userId: result.userId,
+    walletAddress,
+  };
+}
 
 /**
  * Create a test user
@@ -17,7 +80,8 @@ export async function createTestUser(
 ): Promise<Id<"users">> {
   const now = Date.now();
   const userId = await ctx.db.insert("users", {
-    walletAddress: overrides.walletAddress || `0x${randomHex(40)}`,
+    // Production stores addresses lowercase — match that here
+    walletAddress: (overrides.walletAddress || `0x${randomHex(40)}`).toLowerCase(),
     email: overrides.email,
     createdAt: now,
   });
@@ -264,6 +328,7 @@ export async function createTestSession(
   walletAddress: string,
   overrides: {
     nonce?: string;
+    tokenHash?: string;
     expiresAt?: number;
   } = {}
 ): Promise<Id<"sessions">> {
@@ -271,7 +336,10 @@ export async function createTestSession(
   return await ctx.db.insert("sessions", {
     userId,
     walletAddress: walletAddress.toLowerCase(),
-    nonce: overrides.nonce || crypto.randomUUID(),
+    // Authenticated session by default (tokenHash set); pass nonce-only rows
+    // explicitly when testing pending sign-in nonces.
+    nonce: overrides.nonce,
+    tokenHash: overrides.tokenHash ?? randomHex(64),
     expiresAt: overrides.expiresAt ?? now + 7 * 24 * 60 * 60 * 1000,
     createdAt: now,
   });
@@ -357,13 +425,14 @@ function randomHex(length: number): string {
 }
 
 /**
- * Test wallet addresses for consistent testing
+ * Test wallet addresses — derived from TEST_ACCOUNTS private keys so the
+ * addresses, signatures, and sessions all match deterministically.
  */
 export const TEST_WALLETS = {
-  admin: "0x1234567890123456789012345678901234567890",
-  approver: "0x2345678901234567890123456789012345678901",
-  initiator: "0x3456789012345678901234567890123456789012",
-  clerk: "0x4567890123456789012345678901234567890123",
-  viewer: "0x5678901234567890123456789012345678901234",
-  nonMember: "0x6789012345678901234567890123456789012345",
+  admin: TEST_ACCOUNTS.admin.address,
+  approver: TEST_ACCOUNTS.approver.address,
+  initiator: TEST_ACCOUNTS.initiator.address,
+  clerk: TEST_ACCOUNTS.clerk.address,
+  viewer: TEST_ACCOUNTS.viewer.address,
+  nonMember: TEST_ACCOUNTS.nonMember.address,
 } as const;

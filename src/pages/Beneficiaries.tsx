@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react';
+import { getSessionToken } from '@/lib/session';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useAccount } from 'wagmi';
 import { useTranslation } from 'react-i18next';
@@ -83,7 +84,6 @@ function BeneficiarySection({
   iconColor,
   beneficiaries,
   availableTags,
-  walletAddress,
   orgId,
   onEdit,
   onToggleActive,
@@ -93,7 +93,6 @@ function BeneficiarySection({
   iconColor: string;
   beneficiaries: Beneficiary[];
   availableTags: { name: string; normalizedName?: string }[];
-  walletAddress: string;
   orgId?: string;
   onEdit: (b: Beneficiary) => void;
   onToggleActive: (id: Id<'beneficiaries'>, isActive: boolean) => void;
@@ -454,7 +453,6 @@ function BeneficiarySection({
                     <td className="px-6 py-4">
                       <ScreeningBadge
                         beneficiaryId={beneficiary._id}
-                        walletAddress={walletAddress}
                         onClick={() => setScreeningDetailId({ id: beneficiary._id, name: beneficiary.name })}
                       />
                     </td>
@@ -532,7 +530,6 @@ function BeneficiarySection({
                   <div className="flex items-center gap-2 ml-2 shrink-0">
                     <ScreeningBadge
                       beneficiaryId={beneficiary._id}
-                      walletAddress={walletAddress}
                       onClick={() => setScreeningDetailId({ id: beneficiary._id, name: beneficiary.name })}
                     />
                     <span
@@ -624,7 +621,6 @@ function BeneficiarySection({
         <ScreeningDetailModal
           beneficiaryId={screeningDetailId.id}
           beneficiaryName={screeningDetailId.name}
-          walletAddress={walletAddress}
           onClose={() => setScreeningDetailId(null)}
         />
       )}
@@ -665,15 +661,15 @@ export default function Beneficiaries() {
 
   const beneficiaries = useQuery(
     api.beneficiaries.list,
-    orgId && address
-      ? { orgId: orgId as Id<'orgs'>, walletAddress: address, includeTags: true }
+    orgId && address && getSessionToken()
+      ? { orgId: orgId as Id<'orgs'>, sessionToken: getSessionToken() ?? "", includeTags: true }
       : 'skip'
   );
 
   const availableTags = useQuery(
     api.tags.list,
-    orgId && address
-      ? { orgId: orgId as Id<'orgs'>, walletAddress: address }
+    orgId && address && getSessionToken()
+      ? { orgId: orgId as Id<'orgs'>, sessionToken: getSessionToken() ?? "" }
       : 'skip'
   );
 
@@ -722,7 +718,7 @@ export default function Beneficiaries() {
     try {
       await createBeneficiary({
         orgId: orgId as Id<'orgs'>,
-        walletAddress: address,
+        sessionToken: getSessionToken() ?? "",
         type: newType,
         name: newName.trim(),
         beneficiaryAddress: newAddress.trim(),
@@ -798,7 +794,7 @@ export default function Beneficiaries() {
     try {
       await updateBeneficiary({
         beneficiaryId: editingBeneficiary.id,
-        walletAddress: address,
+        sessionToken: getSessionToken() ?? "",
         type: editingBeneficiary.type,
         name: editingBeneficiary.name.trim(),
         beneficiaryAddress: editingBeneficiary.walletAddress.trim(),
@@ -820,7 +816,7 @@ export default function Beneficiaries() {
     try {
       await updateBeneficiary({
         beneficiaryId,
-        walletAddress: address,
+        sessionToken: getSessionToken() ?? "",
         isActive: !isActive,
       });
     } catch (error) {
@@ -1064,7 +1060,6 @@ export default function Beneficiaries() {
             iconColor="bg-purple-500/10 text-purple-400"
             beneficiaries={individuals as Beneficiary[]}
             availableTags={availableTags ?? []}
-            walletAddress={address!}
             orgId={orgId}
             onEdit={handleOpenEdit}
             onToggleActive={handleToggleActive}
@@ -1079,7 +1074,6 @@ export default function Beneficiaries() {
             iconColor="bg-blue-500/10 text-blue-400"
             beneficiaries={businesses as Beneficiary[]}
             availableTags={availableTags ?? []}
-            walletAddress={address!}
             orgId={orgId}
             onEdit={handleOpenEdit}
             onToggleActive={handleToggleActive}

@@ -1,5 +1,5 @@
 import { convexTest } from "convex-test";
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, afterEach } from "vitest";
 import { api } from "../_generated/api";
 import { Doc } from "../_generated/dataModel";
 import schema from "../schema";
@@ -9,10 +9,21 @@ import {
   createTestMembership,
   createTestBeneficiary,
   createFullOrgSetup,
+  signIn,
   TEST_WALLETS,
 } from "./factories";
 
+// convex-test runs scheduled functions on macrotask timers; give them a beat
+// to finish inside the test lifecycle so their writes don't land post-test.
+function drainScheduled(): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, 25));
+}
+
 describe("Beneficiaries", () => {
+  // convex-test fires scheduled functions on macrotask timers; drain them
+  // after EVERY test so screening-action writes never land post-test.
+  afterEach(() => new Promise((resolve) => setTimeout(resolve, 30)));
+
   describe("create", () => {
     it("creates individual beneficiary", async () => {
       const t = convexTest(schema);
@@ -25,9 +36,11 @@ describe("Beneficiaries", () => {
         orgId = setup.orgId;
       });
 
+      const admin = await signIn(t, "admin");
+
       const result = await t.mutation(api.beneficiaries.create, {
         orgId: orgId! as any,
-        walletAddress: TEST_WALLETS.admin,
+        sessionToken: admin.sessionToken,
         type: "individual",
         name: "John Doe",
         beneficiaryAddress: "0x1234567890123456789012345678901234567890",
@@ -44,6 +57,8 @@ describe("Beneficiaries", () => {
         expect(beneficiary?.name).toBe("John Doe");
         expect(beneficiary?.isActive).toBe(true);
       });
+
+      await drainScheduled();
     });
 
     it("creates business beneficiary", async () => {
@@ -57,9 +72,11 @@ describe("Beneficiaries", () => {
         orgId = setup.orgId;
       });
 
+      const admin = await signIn(t, "admin");
+
       const result = await t.mutation(api.beneficiaries.create, {
         orgId: orgId! as any,
-        walletAddress: TEST_WALLETS.admin,
+        sessionToken: admin.sessionToken,
         type: "business",
         name: "Acme Corp",
         beneficiaryAddress: "0x1234567890123456789012345678901234567890",
@@ -70,6 +87,8 @@ describe("Beneficiaries", () => {
         expect(beneficiary?.type).toBe("business");
         expect(beneficiary?.name).toBe("Acme Corp");
       });
+
+      await drainScheduled();
     });
 
     it("normalizes wallet address to lowercase", async () => {
@@ -83,10 +102,12 @@ describe("Beneficiaries", () => {
         orgId = setup.orgId;
       });
 
+      const admin = await signIn(t, "admin");
+
       const mixedCaseAddress = "0xABCDef1234567890123456789012345678901234";
       const result = await t.mutation(api.beneficiaries.create, {
         orgId: orgId! as any,
-        walletAddress: TEST_WALLETS.admin,
+        sessionToken: admin.sessionToken,
         type: "individual",
         name: "Test",
         beneficiaryAddress: mixedCaseAddress,
@@ -96,6 +117,33 @@ describe("Beneficiaries", () => {
         const beneficiary = await ctx.db.get(result.beneficiaryId as any) as Doc<"beneficiaries"> | null;
         expect(beneficiary?.walletAddress).toBe(mixedCaseAddress.toLowerCase());
       });
+
+      await drainScheduled();
+    });
+
+    it("rejects malformed beneficiary addresses", async () => {
+      const t = convexTest(schema);
+
+      let orgId: string;
+      await t.run(async (ctx) => {
+        const setup = await createFullOrgSetup(ctx, {
+          walletAddress: TEST_WALLETS.admin,
+        });
+        orgId = setup.orgId;
+      });
+
+      const admin = await signIn(t, "admin");
+
+      // H-03: full hex validation — not just a 0x prefix
+      await expect(
+        t.mutation(api.beneficiaries.create, {
+          orgId: orgId! as any,
+          sessionToken: admin.sessionToken,
+          type: "individual",
+          name: "Bad Address",
+          beneficiaryAddress: "0xnotavalidaddress",
+        })
+      ).rejects.toThrow(/Invalid beneficiary wallet address/);
     });
 
     it("allows admin to create", async () => {
@@ -110,15 +158,19 @@ describe("Beneficiaries", () => {
         orgId = setup.orgId;
       });
 
+      const admin = await signIn(t, "admin");
+
       const result = await t.mutation(api.beneficiaries.create, {
         orgId: orgId! as any,
-        walletAddress: TEST_WALLETS.admin,
+        sessionToken: admin.sessionToken,
         type: "individual",
         name: "Test",
         beneficiaryAddress: "0x1234567890123456789012345678901234567890",
       });
 
       expect(result.beneficiaryId).toBeDefined();
+
+      await drainScheduled();
     });
 
     it("allows initiator to create", async () => {
@@ -134,15 +186,19 @@ describe("Beneficiaries", () => {
         await createTestMembership(ctx, orgId as any, initiatorId, { role: "initiator" });
       });
 
+      const initiator = await signIn(t, "initiator");
+
       const result = await t.mutation(api.beneficiaries.create, {
         orgId: orgId! as any,
-        walletAddress: TEST_WALLETS.initiator,
+        sessionToken: initiator.sessionToken,
         type: "individual",
         name: "Test",
         beneficiaryAddress: "0x1234567890123456789012345678901234567890",
       });
 
       expect(result.beneficiaryId).toBeDefined();
+
+      await drainScheduled();
     });
 
     it("allows clerk to create", async () => {
@@ -158,15 +214,19 @@ describe("Beneficiaries", () => {
         await createTestMembership(ctx, orgId as any, clerkId, { role: "clerk" });
       });
 
+      const clerk = await signIn(t, "clerk");
+
       const result = await t.mutation(api.beneficiaries.create, {
         orgId: orgId! as any,
-        walletAddress: TEST_WALLETS.clerk,
+        sessionToken: clerk.sessionToken,
         type: "individual",
         name: "Test",
         beneficiaryAddress: "0x1234567890123456789012345678901234567890",
       });
 
       expect(result.beneficiaryId).toBeDefined();
+
+      await drainScheduled();
     });
 
     it("rejects viewer role", async () => {
@@ -182,10 +242,12 @@ describe("Beneficiaries", () => {
         await createTestMembership(ctx, orgId as any, viewerId, { role: "viewer" });
       });
 
+      const viewer = await signIn(t, "viewer");
+
       await expect(
         t.mutation(api.beneficiaries.create, {
           orgId: orgId! as any,
-          walletAddress: TEST_WALLETS.viewer,
+          sessionToken: viewer.sessionToken,
           type: "individual",
           name: "Test",
           beneficiaryAddress: "0x1234567890123456789012345678901234567890",
@@ -212,11 +274,13 @@ describe("Beneficiaries", () => {
         }
       });
 
+      const admin = await signIn(t, "admin");
+
       // 26th should fail
       await expect(
         t.mutation(api.beneficiaries.create, {
           orgId: orgId! as any,
-          walletAddress: TEST_WALLETS.admin,
+          sessionToken: admin.sessionToken,
           type: "individual",
           name: "One Too Many",
           beneficiaryAddress: "0x1234567890123456789012345678901234567890",
@@ -243,11 +307,13 @@ describe("Beneficiaries", () => {
         }
       });
 
+      const admin = await signIn(t, "admin");
+
       // 101st should fail
       await expect(
         t.mutation(api.beneficiaries.create, {
           orgId: orgId! as any,
-          walletAddress: TEST_WALLETS.admin,
+          sessionToken: admin.sessionToken,
           type: "individual",
           name: "One Too Many",
           beneficiaryAddress: "0x1234567890123456789012345678901234567890",
@@ -274,16 +340,20 @@ describe("Beneficiaries", () => {
         }
       });
 
+      const admin = await signIn(t, "admin");
+
       // Should still work
       const result = await t.mutation(api.beneficiaries.create, {
         orgId: orgId! as any,
-        walletAddress: TEST_WALLETS.admin,
+        sessionToken: admin.sessionToken,
         type: "individual",
         name: "Another One",
         beneficiaryAddress: "0x1234567890123456789012345678901234567890",
       });
 
       expect(result.beneficiaryId).toBeDefined();
+
+      await drainScheduled();
     });
 
     it("creates audit log", async () => {
@@ -297,9 +367,11 @@ describe("Beneficiaries", () => {
         orgId = setup.orgId;
       });
 
+      const admin = await signIn(t, "admin");
+
       await t.mutation(api.beneficiaries.create, {
         orgId: orgId! as any,
-        walletAddress: TEST_WALLETS.admin,
+        sessionToken: admin.sessionToken,
         type: "individual",
         name: "Test",
         beneficiaryAddress: "0x1234567890123456789012345678901234567890",
@@ -315,6 +387,8 @@ describe("Beneficiaries", () => {
         expect(createLog).toBeDefined();
         expect(createLog?.objectType).toBe("beneficiary");
       });
+
+      await drainScheduled();
     });
   });
 
@@ -336,9 +410,11 @@ describe("Beneficiaries", () => {
         });
       });
 
+      const admin = await signIn(t, "admin");
+
       await t.mutation(api.beneficiaries.update, {
         beneficiaryId: beneficiaryId! as any,
-        walletAddress: TEST_WALLETS.admin,
+        sessionToken: admin.sessionToken,
         type: "business",
         name: "New Name",
         beneficiaryAddress: "0x9999999999999999999999999999999999999999",
@@ -369,10 +445,12 @@ describe("Beneficiaries", () => {
         });
       });
 
+      const admin = await signIn(t, "admin");
+
       // Deactivate
       await t.mutation(api.beneficiaries.update, {
         beneficiaryId: beneficiaryId! as any,
-        walletAddress: TEST_WALLETS.admin,
+        sessionToken: admin.sessionToken,
         isActive: false,
       });
 
@@ -384,7 +462,7 @@ describe("Beneficiaries", () => {
       // Reactivate
       await t.mutation(api.beneficiaries.update, {
         beneficiaryId: beneficiaryId! as any,
-        walletAddress: TEST_WALLETS.admin,
+        sessionToken: admin.sessionToken,
         isActive: true,
       });
 
@@ -409,10 +487,12 @@ describe("Beneficiaries", () => {
         await createTestMembership(ctx, orgId as any, viewerId, { role: "viewer" });
       });
 
+      const viewer = await signIn(t, "viewer");
+
       await expect(
         t.mutation(api.beneficiaries.update, {
           beneficiaryId: beneficiaryId! as any,
-          walletAddress: TEST_WALLETS.viewer,
+          sessionToken: viewer.sessionToken,
           name: "Hacked Name",
         })
       ).rejects.toThrow();
@@ -431,9 +511,11 @@ describe("Beneficiaries", () => {
         beneficiaryId = await createTestBeneficiary(ctx, orgId as any);
       });
 
+      const admin = await signIn(t, "admin");
+
       await t.mutation(api.beneficiaries.update, {
         beneficiaryId: beneficiaryId! as any,
-        walletAddress: TEST_WALLETS.admin,
+        sessionToken: admin.sessionToken,
         name: "Updated Name",
       });
 
@@ -465,9 +547,11 @@ describe("Beneficiaries", () => {
         await createTestBeneficiary(ctx, orgId as any, { name: "Ben 3" });
       });
 
+      const admin = await signIn(t, "admin");
+
       const result = await t.query(api.beneficiaries.list, {
         orgId: orgId! as any,
-        walletAddress: TEST_WALLETS.admin,
+        sessionToken: admin.sessionToken,
       });
 
       expect(result.length).toBe(3);
@@ -488,9 +572,11 @@ describe("Beneficiaries", () => {
         await createTestBeneficiary(ctx, orgId as any, { isActive: false });
       });
 
+      const admin = await signIn(t, "admin");
+
       const result = await t.query(api.beneficiaries.list, {
         orgId: orgId! as any,
-        walletAddress: TEST_WALLETS.admin,
+        sessionToken: admin.sessionToken,
         activeOnly: true,
       });
 
@@ -513,9 +599,11 @@ describe("Beneficiaries", () => {
         await createTestMembership(ctx, orgId as any, viewerId, { role: "viewer" });
       });
 
+      const viewer = await signIn(t, "viewer");
+
       const result = await t.query(api.beneficiaries.list, {
         orgId: orgId! as any,
-        walletAddress: TEST_WALLETS.viewer,
+        sessionToken: viewer.sessionToken,
       });
 
       expect(result.length).toBe(1);
@@ -538,9 +626,11 @@ describe("Beneficiaries", () => {
         });
       });
 
+      const admin = await signIn(t, "admin");
+
       const result = await t.query(api.beneficiaries.get, {
         beneficiaryId: beneficiaryId! as any,
-        walletAddress: TEST_WALLETS.admin,
+        sessionToken: admin.sessionToken,
       });
 
       expect(result).not.toBeNull();
@@ -552,16 +642,22 @@ describe("Beneficiaries", () => {
     it("returns null for non-existent beneficiary", async () => {
       const t = convexTest(schema);
 
+      // Create then delete a beneficiary so we hold a well-formed ID that no
+      // longer points at any document
+      let ghostId: string;
       await t.run(async (ctx) => {
-        await createFullOrgSetup(ctx, {
+        const setup = await createFullOrgSetup(ctx, {
           walletAddress: TEST_WALLETS.admin,
         });
+        ghostId = await createTestBeneficiary(ctx, setup.orgId as any);
+        await ctx.db.delete(ghostId as any);
       });
 
-      // Use a fake ID
+      const admin = await signIn(t, "admin");
+
       const result = await t.query(api.beneficiaries.get, {
-        beneficiaryId: "fake_id_that_does_not_exist" as any,
-        walletAddress: TEST_WALLETS.admin,
+        beneficiaryId: ghostId! as any,
+        sessionToken: admin.sessionToken,
       });
 
       expect(result).toBeNull();

@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect, useRef } from 'react';
+import { getSessionToken } from '@/lib/session';
 import { useParams } from 'react-router-dom';
 import { useAccount } from 'wagmi';
 import { useTranslation } from 'react-i18next';
@@ -125,7 +126,7 @@ function TransactionsTab({ orgId, address }: TransactionsTabProps) {
     if (!orgId || !address) return null;
     return {
       orgId: orgId as Id<'orgs'>,
-      walletAddress: address,
+      sessionToken: getSessionToken() ?? "",
       startDate: dateFrom ? new Date(dateFrom).getTime() : undefined,
       endDate: dateTo ? new Date(dateTo).getTime() : undefined,
       status: statusFilter.length > 0 ? statusFilter : undefined,
@@ -142,8 +143,8 @@ function TransactionsTab({ orgId, address }: TransactionsTabProps) {
 
   const beneficiaries = useQuery(
     api.beneficiaries.list,
-    orgId && address
-      ? { orgId: orgId as Id<'orgs'>, walletAddress: address, activeOnly: false }
+    orgId && address && getSessionToken()
+      ? { orgId: orgId as Id<'orgs'>, sessionToken: getSessionToken() ?? "", activeOnly: false }
       : 'skip'
   );
 
@@ -151,7 +152,7 @@ function TransactionsTab({ orgId, address }: TransactionsTabProps) {
     if (!orgId || !address) return;
     if (hasSyncedDeposits.current) return;
     hasSyncedDeposits.current = true;
-    void syncDeposits({ orgId: orgId as Id<'orgs'>, walletAddress: address }).catch(() => {
+    void syncDeposits({ orgId: orgId as Id<'orgs'>, sessionToken: getSessionToken() ?? "" }).catch(() => {
       hasSyncedDeposits.current = true;
     });
   }, [address, orgId, syncDeposits]);
@@ -582,7 +583,7 @@ function SpendingTab({ orgId, address }: SpendingTabProps) {
       typeFilter === 'individual' || typeFilter === 'business' ? typeFilter : undefined;
     return {
       orgId: orgId as Id<'orgs'>,
-      walletAddress: address,
+      sessionToken: getSessionToken() ?? "",
       startDate: dateFrom ? new Date(dateFrom).getTime() : undefined,
       endDate: dateTo ? new Date(dateTo).getTime() : undefined,
       type,
@@ -996,7 +997,7 @@ function AuditLogTab({ orgId, address }: AuditLogTabProps) {
     if (!orgId || !address) return null;
     return {
       orgId: orgId as Id<'orgs'>,
-      walletAddress: address,
+      sessionToken: getSessionToken() ?? "",
       startDate: dateFrom ? new Date(dateFrom).getTime() : undefined,
       endDate: dateTo ? new Date(dateTo).getTime() : undefined,
       userId: userFilter ? userFilter as Id<'users'> : undefined,
@@ -1011,8 +1012,8 @@ function AuditLogTab({ orgId, address }: AuditLogTabProps) {
 
   const members = useQuery(
     api.orgs.listMembers,
-    orgId && address
-      ? { orgId: orgId as Id<'orgs'>, walletAddress: address }
+    orgId && address && getSessionToken()
+      ? { orgId: orgId as Id<'orgs'>, sessionToken: getSessionToken() ?? "" }
       : 'skip'
   );
 

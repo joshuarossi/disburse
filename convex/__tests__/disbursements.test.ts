@@ -12,8 +12,13 @@ import {
   createTestDisbursement,
   createTestBatchDisbursement,
   createFullOrgSetup,
+  signIn,
   TEST_WALLETS,
 } from "./factories";
+
+// updateStatus hash-integrity validation requires well-formed 32-byte hashes
+const SAFE_TX_HASH = "0x" + "ab".repeat(32);
+const TX_HASH = "0x" + "cd".repeat(32);
 
 describe("Disbursements", () => {
   describe("create", () => {
@@ -30,9 +35,11 @@ describe("Disbursements", () => {
         beneficiaryId = await createTestBeneficiary(ctx, orgId as any);
       });
 
+      const admin = await signIn(t, "admin");
+
       const result = await t.mutation(api.disbursements.create, {
         orgId: orgId! as any,
-        walletAddress: TEST_WALLETS.admin,
+        sessionToken: admin.sessionToken,
         chainId: 11155111,
         beneficiaryId: beneficiaryId! as any,
         token: "USDC",
@@ -66,10 +73,12 @@ describe("Disbursements", () => {
         beneficiaryId = await createTestBeneficiary(ctx, orgId as any);
       });
 
+      const admin = await signIn(t, "admin");
+
       await expect(
         t.mutation(api.disbursements.create, {
           orgId: orgId! as any,
-          walletAddress: TEST_WALLETS.admin,
+          sessionToken: admin.sessionToken,
           chainId: 11155111,
           beneficiaryId: beneficiaryId! as any,
           token: "USDC",
@@ -93,10 +102,12 @@ describe("Disbursements", () => {
         });
       });
 
+      const admin = await signIn(t, "admin");
+
       await expect(
         t.mutation(api.disbursements.create, {
           orgId: orgId! as any,
-          walletAddress: TEST_WALLETS.admin,
+          sessionToken: admin.sessionToken,
           chainId: 11155111,
           beneficiaryId: beneficiaryId! as any,
           token: "USDC",
@@ -122,10 +133,12 @@ describe("Disbursements", () => {
         otherBeneficiaryId = await createTestBeneficiary(ctx, otherOrgId as any);
       });
 
+      const admin = await signIn(t, "admin");
+
       await expect(
         t.mutation(api.disbursements.create, {
           orgId: orgId! as any,
-          walletAddress: TEST_WALLETS.admin,
+          sessionToken: admin.sessionToken,
           chainId: 11155111,
           beneficiaryId: otherBeneficiaryId! as any,
           token: "USDC",
@@ -148,9 +161,11 @@ describe("Disbursements", () => {
         beneficiaryId = await createTestBeneficiary(ctx, orgId as any);
       });
 
+      const admin = await signIn(t, "admin");
+
       const result = await t.mutation(api.disbursements.create, {
         orgId: orgId! as any,
-        walletAddress: TEST_WALLETS.admin,
+        sessionToken: admin.sessionToken,
         chainId: 11155111,
         beneficiaryId: beneficiaryId! as any,
         token: "USDC",
@@ -176,9 +191,11 @@ describe("Disbursements", () => {
         await createTestMembership(ctx, orgId as any, initiatorId, { role: "initiator" });
       });
 
+      const initiator = await signIn(t, "initiator");
+
       const result = await t.mutation(api.disbursements.create, {
         orgId: orgId! as any,
-        walletAddress: TEST_WALLETS.initiator,
+        sessionToken: initiator.sessionToken,
         chainId: 11155111,
         beneficiaryId: beneficiaryId! as any,
         token: "USDC",
@@ -204,10 +221,12 @@ describe("Disbursements", () => {
         await createTestMembership(ctx, orgId as any, clerkId, { role: "clerk" });
       });
 
+      const clerk = await signIn(t, "clerk");
+
       await expect(
         t.mutation(api.disbursements.create, {
           orgId: orgId! as any,
-          walletAddress: TEST_WALLETS.clerk,
+          sessionToken: clerk.sessionToken,
           chainId: 11155111,
           beneficiaryId: beneficiaryId! as any,
           token: "USDC",
@@ -232,10 +251,12 @@ describe("Disbursements", () => {
         await createTestMembership(ctx, orgId as any, viewerId, { role: "viewer" });
       });
 
+      const viewer = await signIn(t, "viewer");
+
       await expect(
         t.mutation(api.disbursements.create, {
           orgId: orgId! as any,
-          walletAddress: TEST_WALLETS.viewer,
+          sessionToken: viewer.sessionToken,
           chainId: 11155111,
           beneficiaryId: beneficiaryId! as any,
           token: "USDC",
@@ -257,9 +278,11 @@ describe("Disbursements", () => {
         beneficiaryId = await createTestBeneficiary(ctx, orgId as any);
       });
 
+      const admin = await signIn(t, "admin");
+
       await t.mutation(api.disbursements.create, {
         orgId: orgId! as any,
-        walletAddress: TEST_WALLETS.admin,
+        sessionToken: admin.sessionToken,
         chainId: 11155111,
         beneficiaryId: beneficiaryId! as any,
         token: "USDC",
@@ -300,17 +323,19 @@ describe("Disbursements", () => {
         );
       });
 
+      const admin = await signIn(t, "admin");
+
       await t.mutation(api.disbursements.updateStatus, {
         disbursementId: disbursementId! as any,
-        walletAddress: TEST_WALLETS.admin,
+        sessionToken: admin.sessionToken,
         status: "proposed",
-        safeTxHash: "0xsafetxhash123",
+        safeTxHash: SAFE_TX_HASH,
       });
 
       await t.run(async (ctx) => {
         const disbursement = await ctx.db.get(disbursementId as any) as Doc<"disbursements"> | null;
         expect(disbursement?.status).toBe("proposed");
-        expect(disbursement?.safeTxHash).toBe("0xsafetxhash123");
+        expect(disbursement?.safeTxHash).toBe(SAFE_TX_HASH);
       });
     });
 
@@ -329,21 +354,23 @@ describe("Disbursements", () => {
           setup.safeId as any,
           beneficiaryId as any,
           setup.userId,
-          { status: "proposed", safeTxHash: "0xsafetxhash123" }
+          { status: "proposed", safeTxHash: SAFE_TX_HASH }
         );
       });
 
+      const admin = await signIn(t, "admin");
+
       await t.mutation(api.disbursements.updateStatus, {
         disbursementId: disbursementId! as any,
-        walletAddress: TEST_WALLETS.admin,
+        sessionToken: admin.sessionToken,
         status: "executed",
-        txHash: "0xrealtxhash456",
+        txHash: TX_HASH,
       });
 
       await t.run(async (ctx) => {
         const disbursement = await ctx.db.get(disbursementId as any) as Doc<"disbursements"> | null;
         expect(disbursement?.status).toBe("executed");
-        expect(disbursement?.txHash).toBe("0xrealtxhash456");
+        expect(disbursement?.txHash).toBe(TX_HASH);
       });
     });
 
@@ -366,9 +393,11 @@ describe("Disbursements", () => {
         );
       });
 
+      const admin = await signIn(t, "admin");
+
       await t.mutation(api.disbursements.updateStatus, {
         disbursementId: disbursementId! as any,
-        walletAddress: TEST_WALLETS.admin,
+        sessionToken: admin.sessionToken,
         status: "failed",
       });
 
@@ -397,9 +426,11 @@ describe("Disbursements", () => {
         );
       });
 
+      const admin = await signIn(t, "admin");
+
       await t.mutation(api.disbursements.updateStatus, {
         disbursementId: disbursementId! as any,
-        walletAddress: TEST_WALLETS.admin,
+        sessionToken: admin.sessionToken,
         status: "cancelled",
       });
 
@@ -429,11 +460,13 @@ describe("Disbursements", () => {
         );
       });
 
+      const admin = await signIn(t, "admin");
+
       await t.mutation(api.disbursements.updateStatus, {
         disbursementId: disbursementId! as any,
-        walletAddress: TEST_WALLETS.admin,
+        sessionToken: admin.sessionToken,
         status: "proposed",
-        safeTxHash: "0xhash",
+        safeTxHash: SAFE_TX_HASH,
       });
 
       await t.run(async (ctx) => {
@@ -444,7 +477,7 @@ describe("Disbursements", () => {
 
         const statusLog = logs.find((l) => l.action === "disbursement.proposed");
         expect(statusLog).toBeDefined();
-        expect(statusLog?.metadata?.safeTxHash).toBe("0xhash");
+        expect(statusLog?.metadata?.safeTxHash).toBe(SAFE_TX_HASH);
       });
     });
 
@@ -469,10 +502,12 @@ describe("Disbursements", () => {
         await createTestUser(ctx, { walletAddress: TEST_WALLETS.nonMember });
       });
 
+      const nonMember = await signIn(t, "nonMember");
+
       await expect(
         t.mutation(api.disbursements.updateStatus, {
           disbursementId: disbursementId! as any,
-          walletAddress: TEST_WALLETS.nonMember,
+          sessionToken: nonMember.sessionToken,
           status: "proposed",
         })
       ).rejects.toThrow();
@@ -502,9 +537,11 @@ describe("Disbursements", () => {
         );
       });
 
+      const admin = await signIn(t, "admin");
+
       const result = await t.query(api.disbursements.list, {
         orgId: orgId! as any,
-        walletAddress: TEST_WALLETS.admin,
+        sessionToken: admin.sessionToken,
       });
 
       expect(result.items.length).toBe(1);
@@ -528,9 +565,11 @@ describe("Disbursements", () => {
         await createTestDisbursement(ctx, orgId as any, setup.safeId as any, beneficiaryId as any, setup.userId, { status: "executed" });
       });
 
+      const admin = await signIn(t, "admin");
+
       const drafts = await t.query(api.disbursements.list, {
         orgId: orgId! as any,
-        walletAddress: TEST_WALLETS.admin,
+        sessionToken: admin.sessionToken,
         status: ["draft"],
       });
 
@@ -560,9 +599,11 @@ describe("Disbursements", () => {
         }
       });
 
+      const admin = await signIn(t, "admin");
+
       const result = await t.query(api.disbursements.list, {
         orgId: orgId! as any,
-        walletAddress: TEST_WALLETS.admin,
+        sessionToken: admin.sessionToken,
         limit: 5,
       });
 
@@ -588,9 +629,11 @@ describe("Disbursements", () => {
         await createTestMembership(ctx, orgId as any, viewerId, { role: "viewer" });
       });
 
+      const viewer = await signIn(t, "viewer");
+
       const result = await t.query(api.disbursements.list, {
         orgId: orgId! as any,
-        walletAddress: TEST_WALLETS.viewer,
+        sessionToken: viewer.sessionToken,
       });
 
       expect(result.items.length).toBe(1);
@@ -619,9 +662,11 @@ describe("Disbursements", () => {
         );
       });
 
+      const admin = await signIn(t, "admin");
+
       const result = await t.query(api.disbursements.get, {
         disbursementId: disbursementId! as any,
-        walletAddress: TEST_WALLETS.admin,
+        sessionToken: admin.sessionToken,
       });
 
       expect(result).not.toBeNull();
@@ -634,15 +679,29 @@ describe("Disbursements", () => {
     it("returns null for non-existent disbursement", async () => {
       const t = convexTest(schema);
 
+      let disbursementId: string;
       await t.run(async (ctx) => {
-        await createFullOrgSetup(ctx, {
+        const setup = await createFullOrgSetup(ctx, {
           walletAddress: TEST_WALLETS.admin,
         });
+        const beneficiaryId = await createTestBeneficiary(ctx, setup.orgId as any);
+        // Create then delete so we hold a well-formed ID that no longer exists
+        const id = await createTestDisbursement(
+          ctx,
+          setup.orgId as any,
+          setup.safeId as any,
+          beneficiaryId as any,
+          setup.userId
+        );
+        await ctx.db.delete(id as any);
+        disbursementId = id;
       });
 
+      const admin = await signIn(t, "admin");
+
       const result = await t.query(api.disbursements.get, {
-        disbursementId: "fake_id" as any,
-        walletAddress: TEST_WALLETS.admin,
+        disbursementId: disbursementId! as any,
+        sessionToken: admin.sessionToken,
       });
 
       expect(result).toBeNull();
@@ -667,9 +726,11 @@ describe("Disbursements", () => {
         beneficiaryIds.push(await createTestBeneficiary(ctx, orgId as any, { name: "Beneficiary 3" }));
       });
 
+      const admin = await signIn(t, "admin");
+
       const result = await t.mutation(api.disbursements.createBatch, {
         orgId: orgId! as any,
-        walletAddress: TEST_WALLETS.admin,
+        sessionToken: admin.sessionToken,
         chainId: 11155111,
         token: "USDC",
         recipients: [
@@ -718,10 +779,12 @@ describe("Disbursements", () => {
         orgId = setup.orgId;
       });
 
+      const admin = await signIn(t, "admin");
+
       await expect(
         t.mutation(api.disbursements.createBatch, {
           orgId: orgId! as any,
-          walletAddress: TEST_WALLETS.admin,
+          sessionToken: admin.sessionToken,
           chainId: 11155111,
           token: "USDC",
           recipients: [],
@@ -742,10 +805,12 @@ describe("Disbursements", () => {
         beneficiaryId = await createTestBeneficiary(ctx, orgId as any);
       });
 
+      const admin = await signIn(t, "admin");
+
       await expect(
         t.mutation(api.disbursements.createBatch, {
           orgId: orgId! as any,
-          walletAddress: TEST_WALLETS.admin,
+          sessionToken: admin.sessionToken,
           chainId: 11155111,
           token: "USDC",
           recipients: [
@@ -770,11 +835,13 @@ describe("Disbursements", () => {
         beneficiaryIds.push(await createTestBeneficiary(ctx, orgId as any));
       });
 
+      const admin = await signIn(t, "admin");
+
       // Test zero amount
       await expect(
         t.mutation(api.disbursements.createBatch, {
           orgId: orgId! as any,
-          walletAddress: TEST_WALLETS.admin,
+          sessionToken: admin.sessionToken,
           chainId: 11155111,
           token: "USDC",
           recipients: [
@@ -787,7 +854,7 @@ describe("Disbursements", () => {
       await expect(
         t.mutation(api.disbursements.createBatch, {
           orgId: orgId! as any,
-          walletAddress: TEST_WALLETS.admin,
+          sessionToken: admin.sessionToken,
           chainId: 11155111,
           token: "USDC",
           recipients: [
@@ -812,10 +879,12 @@ describe("Disbursements", () => {
         });
       });
 
+      const admin = await signIn(t, "admin");
+
       await expect(
         t.mutation(api.disbursements.createBatch, {
           orgId: orgId! as any,
-          walletAddress: TEST_WALLETS.admin,
+          sessionToken: admin.sessionToken,
           chainId: 11155111,
           token: "USDC",
           recipients: [
@@ -837,10 +906,12 @@ describe("Disbursements", () => {
         beneficiaryId = await createTestBeneficiary(ctx, orgId as any);
       });
 
+      const admin = await signIn(t, "admin");
+
       await expect(
         t.mutation(api.disbursements.createBatch, {
           orgId: orgId! as any,
-          walletAddress: TEST_WALLETS.admin,
+          sessionToken: admin.sessionToken,
           chainId: 11155111,
           token: "USDC",
           recipients: [
@@ -864,9 +935,11 @@ describe("Disbursements", () => {
         beneficiaryIds.push(await createTestBeneficiary(ctx, orgId as any));
       });
 
+      const admin = await signIn(t, "admin");
+
       await t.mutation(api.disbursements.createBatch, {
         orgId: orgId! as any,
-        walletAddress: TEST_WALLETS.admin,
+        sessionToken: admin.sessionToken,
         chainId: 11155111,
         token: "USDC",
         recipients: [
@@ -916,9 +989,11 @@ describe("Disbursements", () => {
         disbursementId = id;
       });
 
+      const admin = await signIn(t, "admin");
+
       const result = await t.query(api.disbursements.getWithRecipients, {
         disbursementId: disbursementId! as any,
-        walletAddress: TEST_WALLETS.admin,
+        sessionToken: admin.sessionToken,
       });
 
       expect(result).not.toBeNull();
@@ -952,9 +1027,11 @@ describe("Disbursements", () => {
         );
       });
 
+      const admin = await signIn(t, "admin");
+
       const result = await t.query(api.disbursements.getWithRecipients, {
         disbursementId: disbursementId! as any,
-        walletAddress: TEST_WALLETS.admin,
+        sessionToken: admin.sessionToken,
       });
 
       expect(result).not.toBeNull();
@@ -1001,15 +1078,18 @@ describe("Disbursements", () => {
         );
       });
 
+      const admin = await signIn(t, "admin");
+
       const result = await t.query(api.disbursements.list, {
         orgId: orgId! as any,
-        walletAddress: TEST_WALLETS.admin,
+        sessionToken: admin.sessionToken,
       });
 
       expect(result.items.length).toBe(2);
       
       const single = result.items.find((d) => d.beneficiary?.name === "Single");
-      const batch = result.items.find((d) => d.beneficiary?.name === "Batch");
+      // Batch rows now render as "<first recipient> +N" instead of a bare "Batch" label
+      const batch = result.items.find((d) => d.type === "batch");
       
       expect(single).toBeDefined();
       expect(single?.type).toBe("single");
@@ -1017,6 +1097,7 @@ describe("Disbursements", () => {
       
       expect(batch).toBeDefined();
       expect(batch?.type).toBe("batch");
+      expect(batch?.beneficiary?.name).toMatch(/ \+1$/);
       expect(batch?.displayAmount || batch?.totalAmount).toBe("300");
     });
 
@@ -1044,9 +1125,11 @@ describe("Disbursements", () => {
         );
       });
 
+      const admin = await signIn(t, "admin");
+
       const result = await t.query(api.disbursements.list, {
         orgId: orgId! as any,
-        walletAddress: TEST_WALLETS.admin,
+        sessionToken: admin.sessionToken,
       });
 
       expect(result.items.length).toBe(1);

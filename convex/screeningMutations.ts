@@ -107,20 +107,19 @@ export const upsertScreeningResult = internalMutation({
 export const reviewScreeningResult = mutation({
   args: {
     screeningResultId: v.id("screeningResults"),
-    walletAddress: v.string(),
+    sessionToken: v.string(),
     status: v.union(
       v.literal("confirmed_match"),
       v.literal("false_positive")
     ),
   },
   handler: async (ctx, args) => {
-    const walletAddress = args.walletAddress.toLowerCase();
     const now = Date.now();
 
     const result = await ctx.db.get(args.screeningResultId);
     if (!result) throw new Error("Screening result not found");
 
-    const { user } = await requireOrgAccess(ctx, result.orgId, walletAddress, ["admin"]);
+    const { user } = await requireOrgAccess(ctx, result.orgId, args.sessionToken, ["admin"]);
 
     await ctx.db.patch(args.screeningResultId, {
       status: args.status,
@@ -152,7 +151,7 @@ export const reviewScreeningResult = mutation({
 export const updateScreeningEnforcement = mutation({
   args: {
     orgId: v.id("orgs"),
-    walletAddress: v.string(),
+    sessionToken: v.string(),
     enforcement: v.union(
       v.literal("block"),
       v.literal("warn"),
@@ -160,8 +159,7 @@ export const updateScreeningEnforcement = mutation({
     ),
   },
   handler: async (ctx, args) => {
-    const walletAddress = args.walletAddress.toLowerCase();
-    const { user } = await requireOrgAccess(ctx, args.orgId, walletAddress, ["admin"]);
+    const { user } = await requireOrgAccess(ctx, args.orgId, args.sessionToken, ["admin"]);
 
     await ctx.db.patch(args.orgId, {
       screeningEnforcement: args.enforcement,

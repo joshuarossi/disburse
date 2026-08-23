@@ -1,4 +1,5 @@
-import { useState, useMemo, useEffect, type ReactNode } from 'react';
+import { useState, useMemo, useCallback, useEffect, type ReactNode } from 'react';
+import { getSessionToken } from '@/lib/session';
 import { useParams } from 'react-router-dom';
 import { useAccount, useReadContracts, useWatchContractEvent } from 'wagmi';
 import { useTranslation } from 'react-i18next';
@@ -104,24 +105,24 @@ export default function Dashboard() {
 
   const safes = useQuery(
     api.safes.getForOrg,
-    orgId && address
-      ? { orgId: orgId as Id<'orgs'>, walletAddress: address }
+    orgId && address && getSessionToken()
+      ? { orgId: orgId as Id<'orgs'>, sessionToken: getSessionToken() ?? "" }
       : 'skip'
   );
 
   const disbursementsList = useQuery(
     api.disbursements.list,
-    orgId && address
-      ? { orgId: orgId as Id<'orgs'>, walletAddress: address, limit: 20 }
+    orgId && address && getSessionToken()
+      ? { orgId: orgId as Id<'orgs'>, sessionToken: getSessionToken() ?? "", limit: 20 }
       : 'skip'
   );
 
   const scheduledDisbursements = useQuery(
     api.disbursements.list,
-    orgId && address
+    orgId && address && getSessionToken()
       ? {
           orgId: orgId as Id<'orgs'>,
-          walletAddress: address,
+          sessionToken: getSessionToken() ?? "",
           status: ['scheduled'],
           sortBy: 'scheduledAt',
           sortOrder: 'asc',
@@ -132,10 +133,10 @@ export default function Dashboard() {
 
   const recentDeposits = useQuery(
     api.depositsData.listRecent,
-    orgId && address
+    orgId && address && getSessionToken()
       ? {
           orgId: orgId as Id<'orgs'>,
-          walletAddress: address,
+          sessionToken: getSessionToken() ?? "",
           limit: hideTestnets ? 10 : 5,
         }
       : 'skip'
@@ -330,10 +331,10 @@ export default function Dashboard() {
 
   const chartReport = useQuery(
     api.reports.getTransactionReport,
-    orgId && address
+    orgId && address && getSessionToken()
       ? {
           orgId: orgId as Id<'orgs'>,
-          walletAddress: address,
+          sessionToken: getSessionToken() ?? "",
           startDate: chartRange.start.getTime(),
           endDate: chartRange.end.getTime(),
           status: ['executed', 'received'],
@@ -398,22 +399,24 @@ export default function Dashboard() {
     () => new Intl.NumberFormat(undefined, { notation: 'compact', maximumFractionDigits: 1 }),
     []
   );
-  const formatCompactCurrency = (value: number) => {
+  // Stable references (module-level semantics) so useMemo deps below don't
+  // churn every render — fixes the exhaustive-deps warnings.
+  const formatCompactCurrency = useCallback((value: number) => {
     const abs = Math.abs(value);
     const sign = value < 0 ? '-' : '';
     return `${sign}$${compactCurrency.format(abs)}`;
-  };
-  const formatTooltipCurrency = (value: number) => {
+  }, [compactCurrency]);
+  const formatTooltipCurrency = useCallback((value: number) => {
     const abs = Math.abs(value);
     const formatted = abs.toLocaleString(undefined, { maximumFractionDigits: 2 });
     return `${value < 0 ? '-' : ''}$${formatted}`;
-  };
-  const formatPositiveCurrency = (value: number) => {
+  }, []);
+  const formatPositiveCurrency = useCallback((value: number) => {
     const abs = Math.abs(value);
     return `$${abs.toLocaleString(undefined, { maximumFractionDigits: 2 })}`;
-  };
+  }, []);
 
-  const renderTooltip = (title: string, rows: Array<{ label: string; value: string; color: string }>) => {
+  const renderTooltip = useCallback((title: string, rows: Array<{ label: string; value: string; color: string }>) => {
     const rowsHtml = rows
       .map(
         (row) => `
@@ -433,7 +436,7 @@ export default function Dashboard() {
         ${rowsHtml}
       </div>
     `;
-  };
+  }, []);
 
   const inflowOutflowCategories = useMemo(
     () => inflowOutflowData.map((day) => day.label),
@@ -591,9 +594,13 @@ export default function Dashboard() {
   );
 
   const depositAddress = safes?.[0]?.safeAddress;
-  const pendingItems = disbursementsList?.items?.filter(
-    (d) => d.status === 'draft' || d.status === 'pending' || d.status === 'proposed'
-  ) ?? [];
+  const pendingItems = useMemo(
+    () =>
+      disbursementsList?.items?.filter(
+        (d) => d.status === "draft" || d.status === "pending" || d.status === "proposed"
+      ) ?? [],
+    [disbursementsList]
+  );
   const executedItems = disbursementsList?.items?.filter((d) => d.status === 'executed') ?? [];
   const visibleDeposits = useMemo(() => {
     const items = recentDeposits ?? [];

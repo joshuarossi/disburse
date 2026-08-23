@@ -1,4 +1,5 @@
 import { useState, useMemo, useRef, useEffect } from 'react';
+import { getSessionToken } from '@/lib/session';
 import { useParams, useSearchParams } from 'react-router-dom';
 import { useAccount, useReadContracts, useChainId } from 'wagmi';
 import { useTranslation } from 'react-i18next';
@@ -218,7 +219,7 @@ export default function Disbursements() {
     
     return {
       orgId: orgId as Id<'orgs'>,
-      walletAddress: address,
+      sessionToken: getSessionToken() ?? "",
       search: search.trim() || undefined,
       status: statusFilter.length > 0 ? statusFilter : undefined,
       token: tokenFilter || undefined,
@@ -247,27 +248,29 @@ export default function Disbursements() {
 
   const beneficiaries = useQuery(
     api.beneficiaries.list,
-    orgId && address
-      ? { orgId: orgId as Id<'orgs'>, walletAddress: address, activeOnly: true, includeTags: true }
+    orgId && address && getSessionToken()
+      ? { orgId: orgId as Id<'orgs'>, sessionToken: getSessionToken() ?? "", activeOnly: true, includeTags: true }
       : 'skip'
   );
 
   const availableTags = useQuery(
     api.tags.list,
-    orgId && address
-      ? { orgId: orgId as Id<'orgs'>, walletAddress: address }
+    orgId && address && getSessionToken()
+      ? { orgId: orgId as Id<'orgs'>, sessionToken: getSessionToken() ?? "" }
       : 'skip'
   );
 
   const safes = useQuery(
     api.safes.getForOrg,
-    orgId && address
-      ? { orgId: orgId as Id<'orgs'>, walletAddress: address }
+    orgId && address && getSessionToken()
+      ? { orgId: orgId as Id<'orgs'>, sessionToken: getSessionToken() ?? "" }
       : 'skip'
   );
   const org = useQuery(
     api.orgs.get,
-    orgId ? { orgId: orgId as Id<'orgs'> } : 'skip'
+    orgId && getSessionToken()
+      ? { orgId: orgId as Id<'orgs'>, sessionToken: getSessionToken() ?? "" }
+      : 'skip'
   );
   const switchChain = useSwitchChain();
   const currentChainId = useChainId();
@@ -405,7 +408,7 @@ export default function Disbursements() {
           if (txHash) {
             await updateStatus({
               disbursementId: disbursement._id,
-              walletAddress: address,
+              sessionToken: getSessionToken() ?? "",
               status: 'executed',
               txHash,
               relayStatus: taskState,
@@ -416,7 +419,7 @@ export default function Disbursements() {
           if (taskState === 'Cancelled' || taskState === 'ExecReverted') {
             await updateStatus({
               disbursementId: disbursement._id,
-              walletAddress: address,
+              sessionToken: getSessionToken() ?? "",
               status: 'failed',
               relayStatus: taskState,
               relayError: taskState,
@@ -427,7 +430,7 @@ export default function Disbursements() {
           if (taskState && taskState !== disbursement.relayStatus) {
             await updateStatus({
               disbursementId: disbursement._id,
-              walletAddress: address,
+              sessionToken: getSessionToken() ?? "",
               status: 'relaying',
               relayStatus: taskState,
             });
@@ -811,7 +814,7 @@ export default function Disbursements() {
         const beneficiaryIds = allRecipients.map(r => r.beneficiaryId as Id<'beneficiaries'>);
         const screeningCheck = await convex.query(api.screeningQueries.checkBeneficiaries, {
           orgId: orgId as Id<'orgs'>,
-          walletAddress: address,
+          sessionToken: getSessionToken() ?? "",
           beneficiaryIds,
         });
 
@@ -836,7 +839,7 @@ export default function Disbursements() {
       try {
         await createBatchDisbursement({
           orgId: orgId as Id<'orgs'>,
-          walletAddress: address,
+          sessionToken: getSessionToken() ?? "",
           chainId: createChainId,
           token,
           recipients: allRecipients.map(r => ({
@@ -859,7 +862,7 @@ export default function Disbursements() {
       if (!skipScreening) {
         const screeningCheck = await convex.query(api.screeningQueries.checkBeneficiaries, {
           orgId: orgId as Id<'orgs'>,
-          walletAddress: address,
+          sessionToken: getSessionToken() ?? "",
           beneficiaryIds: [selectedBeneficiary as Id<'beneficiaries'>],
         });
 
@@ -884,7 +887,7 @@ export default function Disbursements() {
       try {
         await createDisbursement({
           orgId: orgId as Id<'orgs'>,
-          walletAddress: address,
+          sessionToken: getSessionToken() ?? "",
           chainId: createChainId,
           beneficiaryId: selectedBeneficiary as Id<'beneficiaries'>,
           token,
@@ -928,7 +931,7 @@ export default function Disbursements() {
       if (!skipScreening) {
         const screeningCheck = await convex.query(api.screeningQueries.checkDisbursementRecipients, {
           disbursementId: disbursement._id,
-          walletAddress: address,
+          sessionToken: getSessionToken() ?? "",
         });
 
         if (screeningCheck.enforcement === 'block' && screeningCheck.flagged.length > 0) {
@@ -973,7 +976,7 @@ export default function Disbursements() {
 
       await updateStatus({
         disbursementId: disbursement._id,
-        walletAddress: address,
+        sessionToken: getSessionToken() ?? "",
         status: 'pending',
       });
 
@@ -982,7 +985,7 @@ export default function Disbursements() {
       if (disbursement.type === 'batch') {
         const batchData = await convex.query(api.disbursements.getWithRecipients, {
           disbursementId: disbursement._id,
-          walletAddress: address,
+          sessionToken: getSessionToken() ?? "",
         });
         if (!batchData || !batchData.recipients || batchData.recipients.length === 0) {
           throw new Error('No recipients found for batch disbursement');
@@ -1023,13 +1026,13 @@ export default function Disbursements() {
 
       const currentDisb = await convex.query(api.disbursements.get, {
         disbursementId: disbursement._id,
-        walletAddress: address,
+        sessionToken: getSessionToken() ?? "",
       });
 
       if (currentDisb?.scheduledAt && currentDisb.scheduledAt > Date.now()) {
         await scheduleDisbursement({
           disbursementId: disbursement._id,
-          walletAddress: address,
+          sessionToken: getSessionToken() ?? "",
           scheduledAt: currentDisb.scheduledAt,
           safeTxHash,
           relayFeeToken,
@@ -1039,7 +1042,7 @@ export default function Disbursements() {
       } else {
         await updateStatus({
           disbursementId: disbursement._id,
-          walletAddress: address,
+          sessionToken: getSessionToken() ?? "",
           status: 'proposed',
           safeTxHash,
           relayFeeToken,
@@ -1052,7 +1055,7 @@ export default function Disbursements() {
       setError(err instanceof Error ? err.message : 'Failed to propose transaction');
       await updateStatus({
         disbursementId: disbursement._id,
-        walletAddress: address,
+        sessionToken: getSessionToken() ?? "",
         status: 'draft',
       });
     } finally {
@@ -1084,7 +1087,7 @@ export default function Disbursements() {
       if (!skipScreening) {
         const screeningCheck = await convex.query(api.screeningQueries.checkDisbursementRecipients, {
           disbursementId: disbursement._id,
-          walletAddress: address,
+          sessionToken: getSessionToken() ?? "",
         });
 
         if (screeningCheck.enforcement === 'block' && screeningCheck.flagged.length > 0) {
@@ -1121,7 +1124,7 @@ export default function Disbursements() {
 
         await updateStatus({
           disbursementId: disbursement._id,
-          walletAddress: address,
+          sessionToken: getSessionToken() ?? "",
           status: 'relaying',
           relayTaskId: relayResult.taskId,
           relayStatus: 'submitted',
@@ -1136,7 +1139,7 @@ export default function Disbursements() {
 
         await updateStatus({
           disbursementId: disbursement._id,
-          walletAddress: address,
+          sessionToken: getSessionToken() ?? "",
           status: 'executed',
           txHash,
         });
@@ -1146,7 +1149,7 @@ export default function Disbursements() {
       setError(err instanceof Error ? err.message : 'Failed to execute transaction');
       await updateStatus({
         disbursementId: disbursement._id,
-        walletAddress: address,
+        sessionToken: getSessionToken() ?? "",
         status: 'failed',
       });
     } finally {
@@ -1168,7 +1171,7 @@ export default function Disbursements() {
     try {
       const retryResult = await convex.action(api.relay.retryDisbursement, {
         disbursementId: disbursement._id,
-        walletAddress: address,
+        sessionToken: getSessionToken() ?? "",
       });
 
       if (retryResult?.status === 'executed') {
@@ -1218,7 +1221,7 @@ export default function Disbursements() {
     try {
       await updateStatus({
         disbursementId: cancelDisbursementId,
-        walletAddress: address,
+        sessionToken: getSessionToken() ?? "",
         status: 'cancelled',
       });
       setCancelDisbursementId(null);
@@ -1239,7 +1242,7 @@ export default function Disbursements() {
     try {
       await rescheduleDisbursement({
         disbursementId: rescheduleDisbursementId,
-        walletAddress: address,
+        sessionToken: getSessionToken() ?? "",
         newScheduledAt: new Date(newScheduledAt).getTime(),
       });
     } catch (err) {

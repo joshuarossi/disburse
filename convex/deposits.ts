@@ -16,6 +16,9 @@ const SAFE_TX_SERVICE_URL_BY_CHAIN: Record<number, string> = {
 
 const SYNC_THROTTLE_MS = 10 * 60 * 1000;
 const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
+// M-02 fix: bound the pagination loop so a Safe with a huge history cannot
+// run an unbounded number of API calls inside a single action invocation.
+const MAX_PAGES_PER_SAFE = 25;
 
 function getSafeTxServiceUrl(chainId: number): string {
   const url = SAFE_TX_SERVICE_URL_BY_CHAIN[chainId];
@@ -58,12 +61,12 @@ type IncomingTransfer = {
 export const syncForOrg = action({
   args: {
     orgId: v.id("orgs"),
-    walletAddress: v.string(),
+    sessionToken: v.string(),
   },
   handler: async (ctx, args) => {
     const safes = await ctx.runQuery(api.safes.getForOrg, {
       orgId: args.orgId,
-      walletAddress: args.walletAddress,
+      sessionToken: args.sessionToken,
     });
 
     const apiKey = process.env.SAFE_TX_SERVICE_API_KEY;
@@ -75,7 +78,7 @@ export const syncForOrg = action({
       const baseUrl = getSafeTxServiceUrl(safe.chainId);
       const lastSyncedAt = await ctx.runQuery(api.depositsData.getSyncForSafe, {
         orgId: args.orgId,
-        walletAddress: args.walletAddress,
+        sessionToken: args.sessionToken,
         safeId: safe._id,
       });
 
@@ -85,7 +88,7 @@ export const syncForOrg = action({
 
       const latestTimestamp = await ctx.runQuery(api.depositsData.getLatestForSafe, {
         orgId: args.orgId,
-        walletAddress: args.walletAddress,
+        sessionToken: args.sessionToken,
         safeId: safe._id,
       });
 
@@ -93,8 +96,19 @@ export const syncForOrg = action({
 
       let nextUrl: string | null = `${baseUrl}/v1/safes/${safeAddress}/incoming-transfers/`;
       const syncAttemptAt = Date.now();
+      let pageCount = 0;
 
       while (nextUrl) {
+        if (pageCount >= MAX_PAGES_PER_SAFE) {
+          console.warn("[Deposits] Pagination cap reached; remaining transfers will sync on next run", {
+            safeAddress,
+            chainId: safe.chainId,
+            maxPages: MAX_PAGES_PER_SAFE,
+          });
+          break;
+        }
+        pageCount += 1;
+
         const response = await fetch(nextUrl, {
           headers: apiKey ? { Authorization: `Bearer ${apiKey}` } : undefined,
         });
@@ -170,7 +184,7 @@ export const syncForOrg = action({
             fromAddress: transfer.from,
             toAddress,
             source: "safe_tx_service",
-            walletAddress: args.walletAddress,
+            sessionToken: args.sessionToken,
           });
           if (result.inserted) {
             inserted += 1;
@@ -180,7 +194,7 @@ export const syncForOrg = action({
 
       await ctx.runMutation(api.depositsData.upsertSyncForSafe, {
         orgId: args.orgId,
-        walletAddress: args.walletAddress,
+        sessionToken: args.sessionToken,
         safeId: safe._id,
         chainId: safe.chainId,
         lastSyncedAt: syncAttemptAt,

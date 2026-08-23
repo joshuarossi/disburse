@@ -3,27 +3,71 @@ import { Id } from "../_generated/dataModel";
 
 type Role = "admin" | "approver" | "initiator" | "clerk" | "viewer";
 
+const SESSION_MIN_TOKEN_LENGTH = 32;
+
 /**
- * Require that a user has access to an org with one of the specified roles.
- * Throws an error if access is denied.
+ * SHA-256 hex digest of a session token. Only the digest is persisted;
+ * the raw token is returned to the client exactly once at sign-in.
+ */
+export async function hashSessionToken(token: string): Promise<string> {
+  const data = new TextEncoder().encode(token);
+  const digest = await crypto.subtle.digest("SHA-256", data);
+  return Array.from(new Uint8Array(digest))
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+}
+
+/**
+ * Resolve the caller's identity from an opaque session token.
+ * Identity is NEVER taken from client-supplied wallet addresses.
+ * Throws if the token is invalid, unknown, or expired.
+ */
+export async function requireUser(
+  ctx: QueryCtx | MutationCtx,
+  sessionToken: string
+) {
+  if (
+    typeof sessionToken !== "string" ||
+    sessionToken.length < SESSION_MIN_TOKEN_LENGTH
+  ) {
+    throw new Error("Unauthorized: missing or malformed session token");
+  }
+
+  const tokenHash = await hashSessionToken(sessionToken);
+  const session = await ctx.db
+    .query("sessions")
+    .withIndex("by_tokenHash", (q) => q.eq("tokenHash", tokenHash))
+    .first();
+
+  if (!session || !session.tokenHash) {
+    throw new Error("Unauthorized: invalid session");
+  }
+
+  if (session.expiresAt < Date.now()) {
+    // Read-only contexts cannot delete; expired sessions are simply rejected
+    // here and garbage-collected by logout/generateNonce/validateSession flows.
+    throw new Error("Session expired. Please sign in again.");
+  }
+
+  const user = await ctx.db.get(session.userId);
+  if (!user) {
+    throw new Error("Unauthorized: user not found");
+  }
+
+  return { user, session };
+}
+
+/**
+ * Require that the authenticated user has access to an org with one of the
+ * specified roles. Throws an error if access is denied.
  */
 export async function requireOrgAccess(
   ctx: QueryCtx | MutationCtx,
   orgId: Id<"orgs">,
-  walletAddress: string,
+  sessionToken: string,
   allowedRoles: Role[]
 ) {
-  const normalizedWallet = walletAddress.toLowerCase();
-
-  // Get user
-  const user = await ctx.db
-    .query("users")
-    .withIndex("by_wallet", (q) => q.eq("walletAddress", normalizedWallet))
-    .first();
-
-  if (!user) {
-    throw new Error("User not found");
-  }
+  const { user } = await requireUser(ctx, sessionToken);
 
   // Get membership
   const membership = await ctx.db

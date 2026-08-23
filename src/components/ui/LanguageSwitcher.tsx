@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { getSessionToken } from '@/lib/session';
 import { useAccount } from 'wagmi';
 import { useTranslation } from 'react-i18next';
 import { useMutation } from 'convex/react';
@@ -30,7 +31,7 @@ export function LanguageSwitcher({ variant = 'ghost', size = 'sm' }: SwitcherPro
     if (address) {
       try {
         await updatePreferredLanguage({
-          walletAddress: address,
+          sessionToken: getSessionToken() ?? "",
           preferredLanguage: langCode as 'en' | 'es' | 'pt-BR',
         });
       } catch (error) {

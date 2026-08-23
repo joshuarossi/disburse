@@ -4,21 +4,22 @@ import { Id } from '../../../convex/_generated/dataModel';
 import { useTranslation } from 'react-i18next';
 import { Shield, ShieldAlert, ShieldCheck, ShieldQuestion, Loader2, RefreshCw } from 'lucide-react';
 import { useState } from 'react';
+import { getSessionToken } from '@/lib/session';
 
 interface ScreeningBadgeProps {
   beneficiaryId: Id<'beneficiaries'>;
-  walletAddress: string;
   onClick?: () => void;
   onRerun?: () => void;
 }
 
-export function ScreeningBadge({ beneficiaryId, walletAddress, onClick, onRerun }: ScreeningBadgeProps) {
+export function ScreeningBadge({ beneficiaryId, onClick, onRerun }: ScreeningBadgeProps) {
   const { t } = useTranslation();
   const [isRunning, setIsRunning] = useState(false);
+  const sessionToken = getSessionToken() ?? "";
 
   const result = useQuery(
     api.screeningQueries.getScreeningResult,
-    { beneficiaryId, walletAddress }
+    sessionToken ? { beneficiaryId, sessionToken } : 'skip'
   );
 
   const rerunScreening = useAction(api.screening.rerunScreening);
@@ -31,7 +32,7 @@ export function ScreeningBadge({ beneficiaryId, walletAddress, onClick, onRerun 
     try {
       await rerunScreening({
         beneficiaryId,
-        walletAddress,
+        sessionToken,
       });
       // Notify parent if callback provided
       if (onRerun) {

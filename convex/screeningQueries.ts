@@ -60,7 +60,7 @@ export const getActiveBeneficiariesForOrg = internalQuery({
 export const verifyBeneficiaryAccess = internalQuery({
   args: {
     beneficiaryId: v.id("beneficiaries"),
-    walletAddress: v.string(),
+    sessionToken: v.string(),
     allowedRoles: v.array(
       v.union(
         v.literal("admin"),
@@ -72,11 +72,10 @@ export const verifyBeneficiaryAccess = internalQuery({
     ),
   },
   handler: async (ctx, args): Promise<{ orgId: Id<"orgs"> }> => {
-    const walletAddress = args.walletAddress.toLowerCase();
     const beneficiary = await ctx.db.get(args.beneficiaryId);
     if (!beneficiary) throw new Error("Beneficiary not found");
 
-    await requireOrgAccess(ctx, beneficiary.orgId, walletAddress, args.allowedRoles);
+    await requireOrgAccess(ctx, beneficiary.orgId, args.sessionToken, args.allowedRoles);
     return { orgId: beneficiary.orgId };
   },
 });
@@ -87,15 +86,14 @@ export const verifyBeneficiaryAccess = internalQuery({
 export const getScreeningResult = query({
   args: {
     beneficiaryId: v.id("beneficiaries"),
-    walletAddress: v.string(),
+    sessionToken: v.string(),
   },
   handler: async (ctx, args) => {
-    const walletAddress = args.walletAddress.toLowerCase();
 
     const beneficiary = await ctx.db.get(args.beneficiaryId);
     if (!beneficiary) return null;
 
-    await requireOrgAccess(ctx, beneficiary.orgId, walletAddress, [
+    await requireOrgAccess(ctx, beneficiary.orgId, args.sessionToken, [
       "admin", "approver", "initiator", "clerk", "viewer",
     ]);
 
@@ -110,7 +108,7 @@ export const getScreeningResult = query({
 export const listScreeningResults = query({
   args: {
     orgId: v.id("orgs"),
-    walletAddress: v.string(),
+    sessionToken: v.string(),
     statusFilter: v.optional(
       v.union(
         v.literal("clear"),
@@ -122,9 +120,8 @@ export const listScreeningResults = query({
     ),
   },
   handler: async (ctx, args) => {
-    const walletAddress = args.walletAddress.toLowerCase();
 
-    await requireOrgAccess(ctx, args.orgId, walletAddress, [
+    await requireOrgAccess(ctx, args.orgId, args.sessionToken, [
       "admin", "approver", "initiator", "clerk", "viewer",
     ]);
 
@@ -145,12 +142,11 @@ export const listScreeningResults = query({
 export const getScreeningEnforcement = query({
   args: {
     orgId: v.id("orgs"),
-    walletAddress: v.string(),
+    sessionToken: v.string(),
   },
   handler: async (ctx, args) => {
-    const walletAddress = args.walletAddress.toLowerCase();
 
-    await requireOrgAccess(ctx, args.orgId, walletAddress, [
+    await requireOrgAccess(ctx, args.orgId, args.sessionToken, [
       "admin", "approver", "initiator", "clerk", "viewer",
     ]);
 
@@ -163,14 +159,13 @@ export const getScreeningEnforcement = query({
 export const checkBeneficiaries = query({
   args: {
     orgId: v.id("orgs"),
-    walletAddress: v.string(),
+    sessionToken: v.string(),
     beneficiaryIds: v.array(v.id("beneficiaries")),
   },
   handler: async (ctx, args) => {
-    const walletAddress = args.walletAddress.toLowerCase();
 
     // Check access
-    await requireOrgAccess(ctx, args.orgId, walletAddress, [
+    await requireOrgAccess(ctx, args.orgId, args.sessionToken, [
       "admin", "approver", "initiator", "clerk", "viewer",
     ]);
 
@@ -218,15 +213,14 @@ export const checkBeneficiaries = query({
 export const checkDisbursementRecipients = query({
   args: {
     disbursementId: v.id("disbursements"),
-    walletAddress: v.string(),
+    sessionToken: v.string(),
   },
   handler: async (ctx, args) => {
-    const walletAddress = args.walletAddress.toLowerCase();
     const disbursement = await ctx.db.get(args.disbursementId);
     if (!disbursement) return { clear: true, flagged: [], enforcement: "off" as const };
 
     // Check access
-    await requireOrgAccess(ctx, disbursement.orgId, walletAddress, [
+    await requireOrgAccess(ctx, disbursement.orgId, args.sessionToken, [
       "admin", "approver", "initiator", "clerk", "viewer",
     ]);
 

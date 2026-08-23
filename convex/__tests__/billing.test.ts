@@ -7,8 +7,34 @@ import {
   createTestOrg,
   createTestMembership,
   createFullOrgSetup,
+  signIn,
   TEST_WALLETS,
 } from "./factories";
+
+// subscribe/upgradeToPro require a server-verified payment row matching
+// txHash + orgId + plan; tx hashes must be 0x + 64 hex chars.
+const USDC_MAINNET = "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48";
+function txHash(n: number): string {
+  return `0x${n.toString(16).padStart(64, "0")}`;
+}
+
+async function seedVerifiedPayment(
+  ctx: any,
+  orgId: string,
+  plan: "starter" | "team" | "pro",
+  hash: string
+) {
+  await ctx.db.insert("billingPayments", {
+    orgId: orgId as any,
+    txHash: hash,
+    chainId: 1,
+    plan,
+    tokenAddress: USDC_MAINNET,
+    amountRaw: "50000000",
+    paidThroughAt: Date.now() + 30 * 24 * 60 * 60 * 1000,
+    verifiedAt: Date.now(),
+  });
+}
 
 describe("Billing", () => {
   describe("get", () => {
@@ -24,9 +50,10 @@ describe("Billing", () => {
         orgId = setup.orgId;
       });
 
+      const admin = await signIn(t, "admin");
       const result = await t.query(api.billing.get, {
         orgId: orgId! as any,
-        walletAddress: TEST_WALLETS.admin,
+        sessionToken: admin.sessionToken,
       });
 
       expect(result).not.toBeNull();
@@ -51,9 +78,10 @@ describe("Billing", () => {
         orgId = id;
       });
 
+      const admin = await signIn(t, "admin");
       const result = await t.query(api.billing.get, {
         orgId: orgId! as any,
-        walletAddress: TEST_WALLETS.admin,
+        sessionToken: admin.sessionToken,
       });
 
       expect(result?.plan).toBe("starter");
@@ -75,9 +103,10 @@ describe("Billing", () => {
         orgId = id;
       });
 
+      const admin = await signIn(t, "admin");
       const result = await t.query(api.billing.get, {
         orgId: orgId! as any,
-        walletAddress: TEST_WALLETS.admin,
+        sessionToken: admin.sessionToken,
       });
 
       expect(result?.plan).toBe("team");
@@ -99,9 +128,10 @@ describe("Billing", () => {
         orgId = id;
       });
 
+      const admin = await signIn(t, "admin");
       const result = await t.query(api.billing.get, {
         orgId: orgId! as any,
-        walletAddress: TEST_WALLETS.admin,
+        sessionToken: admin.sessionToken,
       });
 
       expect(result?.plan).toBe("pro");
@@ -125,9 +155,10 @@ describe("Billing", () => {
         orgId = id;
       });
 
+      const admin = await signIn(t, "admin");
       const result = await t.query(api.billing.get, {
         orgId: orgId! as any,
-        walletAddress: TEST_WALLETS.admin,
+        sessionToken: admin.sessionToken,
       });
 
       expect(result?.daysRemaining).toBe(daysUntilExpiry);
@@ -148,9 +179,10 @@ describe("Billing", () => {
         orgId = id;
       });
 
+      const admin = await signIn(t, "admin");
       const result = await t.query(api.billing.get, {
         orgId: orgId! as any,
-        walletAddress: TEST_WALLETS.admin,
+        sessionToken: admin.sessionToken,
       });
 
       expect(result?.isActive).toBe(false);
@@ -159,9 +191,10 @@ describe("Billing", () => {
   });
 
   describe("subscribe", () => {
-    it("updates plan from trial to starter", async () => {
+    it("updates plan from trial to starter after verified payment", async () => {
       const t = convexTest(schema);
 
+      const hash = txHash(0x1);
       let orgId: string;
       await t.run(async (ctx) => {
         const setup = await createFullOrgSetup(ctx, {
@@ -169,15 +202,16 @@ describe("Billing", () => {
           plan: "trial",
         });
         orgId = setup.orgId;
+        await seedVerifiedPayment(ctx, orgId, "starter", hash);
       });
 
-      const paidThroughAt = Date.now() + 30 * 24 * 60 * 60 * 1000;
+      const admin = await signIn(t, "admin");
+
       const result = await t.mutation(api.billing.subscribe, {
         orgId: orgId! as any,
-        walletAddress: TEST_WALLETS.admin,
+        sessionToken: admin.sessionToken,
         plan: "starter",
-        txHash: "0xtest123",
-        paidThroughAt,
+        txHash: hash,
       });
 
       expect(result.success).toBe(true);
@@ -185,16 +219,17 @@ describe("Billing", () => {
       // Verify billing updated
       const billing = await t.query(api.billing.get, {
         orgId: orgId! as any,
-        walletAddress: TEST_WALLETS.admin,
+        sessionToken: admin.sessionToken,
       });
 
       expect(billing?.plan).toBe("starter");
       expect(billing?.status).toBe("active");
     });
 
-    it("upgrades from starter to team", async () => {
+    it("upgrades from starter to team after verified payment", async () => {
       const t = convexTest(schema);
 
+      const hash = txHash(0x2);
       let orgId: string;
       await t.run(async (ctx) => {
         const userId = await createTestUser(ctx, { walletAddress: TEST_WALLETS.admin });
@@ -204,26 +239,27 @@ describe("Billing", () => {
           billingStatus: "active",
         });
         orgId = id;
+        await seedVerifiedPayment(ctx, orgId, "team", hash);
       });
 
-      const paidThroughAt = Date.now() + 30 * 24 * 60 * 60 * 1000;
+      const admin = await signIn(t, "admin");
+
       await t.mutation(api.billing.subscribe, {
         orgId: orgId! as any,
-        walletAddress: TEST_WALLETS.admin,
+        sessionToken: admin.sessionToken,
         plan: "team",
-        txHash: "0xtest456",
-        paidThroughAt,
+        txHash: hash,
       });
 
       const billing = await t.query(api.billing.get, {
         orgId: orgId! as any,
-        walletAddress: TEST_WALLETS.admin,
+        sessionToken: admin.sessionToken,
       });
 
       expect(billing?.plan).toBe("team");
     });
 
-    it("creates audit log on subscription", async () => {
+    it("rejects subscribe without a verified payment", async () => {
       const t = convexTest(schema);
 
       let orgId: string;
@@ -235,12 +271,40 @@ describe("Billing", () => {
         orgId = setup.orgId;
       });
 
+      const admin = await signIn(t, "admin");
+
+      // No billingPayments row for this txHash — self-declared payment is dead
+      await expect(
+        t.mutation(api.billing.subscribe, {
+          orgId: orgId! as any,
+          sessionToken: admin.sessionToken,
+          plan: "starter",
+          txHash: txHash(0xdeed),
+        })
+      ).rejects.toThrow(/Payment not verified/);
+    });
+
+    it("creates audit log on subscription", async () => {
+      const t = convexTest(schema);
+
+      const hash = txHash(0x3);
+      let orgId: string;
+      await t.run(async (ctx) => {
+        const setup = await createFullOrgSetup(ctx, {
+          walletAddress: TEST_WALLETS.admin,
+          plan: "trial",
+        });
+        orgId = setup.orgId;
+        await seedVerifiedPayment(ctx, orgId, "pro", hash);
+      });
+
+      const admin = await signIn(t, "admin");
+
       await t.mutation(api.billing.subscribe, {
         orgId: orgId! as any,
-        walletAddress: TEST_WALLETS.admin,
+        sessionToken: admin.sessionToken,
         plan: "pro",
-        txHash: "0xtest789",
-        paidThroughAt: Date.now() + 30 * 24 * 60 * 60 * 1000,
+        txHash: hash,
       });
 
       // Verify audit log
@@ -271,13 +335,14 @@ describe("Billing", () => {
         await createTestMembership(ctx, orgId as any, viewerId, { role: "viewer" });
       });
 
+      const viewer = await signIn(t, "viewer");
+
       await expect(
         t.mutation(api.billing.subscribe, {
           orgId: orgId! as any,
-          walletAddress: TEST_WALLETS.viewer,
+          sessionToken: viewer.sessionToken,
           plan: "starter",
-          txHash: "0xtest",
-          paidThroughAt: Date.now() + 30 * 24 * 60 * 60 * 1000,
+          txHash: txHash(0x4),
         })
       ).rejects.toThrow();
     });
@@ -289,12 +354,17 @@ describe("Billing", () => {
 
       let orgId: string;
       await t.run(async (ctx) => {
-        const setup = await createFullOrgSetup(ctx, { plan: "trial" });
+        const setup = await createFullOrgSetup(ctx, {
+          walletAddress: TEST_WALLETS.admin,
+          plan: "trial",
+        });
         orgId = setup.orgId;
       });
 
+      const admin = await signIn(t, "admin");
       const result = await t.query(api.billing.isActive, {
         orgId: orgId! as any,
+        sessionToken: admin.sessionToken,
       });
 
       expect(result).toBe(true);
@@ -305,7 +375,7 @@ describe("Billing", () => {
 
       let orgId: string;
       await t.run(async (ctx) => {
-        const userId = await createTestUser(ctx);
+        const userId = await createTestUser(ctx, { walletAddress: TEST_WALLETS.admin });
         const { orgId: id } = await createTestOrg(ctx, userId, {
           plan: "trial",
           trialEndsAt: Date.now() - 1000,
@@ -314,8 +384,10 @@ describe("Billing", () => {
         orgId = id;
       });
 
+      const admin = await signIn(t, "admin");
       const result = await t.query(api.billing.isActive, {
         orgId: orgId! as any,
+        sessionToken: admin.sessionToken,
       });
 
       expect(result).toBe(false);
@@ -326,7 +398,7 @@ describe("Billing", () => {
 
       let orgId: string;
       await t.run(async (ctx) => {
-        const userId = await createTestUser(ctx);
+        const userId = await createTestUser(ctx, { walletAddress: TEST_WALLETS.admin });
         const { orgId: id } = await createTestOrg(ctx, userId, {
           plan: "pro",
           paidThroughAt: Date.now() + 30 * 24 * 60 * 60 * 1000,
@@ -335,8 +407,10 @@ describe("Billing", () => {
         orgId = id;
       });
 
+      const admin = await signIn(t, "admin");
       const result = await t.query(api.billing.isActive, {
         orgId: orgId! as any,
+        sessionToken: admin.sessionToken,
       });
 
       expect(result).toBe(true);
@@ -347,7 +421,7 @@ describe("Billing", () => {
 
       let orgId: string;
       await t.run(async (ctx) => {
-        const userId = await createTestUser(ctx);
+        const userId = await createTestUser(ctx, { walletAddress: TEST_WALLETS.admin });
         const { orgId: id } = await createTestOrg(ctx, userId, {
           plan: "pro",
           paidThroughAt: Date.now() - 1000,
@@ -356,8 +430,10 @@ describe("Billing", () => {
         orgId = id;
       });
 
+      const admin = await signIn(t, "admin");
       const result = await t.query(api.billing.isActive, {
         orgId: orgId! as any,
+        sessionToken: admin.sessionToken,
       });
 
       expect(result).toBe(false);
@@ -368,17 +444,20 @@ describe("Billing", () => {
 
       let orgId: string;
       await t.run(async (ctx) => {
-        const userId = await createTestUser(ctx);
-        // Create org without billing (manually)
+        const userId = await createTestUser(ctx, { walletAddress: TEST_WALLETS.admin });
+        // Create org without billing (manually), but the caller must be a member
         orgId = await ctx.db.insert("orgs", {
           name: "Test Org",
           createdBy: userId,
           createdAt: Date.now(),
         });
+        await createTestMembership(ctx, orgId, userId, { role: "admin" });
       });
 
+      const admin = await signIn(t, "admin");
       const result = await t.query(api.billing.isActive, {
         orgId: orgId! as any,
+        sessionToken: admin.sessionToken,
       });
 
       expect(result).toBe(false);

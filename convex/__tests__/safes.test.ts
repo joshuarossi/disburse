@@ -7,6 +7,7 @@ import {
   createTestUser,
   createTestOrg,
   createTestSafe,
+  signIn,
   TEST_WALLETS,
 } from "./factories";
 
@@ -23,9 +24,11 @@ describe("Safes", () => {
         orgId = setup.orgId;
       });
 
+      const admin = await signIn(t, "admin");
+
       const safes = await t.query(api.safes.getForOrg, {
         orgId: orgId! as any,
-        walletAddress: TEST_WALLETS.admin,
+        sessionToken: admin.sessionToken,
       });
 
       expect(Array.isArray(safes)).toBe(true);
@@ -46,10 +49,12 @@ describe("Safes", () => {
         orgId = setup.orgId;
       });
 
+      const admin = await signIn(t, "admin");
+
       const safe = await t.query(api.safes.getForOrgAndChain, {
         orgId: orgId! as any,
         chainId: 11155111,
-        walletAddress: TEST_WALLETS.admin,
+        sessionToken: admin.sessionToken,
       });
 
       expect(safe).not.toBeNull();
@@ -67,10 +72,12 @@ describe("Safes", () => {
         orgId = setup.orgId;
       });
 
+      const admin = await signIn(t, "admin");
+
       const safe = await t.query(api.safes.getForOrgAndChain, {
         orgId: orgId! as any,
         chainId: 1, // Mainnet - not linked
-        walletAddress: TEST_WALLETS.admin,
+        sessionToken: admin.sessionToken,
       });
 
       expect(safe).toBeNull();
@@ -90,9 +97,11 @@ describe("Safes", () => {
         await createTestSafe(ctx, id, { chainId: 11155111, safeAddress });
       });
 
+      const admin = await signIn(t, "admin");
+
       const linkResult = await t.mutation(api.safes.link, {
         orgId: orgId! as any,
-        walletAddress: TEST_WALLETS.admin,
+        sessionToken: admin.sessionToken,
         chainId: 1,
         safeAddress,
       });
@@ -101,7 +110,7 @@ describe("Safes", () => {
 
       const safes = await t.query(api.safes.getForOrg, {
         orgId: orgId! as any,
-        walletAddress: TEST_WALLETS.admin,
+        sessionToken: admin.sessionToken,
       });
 
       expect(safes.length).toBe(2);
@@ -120,10 +129,12 @@ describe("Safes", () => {
         orgId = setup.orgId;
       });
 
+      const admin = await signIn(t, "admin");
+
       await expect(
         t.mutation(api.safes.link, {
           orgId: orgId! as any,
-          walletAddress: TEST_WALLETS.admin,
+          sessionToken: admin.sessionToken,
           chainId: 1,
           safeAddress: "0xdifferentaddress123456789012345678901234",
         })
@@ -142,10 +153,12 @@ describe("Safes", () => {
         await createTestSafe(ctx, id, { chainId: 11155111, safeAddress });
       });
 
+      const admin = await signIn(t, "admin");
+
       await expect(
         t.mutation(api.safes.link, {
           orgId: orgId! as any,
-          walletAddress: TEST_WALLETS.admin,
+          sessionToken: admin.sessionToken,
           chainId: 11155111,
           safeAddress,
         })
@@ -166,14 +179,16 @@ describe("Safes", () => {
         return { orgId: id, safeIdSepolia };
       });
 
+      const admin = await signIn(t, "admin");
+
       await t.mutation(api.safes.unlink, {
         safeId: safeIdSepolia as any,
-        walletAddress: TEST_WALLETS.admin,
+        sessionToken: admin.sessionToken,
       });
 
       const safes = await t.query(api.safes.getForOrg, {
         orgId: orgId! as any,
-        walletAddress: TEST_WALLETS.admin,
+        sessionToken: admin.sessionToken,
       });
 
       expect(safes.length).toBe(1);
@@ -182,14 +197,14 @@ describe("Safes", () => {
       const forSepolia = await t.query(api.safes.getForOrgAndChain, {
         orgId: orgId! as any,
         chainId: 11155111,
-        walletAddress: TEST_WALLETS.admin,
+        sessionToken: admin.sessionToken,
       });
       expect(forSepolia).toBeNull();
 
       const forMainnet = await t.query(api.safes.getForOrgAndChain, {
         orgId: orgId! as any,
         chainId: 1,
-        walletAddress: TEST_WALLETS.admin,
+        sessionToken: admin.sessionToken,
       });
       expect(forMainnet).not.toBeNull();
     });

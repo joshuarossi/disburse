@@ -1,18 +1,16 @@
 import { v } from "convex/values";
 import { query, mutation } from "./_generated/server";
 import { requireOrgAccess } from "./lib/rbac";
-import { Id } from "./_generated/dataModel";
 
 export const getLatestForSafe = query({
   args: {
     orgId: v.id("orgs"),
-    walletAddress: v.string(),
+    sessionToken: v.string(),
     safeId: v.id("safes"),
   },
   handler: async (ctx, args) => {
-    const walletAddress = args.walletAddress.toLowerCase();
 
-    await requireOrgAccess(ctx, args.orgId, walletAddress, ["admin", "approver", "initiator", "clerk", "viewer"]);
+    await requireOrgAccess(ctx, args.orgId, args.sessionToken, ["admin", "approver", "initiator", "clerk", "viewer"]);
 
     const safe = await ctx.db.get(args.safeId);
     if (!safe || safe.orgId !== args.orgId) {
@@ -32,13 +30,12 @@ export const getLatestForSafe = query({
 export const getSyncForSafe = query({
   args: {
     orgId: v.id("orgs"),
-    walletAddress: v.string(),
+    sessionToken: v.string(),
     safeId: v.id("safes"),
   },
   handler: async (ctx, args) => {
-    const walletAddress = args.walletAddress.toLowerCase();
 
-    await requireOrgAccess(ctx, args.orgId, walletAddress, ["admin", "approver", "initiator", "clerk", "viewer"]);
+    await requireOrgAccess(ctx, args.orgId, args.sessionToken, ["admin", "approver", "initiator", "clerk", "viewer"]);
 
     const safe = await ctx.db.get(args.safeId);
     if (!safe || safe.orgId !== args.orgId) {
@@ -57,15 +54,14 @@ export const getSyncForSafe = query({
 export const upsertSyncForSafe = mutation({
   args: {
     orgId: v.id("orgs"),
-    walletAddress: v.string(),
+    sessionToken: v.string(),
     safeId: v.id("safes"),
     chainId: v.number(),
     lastSyncedAt: v.number(),
   },
   handler: async (ctx, args) => {
-    const walletAddress = args.walletAddress.toLowerCase();
 
-    await requireOrgAccess(ctx, args.orgId, walletAddress, ["admin", "approver", "initiator", "clerk", "viewer"]);
+    await requireOrgAccess(ctx, args.orgId, args.sessionToken, ["admin", "approver", "initiator", "clerk", "viewer"]);
 
     const existing = await ctx.db
       .query("depositSyncs")
@@ -93,7 +89,7 @@ export const upsertSyncForSafe = mutation({
 export const upsertDeposit = mutation({
   args: {
     orgId: v.id("orgs"),
-    walletAddress: v.string(),
+    sessionToken: v.string(),
     safeId: v.id("safes"),
     chainId: v.number(),
     safeAddress: v.string(),
@@ -110,9 +106,8 @@ export const upsertDeposit = mutation({
     source: v.literal("safe_tx_service"),
   },
   handler: async (ctx, args) => {
-    const walletAddress = args.walletAddress.toLowerCase();
 
-    await requireOrgAccess(ctx, args.orgId, walletAddress, ["admin", "approver", "initiator", "clerk", "viewer"]);
+    await requireOrgAccess(ctx, args.orgId, args.sessionToken, ["admin", "approver", "initiator", "clerk", "viewer"]);
 
     const existing = await ctx.db
       .query("deposits")
@@ -155,13 +150,12 @@ export const upsertDeposit = mutation({
 export const listRecent = query({
   args: {
     orgId: v.id("orgs"),
-    walletAddress: v.string(),
+    sessionToken: v.string(),
     limit: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
-    const walletAddress = args.walletAddress.toLowerCase();
 
-    await requireOrgAccess(ctx, args.orgId, walletAddress, ["admin", "approver", "initiator", "clerk", "viewer"]);
+    await requireOrgAccess(ctx, args.orgId, args.sessionToken, ["admin", "approver", "initiator", "clerk", "viewer"]);
 
     const deposits = await ctx.db
       .query("deposits")

@@ -6,17 +6,16 @@ import { requireOrgAccess } from "./lib/rbac";
 export const link = mutation({
   args: {
     orgId: v.id("orgs"),
-    walletAddress: v.string(),
+    sessionToken: v.string(),
     safeAddress: v.string(),
     chainId: v.number(),
   },
   handler: async (ctx, args) => {
-    const walletAddress = args.walletAddress.toLowerCase();
     const safeAddressLower = args.safeAddress.toLowerCase();
     const now = Date.now();
 
     // Only admin can link safes
-    const { user } = await requireOrgAccess(ctx, args.orgId, walletAddress, ["admin"]);
+    const { user } = await requireOrgAccess(ctx, args.orgId, args.sessionToken, ["admin"]);
 
     // Check if this chain is already linked for this org
     const existingForChain = await ctx.db
@@ -68,12 +67,11 @@ export const link = mutation({
 export const getForOrg = query({
   args: {
     orgId: v.id("orgs"),
-    walletAddress: v.string(),
+    sessionToken: v.string(),
   },
   handler: async (ctx, args) => {
-    const walletAddress = args.walletAddress.toLowerCase();
 
-    await requireOrgAccess(ctx, args.orgId, walletAddress, ["admin", "approver", "initiator", "clerk", "viewer"]);
+    await requireOrgAccess(ctx, args.orgId, args.sessionToken, ["admin", "approver", "initiator", "clerk", "viewer"]);
 
     return await ctx.db
       .query("safes")
@@ -87,12 +85,11 @@ export const getForOrgAndChain = query({
   args: {
     orgId: v.id("orgs"),
     chainId: v.number(),
-    walletAddress: v.string(),
+    sessionToken: v.string(),
   },
   handler: async (ctx, args) => {
-    const walletAddress = args.walletAddress.toLowerCase();
 
-    await requireOrgAccess(ctx, args.orgId, walletAddress, ["admin", "approver", "initiator", "clerk", "viewer"]);
+    await requireOrgAccess(ctx, args.orgId, args.sessionToken, ["admin", "approver", "initiator", "clerk", "viewer"]);
 
     return await ctx.db
       .query("safes")
@@ -107,10 +104,9 @@ export const getForOrgAndChain = query({
 export const unlink = mutation({
   args: {
     safeId: v.id("safes"),
-    walletAddress: v.string(),
+    sessionToken: v.string(),
   },
   handler: async (ctx, args) => {
-    const walletAddress = args.walletAddress.toLowerCase();
     const now = Date.now();
 
     const safe = await ctx.db.get(args.safeId);
@@ -119,7 +115,7 @@ export const unlink = mutation({
     }
 
     // Only admin can unlink safes
-    const { user } = await requireOrgAccess(ctx, safe.orgId, walletAddress, ["admin"]);
+    const { user } = await requireOrgAccess(ctx, safe.orgId, args.sessionToken, ["admin"]);
 
     await ctx.db.delete(args.safeId);
 

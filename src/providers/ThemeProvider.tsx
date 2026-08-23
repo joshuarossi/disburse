@@ -3,6 +3,7 @@ import { useAccount } from 'wagmi';
 import { useQuery, useMutation } from 'convex/react';
 import { api } from '../../convex/_generated/api';
 import { ThemeContext, Theme } from '../lib/theme';
+import { getSessionToken } from '@/lib/session';
 
 interface ThemeProviderProps {
   children: ReactNode;
@@ -23,9 +24,10 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
     return 'dark'; // Default
   });
 
+  const token = getSessionToken();
   const session = useQuery(
-    api.auth.getSession,
-    address ? { walletAddress: address } : 'skip'
+    api.auth.validateSession,
+    address && token ? { token } : 'skip'
   );
 
   const updatePreferredTheme = useMutation(api.users.updatePreferredTheme);
@@ -47,12 +49,12 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
 
   const setTheme = async (newTheme: Theme) => {
     setThemeState(newTheme);
-    
-    // Save to backend if user is authenticated
-    if (address) {
+
+    // Save to backend if user is authenticated (identity from session token)
+    if (address && token) {
       try {
         await updatePreferredTheme({
-          walletAddress: address,
+          sessionToken: token,
           preferredTheme: newTheme,
         });
       } catch (error) {

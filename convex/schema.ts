@@ -19,16 +19,23 @@ export default defineSchema({
   })
     .index("by_wallet", ["walletAddress"]),
 
-  // Sessions for auth
+  // Sessions for auth.
+  // Lifecycle: generateNonce inserts a PENDING row (nonce set, tokenHash unset,
+  // short expiry). verifySignature consumes the nonce server-side (signature is
+  // cryptographically verified) and inserts an AUTHENTICATED row (tokenHash set,
+  // raw token returned to client exactly once). All privileged functions resolve
+  // the caller's identity exclusively from sessionToken -> tokenHash lookup.
   sessions: defineTable({
     userId: v.id("users"),
     walletAddress: v.string(),
-    nonce: v.string(),
+    nonce: v.optional(v.string()), // set on pending rows only
+    tokenHash: v.optional(v.string()), // SHA-256 hex of the opaque session token; never store raw tokens
     expiresAt: v.number(),
     createdAt: v.number(),
   })
     .index("by_wallet", ["walletAddress"])
-    .index("by_nonce", ["nonce"]),
+    .index("by_nonce", ["nonce"])
+    .index("by_tokenHash", ["tokenHash"]),
 
   // Organizations
   orgs: defineTable({
@@ -215,6 +222,24 @@ export default defineSchema({
   })
     .index("by_disbursement", ["disbursementId"])
     .index("by_beneficiary", ["beneficiaryId"]),
+
+  // Verified subscription payments (server-verified on-chain before plan activation)
+  billingPayments: defineTable({
+    orgId: v.id("orgs"),
+    txHash: v.string(),
+    chainId: v.number(),
+    plan: v.union(
+      v.literal("starter"),
+      v.literal("team"),
+      v.literal("pro")
+    ),
+    tokenAddress: v.string(),
+    amountRaw: v.string(),
+    paidThroughAt: v.number(),
+    verifiedAt: v.number(),
+  })
+    .index("by_org", ["orgId"])
+    .index("by_tx", ["txHash"]),
 
   // Billing records
   billing: defineTable({

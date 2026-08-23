@@ -6,7 +6,7 @@ import { requireOrgAccess } from "./lib/rbac";
 export const list = query({
   args: {
     orgId: v.id("orgs"),
-    walletAddress: v.string(),
+    sessionToken: v.string(),
     limit: v.optional(v.number()),
     startDate: v.optional(v.number()),
     endDate: v.optional(v.number()),
@@ -14,10 +14,8 @@ export const list = query({
     actionType: v.optional(v.array(v.string())),
   },
   handler: async (ctx, args) => {
-    const walletAddress = args.walletAddress.toLowerCase();
-
     // Any member can view audit logs
-    await requireOrgAccess(ctx, args.orgId, walletAddress, ["admin", "approver", "initiator", "clerk", "viewer"]);
+    await requireOrgAccess(ctx, args.orgId, args.sessionToken, ["admin", "approver", "initiator", "clerk", "viewer"]);
 
     const auditQuery = ctx.db
       .query("auditLog")

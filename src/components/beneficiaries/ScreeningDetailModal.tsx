@@ -5,28 +5,28 @@ import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { X, ShieldAlert, ShieldCheck, Shield, RefreshCw } from 'lucide-react';
 import { useState } from 'react';
+import { getSessionToken } from '@/lib/session';
 
 interface ScreeningDetailModalProps {
   beneficiaryId: Id<'beneficiaries'>;
   beneficiaryName: string;
-  walletAddress: string;
   onClose: () => void;
 }
 
 export function ScreeningDetailModal({
   beneficiaryId,
   beneficiaryName,
-  walletAddress,
   onClose,
 }: ScreeningDetailModalProps) {
   const { t } = useTranslation();
   const [reviewError, setReviewError] = useState<string | null>(null);
   const [isRerunning, setIsRerunning] = useState(false);
   const [rerunError, setRerunError] = useState<string | null>(null);
+  const sessionToken = getSessionToken() ?? "";
 
   const result = useQuery(
     api.screeningQueries.getScreeningResult,
-    { beneficiaryId, walletAddress }
+    sessionToken ? { beneficiaryId, sessionToken } : 'skip'
   );
 
   const reviewResult = useMutation(api.screeningMutations.reviewScreeningResult);
@@ -38,7 +38,7 @@ export function ScreeningDetailModal({
     try {
       await reviewResult({
         screeningResultId: result._id,
-        walletAddress,
+        sessionToken,
         status,
       });
     } catch (error) {
@@ -52,7 +52,7 @@ export function ScreeningDetailModal({
     try {
       await rerunScreening({
         beneficiaryId,
-        walletAddress,
+        sessionToken,
       });
       // The query will automatically refresh to show the new result
     } catch (error) {

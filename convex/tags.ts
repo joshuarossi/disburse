@@ -7,13 +7,12 @@ import { normalizeTagName } from "./lib/tags";
 export const list = query({
   args: {
     orgId: v.id("orgs"),
-    walletAddress: v.string(),
+    sessionToken: v.string(),
     search: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    const walletAddress = args.walletAddress.toLowerCase();
 
-    await requireOrgAccess(ctx, args.orgId, walletAddress, [
+    await requireOrgAccess(ctx, args.orgId, args.sessionToken, [
       "admin",
       "approver",
       "initiator",

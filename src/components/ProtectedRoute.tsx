@@ -4,6 +4,7 @@ import { useAccount } from 'wagmi';
 import { useQuery } from 'convex/react';
 import { api } from '../../convex/_generated/api';
 import { Loader2 } from 'lucide-react';
+import { getSessionToken, clearSessionToken } from '@/lib/session';
 
 interface ProtectedRouteProps {
   children: ReactNode;
@@ -14,24 +15,37 @@ export function ProtectedRoute({ children, requireOrg = false }: ProtectedRouteP
   const navigate = useNavigate();
   const { address, isConnecting } = useAccount();
   const { orgId } = useParams<{ orgId: string }>();
+  const token = getSessionToken();
 
-  // Check for valid session
+  // Check for valid session (identity resolved server-side from the token)
   const session = useQuery(
-    api.auth.getSession,
-    address ? { walletAddress: address } : 'skip'
+    api.auth.validateSession,
+    address && token ? { token } : 'skip'
   );
 
-  // Check org membership if required
+  // Check org membership if required (token-based identity)
   const orgs = useQuery(
     api.orgs.listForUser,
-    address ? { walletAddress: address } : 'skip'
+    address && token ? { sessionToken: token } : 'skip'
   );
+
+  // Clear the stored token when the wallet disconnects
+  useEffect(() => {
+    if (!isConnecting && !address) {
+      clearSessionToken();
+    }
+  }, [address, isConnecting]);
 
   // Redirect to login if not connected or no session
   useEffect(() => {
     if (isConnecting) return;
-    
+
     if (!address) {
+      navigate('/login');
+      return;
+    }
+
+    if (!token) {
       navigate('/login');
       return;
     }
@@ -41,19 +55,22 @@ export function ProtectedRoute({ children, requireOrg = false }: ProtectedRouteP
 
     // No valid session
     if (session === null) {
+      clearSessionToken();
       navigate('/login');
       return;
     }
-  }, [address, isConnecting, session, navigate]);
+  }, [address, isConnecting, token, session, navigate]);
 
-  // Check org access if requireOrg is true
+  // Check org access if requireOrg is true (active memberships only)
   useEffect(() => {
     if (!requireOrg || !orgId || orgs === undefined) return;
 
-    // Check if user is a member of this org
-    const isMember = orgs?.some((org) => org?._id === orgId);
-    
-    if (orgs !== undefined && !isMember) {
+    // Check if user is an ACTIVE member of this org
+    const isActiveMember = orgs?.some(
+      (org) => org?._id === orgId && org?.membershipStatus === 'active'
+    );
+
+    if (orgs !== undefined && !isActiveMember) {
       navigate('/select-org');
     }
   }, [requireOrg, orgId, orgs, navigate]);
@@ -70,14 +87,16 @@ export function ProtectedRoute({ children, requireOrg = false }: ProtectedRouteP
     );
   }
 
-  // No address or session means not authenticated
-  if (!address || !session) {
+  // No address, token, or session means not authenticated
+  if (!address || !token || !session) {
     return null;
   }
 
   // If requireOrg, check org access
   if (requireOrg && orgId) {
-    const isMember = orgs?.some((org) => org?._id === orgId);
+    const isActiveMember = orgs?.some(
+      (org) => org?._id === orgId && org?.membershipStatus === 'active'
+    );
     if (orgs === undefined) {
       return (
         <div className="flex min-h-screen items-center justify-center bg-navy-950">
@@ -88,7 +107,7 @@ export function ProtectedRoute({ children, requireOrg = false }: ProtectedRouteP
         </div>
       );
     }
-    if (!isMember) {
+    if (!isActiveMember) {
       return null;
     }
   }

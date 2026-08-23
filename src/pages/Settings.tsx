@@ -1,8 +1,9 @@
 import { useState } from 'react';
+import { getSessionToken } from '@/lib/session';
 import { useParams } from 'react-router-dom';
 import { useAccount, useSendTransaction, useWaitForTransactionReceipt } from 'wagmi';
 import { useTranslation } from 'react-i18next';
-import { useQuery, useMutation } from 'convex/react';
+import { useQuery, useMutation, useAction } from 'convex/react';
 import { api } from '../../convex/_generated/api';
 import { Id } from '../../convex/_generated/dataModel';
 import { AppLayout } from '@/components/layout/AppLayout';
@@ -106,13 +107,15 @@ export default function Settings() {
 
   const org = useQuery(
     api.orgs.get,
-    orgId ? { orgId: orgId as Id<'orgs'> } : 'skip'
+    orgId && getSessionToken()
+      ? { orgId: orgId as Id<'orgs'>, sessionToken: getSessionToken() ?? "" }
+      : 'skip'
   );
 
   const safes = useQuery(
     api.safes.getForOrg,
-    orgId && address
-      ? { orgId: orgId as Id<'orgs'>, walletAddress: address }
+    orgId && address && getSessionToken()
+      ? { orgId: orgId as Id<'orgs'>, sessionToken: getSessionToken() ?? "" }
       : 'skip'
   );
   const depositAddress = safes && safes.length > 0 ? safes[0].safeAddress : undefined;
@@ -121,15 +124,15 @@ export default function Settings() {
 
   const members = useQuery(
     api.orgs.listMembers,
-    orgId && address
-      ? { orgId: orgId as Id<'orgs'>, walletAddress: address }
+    orgId && address && getSessionToken()
+      ? { orgId: orgId as Id<'orgs'>, sessionToken: getSessionToken() ?? "" }
       : 'skip'
   );
 
   const billing = useQuery(
     api.billing.get,
-    orgId && address
-      ? { orgId: orgId as Id<'orgs'>, walletAddress: address }
+    orgId && address && getSessionToken()
+      ? { orgId: orgId as Id<'orgs'>, sessionToken: getSessionToken() ?? "" }
       : 'skip'
   );
 
@@ -142,14 +145,15 @@ export default function Settings() {
   const updateOrgName = useMutation(api.orgs.updateName);
   const linkSafe = useMutation(api.safes.link);
   const unlinkSafe = useMutation(api.safes.unlink);
+  const verifySubscriptionPayment = useAction(api.billing.verifySubscriptionPayment);
   const subscribe = useMutation(api.billing.subscribe);
   const updateScreeningEnforcement = useMutation(api.screeningMutations.updateScreeningEnforcement);
   const updateRelaySettings = useMutation(api.orgs.updateRelaySettings);
 
   const screeningEnforcement = useQuery(
     api.screeningQueries.getScreeningEnforcement,
-    orgId && address
-      ? { orgId: orgId as Id<'orgs'>, walletAddress: address }
+    orgId && address && getSessionToken()
+      ? { orgId: orgId as Id<'orgs'>, sessionToken: getSessionToken() ?? "" }
       : 'skip'
   );
   const [savingEnforcement, setSavingEnforcement] = useState(false);
@@ -173,7 +177,7 @@ export default function Settings() {
     try {
       await updateOrgName({
         orgId: orgId as Id<'orgs'>,
-        walletAddress: address,
+        sessionToken: getSessionToken() ?? "",
         name: orgName.trim(),
       });
       setIsEditingName(false);
@@ -191,7 +195,7 @@ export default function Settings() {
     try {
       await updateRelaySettings({
         orgId: orgId as Id<'orgs'>,
-        walletAddress: address,
+        sessionToken: getSessionToken() ?? "",
         relayFeeTokenSymbol,
         relayFeeMode,
       });
@@ -231,7 +235,7 @@ export default function Settings() {
 
       await linkSafe({
         orgId: orgId as Id<'orgs'>,
-        walletAddress: address,
+        sessionToken: getSessionToken() ?? "",
         safeAddress: safeAddress.trim(),
         chainId: selectedChainId,
       });
@@ -248,7 +252,7 @@ export default function Settings() {
     if (!address) return;
     if (!confirm(t('settings.safe.unlinkConfirm'))) return;
     try {
-      await unlinkSafe({ safeId, walletAddress: address });
+      await unlinkSafe({ safeId, sessionToken: getSessionToken() ?? "" });
     } catch (error) {
       console.error('Failed to unlink safe:', error);
     }
@@ -260,7 +264,7 @@ export default function Settings() {
     try {
       await updateScreeningEnforcement({
         orgId: orgId as Id<'orgs'>,
-        walletAddress: address,
+        sessionToken: getSessionToken() ?? "",
         enforcement,
       });
     } catch (error) {
@@ -320,15 +324,20 @@ export default function Settings() {
     setBillingError(null);
 
     try {
-      // Calculate paid through date (30 days from now)
-      const paidThroughAt = Date.now() + 30 * 24 * 60 * 60 * 1000;
+      // C-03: server verifies the on-chain payment first, then the plan is
+      // activated. paidThroughAt is derived server-side from verified payment.
+      await verifySubscriptionPayment({
+        orgId: orgId as Id<'orgs'>,
+        sessionToken: getSessionToken() ?? "",
+        plan: selectedPlan,
+        txHash: hash,
+      });
 
       await subscribe({
         orgId: orgId as Id<'orgs'>,
-        walletAddress: address,
+        sessionToken: getSessionToken() ?? "",
         plan: selectedPlan,
         txHash: hash,
-        paidThroughAt,
       });
 
       setPaymentStep('success');

@@ -1,4 +1,5 @@
 import { ReactNode } from 'react';
+import { getSessionToken } from '@/lib/session';
 import { useQuery } from 'convex/react';
 import { api } from '../../../convex/_generated/api';
 import { Id } from '../../../convex/_generated/dataModel';
@@ -42,7 +43,7 @@ export function BatchDetailModal({ disbursementId, onClose, renderActions }: Bat
   const disbursement = useQuery(
     api.disbursements.getWithRecipients,
     address && disbursementId
-      ? { disbursementId, walletAddress: address }
+      ? { disbursementId, sessionToken: getSessionToken() ?? "" }
       : 'skip'
   );
 

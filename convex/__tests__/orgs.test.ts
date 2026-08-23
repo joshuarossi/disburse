@@ -8,6 +8,7 @@ import {
   createTestOrg,
   createTestMembership,
   createFullOrgSetup,
+  signIn,
   TEST_WALLETS,
 } from "./factories";
 
@@ -16,14 +17,11 @@ describe("Orgs", () => {
     it("creates org with membership and billing", async () => {
       const t = convexTest(schema);
 
-      // First create user via auth
-      await t.mutation(api.auth.generateNonce, {
-        walletAddress: TEST_WALLETS.admin,
-      });
+      const admin = await signIn(t, "admin");
 
       const result = await t.mutation(api.orgs.create, {
         name: "Test Organization",
-        walletAddress: TEST_WALLETS.admin,
+        sessionToken: admin.sessionToken,
       });
 
       expect(result.orgId).toBeDefined();
@@ -58,13 +56,11 @@ describe("Orgs", () => {
     it("creates audit log", async () => {
       const t = convexTest(schema);
 
-      await t.mutation(api.auth.generateNonce, {
-        walletAddress: TEST_WALLETS.admin,
-      });
+      const admin = await signIn(t, "admin");
 
       const result = await t.mutation(api.orgs.create, {
         name: "Audit Test Org",
-        walletAddress: TEST_WALLETS.admin,
+        sessionToken: admin.sessionToken,
       });
 
       await t.run(async (ctx) => {
@@ -78,15 +74,17 @@ describe("Orgs", () => {
       });
     });
 
-    it("throws for non-existent user", async () => {
+    it("throws for unauthenticated caller (invalid session)", async () => {
       const t = convexTest(schema);
 
+      // Identity now comes exclusively from server-issued session tokens;
+      // a token that hashes to no known session is rejected.
       await expect(
         t.mutation(api.orgs.create, {
           name: "Test Org",
-          walletAddress: TEST_WALLETS.nonMember, // No user created
+          sessionToken: "f".repeat(64),
         })
-      ).rejects.toThrow("User not found");
+      ).rejects.toThrow("Unauthorized");
     });
   });
 
@@ -100,11 +98,13 @@ describe("Orgs", () => {
         await createTestOrg(ctx, userId, { name: "Org 2" });
       });
 
+      const admin = await signIn(t, "admin");
       const result = await t.query(api.orgs.listForUser, {
-        walletAddress: TEST_WALLETS.admin,
+        sessionToken: admin.sessionToken,
       });
 
       expect(result.length).toBe(2);
+      expect(result.every((o) => o?.membershipStatus === "active")).toBe(true);
     });
 
     it("includes role in response", async () => {
@@ -115,8 +115,9 @@ describe("Orgs", () => {
         await createTestOrg(ctx, userId, { role: "admin" });
       });
 
+      const admin = await signIn(t, "admin");
       const result = await t.query(api.orgs.listForUser, {
-        walletAddress: TEST_WALLETS.admin,
+        sessionToken: admin.sessionToken,
       });
 
       expect(result[0]?.role).toBe("admin");
@@ -135,19 +136,23 @@ describe("Orgs", () => {
         await createTestMembership(ctx, removedOrgId as any, userId, { status: "removed" });
       });
 
+      const admin = await signIn(t, "admin");
       const result = await t.query(api.orgs.listForUser, {
-        walletAddress: TEST_WALLETS.admin,
+        sessionToken: admin.sessionToken,
       });
 
       expect(result.length).toBe(1);
       expect(result[0]?.name).toBe("Active Org");
     });
 
-    it("returns empty array for non-existent user", async () => {
+    it("returns empty array for user with no memberships", async () => {
       const t = convexTest(schema);
 
+      // nonMember has no seeded memberships; signIn creates the auth identity
+      const nonMember = await signIn(t, "nonMember");
+
       const result = await t.query(api.orgs.listForUser, {
-        walletAddress: TEST_WALLETS.nonMember,
+        sessionToken: nonMember.sessionToken,
       });
 
       expect(result).toEqual([]);
@@ -155,22 +160,46 @@ describe("Orgs", () => {
   });
 
   describe("get", () => {
-    it("returns org by ID", async () => {
+    it("returns org by ID for a member", async () => {
       const t = convexTest(schema);
 
       let orgId: string;
       await t.run(async (ctx) => {
-        const userId = await createTestUser(ctx);
-        const { orgId: id } = await createTestOrg(ctx, userId, { name: "Test Org" });
-        orgId = id;
+        const setup = await createFullOrgSetup(ctx, {
+          walletAddress: TEST_WALLETS.admin,
+          orgName: "Test Org",
+        });
+        orgId = setup.orgId;
       });
 
+      const admin = await signIn(t, "admin");
       const result = await t.query(api.orgs.get, {
         orgId: orgId! as any,
+        sessionToken: admin.sessionToken,
       });
 
       expect(result).not.toBeNull();
       expect(result?.name).toBe("Test Org");
+    });
+
+    it("throws for non-member", async () => {
+      const t = convexTest(schema);
+
+      let orgId: string;
+      await t.run(async (ctx) => {
+        const setup = await createFullOrgSetup(ctx, {
+          walletAddress: TEST_WALLETS.admin,
+        });
+        orgId = setup.orgId;
+      });
+
+      const nonMember = await signIn(t, "nonMember");
+      await expect(
+        t.query(api.orgs.get, {
+          orgId: orgId! as any,
+          sessionToken: nonMember.sessionToken,
+        })
+      ).rejects.toThrow("Not a member of this organization");
     });
   });
 
@@ -187,14 +216,17 @@ describe("Orgs", () => {
         orgId = setup.orgId;
       });
 
+      const admin = await signIn(t, "admin");
+
       await t.mutation(api.orgs.updateName, {
         orgId: orgId! as any,
-        walletAddress: TEST_WALLETS.admin,
+        sessionToken: admin.sessionToken,
         name: "New Name",
       });
 
       const result = await t.query(api.orgs.get, {
         orgId: orgId! as any,
+        sessionToken: admin.sessionToken,
       });
 
       expect(result?.name).toBe("New Name");
@@ -213,13 +245,15 @@ describe("Orgs", () => {
         await createTestMembership(ctx, orgId as any, viewerId, { role: "viewer" });
       });
 
+      const viewer = await signIn(t, "viewer");
+
       await expect(
         t.mutation(api.orgs.updateName, {
           orgId: orgId! as any,
-          walletAddress: TEST_WALLETS.viewer,
+          sessionToken: viewer.sessionToken,
           name: "Hacked Name",
         })
-      ).rejects.toThrow("Not authorized");
+      ).rejects.toThrow("Insufficient permissions. Required: admin");
     });
 
     it("creates audit log", async () => {
@@ -233,9 +267,11 @@ describe("Orgs", () => {
         orgId = setup.orgId;
       });
 
+      const admin = await signIn(t, "admin");
+
       await t.mutation(api.orgs.updateName, {
         orgId: orgId! as any,
-        walletAddress: TEST_WALLETS.admin,
+        sessionToken: admin.sessionToken,
         name: "Updated Name",
       });
 
@@ -253,7 +289,7 @@ describe("Orgs", () => {
   });
 
   describe("inviteMember", () => {
-    it("invites new member with specified role", async () => {
+    it("invites new member with specified role (pending until accepted)", async () => {
       const t = convexTest(schema);
 
       let orgId: string;
@@ -265,21 +301,50 @@ describe("Orgs", () => {
         orgId = setup.orgId;
       });
 
+      const admin = await signIn(t, "admin");
+
       const result = await t.mutation(api.orgs.inviteMember, {
         orgId: orgId! as any,
-        walletAddress: TEST_WALLETS.admin,
+        sessionToken: admin.sessionToken,
         memberWalletAddress: TEST_WALLETS.viewer,
         role: "viewer",
       });
 
       expect(result.membershipId).toBeDefined();
 
-      // Verify member was added
+      // Membership starts as invited, not active
       await t.run(async (ctx) => {
         const membership = await ctx.db.get(result.membershipId as any) as Doc<"orgMemberships"> | null;
         expect(membership?.role).toBe("viewer");
+        expect(membership?.status).toBe("invited");
+      });
+
+      // Invited member cannot access the org until they accept their invite
+      const viewer = await signIn(t, "viewer");
+      await expect(
+        t.query(api.orgs.get, {
+          orgId: orgId! as any,
+          sessionToken: viewer.sessionToken,
+        })
+      ).rejects.toThrow("Membership is not active");
+
+      // Only the invitee's own token can accept
+      await t.mutation(api.orgs.acceptInvite, {
+        orgId: orgId! as any,
+        sessionToken: viewer.sessionToken,
+      });
+
+      await t.run(async (ctx) => {
+        const membership = await ctx.db.get(result.membershipId as any) as Doc<"orgMemberships"> | null;
         expect(membership?.status).toBe("active");
       });
+
+      // Now they have access
+      const org = await t.query(api.orgs.get, {
+        orgId: orgId! as any,
+        sessionToken: viewer.sessionToken,
+      });
+      expect(org).not.toBeNull();
     });
 
     it("creates user if not exists", async () => {
@@ -295,9 +360,11 @@ describe("Orgs", () => {
         orgId = setup.orgId;
       });
 
+      const admin = await signIn(t, "admin");
+
       await t.mutation(api.orgs.inviteMember, {
         orgId: orgId! as any,
-        walletAddress: TEST_WALLETS.admin,
+        sessionToken: admin.sessionToken,
         memberWalletAddress: newWallet,
         role: "initiator",
       });
@@ -313,7 +380,7 @@ describe("Orgs", () => {
       });
     });
 
-    it("reactivates removed member", async () => {
+    it("re-invites removed member who must accept to reactivate", async () => {
       const t = convexTest(schema);
 
       let orgId: string;
@@ -332,14 +399,28 @@ describe("Orgs", () => {
         });
       });
 
+      const admin = await signIn(t, "admin");
+
       const result = await t.mutation(api.orgs.inviteMember, {
         orgId: orgId! as any,
-        walletAddress: TEST_WALLETS.admin,
+        sessionToken: admin.sessionToken,
         memberWalletAddress: TEST_WALLETS.viewer,
         role: "approver", // New role
       });
 
-      // Verify member was reactivated with new role
+      // Re-invite stays pending until the invitee accepts
+      await t.run(async (ctx) => {
+        const membership = await ctx.db.get(result.membershipId as any) as Doc<"orgMemberships"> | null;
+        expect(membership?.status).toBe("invited");
+        expect(membership?.role).toBe("approver");
+      });
+
+      const viewer = await signIn(t, "viewer");
+      await t.mutation(api.orgs.acceptInvite, {
+        orgId: orgId! as any,
+        sessionToken: viewer.sessionToken,
+      });
+
       await t.run(async (ctx) => {
         const membership = await ctx.db.get(result.membershipId as any) as Doc<"orgMemberships"> | null;
         expect(membership?.status).toBe("active");
@@ -362,10 +443,12 @@ describe("Orgs", () => {
         await createTestMembership(ctx, orgId as any, viewerId, { role: "viewer", status: "active" });
       });
 
+      const admin = await signIn(t, "admin");
+
       await expect(
         t.mutation(api.orgs.inviteMember, {
           orgId: orgId! as any,
-          walletAddress: TEST_WALLETS.admin,
+          sessionToken: admin.sessionToken,
           memberWalletAddress: TEST_WALLETS.viewer,
           role: "approver",
         })
@@ -386,11 +469,13 @@ describe("Orgs", () => {
         orgId = id;
       });
 
+      const admin = await signIn(t, "admin");
+
       // Try to add second user (should fail)
       await expect(
         t.mutation(api.orgs.inviteMember, {
           orgId: orgId! as any,
-          walletAddress: TEST_WALLETS.admin,
+          sessionToken: admin.sessionToken,
           memberWalletAddress: TEST_WALLETS.viewer,
           role: "viewer",
         })
@@ -417,11 +502,13 @@ describe("Orgs", () => {
         }
       });
 
+      const admin = await signIn(t, "admin");
+
       // 6th user should fail
       await expect(
         t.mutation(api.orgs.inviteMember, {
           orgId: orgId! as any,
-          walletAddress: TEST_WALLETS.admin,
+          sessionToken: admin.sessionToken,
           memberWalletAddress: TEST_WALLETS.nonMember,
           role: "viewer",
         })
@@ -448,10 +535,12 @@ describe("Orgs", () => {
         }
       });
 
+      const admin = await signIn(t, "admin");
+
       // Should still work
       const result = await t.mutation(api.orgs.inviteMember, {
         orgId: orgId! as any,
-        walletAddress: TEST_WALLETS.admin,
+        sessionToken: admin.sessionToken,
         memberWalletAddress: TEST_WALLETS.nonMember,
         role: "viewer",
       });
@@ -472,14 +561,16 @@ describe("Orgs", () => {
         await createTestMembership(ctx, orgId as any, viewerId, { role: "viewer" });
       });
 
+      const viewer = await signIn(t, "viewer");
+
       await expect(
         t.mutation(api.orgs.inviteMember, {
           orgId: orgId! as any,
-          walletAddress: TEST_WALLETS.viewer,
+          sessionToken: viewer.sessionToken,
           memberWalletAddress: TEST_WALLETS.nonMember,
           role: "clerk",
         })
-      ).rejects.toThrow("Only admins");
+      ).rejects.toThrow("Insufficient permissions. Required: admin");
     });
   });
 
@@ -499,10 +590,12 @@ describe("Orgs", () => {
         membershipId = await createTestMembership(ctx, orgId as any, viewerId, { role: "viewer" });
       });
 
+      const admin = await signIn(t, "admin");
+
       await t.mutation(api.orgs.updateMemberRole, {
         orgId: orgId! as any,
         membershipId: membershipId! as any,
-        walletAddress: TEST_WALLETS.admin,
+        sessionToken: admin.sessionToken,
         newRole: "approver",
       });
 
@@ -525,11 +618,13 @@ describe("Orgs", () => {
         membershipId = setup.membershipId;
       });
 
+      const admin = await signIn(t, "admin");
+
       await expect(
         t.mutation(api.orgs.updateMemberRole, {
           orgId: orgId! as any,
           membershipId: membershipId! as any,
-          walletAddress: TEST_WALLETS.admin,
+          sessionToken: admin.sessionToken,
           newRole: "viewer",
         })
       ).rejects.toThrow("Cannot demote the last admin");
@@ -552,11 +647,13 @@ describe("Orgs", () => {
         await createTestMembership(ctx, orgId as any, secondAdminId, { role: "admin" });
       });
 
+      const admin = await signIn(t, "admin");
+
       // Should work now
       await t.mutation(api.orgs.updateMemberRole, {
         orgId: orgId! as any,
         membershipId: firstAdminMembershipId! as any,
-        walletAddress: TEST_WALLETS.admin,
+        sessionToken: admin.sessionToken,
         newRole: "viewer",
       });
 
@@ -581,10 +678,12 @@ describe("Orgs", () => {
         membershipId = await createTestMembership(ctx, orgId as any, viewerId, { role: "viewer" });
       });
 
+      const admin = await signIn(t, "admin");
+
       await t.mutation(api.orgs.updateMemberRole, {
         orgId: orgId! as any,
         membershipId: membershipId! as any,
-        walletAddress: TEST_WALLETS.admin,
+        sessionToken: admin.sessionToken,
         newRole: "clerk",
       });
 
@@ -618,10 +717,12 @@ describe("Orgs", () => {
         membershipId = await createTestMembership(ctx, orgId as any, viewerId, { role: "viewer" });
       });
 
+      const admin = await signIn(t, "admin");
+
       await t.mutation(api.orgs.removeMember, {
         orgId: orgId! as any,
         membershipId: membershipId! as any,
-        walletAddress: TEST_WALLETS.admin,
+        sessionToken: admin.sessionToken,
       });
 
       await t.run(async (ctx) => {
@@ -643,11 +744,13 @@ describe("Orgs", () => {
         membershipId = setup.membershipId;
       });
 
+      const admin = await signIn(t, "admin");
+
       await expect(
         t.mutation(api.orgs.removeMember, {
           orgId: orgId! as any,
           membershipId: membershipId! as any,
-          walletAddress: TEST_WALLETS.admin,
+          sessionToken: admin.sessionToken,
         })
       ).rejects.toThrow("Cannot remove the last admin");
     });
@@ -669,11 +772,13 @@ describe("Orgs", () => {
         await createTestMembership(ctx, orgId as any, secondAdminId, { role: "admin" });
       });
 
+      const admin = await signIn(t, "admin");
+
       await expect(
         t.mutation(api.orgs.removeMember, {
           orgId: orgId! as any,
           membershipId: membershipId! as any,
-          walletAddress: TEST_WALLETS.admin,
+          sessionToken: admin.sessionToken,
         })
       ).rejects.toThrow("Cannot remove yourself");
     });
@@ -693,10 +798,12 @@ describe("Orgs", () => {
         membershipId = await createTestMembership(ctx, orgId as any, viewerId, { role: "viewer" });
       });
 
+      const admin = await signIn(t, "admin");
+
       await t.mutation(api.orgs.removeMember, {
         orgId: orgId! as any,
         membershipId: membershipId! as any,
-        walletAddress: TEST_WALLETS.admin,
+        sessionToken: admin.sessionToken,
       });
 
       await t.run(async (ctx) => {
@@ -726,9 +833,11 @@ describe("Orgs", () => {
         await createTestMembership(ctx, orgId as any, viewerId, { role: "viewer" });
       });
 
+      const admin = await signIn(t, "admin");
+
       const result = await t.query(api.orgs.listMembers, {
         orgId: orgId! as any,
-        walletAddress: TEST_WALLETS.admin,
+        sessionToken: admin.sessionToken,
       });
 
       expect(result.length).toBe(2);
@@ -747,9 +856,11 @@ describe("Orgs", () => {
         orgId = setup.orgId;
       });
 
+      const admin = await signIn(t, "admin");
+
       const result = await t.query(api.orgs.listMembers, {
         orgId: orgId! as any,
-        walletAddress: TEST_WALLETS.admin,
+        sessionToken: admin.sessionToken,
       });
 
       expect(result[0]?.walletAddress).toBe(TEST_WALLETS.admin.toLowerCase());
@@ -768,9 +879,11 @@ describe("Orgs", () => {
         await createTestMembership(ctx, orgId as any, viewerId, { role: "viewer" });
       });
 
+      const viewer = await signIn(t, "viewer");
+
       const result = await t.query(api.orgs.listMembers, {
         orgId: orgId! as any,
-        walletAddress: TEST_WALLETS.viewer,
+        sessionToken: viewer.sessionToken,
       });
 
       expect(result.length).toBe(2);

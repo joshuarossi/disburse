@@ -158,7 +158,7 @@ export const screenBeneficiary = internalAction({
   args: {
     beneficiaryId: v.id("beneficiaries"),
     orgId: v.id("orgs"),
-    walletAddress: v.string(),
+    sessionToken: v.string(),
   },
   handler: async (ctx, args): Promise<{ status: string; matchCount: number }> => {
     // Get beneficiary
@@ -201,7 +201,7 @@ export const screenBeneficiary = internalAction({
 export const screenAllBeneficiaries = action({
   args: {
     orgId: v.id("orgs"),
-    walletAddress: v.string(),
+    sessionToken: v.string(),
   },
   handler: async (ctx, args) => {
     const beneficiaries = await ctx.runQuery(
@@ -216,7 +216,7 @@ export const screenAllBeneficiaries = action({
       const result = await ctx.runAction(internal.screening.screenBeneficiary, {
         beneficiaryId: beneficiary._id,
         orgId: args.orgId,
-        walletAddress: args.walletAddress,
+        sessionToken: args.sessionToken,
       });
       screened++;
       if (result.status === "potential_match") flagged++;
@@ -231,13 +231,13 @@ export const screenAllBeneficiaries = action({
 export const rerunScreening = action({
   args: {
     beneficiaryId: v.id("beneficiaries"),
-    walletAddress: v.string(),
+    sessionToken: v.string(),
   },
   handler: async (ctx, args): Promise<{ status: string; matchCount: number }> => {
     // Verify access (admin, approver, initiator, or clerk can rerun)
     const { orgId } = await ctx.runQuery(internal.screeningQueries.verifyBeneficiaryAccess, {
       beneficiaryId: args.beneficiaryId,
-      walletAddress: args.walletAddress,
+      sessionToken: args.sessionToken,
       allowedRoles: ["admin", "approver", "initiator", "clerk"],
     });
 
@@ -245,7 +245,7 @@ export const rerunScreening = action({
     const result: { status: string; matchCount: number } = await ctx.runAction(internal.screening.screenBeneficiary, {
       beneficiaryId: args.beneficiaryId,
       orgId,
-      walletAddress: args.walletAddress,
+      sessionToken: args.sessionToken,
     });
 
     return result;

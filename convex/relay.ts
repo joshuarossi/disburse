@@ -67,8 +67,11 @@ interface SafeTxPayload {
 
 function encodeExecTransaction(safeTx: SafeTxPayload): string {
   const confirmations = [...(safeTx.confirmations || [])];
+  // H-05 fix: Safe requires signatures sorted ascending by signer address.
+  // Compare lowercase hex byte-order — locale-aware comparison of checksummed
+  // addresses is locale-dependent and can produce an invalid ordering.
   confirmations.sort((a: SafeConfirmation, b: SafeConfirmation) =>
-    getAddress(a.owner).localeCompare(getAddress(b.owner))
+    getAddress(a.owner).toLowerCase() < getAddress(b.owner).toLowerCase() ? -1 : 1
   );
   const signaturesHex = "0x" + confirmations
     .map((c: SafeConfirmation) => c.signature.replace("0x", ""))
@@ -136,12 +139,12 @@ export const getTaskStatus = action({
 export const retryDisbursement = action({
   args: {
     disbursementId: v.id("disbursements"),
-    walletAddress: v.string(),
+    sessionToken: v.string(),
   },
   handler: async (ctx, args) => {
     const disbursement = await ctx.runQuery(api.disbursements.get, {
       disbursementId: args.disbursementId,
-      walletAddress: args.walletAddress,
+      sessionToken: args.sessionToken,
     });
 
     if (!disbursement) {
@@ -169,7 +172,7 @@ export const retryDisbursement = action({
       if (response.status === 404) {
         await ctx.runMutation(api.disbursements.updateStatus, {
           disbursementId: args.disbursementId,
-          walletAddress: args.walletAddress,
+          sessionToken: args.sessionToken,
           status: "failed",
           relayStatus: "safe_tx_not_found",
           relayError: "Safe transaction not found in service.",
@@ -187,7 +190,7 @@ export const retryDisbursement = action({
     if (safeTx?.isExecuted && safeTx?.transactionHash) {
       await ctx.runMutation(api.disbursements.updateStatus, {
         disbursementId: args.disbursementId,
-        walletAddress: args.walletAddress,
+        sessionToken: args.sessionToken,
         status: "executed",
         txHash: safeTx.transactionHash,
         relayStatus: "executed",
@@ -202,7 +205,7 @@ export const retryDisbursement = action({
     if (confirmations < confirmationsRequired) {
       await ctx.runMutation(api.disbursements.updateStatus, {
         disbursementId: args.disbursementId,
-        walletAddress: args.walletAddress,
+        sessionToken: args.sessionToken,
         status: "proposed",
         relayStatus: "needs_confirmations",
       });
@@ -216,7 +219,7 @@ export const retryDisbursement = action({
 
     await ctx.runMutation(api.disbursements.updateStatus, {
       disbursementId: args.disbursementId,
-      walletAddress: args.walletAddress,
+      sessionToken: args.sessionToken,
       status: "proposed",
       relayStatus: "ready_for_relay",
     });
@@ -270,6 +273,33 @@ export const fireScheduledRelay = internalAction({
       }
       const safeTx = await txResponse.json();
 
+      // C-04 fix: never relay without a fully signed transaction. Relaying an
+      // under-threshold tx reverts on-chain while still consuming the Gelato
+      // sync fee from the Safe's funds.
+      const confirmations = safeTx?.confirmations?.length ?? 0;
+      const confirmationsRequired = safeTx?.confirmationsRequired ?? 0;
+      if (confirmations < confirmationsRequired) {
+        await ctx.runMutation(internal.disbursements.updateStatusInternal, {
+          disbursementId: args.disbursementId,
+          status: "failed",
+          relayError: `Insufficient confirmations at relay time (${confirmations}/${confirmationsRequired}).`,
+          relayStatus: "insufficient_confirmations",
+        });
+        return { error: "insufficient_confirmations" };
+      }
+
+      // Already executed on-chain? Record it instead of relaying a second time.
+      if (safeTx?.isExecuted && safeTx?.transactionHash) {
+        await ctx.runMutation(internal.disbursements.updateStatusInternal, {
+          disbursementId: args.disbursementId,
+          status: "failed",
+          relayError: "Safe transaction already executed before relay.",
+          relayStatus: "already_executed",
+          txHash: safeTx.transactionHash,
+        });
+        return { status: "already_executed" };
+      }
+
       const encodedTransaction = encodeExecTransaction(safeTx);
 
       const gasToken = safeTx.gasToken ?? ZERO_ADDRESS;
@@ -277,11 +307,19 @@ export const fireScheduledRelay = internalAction({
         ? GELATO_NATIVE_TOKEN_ADDRESS
         : gasToken;
 
+      const gelatoApiKey = process.env.GELATO_RELAY_API_KEY;
+      const relayHeaders: Record<string, string> = {
+        "Content-Type": "application/json",
+      };
+      if (gelatoApiKey) {
+        relayHeaders["Authorization"] = `Bearer ${gelatoApiKey}`;
+      }
+
       const relayResponse = await fetch(
         "https://api.gelato.digital/relays/v2/call-with-sync-fee",
         {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: relayHeaders,
           body: JSON.stringify({
             chainId: String(disbursement.chainId),
             target: disbursement.safeAddress,

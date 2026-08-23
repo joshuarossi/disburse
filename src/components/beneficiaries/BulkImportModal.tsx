@@ -1,4 +1,5 @@
 import { useState, useCallback, useMemo, useRef } from 'react';
+import { getSessionToken } from '@/lib/session';
 import { useAccount } from 'wagmi';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useMutation } from 'convex/react';
@@ -36,8 +37,8 @@ export function BulkImportModal({ orgId, onClose, onSuccess }: BulkImportModalPr
   // Get existing beneficiaries to check for duplicates
   const existingBeneficiaries = useQuery(
     api.beneficiaries.list,
-    orgId && address
-      ? { orgId, walletAddress: address }
+    orgId && address && getSessionToken()
+      ? { orgId, sessionToken: getSessionToken() ?? "" }
       : 'skip'
   );
 
@@ -169,7 +170,7 @@ export function BulkImportModal({ orgId, onClose, onSuccess }: BulkImportModalPr
     try {
       await createBulk({
         orgId,
-        walletAddress: address,
+        sessionToken: getSessionToken() ?? "",
         beneficiaries: selectedRows.map((row) => ({
           type: row.type.trim().toLowerCase() as 'individual' | 'business',
           name: row.name.trim(),

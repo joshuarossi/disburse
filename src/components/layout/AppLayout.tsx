@@ -1,4 +1,5 @@
 import { ReactNode, useState, useEffect } from 'react';
+import { getSessionToken } from '@/lib/session';
 import { Link, useParams, useLocation } from 'react-router-dom';
 import { useQuery } from 'convex/react';
 import { useAccount, useDisconnect } from 'wagmi';
@@ -59,21 +60,23 @@ export function AppLayout({ children }: AppLayoutProps) {
 
   const org = useQuery(
     api.orgs.get,
-    orgId ? { orgId: orgId as Id<'orgs'> } : 'skip'
+    orgId && getSessionToken()
+      ? { orgId: orgId as Id<'orgs'>, sessionToken: getSessionToken() ?? "" }
+      : 'skip'
   );
 
   const billing = useQuery(
     api.billing.get,
-    orgId && address
-      ? { orgId: orgId as Id<'orgs'>, walletAddress: address }
+    orgId && address && getSessionToken()
+      ? { orgId: orgId as Id<'orgs'>, sessionToken: getSessionToken() ?? "" }
       : 'skip'
   );
 
   // Get current user's membership to display their name
   const members = useQuery(
     api.orgs.listMembers,
-    orgId && address
-      ? { orgId: orgId as Id<'orgs'>, walletAddress: address }
+    orgId && address && getSessionToken()
+      ? { orgId: orgId as Id<'orgs'>, sessionToken: getSessionToken() ?? "" }
       : 'skip'
   );
 

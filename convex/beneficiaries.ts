@@ -4,6 +4,7 @@ import { internal } from "./_generated/api";
 import { requireOrgAccess } from "./lib/rbac";
 import { getOrgLimits } from "./billing";
 import { dedupeTagNames } from "./lib/tags";
+import { assertValidAddress } from "./lib/validation";
 import { Id } from "./_generated/dataModel";
 
 const buildTagsForOrg = async (ctx: QueryCtx, orgId: Id<"orgs">) => {
@@ -112,15 +113,14 @@ const setBeneficiaryTags = async (
 export const list = query({
   args: { 
     orgId: v.id("orgs"),
-    walletAddress: v.string(),
+    sessionToken: v.string(),
     activeOnly: v.optional(v.boolean()),
     includeTags: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
-    const walletAddress = args.walletAddress.toLowerCase();
 
     // Verify access (any role can view)
-    await requireOrgAccess(ctx, args.orgId, walletAddress, ["admin", "approver", "initiator", "clerk", "viewer"]);
+    await requireOrgAccess(ctx, args.orgId, args.sessionToken, ["admin", "approver", "initiator", "clerk", "viewer"]);
 
     const includeTags = args.includeTags ?? false;
     const tagsByBeneficiary = includeTags
@@ -157,7 +157,7 @@ export const list = query({
 export const create = mutation({
   args: {
     orgId: v.id("orgs"),
-    walletAddress: v.string(),
+    sessionToken: v.string(),
     type: v.union(v.literal("individual"), v.literal("business")),
     name: v.string(),
     beneficiaryAddress: v.string(),
@@ -167,11 +167,10 @@ export const create = mutation({
     tags: v.optional(v.array(v.string())),
   },
   handler: async (ctx, args) => {
-    const walletAddress = args.walletAddress.toLowerCase();
     const now = Date.now();
 
     // Verify access (admin, initiator, or clerk can create)
-    const { user } = await requireOrgAccess(ctx, args.orgId, walletAddress, ["admin", "initiator", "clerk"]);
+    const { user } = await requireOrgAccess(ctx, args.orgId, args.sessionToken, ["admin", "initiator", "clerk"]);
 
     // Check tier limits for beneficiaries
     const limits = await getOrgLimits(ctx, args.orgId);
@@ -184,6 +183,8 @@ export const create = mutation({
       throw new Error(`Your plan allows a maximum of ${limits.maxBeneficiaries} beneficiaries. Please upgrade to add more.`);
     }
 
+    // H-03: validate destination address server-side before persisting
+    assertValidAddress(args.beneficiaryAddress, "beneficiary wallet address");
     const beneficiaryId = await ctx.db.insert("beneficiaries", {
       orgId: args.orgId,
       type: args.type,
@@ -221,7 +222,7 @@ export const create = mutation({
     await ctx.scheduler.runAfter(0, internal.screening.screenBeneficiary, {
       beneficiaryId,
       orgId: args.orgId,
-      walletAddress: args.walletAddress,
+      sessionToken: args.sessionToken,
     });
 
     return { beneficiaryId };
@@ -232,7 +233,7 @@ export const create = mutation({
 export const update = mutation({
   args: {
     beneficiaryId: v.id("beneficiaries"),
-    walletAddress: v.string(),
+    sessionToken: v.string(),
     type: v.optional(v.union(v.literal("individual"), v.literal("business"))),
     name: v.optional(v.string()),
     beneficiaryAddress: v.optional(v.string()),
@@ -243,7 +244,6 @@ export const update = mutation({
     tags: v.optional(v.array(v.string())),
   },
   handler: async (ctx, args) => {
-    const walletAddress = args.walletAddress.toLowerCase();
     const now = Date.now();
 
     const beneficiary = await ctx.db.get(args.beneficiaryId);
@@ -252,12 +252,15 @@ export const update = mutation({
     }
 
     // Verify access
-    const { user } = await requireOrgAccess(ctx, beneficiary.orgId, walletAddress, ["admin", "initiator", "clerk"]);
+    const { user } = await requireOrgAccess(ctx, beneficiary.orgId, args.sessionToken, ["admin", "initiator", "clerk"]);
 
     const updates: Record<string, unknown> = { updatedAt: now };
     if (args.type !== undefined) updates.type = args.type;
     if (args.name !== undefined) updates.name = args.name;
-    if (args.beneficiaryAddress !== undefined) updates.walletAddress = args.beneficiaryAddress.toLowerCase();
+    if (args.beneficiaryAddress !== undefined) {
+      assertValidAddress(args.beneficiaryAddress, "beneficiary wallet address");
+      updates.walletAddress = args.beneficiaryAddress.toLowerCase();
+    }
     if (args.notes !== undefined) updates.notes = args.notes;
     if (args.preferredToken !== undefined) updates.preferredToken = args.preferredToken;
     if (args.preferredChainId !== undefined) updates.preferredChainId = args.preferredChainId;
@@ -293,10 +296,9 @@ export const update = mutation({
 export const get = query({
   args: { 
     beneficiaryId: v.id("beneficiaries"),
-    walletAddress: v.string(),
+    sessionToken: v.string(),
   },
   handler: async (ctx, args) => {
-    const walletAddress = args.walletAddress.toLowerCase();
 
     const beneficiary = await ctx.db.get(args.beneficiaryId);
     if (!beneficiary) {
@@ -304,7 +306,7 @@ export const get = query({
     }
 
     // Verify access
-    await requireOrgAccess(ctx, beneficiary.orgId, walletAddress, ["admin", "approver", "initiator", "clerk", "viewer"]);
+    await requireOrgAccess(ctx, beneficiary.orgId, args.sessionToken, ["admin", "approver", "initiator", "clerk", "viewer"]);
 
     return beneficiary;
   },
@@ -314,14 +316,13 @@ export const get = query({
 export const checkDuplicateAddresses = query({
   args: {
     orgId: v.id("orgs"),
-    walletAddress: v.string(),
+    sessionToken: v.string(),
     addresses: v.array(v.string()),
   },
   handler: async (ctx, args) => {
-    const walletAddress = args.walletAddress.toLowerCase();
 
     // Verify access (any role can check)
-    await requireOrgAccess(ctx, args.orgId, walletAddress, ["admin", "approver", "initiator", "clerk", "viewer"]);
+    await requireOrgAccess(ctx, args.orgId, args.sessionToken, ["admin", "approver", "initiator", "clerk", "viewer"]);
 
     // Get all existing beneficiaries for this org
     const existingBeneficiaries = await ctx.db
@@ -351,7 +352,7 @@ export const checkDuplicateAddresses = query({
 export const createBulk = mutation({
   args: {
     orgId: v.id("orgs"),
-    walletAddress: v.string(),
+    sessionToken: v.string(),
     beneficiaries: v.array(
       v.object({
         type: v.union(v.literal("individual"), v.literal("business")),
@@ -364,11 +365,10 @@ export const createBulk = mutation({
     ),
   },
   handler: async (ctx, args) => {
-    const walletAddress = args.walletAddress.toLowerCase();
     const now = Date.now();
 
     // Verify access (admin, initiator, or clerk can create)
-    const { user } = await requireOrgAccess(ctx, args.orgId, walletAddress, ["admin", "initiator", "clerk"]);
+    const { user } = await requireOrgAccess(ctx, args.orgId, args.sessionToken, ["admin", "initiator", "clerk"]);
 
     if (args.beneficiaries.length === 0) {
       throw new Error("No beneficiaries provided");
@@ -422,11 +422,9 @@ export const createBulk = mutation({
       if (!beneficiary.beneficiaryAddress || !beneficiary.beneficiaryAddress.trim()) {
         throw new Error("Wallet address is required");
       }
-      // Basic Ethereum address validation (42 chars, starts with 0x)
       const address = beneficiary.beneficiaryAddress.trim();
-      if (!address.startsWith("0x") || address.length !== 42) {
-        throw new Error(`Invalid wallet address format: ${address}`);
-      }
+      // H-03: full hex validation (0x + 40 hex chars)
+      assertValidAddress(address, "beneficiary wallet address");
     }
 
     // Create all beneficiaries
@@ -469,7 +467,7 @@ export const createBulk = mutation({
       await ctx.scheduler.runAfter(0, internal.screening.screenBeneficiary, {
         beneficiaryId: id,
         orgId: args.orgId,
-        walletAddress: args.walletAddress,
+        sessionToken: args.sessionToken,
       });
     }
 
