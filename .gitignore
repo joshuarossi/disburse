@@ -31,3 +31,4 @@ dist-ssr
 .env.local
 .env.*.local
 sdn_enhanced.xml
+code-review-report.html
