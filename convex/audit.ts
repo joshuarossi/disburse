@@ -1,6 +1,52 @@
 import { v } from "convex/values";
-import { query } from "./_generated/server";
+import { query, MutationCtx } from "./_generated/server";
 import { requireOrgAccess } from "./lib/rbac";
+import { Id } from "./_generated/dataModel";
+
+// ─── Append-only audit writer (M-06) ──────────────────────────────────────────
+//
+// All audit entries MUST be written through appendAudit(). It:
+//   - normalizes metadata to the flat primitive map the schema enforces
+//     (arrays/objects are JSON.stringify-ed, undefined values dropped)
+//   - stamps the server-side time when the caller doesn't provide one
+//   - is the single choke point for future hardening (signing, export, etc.)
+
+export type AuditValue = string | number | boolean | null;
+
+interface AuditEntry {
+  orgId: Id<"orgs">;
+  actorUserId: Id<"users">;
+  action: string;
+  objectType: string;
+  objectId: string;
+  metadata?: Record<string, AuditValue | AuditValue[] | Record<string, AuditValue> | undefined>;
+  timestamp?: number;
+}
+
+export async function appendAudit(ctx: MutationCtx, entry: AuditEntry): Promise<void> {
+  let metadata: Record<string, AuditValue> | undefined;
+  if (entry.metadata) {
+    metadata = {};
+    for (const [key, value] of Object.entries(entry.metadata)) {
+      if (value === undefined) continue;
+      if (value !== null && typeof value === "object") {
+        metadata[key] = JSON.stringify(value);
+      } else {
+        metadata[key] = value;
+      }
+    }
+  }
+
+  await ctx.db.insert("auditLog", {
+    orgId: entry.orgId,
+    actorUserId: entry.actorUserId,
+    action: entry.action,
+    objectType: entry.objectType,
+    objectId: entry.objectId,
+    metadata,
+    timestamp: entry.timestamp ?? Date.now(),
+  });
+}
 
 // List audit logs for an org
 export const list = query({

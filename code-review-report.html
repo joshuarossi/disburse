@@ -1,0 +1,422 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Code Review Report — disburse</title>
+<style>
+  :root {
+    --bg: #0b1120;
+    --surface: #111a2e;
+    --surface-2: #16213a;
+    --border: #233250;
+    --text: #e2e8f0;
+    --muted: #94a3b8;
+    --accent: #38bdf8;
+    --critical: #f43f5e;
+    --high: #fb923c;
+    --medium: #eab308;
+    --low: #38bdf8;
+    --good: #34d399;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.6;
+    padding-bottom: 80px;
+  }
+  .container { max-width: 1080px; margin: 0 auto; padding: 0 24px; }
+  header.hero {
+    padding: 56px 0 40px;
+    background:
+      radial-gradient(600px 300px at 20% 0%, rgba(56,189,248,0.12), transparent),
+      radial-gradient(500px 260px at 85% 10%, rgba(244,63,94,0.10), transparent);
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 40px;
+  }
+  h1 { font-size: 2rem; letter-spacing: -0.02em; }
+  .subtitle { color: var(--muted); margin-top: 6px; font-size: 1rem; }
+  .meta-grid { display: flex; flex-wrap: wrap; gap: 28px; margin-top: 24px; font-size: 0.9rem; }
+  .meta-item strong { display: block; color: var(--accent); font-size: 1.15rem; }
+  .meta-item span { color: var(--muted); }
+
+  h2 { font-size: 1.35rem; margin: 44px 0 16px; letter-spacing: -0.01em; border-left: 3px solid var(--accent); padding-left: 12px; }
+  h3 { font-size: 1.05rem; margin: 22px 0 10px; }
+
+  .verdict {
+    background: linear-gradient(135deg, rgba(244,63,94,0.12), rgba(251,146,60,0.08));
+    border: 1px solid rgba(244,63,94,0.35);
+    border-radius: 12px;
+    padding: 22px 26px;
+    margin-bottom: 8px;
+  }
+  .verdict h2 { margin-top: 0; border: none; padding: 0; font-size: 1.2rem; color: #fecdd3; }
+  .verdict p { color: var(--text); margin-top: 8px; }
+
+  table { width: 100%; border-collapse: collapse; margin: 14px 0; font-size: 0.92rem; }
+  th, td { text-align: left; padding: 10px 14px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  th { color: var(--muted); font-weight: 600; text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.06em; }
+
+  .badge {
+    display: inline-block; padding: 2px 10px; border-radius: 999px;
+    font-size: 0.7rem; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase;
+  }
+  .badge.critical { background: rgba(244,63,94,0.15); color: var(--critical); border: 1px solid rgba(244,63,94,0.4); }
+  .badge.high     { background: rgba(251,146,60,0.13); color: var(--high); border: 1px solid rgba(251,146,60,0.4); }
+  .badge.medium   { background: rgba(234,179,8,0.12); color: var(--medium); border: 1px solid rgba(234,179,8,0.4); }
+  .badge.low      { background: rgba(56,189,248,0.12); color: var(--low); border: 1px solid rgba(56,189,248,0.4); }
+  .badge.good     { background: rgba(52,211,153,0.12); color: var(--good); border: 1px solid rgba(52,211,153,0.4); }
+
+  .finding {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px 24px;
+    margin: 18px 0;
+  }
+  .finding.critical { border-left: 4px solid var(--critical); }
+  .finding.high { border-left: 4px solid var(--high); }
+  .finding.medium { border-left: 4px solid var(--medium); }
+  .finding.low { border-left: 4px solid var(--low); }
+  .finding-head { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; margin-bottom: 8px; }
+  .finding-head .num { color: var(--muted); font-family: ui-monospace, monospace; font-size: 0.85rem; }
+  .finding-head .title { font-weight: 700; font-size: 1.05rem; }
+  .loc {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.8rem; color: var(--accent);
+    background: rgba(56,189,248,0.08);
+    padding: 2px 8px; border-radius: 6px; display: inline-block; margin: 4px 6px 4px 0;
+  }
+  p.desc { color: var(--muted); margin: 8px 0; font-size: 0.95rem; }
+  ul.tight { margin: 8px 0 8px 20px; color: var(--muted); font-size: 0.93rem; }
+  ul.tight li { margin: 4px 0; }
+  pre {
+    background: #0d1425;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 14px 16px;
+    overflow-x: auto;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.82rem;
+    line-height: 1.55;
+    margin: 12px 0;
+    color: #cbd5e1;
+  }
+  code.inline {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.85em; background: rgba(148,163,184,0.12); padding: 1px 6px; border-radius: 5px;
+  }
+  .rec { color: #86efac; }
+  .impact-label { font-weight: 700; color: var(--text); }
+  .footer-note { color: var(--muted); font-size: 0.82rem; margin-top: 48px; text-align: center; }
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  @media (max-width: 720px) { .grid-2 { grid-template-columns: 1fr; } }
+  .stat-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 18px 22px; }
+  .stat-card .big { font-size: 1.7rem; font-weight: 800; }
+  .stat-card .lbl { color: var(--muted); font-size: 0.82rem; }
+  .toc a { color: var(--accent); text-decoration: none; }
+  .toc li { margin: 4px 0; }
+</style>
+</head>
+<body>
+
+<header class="hero">
+  <div class="container">
+    <h1>Code Review Report — <span style="color:var(--accent)">disburse</span></h1>
+    <p class="subtitle">Stablecoin treasury &amp; disbursement platform · React 19 + Vite + Convex + wagmi/Safe + Gelato relay</p>
+    <div class="meta-grid">
+      <div class="meta-item"><strong>128</strong><span>tracked files</span></div>
+      <div class="meta-item"><strong>~16.2k</strong><span>LOC reviewed (src + convex)</span></div>
+      <div class="meta-item"><strong style="color:var(--critical)">6</strong><span>critical findings</span></div>
+      <div class="meta-item"><strong style="color:var(--high)">6</strong><span>high findings</span></div>
+      <div class="meta-item"><strong style="color:var(--medium)">8</strong><span>medium findings</span></div>
+      <div class="meta-item"><strong>v0.3.0 @ 653f24c</strong><span>HEAD reviewed</span></div>
+    </div>
+  </div>
+</header>
+
+<div class="container">
+
+  <!-- EXEC SUMMARY -->
+  <section id="summary" class="verdict">
+    <h2>Executive Summary — Not production-ready</h2>
+    <p><strong>The application's entire security model is client-trusted.</strong> Every Convex function authenticates callers by accepting a
+    <code class="inline">walletAddress</code> string as an argument, and the SIWE flow never verifies signatures server-side
+    (<code class="inline">convex/auth.ts:85</code>: “we trust the frontend verification”). Any user can act as any wallet — including org admins —
+    by simply passing that address to any API call. This defeats the RBAC system entirely and exposes fund movement, role management,
+    and billing controls. For an app whose purpose is moving treasury funds, this must be fixed before anything else.</p>
+    <p>Beyond auth: payments are recorded as executed without on-chain verification, plan upgrades are trusted from client-supplied
+    transaction data, the scheduled relay submits Safe transactions without checking signature thresholds, CSV exports are vulnerable to
+    formula injection, and <strong>the whole backend test suite is broken (137 of 190 tests failing)</strong>, so none of this is currently caught by CI.</p>
+  </section>
+
+  <!-- SCORECARD -->
+  <h2>Scorecard</h2>
+  <div class="grid-2">
+    <div class="stat-card"><div class="big" style="color:var(--critical)">D&nbsp;/&nbsp;Failing</div><div class="lbl">Security posture — client-trusted identity, no server-side verification anywhere in the request path</div></div>
+    <div class="stat-card"><div class="big" style="color:var(--high)">137 / 190 fail</div><div class="lbl">Tests — all Convex backend suites error at startup (<code class="inline">convex-test</code>/Vitest&nbsp;4 incompatibility)</div></div>
+    <div class="stat-card"><div class="big" style="color:var(--medium)">1 err · 7 warn</div><div class="lbl">Lint — <code class="inline">eslint .</code> exits non-zero (unused import + exhaustive-deps warnings)</div></div>
+    <div class="stat-card"><div class="big" style="color:var(--good)">Pass</div><div class="lbl">Type safety — <code class="inline">tsc -b</code> compiles cleanly across app and convex projects</div></div>
+  </div>
+
+  <nav class="toc" style="margin-top:28px; background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:18px 26px;">
+    <strong>Contents</strong>
+    <ul style="margin:8px 0 0 20px; font-size:0.92rem;">
+      <li><a href="#critical">Critical findings</a></li>
+      <li><a href="#high">High severity</a></li>
+      <li><a href="#medium">Medium severity</a></li>
+      <li><a href="#positive">What's done well</a></li>
+      <li><a href="#roadmap">Recommended remediation order</a></li>
+      <li><a href="#verification">Verification commands run</a></li>
+    </ul>
+  </nav>
+
+  <!-- CRITICAL -->
+  <h2 id="critical">Critical Findings</h2>
+
+  <div class="finding critical">
+    <div class="finding-head"><span class="badge critical">Critical</span><span class="num">C-01</span><span class="title">Full authentication bypass — identity is whatever the caller claims</span></div>
+    <span class="loc">convex/auth.ts:85-87</span><span class="loc">convex/lib/rbac.ts:10-49</span><span class="loc">(pattern in every convex/*.ts module)</span>
+    <p class="desc">Every query and mutation takes <code class="inline">walletAddress: v.string()</code> from the client and uses it directly to look up users/memberships.
+    There is no session token, no HTTP auth header, no signature check — the address is the only credential. The comment in the code acknowledges it:</p>
+    <pre>// convex/auth.ts:85
+// Note: In production, you would verify the signature here using viem
+// For now, we trust the frontend verification
+// The signature verification happens client-side with wagmi/viem</pre>
+    <p class="desc"><span class="impact-label">Impact:</span> complete account takeover. A single curl can list another org's disbursements, create/execute payments,
+    promote/demote members, link/unlink Safes, or upgrade billing — as any wallet. RBAC (<code class="inline">requireOrgAccess</code>) is correctly implemented
+    but is built on an unauthenticated input, so it provides zero real protection.</p>
+    <ul class="tight">
+      <li><span class="impact-label">Fix:</span> verify the SIWE signature server-side with viem's <code class="inline">verifyMessage</code> (+ EIP-127/6492 for Smart Accounts) inside <code class="inline">verifySignature</code>.</li>
+      <li>Issue an opaque session token (random, hashed-at-rest) returned to the client and required via <code class="inline">Authorization</code>-style arg/header on every call; resolve identity from the token, never from a body parameter.</li>
+      <li>Convex supports this pattern well — consider <a href="https://docs.convex.dev/auth" style="color:var(--accent)">Convex Auth</a> or custom JWT auth so <code class="inline">ctx.auth.getUserIdentity()</code> replaces every <code class="inline">args.walletAddress</code> (~30+ call sites).</li>
+    </ul>
+  </div>
+
+  <div class="finding critical">
+    <div class="finding-head"><span class="badge critical">Critical</span><span class="num">C-02</span><span class="title">Payments marked "executed" with fabricated tx hashes; no status state machine</span></div>
+    <span class="loc">convex/disbursements.ts:293-423</span>
+    <p class="desc"><code class="inline">updateStatus</code> accepts arbitrary transitions from any allowed role: <code class="inline">draft → executed</code> directly,
+    or re-opening cancelled items. The client supplies <code class="inline">txHash</code>/<code class="inline">safeTxHash</code> and nothing validates them against the chain,
+    the Safe Transaction Service, or even format. Combined with C-01, anyone can record phantom executed payments for audit/compliance purposes.</p>
+    <ul class="tight">
+      <li><span class="impact-label">Fix:</span> enforce a transition map (e.g., draft→pending→proposed→relaying→executed) server-side; only internal actions/scheduled jobs may set terminal states after verifying on-chain receipt via RPC or Safe API.</li>
+      <li>Add checksum validation on hash inputs and cross-check <code class="inline">txHash</code> against the expected Safe tx before marking executed.</li>
+    </ul>
+  </div>
+
+  <div class="finding critical">
+    <div class="finding-head"><span class="badge critical">Critical</span><span class="num">C-03</span><span class="title">Billing upgrades trust client-declared payment</span></div>
+    <span class="loc">convex/billing.ts:106-162</span>
+    <p class="desc"><code class="inline">subscribe</code> / <code class="inline">upgradeToPro</code> accept <code class="inline">txHash</code> and <code class="inline">paidThroughAt</code> from the client and activate the plan immediately.
+    No payment is verified on-chain — amount, recipient, token, and recency are unchecked. Any admin (or anyone, given C-01) gets Pro forever with a random hex string and an epoch far in the future.</p>
+    <pre>await ctx.db.patch(billing._id, {
+  plan: args.plan,
+  status: "active",
+  paidThroughAt: args.paidThroughAt, // client-controlled!
+  ...
+});</pre>
+    <ul class="tight">
+      <li><span class="impact-label">Fix:</span> verify the payment server-side: look up txHash via RPC/Safe API, confirm transfer of correct amount/token to the Disburse treasury address, derive <code class="inline">paidThroughAt</code> from the verified payment — never accept it as input.</li>
+    </ul>
+  </div>
+
+  <div class="finding critical">
+    <div class="finding-head"><span class="badge critical">Critical</span><span class="num">C-04</span><span class="title">Scheduled relay executes Safe transactions without threshold/signature validation</span></div>
+    <span class="loc">convex/relay.ts:230-330</span>
+    <p class="desc"><code class="inline">fireScheduledRelay</code> fetches the Safe tx from the transaction service, packs whatever confirmations exist into a signatures blob, and POSTs it to Gelato's public
+    <code class="inline">call-with-sync-fee</code> endpoint — without checking <code class="inline">confirmations.length ≥ confirmationsRequired</code>, without verifying signature validity, and without an API key or sponsorship setup.</p>
+    <ul class="tight">
+      <li>If under threshold: <code class="inline">execTransaction</code> reverts on-chain but the sync fee is still consumed → silent loss of gas funds from the Safe.</li>
+      <li>No re-validation that the safeTx payload still matches what was approved/approved by the disbursement record.</li>
+      <li>Gelato relays require payment configuration (1Balance or fee transfer); unauthenticated calls will fail in production or drain whoever sponsors them.</li>
+    </ul>
+    <ul class="tight">
+      <li><span class="impact-label">Fix:</span> assert threshold met before encoding; use the Safe SDK server-side (<code class="inline">@safe-global/protocol-kit</code>) which handles signature ordering/validation; configure Gelato sponsorship properly and store credentials in env (server-side, non-VITE).</li>
+    </ul>
+  </div>
+
+  <div class="finding critical">
+    <div class="finding-head"><span class="badge critical">Critical</span><span class="num">C-05</span><span class="title">Entire backend test suite broken — 137 tests fail before running assertions</span></div>
+    <span class="loc">vitest.config.ts:17-37</span><span class="loc">node_modules/convex-test/dist/index.js:1053</span>
+    <p class="desc">All 11 Convex test files fail with <code class="inline">TypeError: (intermediate value).glob is not a function</code> thrown from <code class="inline">convexTest()</code>.
+    This is a known incompatibility between <code class="inline">convex-test</code> and Vitest&nbsp;4's module runner (the repo pins <code class="inline">vitest ^4.0.17</code>). Only 2 frontend test files pass.
+    The suite that would have caught C-01/C-02/C-03 gaps cannot run at all.</p>
+    <ul class="tight">
+      <li><span class="impact-label">Fix:</span> pin vitest to ^3.x (or upgrade convex-test when it gains Vitest 4 support), then wire <code class="inline">bun run test:run && bun run lint && tsc -b</code> into CI so regressions are impossible to merge silently.</li>
+    </ul>
+  </div>
+
+  <div class="finding critical">
+    <div class="finding-head"><span class="badge critical">Critical</span><span class="num">C-06</span><span class="title">Invite flow grants immediate active access with no acceptance step</span></div>
+    <span class="loc">convex/orgs.ts:404-534</span>
+    <p class="desc"><code class="inline">inviteMember</code> creates the membership row with <code class="inline">status: "active"</code> instantly — there is no invitation token,
+    email/notification, or acceptance flow. Any admin can add <em>any</em> wallet address as an active member of any role, including <code class="inline">admin</code>. With C-01, membership equals access.</p>
+    <ul class="tight">
+      <li><span class="impact-label">Fix:</span> create memberships as <code class="inline">invited</code>; require the invited wallet to sign a claim message (post-auth-fix) to flip to active; cap assignable roles and notify existing admins.</li>
+    </ul>
+  </div>
+
+  <!-- HIGH -->
+  <h2 id="high">High Severity</h2>
+
+  <div class="finding high">
+    <div class="finding-head"><span class="badge high">High</span><span class="num">H-01</span><span class="title">CSV export vulnerable to formula injection</span></div>
+    <span class="loc">src/lib/csv.ts:61-74</span>
+    <p class="desc"><code class="inline">escapeValue</code> quotes commas/newlines but does not neutralize leading <code class="inline">= + - @ \t</code>. Beneficiary names, memos, and notes are attacker-influenceable
+    (bulk CSV import, free-text fields) and are exported to Reports CSVs. Opening in Excel/Sheets can execute formulas (e.g., <code class="inline">=WEBSERVICE(...)</code>) or exfiltrate via DDE — a classic issue in finance tooling.</p>
+    <ul class="tight">
+      <li><span class="impact-label">Fix:</span> prefix dangerous leading characters with <code class="inline">'</code> (apostrophe) or a tab, per OWASP CSV injection guidance.</li>
+    </ul>
+  </div>
+
+  <div class="finding high">
+    <div class="finding-head"><span class="badge high">High</span><span class="num">H-02</span><span class="title">Monetary amounts parsed as floats; no decimal/limit validation</span></div>
+    <span class="loc">convex/disbursements.ts:649-654</span><span class="loc">convex/disbursements.ts:172-177</span>
+    <p class="desc">Amounts are stored as strings (good) but validated with <code class="inline">parseFloat</code> and summed with float arithmetic for batch totals:
+    <code class="inline">totalAmount += amountNum</code>. Precision drift, scientific notation ("1e21"), and garbage like <code class="inline">12abc.5</code> slip past. No per-token decimal checks or max-amount caps exist; sorting also compares via parseFloat.</p>
+    <ul class="tight">
+      <li><span class="impact-label">Fix:</span> validate with regex <code class="inline">^\d+(\.\d{1,decimals})?$</code> against token decimals, sum in integer base-units with BigInt, and enforce sanity caps.</li>
+    </ul>
+  </div>
+
+  <div class="finding high">
+    <div class="finding-head"><span class="badge high">High</span><span class="num">H-03</span><span class="title">Wallet-address inputs barely validated</span></div>
+    <span class="loc">src/lib/csv.ts:290-291</span><span class="loc">convex/auth.ts</span><span class="loc">convex/beneficiaries.ts</span>
+    <p class="desc">Validation reduces to <code class="inline">startsWith('0x') && length === 42</code> — non-hex characters pass. Backend functions lowercase whatever arrives with no checksum/format gate.
+    Invalid addresses propagate into beneficiaries, deposits denormalization, and eventually on-chain transfer calldata (where they revert late, wasting gas and approval time).</p>
+    <ul class="tight">
+      <li><span class="impact-label">Fix:</span> validate with viem <code class="inline">isAddress()</code> at both boundaries; reject (or normalize-and-record) mixed-case strings that fail EIP-55 checksums on import.</li>
+    </ul>
+  </div>
+
+  <div class="finding high">
+    <div class="finding-head"><span class="badge high">High</span><span class="num">H-04</span><span class="title">Unauthenticated queries leak org data</span></div>
+    <span class="loc">convex/orgs.ts:186-191</span><span class="loc">convex/billing.ts:211-235</span>
+    <p class="desc"><code class="inline">orgs.get</code> and <code class="inline">billing.isActive</code> take only an org ID with no access check — org name, creator, screening-enforcement mode, and subscription state are enumerable by ID guessing.
+    Inconsistent with the rest of the codebase where checks exist (even if undermined by C-01).</p>
+  </div>
+
+  <div class="finding high">
+    <div class="finding-head"><span class="badge high">High</span><span class="num">H-05</span><span class="title">Unsafe signature ordering in hand-rolled execTransaction encoder</span></div>
+    <span class="loc">convex/relay.ts:68-100</span>
+    <p class="desc">Safe requires signatures sorted ascending by signer address. The encoder sorts checksummed addresses with <code class="inline">localeCompare</code>, whose collation is locale-dependent and case-aware — not guaranteed to equal byte-order comparison of lowercase hex.
+    Misordered signatures produce invalid <code class="inline">execTransaction</code> calldata (revert + lost relay fee). Hand-building this ABI payload also bypasses protocol-kit's contract-signature handling.</p>
+    <ul class="tight">
+      <li><span class="impact-label">Fix:</span> sort by <code class="inline">owner.toLowerCase()</code> plain comparison, or better: build the transaction with protocol-kit server-side instead of manual ABI encoding.</li>
+    </ul>
+  </div>
+
+  <div class="finding high">
+    <div class="finding-head"><span class="badge high">High</span><span class="num">H-06</span><span class="title">Session lifecycle weaknesses</span></div>
+    <span class="loc">convex/auth.ts:33-49, 75-91, 145-161</span>
+    <p class="desc">Sessions are keyed solely by wallet: generating a nonce deletes <em>all</em> other sessions for that wallet (logout-by-login across devices), the nonce is checked via substring <code class="inline">message.includes(nonce)</code>,
+    is never deleted/consumed after use (replay within window), and expired sessions are lazily cleaned only on access. No binding to issuer/domain in the SIWE message is enforced server-side (nothing is enforced server-side).</p>
+    <ul class="tight">
+      <li><span class="impact-label">Fix:</span> consume nonces on use, parse and validate full SIWE message fields (domain, uri, issuedAt, expirationTime), rotate tokens, and index expiry for a periodic cleanup job.</li>
+    </ul>
+  </div>
+
+  <!-- MEDIUM -->
+  <h2 id="medium">Medium Severity</h2>
+
+  <div class="finding medium">
+    <div class="finding-head"><span class="badge medium">Medium</span><span class="num">M-01</span><span class="title">disbursements.list loads entire org history + N+1 enrichment per request</span></div>
+    <span class="loc">convex/disbursements.ts:42-120</span>
+    <p class="desc"><code class="inline">list</code> collects every disbursement for the org, then for each batch runs one query per recipient plus one <code class="inline">db.get</code> per beneficiary — then filters/sorts/paginates in memory.
+    Cursor pagination is fake (index over the full array). At thousands of rows this blows past read limits and latency budgets on every page view.</p>
+    <ul class="tight">
+      <li><span class="impact-label">Fix:</span> push filters into indexed queries (<code class="inline">by_org_status</code> exists), paginate with real cursors, and denormalize a searchable display-name onto the disbursement row at write time.</li>
+    </ul>
+  </div>
+
+  <div class="finding medium">
+    <div class="finding-head"><span class="badge medium">Medium</span><span class="num">M-02</span><span class="title">Deposit sync: unbounded pagination loop, per-row mutations, same-second skips</span></div>
+    <span class="loc">convex/deposits.ts:97-179</span>
+    <p class="desc">The <code class="inline">while (nextUrl)</code> loop has no page cap; each insert is its own <code class="inline">runMutation</code> (slow, expensive); the incremental cutoff uses <code class="inline">eventTimestamp <= sinceTimestamp</code>, which permanently skips transfers sharing the latest recorded timestamp.</p>
+  </div>
+
+  <div class="finding medium">
+    <div class="finding-head"><span class="badge medium">Medium</span><span class="num">M-03</span><span class="title">User creation race condition — duplicate wallets possible</span></div>
+    <span class="loc">convex/auth.ts:14-26</span><span class="loc">convex/orgs.ts:458-470</span>
+    <p class="desc">Both <code class="inline">generateNonce</code> and <code class="inline">inviteMember</code> do check-then-insert on <code class="inline">users.walletAddress</code>. Convex doesn't enforce unique indexes; two concurrent calls create duplicate users, splitting memberships/history across identities.</p>
+    <ul class="tight"><li><span class="impact-label">Fix:</span> serialize inserts through a deterministic-ID pattern (derive <code class="inline">_id</code> from the wallet) or retry-on-conflict logic.</li></ul>
+  </div>
+
+  <div class="finding medium">
+    <div class="finding-head"><span class="badge medium">Medium</span><span class="num">M-04</span><span class="title">God components — five pages exceed ~1,200 lines</span></div>
+    <span class="loc">src/pages/Disbursements.tsx (2,720 lines)</span><span class="loc">Reports.tsx (1,347)</span><span class="loc">Beneficiaries.tsx (1,286)</span><span class="loc">Dashboard.tsx (1,265)</span><span class="loc">Settings.tsx (1,200)</span>
+    <p class="desc">These files mix data fetching, business rules, modals, charts, and inline form logic. This drives slow onboarding, merge conflicts, and the seven <code class="inline">react-hooks/exhaustive-deps</code> warnings currently emitted in Dashboard (stale-memo risk around currency formatting functions defined during render).</p>
+    <ul class="tight"><li><span class="impact-label">Fix:</span> extract feature folders (hooks for queries, presentational components, modal children); move formatters to module scope to fix the lint warnings.</li></ul>
+  </div>
+
+  <div class="finding medium">
+    <div class="finding-head"><span class="badge medium">Medium</span><span class="num">M-05</span><span class="title">Screening enforcement has bypass paths and weak matching surface</span></div>
+    <span class="loc">convex/disbursements.ts:331-366</span><span class="loc">convex/screening.ts:43</span>
+    <p class="desc">OFAC blocking runs only when status moves to pending/proposed through <code class="inline">updateStatus</code> — but batch creation, direct schedule, and (per C-02) arbitrary transitions don't consistently funnel through it; results are fetched with unindexed <code class="inline">.filter</code>. Fuzzy matching at 0.85 Levenshtein similarity is reasonable but aliases/transliterations coverage depends entirely on the import script's data quality, and there's no re-screening when the SDN list updates.</p>
+  </div>
+
+  <div class="finding medium">
+    <div class="finding-head"><span class="badge medium">Medium</span><span class="num">M-06</span><span class="title">auditLog metadata typed v.any(); audit trail not append-only by design</span></div>
+    <span class="loc">convex/schema.ts:242-252</span>
+    <p class="desc">Compliance-critical log allows arbitrary shapes and rows are mutable documents — any writer can patch/delete history (and with C-01, anyone can). For a product selling compliance features, log writes should be validated, append-only, and possibly exported periodically.</p>
+  </div>
+
+  <div class="finding medium">
+    <div class="finding-head"><span class="badge medium">Medium</span><span class="num">M-07</span><span class="title">Server code reads VITE_-prefixed env vars</span></div>
+    <span class="loc">convex/orgs.ts:9,19-21,27-41</span>
+    <p class="desc">Convex functions read <code class="inline">process.env.VITE_GELATO_DEFAULT_FEE_TOKEN</code>, <code class="inline">VITE_DISBURSE_BENEFICIARY_*</code>, etc. The VITE_ prefix convention means "bundled into client output" — using it for server-side defaults is confusing and risks someone later putting a genuinely sensitive value behind the prefix expecting it to stay private. Also duplicated config between <code class="inline">.env</code> and <code class="inline">.env.local</code>.</p>
+  </div>
+
+  <div class="finding medium">
+    <div class="finding-head"><span class="badge medium">Medium</span><span class="num">M-08</span><span class="title">Repo hygiene: 105MB OFAC XML adjacent to repo, dead mockups file, dist/ artifacts</span></div>
+    <span class="loc">sdn_enhanced.xml (105MB, gitignored but local)</span><span class="loc">treasury-mockups.jsx (untracked)</span><span class="loc">dist/</span>
+    <p class="desc">The SDN dataset and design mockups live in the repo root untracked; <code class="inline">dist/</code> build output persists locally. None are committed (verified), but they invite accidental staging. Consider a <code class="inline">data/</code> dir documented in README and a stricter root layout.</p>
+  </div>
+
+  <!-- POSITIVES -->
+  <h2 id="positive">What's Done Well</h2>
+  <table>
+    <tr><th>Area</th><th>Observation</th></tr>
+    <tr><td>Type safety</td><td><code class="inline">tsc -b</code> passes cleanly; recent commits show deliberate type-hardening work.</td></tr>
+    <tr><td>Secrets hygiene</td><td><code class="inline">.env</code>/<code class="inline">.env.local</code> correctly gitignored and untracked; only public VITE_ values inside; no leaked keys found in tracked files.</td></tr>
+    <tr><td>Audit logging discipline</td><td>Nearly every mutation writes structured <code class="inline">auditLog</code> entries with actor/action/metadata — great foundation once hardened (M-06).</td></tr>
+    <tr><td>Centralized RBAC helper</td><td>All modules route through one <code class="inline">requireOrgAccess</code> with indexed membership lookup — easy place to retrofit real auth.</td></tr>
+    <tr><td>Schema design</td><td>Sensible table decomposition, thorough indexes (incl. compound + search index for SDN names), optional-field backward-compat migrations.</td></tr>
+    <tr><td>Testing intent</td><td>convex-test integration tests for flows (org-setup, disbursement-flow, billing-upgrade) plus unit tests and factories — good shape, currently broken at runtime (C-05).</td></tr>
+    <tr><td>i18n &amp; theming</td><td>Full en/es/pt-BR locale files, language + theme switchers persisted to user preferences.</td></tr>
+    <tr><td>Compliance thinking</td><td>SDN screening pipeline with enforcement modes (block/warn/off), review workflow, and block-time checks shows real domain awareness.</td></tr>
+  </table>
+
+  <!-- ROADMAP -->
+  <h2 id="roadmap">Recommended Remediation Order</h2>
+  <table>
+    <tr><th>#</th><th>Action</th><th>Addresses</th><th>Effort</th></tr>
+    <tr><td>1</td><td>Implement real server-side auth (verify SIWE signature → session token → replace all <code class="inline">args.walletAddress</code> identity lookups)</td><td>C-01, H-06</td><td>L</td></tr>
+    <tr><td>2</td><td>Repair test toolchain (vitest↔convex-test compat) and add CI gate: lint + tsc + tests green required to merge</td><td>C-05, lint error</td><td>M</td></tr>
+    <tr><td>3</td><td>Enforce status state machine + on-chain verification for terminal states</td><td>C-02</td><td>M</td></tr>
+    <tr><td>4</td><td>Verify payments server-side before activating plans; add auth checks to <code class="inline">orgs.get</code>/<code class="inline">billing.isActive</code></td><td>C-03, H-04</td><td>M</td></tr>
+    <tr><td>5</td><td>Harden scheduled relay: threshold assertion, SDK-based encoding, proper Gelato credentials</td><td>C-04, H-05</td><td>M</td></tr>
+    <tr><td>6</td><td>Input hardening sweep: address validation, BigInt amounts, CSV injection escaping</td><td>H-01, H-02, H-03</td><td>S</td></tr>
+    <tr><td>7</td><td>Invitation acceptance flow; unique-user creation strategy</td><td>C-06, M-03</td><td>M</td></tr>
+    <tr><td>8</td><td>Query performance refactor of <code class="inline">disbursements.list</code>; deposit-sync bounds</td><td>M-01, M-02</td><td>M</td></tr>
+    <tr><td>9</td><td>Break up god components; fix exhaustive-deps warnings</td><td>M-04</td><td>M–L</td></tr>
+  </table>
+
+  <!-- VERIFICATION -->
+  <h2 id="verification">Verification Commands Run During Review</h2>
+  <pre>$ bun run lint        # 1 error (convex/depositsData.ts unused 'Id'), 7 warnings (Dashboard exhaustive-deps)
+$ bunx tsc -b         # exit 0 — clean
+$ bun run test:run    # Test Files: 11 failed | 2 passed (13)
+                      # Tests: 137 failed | 53 passed (190)
+                      # Failure mode: TypeError: (intermediate value).glob is not a function
+                      #               (convex-test ↔ vitest 4 incompatibility)</pre>
+
+  <p class="footer-note">Generated by automated code review · disburse@0.3.0 · commit 653f24c · Aug 23, 2026<br>
+  Severity ratings assume internet-reachable deployment; adjust if the system is demo/testnet-only.</p>
+
+</div>
+</body>
+</html>

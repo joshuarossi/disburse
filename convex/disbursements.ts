@@ -1,9 +1,20 @@
+import { appendAudit } from "./audit";
 import { v } from "convex/values";
 import { internalMutation, internalQuery, mutation, query } from "./_generated/server";
 import { Id } from "./_generated/dataModel";
 import { requireOrgAccess } from "./lib/rbac";
 import { assertValidAddress, assertValidAmount, assertValidTxHash, amountToBaseUnits, formatBaseUnits } from "./lib/validation";
 import { internal } from "./_generated/api";
+
+type DisbursementStatus =
+  | "draft"
+  | "pending"
+  | "proposed"
+  | "scheduled"
+  | "relaying"
+  | "executed"
+  | "failed"
+  | "cancelled";
 
 // List disbursements for an org with filtering, searching, sorting, and pagination
 export const list = query({
@@ -35,109 +46,40 @@ export const list = query({
     const limit = args.limit ?? 20;
     const sortBy = args.sortBy ?? "createdAt";
     const sortOrder = args.sortOrder ?? "desc";
+    const searchLower = args.search?.toLowerCase().trim() || null;
 
     // Any member can view
     await requireOrgAccess(ctx, args.orgId, args.sessionToken, ["admin", "approver", "initiator", "clerk", "viewer"]);
 
-    // Fetch all disbursements for the org (we need to filter in memory for search)
-    const allDisbursements = await ctx.db
-      .query("disbursements")
-      .withIndex("by_org", (q) => q.eq("orgId", args.orgId))
-      .collect();
-
-    // Enrich with beneficiary data first (needed for search)
-    const enriched = await Promise.all(
-      allDisbursements.map(async (d) => {
-        // For batch disbursements, get first beneficiary name and count
-        if (d.type === "batch") {
-          const recipients = await ctx.db
-            .query("disbursementRecipients")
-            .withIndex("by_disbursement", (q) => q.eq("disbursementId", d._id))
-            .collect();
-          
-          // Get all beneficiary names and objects for search
-          const recipientNames: string[] = [];
-          const recipientBeneficiaries: Array<{ recipient: typeof recipients[0]; beneficiary: NonNullable<Awaited<ReturnType<typeof ctx.db.get<"beneficiaries">>>> }> = [];
-          
-          for (const recipient of recipients) {
-            const beneficiary = await ctx.db.get(recipient.beneficiaryId);
-            if (beneficiary) {
-              recipientNames.push(beneficiary.name);
-              recipientBeneficiaries.push({ recipient, beneficiary });
-            }
-          }
-          
-          let batchDisplayName = "Batch";
-          if (recipients.length > 0) {
-            // Check if there's a search term and find matching recipient
-            const searchLower = args.search?.toLowerCase().trim();
-            let displayBeneficiary = recipientBeneficiaries[0]?.beneficiary;
-            let otherCount = recipients.length - 1;
-            
-            if (searchLower) {
-              // Find first recipient whose name matches the search
-              const matchingIndex = recipientBeneficiaries.findIndex((rb) =>
-                rb.beneficiary.name.toLowerCase().includes(searchLower)
-              );
-              
-              if (matchingIndex !== -1) {
-                // Use the matching recipient for display
-                displayBeneficiary = recipientBeneficiaries[matchingIndex].beneficiary;
-                otherCount = recipients.length - 1; // Count of others (excluding the matched one)
-              }
-            }
-            
-            if (displayBeneficiary) {
-              if (otherCount > 0) {
-                batchDisplayName = `${displayBeneficiary.name} +${otherCount}`;
-              } else {
-                batchDisplayName = displayBeneficiary.name;
-              }
-            }
-          }
-          
-          return {
-            ...d,
-            beneficiary: { name: batchDisplayName, walletAddress: "" },
-            // Store all recipient names for search
-            recipientNames,
-            // Use totalAmount for batch, amount for single
-            displayAmount: d.totalAmount || d.amount || "0",
-          };
-        }
-
-        // For single disbursements, get beneficiary
-        const beneficiary = d.beneficiaryId ? await ctx.db.get(d.beneficiaryId) : null;
-        return {
-          ...d,
-          beneficiary: beneficiary
-            ? { name: beneficiary.name, walletAddress: beneficiary.walletAddress }
-            : null,
-          recipientNames: [],
-          displayAmount: d.amount || "0",
-        };
-      })
-    );
-
-    // Apply filters
-    let filtered = enriched;
-
-    // Status filter (supports multiple statuses)
-    if (args.status && args.status.length > 0) {
-      filtered = filtered.filter((d) => args.status!.includes(d.status));
+    // ── Candidate fetch (M-01: index pushdown for single-status filters)
+    const statusList = args.status && args.status.length > 0 ? args.status : null;
+    let candidates;
+    if (statusList && statusList.length === 1) {
+      candidates = await ctx.db
+        .query("disbursements")
+        .withIndex("by_org_status", (q) =>
+          q.eq("orgId", args.orgId).eq("status", statusList[0] as DisbursementStatus)
+        )
+        .collect();
+    } else {
+      candidates = await ctx.db
+        .query("disbursements")
+        .withIndex("by_org", (q) => q.eq("orgId", args.orgId))
+        .collect();
+      if (statusList) {
+        candidates = candidates.filter((d) => statusList.includes(d.status));
+      }
     }
 
-    // Token filter
+    // ── Cheap row-level filters (no joins required)
+    let filtered = candidates;
+
     if (args.token) {
       filtered = filtered.filter((d) => d.token === args.token);
     }
-
-    // Chain filter
     if (args.chainId !== undefined) {
       filtered = filtered.filter((d) => d.chainId === args.chainId);
     }
-
-    // Date range filter
     if (args.dateFrom) {
       filtered = filtered.filter((d) => d.createdAt >= args.dateFrom!);
     }
@@ -147,22 +89,55 @@ export const list = query({
       filtered = filtered.filter((d) => d.createdAt <= endOfDay);
     }
 
-    // Search filter (beneficiary name or memo)
-    if (args.search && args.search.trim()) {
-      const searchLower = args.search.toLowerCase().trim();
-      filtered = filtered.filter((d) => {
-        const beneficiaryMatch = d.beneficiary?.name?.toLowerCase().includes(searchLower);
-        // For batch disbursements, also search through all recipient names
-        const recipientMatch = (d as { recipientNames?: string[] }).recipientNames?.some((name: string) => 
-          name.toLowerCase().includes(searchLower)
-        );
-        const memoMatch = d.memo?.toLowerCase().includes(searchLower);
-        const amountMatch = (d.displayAmount || d.amount || "").includes(searchLower);
-        return beneficiaryMatch || recipientMatch || memoMatch || amountMatch;
-      });
+    // ── Lazy search: memo/amount match on row fields; name matches resolve
+    // beneficiary docs on demand via a per-request cache (each doc read once).
+    const beneficiaryCache = new Map<string, Awaited<ReturnType<typeof ctx.db.get<"beneficiaries">>>>();
+    const fetchBeneficiary = async (id?: string) => {
+      if (!id) return null;
+      const cached = beneficiaryCache.get(id);
+      if (cached !== undefined) return cached;
+      const doc = await ctx.db.get(id as Id<"beneficiaries">);
+      beneficiaryCache.set(id, doc);
+      return doc;
+    };
+
+    const rowDisplayAmount = (d: typeof filtered[0]) => d.totalAmount || d.amount || "";
+
+    if (searchLower) {
+      const matched: typeof filtered = [];
+      for (const d of filtered) {
+        if (d.memo?.toLowerCase().includes(searchLower)) {
+          matched.push(d);
+          continue;
+        }
+        if (rowDisplayAmount(d).includes(searchLower)) {
+          matched.push(d);
+          continue;
+        }
+
+        if (d.type === "batch") {
+          const recipients = await ctx.db
+            .query("disbursementRecipients")
+            .withIndex("by_disbursement", (q) => q.eq("disbursementId", d._id))
+            .collect();
+          let hit = false;
+          for (const r of recipients) {
+            const b = await fetchBeneficiary(r.beneficiaryId);
+            if (b?.name.toLowerCase().includes(searchLower)) {
+              hit = true;
+              break;
+            }
+          }
+          if (hit) matched.push(d);
+        } else {
+          const b = await fetchBeneficiary(d.beneficiaryId ?? undefined);
+          if (b?.name.toLowerCase().includes(searchLower)) matched.push(d);
+        }
+      }
+      filtered = matched;
     }
 
-    // Sorting
+    // ── Sorting on row fields only (displayAmount derives from the row itself)
     filtered.sort((a, b) => {
       let comparison = 0;
       switch (sortBy) {
@@ -170,8 +145,8 @@ export const list = query({
           comparison = a.createdAt - b.createdAt;
           break;
         case "amount": {
-          const aAmount = parseFloat(a.displayAmount || a.amount || "0");
-          const bAmount = parseFloat(b.displayAmount || b.amount || "0");
+          const aAmount = parseFloat(rowDisplayAmount(a) || "0");
+          const bAmount = parseFloat(rowDisplayAmount(b) || "0");
           comparison = aAmount - bAmount;
           break;
         }
@@ -193,10 +168,8 @@ export const list = query({
       return sortOrder === "desc" ? -comparison : comparison;
     });
 
-    // Get total count before pagination
     const totalCount = filtered.length;
 
-    // Cursor-based pagination
     let startIndex = 0;
     if (args.cursor) {
       const cursorIndex = filtered.findIndex((d) => d._id === args.cursor);
@@ -205,13 +178,75 @@ export const list = query({
       }
     }
 
-    // Slice for current page
     const page = filtered.slice(startIndex, startIndex + limit);
     const hasMore = startIndex + limit < totalCount;
     const nextCursor = hasMore && page.length > 0 ? page[page.length - 1]._id : null;
 
+    // ── Enrich ONLY the returned page (≤ limit beneficiary reads / batch joins)
+    const items = await Promise.all(
+      page.map(async (d) => {
+        if (d.type === "batch") {
+          const recipients = await ctx.db
+            .query("disbursementRecipients")
+            .withIndex("by_disbursement", (q) => q.eq("disbursementId", d._id))
+            .collect();
+
+          const recipientNames: string[] = [];
+          const recipientBeneficiaries: Array<{ recipient: typeof recipients[0]; beneficiary: NonNullable<Awaited<ReturnType<typeof ctx.db.get<"beneficiaries">>>> }> = [];
+
+          for (const recipient of recipients) {
+            const beneficiary = await fetchBeneficiary(recipient.beneficiaryId);
+            if (beneficiary) {
+              recipientNames.push(beneficiary.name);
+              recipientBeneficiaries.push({ recipient, beneficiary });
+            }
+          }
+
+          let batchDisplayName = "Batch";
+          if (recipients.length > 0) {
+            let displayBeneficiary = recipientBeneficiaries[0]?.beneficiary;
+            const otherCount = recipients.length - 1;
+
+            if (searchLower) {
+              // Promote the first matching recipient to the display position
+              const matchingIndex = recipientBeneficiaries.findIndex((rb) =>
+                rb.beneficiary.name.toLowerCase().includes(searchLower)
+              );
+              if (matchingIndex !== -1) {
+                displayBeneficiary = recipientBeneficiaries[matchingIndex].beneficiary;
+              }
+            }
+
+            if (displayBeneficiary) {
+              batchDisplayName =
+                otherCount > 0
+                  ? `${displayBeneficiary.name} +${otherCount}`
+                  : displayBeneficiary.name;
+            }
+          }
+
+          return {
+            ...d,
+            beneficiary: { name: batchDisplayName, walletAddress: "" },
+            recipientNames,
+            displayAmount: d.totalAmount || d.amount || "0",
+          };
+        }
+
+        const beneficiary = await fetchBeneficiary(d.beneficiaryId ?? undefined);
+        return {
+          ...d,
+          beneficiary: beneficiary
+            ? { name: beneficiary.name, walletAddress: beneficiary.walletAddress }
+            : null,
+          recipientNames: [],
+          displayAmount: d.amount || "0",
+        };
+      })
+    );
+
     return {
-      items: page,
+      items,
       totalCount,
       hasMore,
       nextCursor,
@@ -278,7 +313,7 @@ export const create = mutation({
     });
 
     // Audit log
-    await ctx.db.insert("auditLog", {
+    await appendAudit(ctx, {
       orgId: args.orgId,
       actorUserId: user._id,
       action: "disbursement.created",
@@ -438,7 +473,7 @@ export const updateStatus = mutation({
     await ctx.db.patch(args.disbursementId, updates);
 
     // Audit log
-    await ctx.db.insert("auditLog", {
+    await appendAudit(ctx, {
       orgId: disbursement.orgId,
       actorUserId: user._id,
       action: `disbursement.${args.status}`,
@@ -499,7 +534,7 @@ export const updateStatusInternal = internalMutation({
     await ctx.db.patch(args.disbursementId, updates);
 
     if (disbursement) {
-      await ctx.db.insert("auditLog", {
+      await appendAudit(ctx, {
         orgId: disbursement.orgId,
         actorUserId: disbursement.createdBy,
         action: `disbursement.${args.status}`,
@@ -555,7 +590,7 @@ export const schedule = mutation({
       scheduledVersion,
     });
 
-    await ctx.db.insert("auditLog", {
+    await appendAudit(ctx, {
       orgId: disbursement.orgId,
       actorUserId: user._id,
       action: "disbursement.scheduled",
@@ -600,7 +635,7 @@ export const reschedule = mutation({
       scheduledVersion,
     });
 
-    await ctx.db.insert("auditLog", {
+    await appendAudit(ctx, {
       orgId: disbursement.orgId,
       actorUserId: user._id,
       action: "disbursement.rescheduled",
@@ -724,7 +759,7 @@ export const createBatch = mutation({
     }
 
     // Audit log
-    await ctx.db.insert("auditLog", {
+    await appendAudit(ctx, {
       orgId: args.orgId,
       actorUserId: user._id,
       action: "disbursement.created",

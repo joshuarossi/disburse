@@ -3,6 +3,7 @@ import { mutation, query } from "./_generated/server";
 import { verifyMessage } from "viem";
 import { assertValidAddress } from "./lib/validation";
 import { hashSessionToken } from "./lib/rbac";
+import { getOrCreateUser } from "./lib/users";
 
 const NONCE_TTL_MS = 10 * 60 * 1000; // pending sign-in nonces
 const SESSION_TTL_MS = 7 * 24 * 60 * 60 * 1000; // authenticated sessions
@@ -95,24 +96,8 @@ export const generateNonce = mutation({
     const walletAddress = args.walletAddress.toLowerCase();
     const now = Date.now();
 
-    // Get user
-    let user = await ctx.db
-      .query("users")
-      .withIndex("by_wallet", (q) => q.eq("walletAddress", walletAddress))
-      .first();
-
-    // Create user if they don't exist
-    if (!user) {
-      const userId = await ctx.db.insert("users", {
-        walletAddress,
-        createdAt: now,
-      });
-      user = await ctx.db.get(userId);
-    }
-
-    if (!user) {
-      throw new Error("Failed to create user");
-    }
+    // M-03: race-safe lookup-or-create (heals duplicate rows from races)
+    const user = await getOrCreateUser(ctx, walletAddress);
 
     // Clean up this wallet's stale pending nonces (keep live sessions intact)
     const stalePending = await ctx.db

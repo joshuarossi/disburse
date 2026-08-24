@@ -1,3 +1,4 @@
+import { appendAudit, type AuditValue } from "./audit";
 import { v } from "convex/values";
 import { mutation, query, QueryCtx, MutationCtx } from "./_generated/server";
 import { internal } from "./_generated/api";
@@ -203,7 +204,7 @@ export const create = mutation({
     }
 
     // Audit log
-    await ctx.db.insert("auditLog", {
+    await appendAudit(ctx, {
       orgId: args.orgId,
       actorUserId: user._id,
       action: "beneficiary.created",
@@ -272,13 +273,13 @@ export const update = mutation({
       await setBeneficiaryTags(ctx, beneficiary.orgId, args.beneficiaryId, user._id, args.tags);
     }
 
-    const auditMetadata: Record<string, unknown> = { ...updates };
+    const auditMetadata: Record<string, AuditValue | string[]> = { ...updates } as Record<string, AuditValue | string[]>;
     if (args.tags !== undefined) {
       auditMetadata.tags = args.tags;
     }
 
     // Audit log
-    await ctx.db.insert("auditLog", {
+    await appendAudit(ctx, {
       orgId: beneficiary.orgId,
       actorUserId: user._id,
       action: "beneficiary.updated",
@@ -446,7 +447,7 @@ export const createBulk = mutation({
       createdIds.push(beneficiaryId);
 
       // Audit log for each beneficiary
-      await ctx.db.insert("auditLog", {
+      await appendAudit(ctx, {
         orgId: args.orgId,
         actorUserId: user._id,
         action: "beneficiary.created",

@@ -1,3 +1,4 @@
+import { appendAudit } from "./audit";
 import { v } from "convex/values";
 import { internalMutation, mutation } from "./_generated/server";
 import { requireOrgAccess } from "./lib/rbac";
@@ -128,7 +129,7 @@ export const reviewScreeningResult = mutation({
     });
 
     // Audit log
-    await ctx.db.insert("auditLog", {
+    await appendAudit(ctx, {
       orgId: result.orgId,
       actorUserId: user._id,
       action: "screening.reviewed",
@@ -165,7 +166,7 @@ export const updateScreeningEnforcement = mutation({
       screeningEnforcement: args.enforcement,
     });
 
-    await ctx.db.insert("auditLog", {
+    await appendAudit(ctx, {
       orgId: args.orgId,
       actorUserId: user._id,
       action: "org.screeningEnforcementUpdated",

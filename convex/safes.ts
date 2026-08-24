@@ -1,3 +1,4 @@
+import { appendAudit } from "./audit";
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import { requireOrgAccess } from "./lib/rbac";
@@ -49,7 +50,7 @@ export const link = mutation({
     });
 
     // Audit log
-    await ctx.db.insert("auditLog", {
+    await appendAudit(ctx, {
       orgId: args.orgId,
       actorUserId: user._id,
       action: "safe.linked",
@@ -120,7 +121,7 @@ export const unlink = mutation({
     await ctx.db.delete(args.safeId);
 
     // Audit log
-    await ctx.db.insert("auditLog", {
+    await appendAudit(ctx, {
       orgId: safe.orgId,
       actorUserId: user._id,
       action: "safe.unlinked",

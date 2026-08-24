@@ -1,3 +1,4 @@
+import { appendAudit } from "./audit";
 import { v } from "convex/values";
 import { mutation, query, action, internalQuery, internalMutation } from "./_generated/server";
 import { requireOrgAccess } from "./lib/rbac";
@@ -334,7 +335,7 @@ export const subscribe = mutation({
     });
 
     // Audit log
-    await ctx.db.insert("auditLog", {
+    await appendAudit(ctx, {
       orgId: args.orgId,
       actorUserId: user._id,
       action: "billing.subscribed",
@@ -401,7 +402,7 @@ export const upgradeToPro = mutation({
     });
 
     // Audit log
-    await ctx.db.insert("auditLog", {
+    await appendAudit(ctx, {
       orgId: args.orgId,
       actorUserId: user._id,
       action: "billing.upgraded",

@@ -39,7 +39,7 @@ export const TEST_ACCOUNTS: Record<TestRoleName, PrivateKeyAccount> =
  */
 export async function signIn(
   t: {
-    mutation: (fnRef: unknown, args: unknown) => Promise<any>;
+    mutation: (...callArgs: any[]) => Promise<any>;
   },
   roleName: TestRoleName
 ): Promise<{ sessionToken: string; userId: Id<"users">; walletAddress: string }> {
@@ -356,7 +356,7 @@ export async function createTestAuditLog(
     action?: string;
     objectType?: string;
     objectId?: string;
-    metadata?: unknown;
+    metadata?: Record<string, string | number | boolean | null>;
   } = {}
 ): Promise<Id<"auditLog">> {
   return await ctx.db.insert("auditLog", {

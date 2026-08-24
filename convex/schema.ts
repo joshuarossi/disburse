@@ -263,14 +263,23 @@ export default defineSchema({
   })
     .index("by_org", ["orgId"]),
 
-  // Audit log for compliance
+  // Audit log for compliance.
+  // APPEND-ONLY by convention: writers MUST go through appendAudit() in
+  // convex/audit.ts; patching/deleting entries is a compliance violation.
+  // Metadata is constrained to flat primitive maps — complex values are
+  // serialized by the helper before persisting.
   auditLog: defineTable({
     orgId: v.id("orgs"),
     actorUserId: v.id("users"),
     action: v.string(),
     objectType: v.string(),
     objectId: v.string(),
-    metadata: v.optional(v.any()),
+    metadata: v.optional(
+      v.record(
+        v.string(),
+        v.union(v.string(), v.number(), v.boolean(), v.null())
+      )
+    ),
     timestamp: v.number(),
   })
     .index("by_org", ["orgId"])

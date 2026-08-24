@@ -1,8 +1,10 @@
+import { appendAudit } from "./audit";
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import { getOrgLimits } from "./billing";
 import { requireOrgAccess, requireUser } from "./lib/rbac";
 import { assertValidAddress } from "./lib/validation";
+import { getOrCreateUser } from "./lib/users";
 
 const SUPPORTED_RELAY_FEE_TOKENS = ["USDC", "USDT"] as const;
 type RelayFeeMode = "stablecoin_preferred" | "stablecoin_only";
@@ -112,7 +114,7 @@ export const create = mutation({
         updatedAt: now,
       });
 
-      await ctx.db.insert("auditLog", {
+      await appendAudit(ctx, {
         orgId,
         actorUserId: user._id,
         action: "beneficiary.created",
@@ -128,7 +130,7 @@ export const create = mutation({
     }
 
     // Audit log
-    await ctx.db.insert("auditLog", {
+    await appendAudit(ctx, {
       orgId,
       actorUserId: user._id,
       action: "org.created",
@@ -199,7 +201,7 @@ export const updateName = mutation({
     await ctx.db.patch(args.orgId, { name: args.name });
 
     // Audit log
-    await ctx.db.insert("auditLog", {
+    await appendAudit(ctx, {
       orgId: args.orgId,
       actorUserId: user._id,
       action: "org.updated",
@@ -249,7 +251,7 @@ export const updateRelaySettings = mutation({
       relayFeeMode,
     });
 
-    await ctx.db.insert("auditLog", {
+    await appendAudit(ctx, {
       orgId: args.orgId,
       actorUserId: user._id,
       action: "org.relaySettingsUpdated",
@@ -388,24 +390,8 @@ export const inviteMember = mutation({
       throw new Error(`Your plan allows a maximum of ${limits.maxUsers} user(s). Please upgrade to add more team members.`);
     }
 
-    // Check if member already exists or create new user
-    let memberUser = await ctx.db
-      .query("users")
-      .withIndex("by_wallet", (q) => q.eq("walletAddress", memberWalletAddress))
-      .first();
-
-    if (!memberUser) {
-      // Create new user for invited member
-      const userId = await ctx.db.insert("users", {
-        walletAddress: memberWalletAddress,
-        createdAt: now,
-      });
-      memberUser = await ctx.db.get(userId);
-    }
-
-    if (!memberUser) {
-      throw new Error("Failed to create user");
-    }
+    // M-03: race-safe lookup-or-create for the invitee
+    const memberUser = await getOrCreateUser(ctx, memberWalletAddress);
 
     // Check if membership already exists
     const existingMembership = await ctx.db
@@ -428,7 +414,7 @@ export const inviteMember = mutation({
       });
       
       // Audit log
-      await ctx.db.insert("auditLog", {
+      await appendAudit(ctx, {
         orgId: args.orgId,
         actorUserId: user._id,
         action: "member.reactivated",
@@ -453,7 +439,7 @@ export const inviteMember = mutation({
     });
 
     // Audit log
-    await ctx.db.insert("auditLog", {
+    await appendAudit(ctx, {
       orgId: args.orgId,
       actorUserId: user._id,
       action: "member.invited",
@@ -499,7 +485,7 @@ export const acceptInvite = mutation({
     await ctx.db.patch(membership._id, { status: "active" });
 
     // Audit log
-    await ctx.db.insert("auditLog", {
+    await appendAudit(ctx, {
       orgId: args.orgId,
       actorUserId: user._id,
       action: "member.inviteAccepted",
@@ -557,7 +543,7 @@ export const updateMemberRole = mutation({
     await ctx.db.patch(args.membershipId, { role: args.newRole });
 
     // Audit log
-    await ctx.db.insert("auditLog", {
+    await appendAudit(ctx, {
       orgId: args.orgId,
       actorUserId: user._id,
       action: "member.roleUpdated",
@@ -614,7 +600,7 @@ export const updateMemberName = mutation({
     await ctx.db.patch(args.membershipId, { name: args.name });
 
     // Audit log
-    await ctx.db.insert("auditLog", {
+    await appendAudit(ctx, {
       orgId: args.orgId,
       actorUserId: user._id,
       action: "member.nameUpdated",
@@ -671,7 +657,7 @@ export const updateMemberEmail = mutation({
     await ctx.db.patch(args.membershipId, { email: args.email });
 
     // Audit log
-    await ctx.db.insert("auditLog", {
+    await appendAudit(ctx, {
       orgId: args.orgId,
       actorUserId: user._id,
       action: "member.emailUpdated",
@@ -727,7 +713,7 @@ export const removeMember = mutation({
     await ctx.db.patch(args.membershipId, { status: "removed" });
 
     // Audit log
-    await ctx.db.insert("auditLog", {
+    await appendAudit(ctx, {
       orgId: args.orgId,
       actorUserId: user._id,
       action: "member.removed",
