@@ -83,9 +83,8 @@ export function PaymentBatchForm({
   const { environment } = useActivityEnvironment();
   const allSafes = useQuery(api.safes.getForOrg, args);
   const safes = allSafes?.filter(
-    (safe) => chainEnvironment(safe.chainId) === environment,
+    (safe) => safe.isActive !== false && chainEnvironment(safe.chainId) === environment,
   );
-  const create = useMutation(api.paymentRuns.create);
   const createGrouped = useMutation(api.paymentRuns.createGrouped);
   const useSavedInstructions = !draft;
   const [createdBatches, setCreatedBatches] = useState<Array<{
@@ -147,6 +146,7 @@ export function PaymentBatchForm({
     payoutRecipients?.filter((b) =>
       Object.prototype.hasOwnProperty.call(amounts, b._id),
     ) ?? [];
+  const unavailableSelections = beneficiaries ? Object.keys(amounts).filter(id => !payoutRecipients?.some(recipient => recipient._id === id)) : [];
   const payoutFor = (recipient: {
     preferredToken?: string;
     preferredChainId?: number;
@@ -307,7 +307,7 @@ export function PaymentBatchForm({
     setSaving(true);
     setError("");
     try {
-      if (useSavedInstructions && !draft) {
+      if (!draft) {
         const result = await createGrouped({
           orgId,
           sessionToken,
@@ -339,13 +339,7 @@ export function PaymentBatchForm({
           amount: amounts[b._id],
         })),
       };
-      const result = draft
-        ? await updateDraft({ ...fields, disbursementId: draft.id })
-        : await create({
-            ...fields,
-            orgId,
-            cadence: cadence === "once" ? undefined : cadence,
-          });
+      const result = await updateDraft({ ...fields, disbursementId: draft.id });
       navigate(`/org/${orgId}/disbursements?focus=${result.disbursementId}`);
       onClose();
     } catch (error) {
@@ -568,6 +562,12 @@ export function PaymentBatchForm({
                 ))
               )}
             </div>
+            {unavailableSelections.map(id => (
+              <div key={id} role="alert" className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-amber-500/30 p-3 text-sm">
+                <p>{draft?.recipients.find(r => r.beneficiaryId === id)?.recipientName ?? "Selected recipient"} is archived or unavailable. Remove them from this draft to continue.</p>
+                <Button size="sm" variant="secondary" onClick={() => setAmounts(current => { const next = { ...current }; delete next[id]; return next; })}>Remove unavailable recipient</Button>
+              </div>
+            ))}
             {instructionErrors.length > 0 && (
               <div
                 role="alert"

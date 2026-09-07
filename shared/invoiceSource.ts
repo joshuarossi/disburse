@@ -14,7 +14,8 @@ export function invoiceFileType(
 ): InvoiceFileType {
   if (!bytes.length || bytes.length > MAX_INVOICE_FILE_BYTES)
     throw new Error("Choose a file between 1 byte and 10 MB.");
-  const ascii = new TextDecoder().decode(bytes.slice(0, 12));
+  // Binary length bytes in RIFF headers must not shift character offsets.
+  const ascii = String.fromCharCode(...bytes.slice(0, 12));
   const type = ascii.startsWith("%PDF-")
     ? "application/pdf"
     : bytes[0] === 137 &&

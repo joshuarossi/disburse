@@ -224,7 +224,7 @@
         },
         "schedules": {
           "title": "Schedule and repeat payments",
-          "body": "Choose a future pay date and complete approvals beforehand. The payment service submits eligible scheduled payments when due. Recurring instructions prepare a new draft for each cycle; each draft needs fresh review and authorization. Review paused instructions when recipient details or permissions change. Cancelling an instruction does not invalidate a proposal already signed in Safe."
+          "body": "Choose a future pay date and complete approvals beforehand. When configured, the payment service submits eligible scheduled payments when due. Recurring instructions prepare a new draft for each cycle; each draft needs fresh review and authorization. Review paused instructions when recipient details or permissions change. Cancelling an instruction does not invalidate a proposal already signed in Safe."
         },
         "fees": {
           "title": "Understand amounts and fees",
@@ -232,11 +232,11 @@
         },
         "recovery": {
           "title": "Resolve a payment needing attention",
-          "body": "Open Payments and choose Needs attention. Check settlement verifies the original submission without sending it again. Resume payment is available only when no submission was attempted. Avoid preparing a replacement while the original outcome is uncertain. Receipt linking can reconcile an existing delegated payment even when new payments are blocked."
+          "body": "Open Payments and choose Needs attention. Check settlement verifies the original submission without sending it again. Resume only when the app confirms it can retry the original authorization. Avoid preparing a replacement while the original outcome is uncertain. Receipt linking can reconcile an existing delegated payment even when new payments are blocked."
         },
         "billing": {
           "title": "Trial, renewal and access",
-          "body": "The trial lasts 30 days. Paid subscriptions cover 30 days at a time and do not renew automatically. After expiry, you can view and export records, prepare drafts and cancel instructions; new payment submissions require renewal. Renew in Settings, under Plan & billing. If checkout was interrupted, verify the saved receipt before paying again."
+          "body": "The trial includes 30 days of Pro. After it ends, Free features apply: you can continue managing your funds and sending payments, paying your own fees. Paid subscriptions cover 30 days and do not renew automatically. Renew in Settings, under Plan & billing. If checkout was interrupted, verify the saved receipt before paying again. Your funds stay in your Safe."
         },
         "reports": {
           "title": "Reconcile your records",
@@ -321,6 +321,7 @@
       "subtitle": "Connect your wallet to get started",
       "connectWallet": "Connect Wallet",
       "wrongNetwork": "Wrong network",
+      "signInCancelled": "Sign-in cancelled. Select Try again when you are ready.",
       "signingIn": "Signing you in...",
       "terms": "By connecting, you agree to our",
       "termsOfService": "Terms of Service",

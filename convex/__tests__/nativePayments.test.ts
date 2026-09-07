@@ -115,6 +115,40 @@ function receipt(safe: string, amount = 1000001n, hash = safeTxHash) {
   };
 }
 
+it.each([true, false])("only finalizes a confirmed failure emitted by the original Safe (matching address: %s)", async matchingAddress => {
+  const { t, ids, args } = await setup();
+  await t.action(api.nativePayments.start, args);
+  const failedReceipt = { ...receipt(ids.safeAddress), logs: [{
+    address: matchingAddress ? ids.safeAddress : TEST_WALLETS.viewer,
+    topics: encodeEventTopics({ abi: parseAbi(["event ExecutionFailure(bytes32 txHash, uint256 payment)"]), eventName: "ExecutionFailure" }),
+    data: encodeAbiParameters([{ type: "bytes32" }, { type: "uint256" }], [safeTxHash, 0n]),
+  }] };
+  await t.run(ctx => ctx.db.patch(ids.disbursementId, { txHash }));
+  chain.getTransactionReceipt.mockResolvedValue(failedReceipt);
+  await t.action(internal.nativePayments.reconcile, { disbursementId: ids.disbursementId });
+  const payment = await t.run(ctx => ctx.db.get(ids.disbursementId));
+  expect(payment).toMatchObject({ status: matchingAddress ? "failed" : "relaying", txHash });
+  expect(payment!.settlement).toBeUndefined();
+  if (matchingAddress) {
+    expect(payment!.nativeRecoveryAt).toBeUndefined();
+    await expect(t.action(api.nativePayments.start, args)).rejects.toThrow();
+  }
+});
+
+it("waits for confirmation depth before finalizing a Safe failure", async () => {
+  const { t, ids, args } = await setup();
+  await t.action(api.nativePayments.start, args);
+  await t.run(ctx => ctx.db.patch(ids.disbursementId, { txHash }));
+  chain.getBlockNumber.mockResolvedValue(490n);
+  chain.getTransactionReceipt.mockResolvedValue({ ...receipt(ids.safeAddress), logs: [{
+    address: ids.safeAddress,
+    topics: encodeEventTopics({ abi: parseAbi(["event ExecutionFailure(bytes32 txHash, uint256 payment)"]), eventName: "ExecutionFailure" }),
+    data: encodeAbiParameters([{ type: "bytes32" }, { type: "uint256" }], [safeTxHash, 0n]),
+  }] });
+  await t.action(internal.nativePayments.reconcile, { disbursementId: ids.disbursementId });
+  expect(await t.run(ctx => ctx.db.get(ids.disbursementId))).toMatchObject({ status: "relaying" });
+});
+
 it("saves a network checkpoint before broadcasting and rejects another claim", async () => {
   const { t, args } = await setup();
   await t.action(api.nativePayments.start, args);

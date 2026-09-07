@@ -8,6 +8,12 @@ const preview = {
   CONVEX_DEPLOY_KEY: 'preview:example:disburse|test-only',
 };
 
+test('long preview branches use the 28-character Pages alias and keep the immutable origin', () => {
+  const commands = deploymentCommands({ ...preview, CF_PAGES_BRANCH: 'codex/v2-review-fixes-long-branch-name' });
+  assert.deepEqual(commands[1].slice(0, 4), ['env', 'set', 'SIWE_DOMAIN', 'codex-v2-review-fixes-long-b.disburse.pages.dev']);
+  assert.ok(commands[2][3].includes('abc123.disburse.pages.dev'));
+});
+
 test('Pages supplies the branch explicitly to the pinned Convex CLI', () => {
   const [deploy, ...settings] = deploymentCommands(preview);
   assert.deepEqual(deploy.slice(-2), ['--preview-create', 'codex/v2-release']);

@@ -5,6 +5,7 @@ import { api, internal } from "../_generated/api";
 import {
   createFullOrgSetup,
   createTestBeneficiary,
+  createTestMembership,
   signIn,
   TEST_WALLETS,
 } from "./factories";
@@ -152,6 +153,7 @@ it("records versioned evidence and retains an unexpired decision only for unchan
     await decision(),
   );
   const reviewed = await read();
+  if (!reviewed?._id) throw new Error("Missing reviewed evidence");
   expect(reviewed?.status).toBe("false_positive");
   vi.setSystemTime(Date.now() + 2 * 60_000);
   const second = await load();
@@ -303,7 +305,7 @@ it("holds a bounded group for background screening and does not requeue the same
   const { t, ids, load } = await setup("Unrelated Contractor");
   await load();
   await t.run(async (ctx) => {
-    for (let i = 0; i < 25; i++)
+    for (let i = 0; i < 125; i++)
       await createTestBeneficiary(ctx, ids.orgId, {
         name: `Queue recipient ${i}`,
       });
@@ -312,13 +314,73 @@ it("holds a bounded group for background screening and does not requeue the same
   const waiting = await t.run((ctx) => ctx.db.query("beneficiaries").collect());
   expect(
     waiting.filter((r) => (r.nextScreeningAt ?? 0) > Date.now()),
-  ).toHaveLength(20);
+  ).toHaveLength(100);
+  const scheduled = await t.run(ctx => ctx.db.system.query("_scheduled_functions").collect());
+  expect(scheduled.some(job => job.name === "screeningQueue:due" && job.scheduledTime <= Date.now() + 1000)).toBe(true);
   await t.mutation(internal.screeningQueue.due, {});
   expect(
     (await t.run((ctx) => ctx.db.query("beneficiaries").collect())).filter(
       (r) => (r.nextScreeningAt ?? 0) > Date.now(),
     ),
-  ).toHaveLength(26);
+  ).toHaveLength(126);
+});
+
+it.each(["false_positive", "confirmed_match"] as const)("preserves a %s decision across an outage and an unchanged list update", async status => {
+  const { t, ids, sessionToken, load, scan, read, decision, check } = await setup();
+  await t.mutation(api.screeningMutations.updateScreeningEnforcement, { orgId: ids.orgId, sessionToken, enforcement: "block" });
+  await load();
+  await scan();
+  await t.mutation(api.screeningMutations.reviewScreeningResult, { ...(await decision()), status });
+  const reviewed = await read();
+  if (!reviewed?._id) throw new Error("Missing reviewed evidence");
+  const attempt = await t.mutation(internal.screeningMutations.beginScreening, { orgId: ids.orgId, beneficiaryId: ids.beneficiaryId });
+  await t.mutation(internal.screeningMutations.upsertScreeningResult, {
+    orgId: ids.orgId, beneficiaryId: ids.beneficiaryId, attempt: attempt!.attempt,
+    input: screeningInput(attempt!.recipient), expectedFingerprint: screeningInputFingerprint(attempt!.recipient),
+    status: "unavailable", matches: [], error: "Temporary source outage",
+  });
+  expect(await read()).toMatchObject({ status, decisionId: reviewed!.decisionId, runId: reviewed!.runId, reviewExpiresAt: reviewed!.reviewExpiresAt, lastError: "Temporary source outage" });
+  expect(await check()).toMatchObject({ clear: false, flagged: [{ status: status === "confirmed_match" ? status : "unavailable" }] });
+  const nextDataset = await load();
+  await scan();
+  expect(await read()).toMatchObject({ status, decisionId: reviewed!.decisionId, datasetId: nextDataset, reviewExpiresAt: reviewed!.reviewExpiresAt });
+  expect((await t.run(ctx => ctx.db.get(reviewed._id)))!.lastError).toBeUndefined();
+  expect(await t.run(ctx => ctx.db.query("screeningRuns").collect())).toHaveLength(3);
+});
+
+it("keeps a confirmed match after the review period while retaining its original evidence", async () => {
+  const { t, load, scan, read, decision } = await setup();
+  await load(); await scan();
+  await t.mutation(api.screeningMutations.reviewScreeningResult, { ...(await decision()), status: "confirmed_match" });
+  const reviewed = await read();
+  if (!reviewed?._id) throw new Error("Missing reviewed evidence");
+  vi.setSystemTime(Date.now() + 8 * 86400_000);
+  await load(); await scan();
+  expect(await read()).toMatchObject({ status: "confirmed_match", decisionId: reviewed!.decisionId });
+});
+
+it("requires an administrator to review a hit even when an approver can authorize payments", async () => {
+  const { t, ids, load, scan, decision } = await setup();
+  const approver = await signIn(t, "approver");
+  await t.run(ctx => createTestMembership(ctx, ids.orgId, approver.userId, { role: "approver" }));
+  await load(); await scan();
+  const review = await decision();
+  expect(await t.query(api.screeningQueries.getScreeningResult, { beneficiaryId: ids.beneficiaryId, sessionToken: approver.sessionToken })).toMatchObject({ canReview: false });
+  await expect(t.mutation(api.screeningMutations.reviewScreeningResult, { ...review, sessionToken: approver.sessionToken })).rejects.toThrow(/role|permission|access/i);
+  expect(await t.run(ctx => ctx.db.query("screeningDecisions").collect())).toHaveLength(0);
+});
+
+it("rejects results for a retired list with a retryable code without overwriting the last evidence", async () => {
+  const { t, ids, load, scan, read } = await setup();
+  const datasetId = await load(); await scan();
+  const previous = await read();
+  const attempt = await t.mutation(internal.screeningMutations.beginScreening, { orgId: ids.orgId, beneficiaryId: ids.beneficiaryId });
+  await load();
+  await expect(t.mutation(internal.screeningMutations.upsertScreeningResult, {
+    orgId: ids.orgId, beneficiaryId: ids.beneficiaryId, datasetId, attempt: attempt!.attempt,
+    input: screeningInput(attempt!.recipient), expectedFingerprint: screeningInputFingerprint(attempt!.recipient), status: "clear", matches: [],
+  })).rejects.toThrow(/SCREENING_DATASET_CHANGED/);
+  expect(await read()).toMatchObject({ runId: previous!.runId, status: previous!.status });
 });
 
 it("rejects both older success and older failure after a newer attempt completes", async () => {

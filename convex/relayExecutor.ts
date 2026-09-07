@@ -14,6 +14,7 @@ import { assertSafeProposal, readOwnerApprovalStatus, type SafeProposal } from '
 import { encodeExecTransaction } from './lib/encodeSafeExecution';
 import { loadPaymentProposal } from './lib/paymentProposal';
 import { managedRelay } from './lib/managedRelay';
+import { relayConfiguration } from './lib/relayConfiguration';
 import { getChainClient } from './lib/safeVerification';
 import { assertPaymentReceipt } from './lib/executionReceipt';
 import { assertReceiptConfirmations } from '../shared/confirmations';
@@ -35,6 +36,16 @@ async function checkProvider(chainId: number, fee: ExecutionFee) {
   if (balance.balance <= 0n) throw new Error('The managed payment service needs billing attention. Your payment has not been submitted.');
 }
 export const validateFee = internalAction({ args: { chainId: v.number(), fee: v.object({ token: v.string(), tokenAddress: v.string(), collector: v.string(), amount: v.string() }) }, handler: async (_ctx, args): Promise<void> => checkProvider(args.chainId, args.fee) });
+// Operator-only, read-only preflight: invoke with the Convex dashboard or CLI.
+// Uses the deployed secrets and payment checks without creating or sending a job.
+export const configurationCheck = internalAction({
+  args: { chainId: v.number(), token: v.string() },
+  handler: async (_ctx, args) => {
+    const { fee } = relayConfiguration(args.chainId, args.token.trim().toUpperCase());
+    await checkProvider(args.chainId, fee);
+    return { status: 'ready' as const, chainId: args.chainId, fee };
+  },
+});
 export const checkFee = action({ args: { disbursementId: v.id('disbursements'), sessionToken: v.string(), reviewedIdentity: v.string() }, handler: async (ctx, args): Promise<void> => {
   const p = await ctx.runQuery(api.disbursements.get, { disbursementId: args.disbursementId, sessionToken: args.sessionToken });
   if (!p?.chainId || !p.executionFee || feeIdentity(p.executionFee) !== args.reviewedIdentity) throw new Error('Review the current payment fee before signing.');

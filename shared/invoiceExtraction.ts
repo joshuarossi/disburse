@@ -70,6 +70,8 @@ function moneyValue(raw: string): string | null {
     else if (/^\d{1,3}(\.\d{3})+,\d{1,6}$/.test(value))
       normalized = value.replace(/\./g, "").replace(",", ".");
     else return null;
+  } else if (/^\d{1,3}[.,]\d{3}$/.test(value)) {
+    return null; // Either separator can mean thousands or decimal precision.
   } else if (value.includes(",")) {
     if (/^\d+,\d{2}$/.test(value)) normalized = value.replace(",", ".");
     else return null; // A single separator with three digits is locale-ambiguous.

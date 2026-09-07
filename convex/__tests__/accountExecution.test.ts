@@ -12,7 +12,7 @@ import { feeIdentity } from '../../shared/executionFee';
 import { accountChangeReceiptOutcome } from '../lib/accountChange';
 import type { AccountAuthority } from '../lib/accountAuthority';
 
-const state = vi.hoisted(() => ({ graph: null as AccountAuthority | null, enabled: true, amount: 0n, spent: 0n, reset: 0, registered: true, badCode: false, check: vi.fn(), receipt: null as any, getLogs: vi.fn(), send: vi.fn(), status: vi.fn(), call: vi.fn(), getTransaction: vi.fn() }));
+const state = vi.hoisted(() => ({ graph: null as AccountAuthority | null, enabled: true, allowanceNonce: 1, amount: 0n, spent: 0n, reset: 0, registered: true, badCode: false, check: vi.fn(), receipt: null as any, getLogs: vi.fn(), send: vi.fn(), status: vi.fn(), call: vi.fn(), getTransaction: vi.fn() }));
 const token = CHAIN_TOKENS[11155111].USDC.address;
 const parent = '0x8888888888888888888888888888888888888888';
 vi.mock('../lib/safeIdentity', () => ({ assertSafeIdentity: async () => {} }));
@@ -40,7 +40,7 @@ vi.mock('../lib/safeVerification', () => ({ getChainClient: () => ({
     if (functionName === 'isModuleEnabled') return state.enabled;
     if (functionName === 'getDelegates') return [state.registered ? [TEST_WALLETS.initiator, TEST_WALLETS.admin] : [], 0];
     if (functionName === 'getTokens') return [token];
-    if (functionName === 'getTokenAllowance') return [state.amount, state.spent, BigInt(state.reset), 10n, 1n];
+    if (functionName === 'getTokenAllowance') return [state.amount, state.spent, BigInt(state.reset), 10n, BigInt(state.allowanceNonce)];
     if (functionName === 'balanceOf') return 100000000n;
     if (functionName === 'checkNSignatures') return state.check(args);
     if (functionName === 'generateTransferHash') return keccak256(encodeAbiParameters([{ type: 'address' }, { type: 'address' }, { type: 'address' }, { type: 'uint96' }, { type: 'address' }, { type: 'uint96' }, { type: 'uint16' }], args as [Hex, Hex, Hex, bigint, Hex, bigint, number]));
@@ -52,7 +52,7 @@ vi.mock('../lib/safeVerification', () => ({ getChainClient: () => ({
   },
 }) }));
 beforeEach(() => {
-  vi.useFakeTimers(); vi.clearAllMocks(); state.check.mockReset(); state.enabled = true; state.amount = 0n; state.spent = 0n; state.reset = 0; state.registered = true; state.badCode = false; state.receipt = null;
+  vi.useFakeTimers(); vi.clearAllMocks(); state.check.mockReset(); state.enabled = true; state.allowanceNonce = 1; state.amount = 0n; state.spent = 0n; state.reset = 0; state.registered = true; state.badCode = false; state.receipt = null;
   state.call.mockResolvedValue({ data: '0x' }); state.getTransaction.mockReset();
   state.getLogs.mockResolvedValue([]); state.send.mockResolvedValue('provider-one'); state.status.mockResolvedValue({ chainId: 11155111, status: 100 });
   vi.stubEnv('GELATO_TESTNET_API_KEY', 'test-service');
@@ -525,9 +525,16 @@ it('native allowance sends remain available after trial expiry', async () => {
   expect(request.attemptId).toBeTruthy();
   expect((await t.run(ctx => ctx.db.get(identity.disbursementId)))?.executionFee).toBeUndefined();
 });
-it('native allowance recovery does not depend on a returned wallet hash', async () => {
-  const { t, identity, quote, prepare } = await nativeAllowanceFixture();
-  await prepare(); await t.action(api.delegatedNative.start, identity);
+it('recovers a declined allowance payment and permits the next payment after its nonce advances', async () => {
+  const { t, ids, identity, quote, prepare } = await nativeAllowanceFixture();
+  await prepare();
+  const first = await t.action(api.delegatedNative.start, identity);
+  await t.mutation(api.nativePayments.walletRejected, { ...identity, attemptId: first.attemptId });
+  const original = (await t.run(ctx => ctx.db.get(identity.disbursementId)))!;
+  const next = await t.mutation(api.disbursements.create, { orgId: ids.orgId, sessionToken: identity.sessionToken, beneficiaryId: original.beneficiaryId!, amount: '1', token: 'USDC', chainId: 11155111 });
+  await expect(t.action(api.delegatedPayments.quote, { ...identity, disbursementId: next.disbursementId, feeMode: 'wallet' })).rejects.toThrow('ALLOWANCE_AUTHORIZATION_RESERVED');
+  const retry = await t.action(api.delegatedNative.start, identity);
+  expect(retry.data).toBe(first.data);
   const txHash = `0x${'aa'.repeat(32)}` as Hex, safe = state.graph!.root;
   const topic = (a: string) => `0x${a.slice(2).toLowerCase().padStart(64, '0')}`;
   const moduleLog = { address: CURRENT_ALLOWANCE.address, topics: [keccak256(stringToHex('ExecuteAllowanceTransfer(address,address,address,address,uint96,uint16)')), topic(safe)], data: encodeAbiParameters([{ type: 'address' }, { type: 'address' }, { type: 'address' }, { type: 'uint96' }, { type: 'uint16' }], [TEST_WALLETS.admin, token, quote.recipientAddress as Hex, 1000000n, quote.nonce]), transactionHash: txHash };
@@ -536,6 +543,10 @@ it('native allowance recovery does not depend on a returned wallet hash', async 
   await t.action(internal.nativePayments.reconcile, { disbursementId: identity.disbursementId });
   const saved = await t.run(ctx => ctx.db.get(identity.disbursementId));
   expect(saved?.status, JSON.stringify({ status: saved?.status, error: saved?.relayError, txHash: saved?.txHash, checkpoint: saved?.nativeExecution, getLogs: state.getLogs.mock.calls.length })).toBe('executed'); expect(saved?.txHash).toBe(txHash); expect(saved?.nativeRecoveryAt).toBeUndefined(); expect(saved?.settlement?.blockNumber).toBe('120');
+  state.allowanceNonce = quote.nonce + 1;
+  const nextQuote = await t.action(api.delegatedPayments.quote, { ...identity, disbursementId: next.disbursementId, feeMode: 'wallet' });
+  expect(nextQuote.nonce).toBe(quote.nonce + 1);
+  expect(await t.run(ctx => ctx.db.query('delegationReservations').collect())).toHaveLength(1);
 });
 it('a reverted native allowance receipt needs confirmations and exact calldata before retry', async () => {
   const { t, identity, prepare } = await nativeAllowanceFixture();

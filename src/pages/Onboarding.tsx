@@ -9,6 +9,8 @@ import { useMutation, useAction } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { Id } from "../../convex/_generated/dataModel";
 import { Button } from "@/components/ui/button";
+import { Notice } from "@/components/workspace/WorkspacePrimitives";
+import { walletDeclined, walletErrorMessage } from "@/lib/walletErrors";
 import { CHAINS_LIST } from "@/lib/chains";
 import {
   ArrowLeft,
@@ -75,6 +77,7 @@ export default function Onboarding() {
   const [safeThreshold, setSafeThreshold] = useState(1);
   const [deploying, setDeploying] = useState(false);
   const [safeError, setSafeError] = useState<string | null>(null);
+  const [safeCancelled, setSafeCancelled] = useState(false);
   const [linkingExisting, setLinkingExisting] = useState(false);
 
   // ---- nav state ----
@@ -204,6 +207,7 @@ export default function Onboarding() {
   const handleLinkExisting = async () => {
     if (!orgId || !address || !existingSafeAddress.trim()) return;
     setSafeError(null);
+    setSafeCancelled(false);
     setLinkingExisting(true);
 
     try {
@@ -217,7 +221,7 @@ export default function Onboarding() {
       // Done — go to dashboard
       navigate(`/org/${orgId}/dashboard`);
     } catch (err) {
-      setSafeError(err instanceof Error ? err.message : "Failed to link Safe");
+      setSafeError(walletErrorMessage(err, "Could not link this account. Check its address and network, then try again."));
     } finally {
       setLinkingExisting(false);
     }
@@ -229,7 +233,9 @@ export default function Onboarding() {
     setupLock.current = true;
     const deploymentChainId = selectedChainId;
     let broadcast = false;
+    let sendStarted = false;
     setSafeError(null);
+    setSafeCancelled(false);
     setDeploying(true);
 
     try {
@@ -251,15 +257,17 @@ export default function Onboarding() {
         deploymentChainId,
       );
 
-      // Send the deploy transaction — MetaMask will prompt
+      // Retain the deterministic address even if the wallet loses its response.
+      setExistingSafeAddress(predictedAddress);
+      sendStarted = true;
       const txHash = await sendTransactionAsync({
         to: deployTx.to as `0x${string}`,
         data: deployTx.data as `0x${string}`,
         value: deployTx.value,
+        chainId: deploymentChainId,
       });
 
       broadcast = true;
-      setExistingSafeAddress(predictedAddress);
       const client = getPublicClient(config, {
         chainId: deploymentChainId as SupportedChainId,
       });
@@ -280,13 +288,18 @@ export default function Onboarding() {
       // Navigate to dashboard
       navigate(`/org/${orgId}/dashboard`);
     } catch (err) {
-      if (broadcast) setHasSafe(true);
+      const cancelled = !broadcast && walletDeclined(err);
+      const needsConfirmation = broadcast || (sendStarted && !cancelled);
+      if (needsConfirmation) setHasSafe(true);
+      setSafeCancelled(cancelled);
       setSafeError(
         broadcast
-          ? `The deployment was submitted. Check the account below and link it once confirmed. ${err instanceof Error ? err.message : ""}`
-          : err instanceof Error
-            ? err.message
-            : "Failed to deploy Safe",
+          ? "Account creation was submitted. Check your wallet activity, then link the account below once it is confirmed."
+          : needsConfirmation
+            ? "Your wallet did not confirm whether account creation was submitted. Check your wallet activity before trying again. If it was confirmed, link the account below."
+            : cancelled
+              ? "Account creation cancelled. Your settings are saved here. Select Create Safe when you are ready to try again."
+              : walletErrorMessage(err, "Could not prepare your account. Check your wallet connection and try again."),
       );
     } finally {
       setupLock.current = false;
@@ -317,12 +330,7 @@ export default function Onboarding() {
     const active = idx === currentIdx;
 
     return (
-      <div className={`flex items-center gap-2 ${idx > 0 ? "ml-auto" : ""}`}>
-        {idx > 0 && (
-          <div
-            className={`h-px w-6 ${done ? "bg-accent-500" : "bg-white/10"}`}
-          />
-        )}
+      <div className="flex min-w-0 flex-1 flex-col items-center gap-2">
         <div
           className={`flex h-8 w-8 items-center justify-center rounded-full border transition-colors ${
             done
@@ -341,7 +349,7 @@ export default function Onboarding() {
           )}
         </div>
         <span
-          className={`text-xs font-medium ${active ? "text-white" : done ? "text-accent-400" : "text-slate-500"}`}
+          className={`text-[11px] font-medium sm:text-xs ${active ? "text-white" : done ? "text-accent-400" : "text-slate-500"}`}
         >
           {label}
         </span>
@@ -369,7 +377,7 @@ export default function Onboarding() {
   return (
     <div className="workspace workspace-entry flex min-h-screen flex-col items-center justify-center bg-navy-950 px-6 py-12">
       {/* Background glow */}
-      <div className="absolute inset-0 -z-10">
+      <div className="absolute inset-0 -z-10 overflow-hidden">
         <div className="absolute left-1/2 top-1/2 h-[500px] w-[500px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-accent-500/10 blur-[120px]" />
       </div>
 
@@ -387,7 +395,7 @@ export default function Onboarding() {
         </div>
 
         {/* Card */}
-        <div className="rounded-2xl border border-white/10 bg-navy-900/50 p-8">
+        <div className="rounded-2xl border border-white/10 bg-navy-900/50 p-5 sm:p-8">
           {/* ================================================================
               STEP: PROFILE
               ============================================================== */}
@@ -493,6 +501,7 @@ export default function Onboarding() {
               <div className="flex gap-3 pt-2">
                 <Button
                   variant="secondary"
+                  aria-label="Back"
                   onClick={goBack}
                   className="w-12 shrink-0"
                 >
@@ -688,6 +697,7 @@ export default function Onboarding() {
               <div className="flex gap-3 pt-2">
                 <Button
                   variant="secondary"
+                  aria-label="Back"
                   onClick={goBack}
                   className="w-12 shrink-0"
                 >
@@ -788,19 +798,15 @@ export default function Onboarding() {
                   </div>
 
                   {safeError && (
-                    <div
-                      role="alert"
-                      className="flex items-start gap-2 rounded-lg border border-red-500/30 bg-red-500/5 p-3"
-                    >
-                      <AlertCircle className="h-4 w-4 text-red-400 shrink-0 mt-0.5" />
-                      <p className="text-sm text-red-400">{safeError}</p>
-                    </div>
+                    <Notice tone={safeCancelled ? "info" : "error"}>{safeError}</Notice>
                   )}
 
                   <div className="flex gap-3 pt-2">
                     <Button
                       variant="secondary"
-                      onClick={() => setHasSafe(null)}
+                      aria-label="Back"
+                      disabled={linkingExisting}
+                      onClick={() => { setHasSafe(null); setSafeError(null); }}
                       className="w-12 shrink-0"
                     >
                       <ArrowLeft className="h-4 w-4" />
@@ -837,7 +843,7 @@ export default function Onboarding() {
                     </p>
                     <div className="mt-2 space-y-1.5">
                       <div className="flex items-center gap-2">
-                        <span className="rounded bg-accent-500/15 px-2 py-0.5 text-xs font-mono text-accent-400">
+                        <span className="rounded bg-accent-500/15 px-2 py-0.5 text-xs font-mono text-[var(--ws-text)]">
                           {address?.slice(0, 8)}...{address?.slice(-4)}
                         </span>
                         <span className="text-xs text-slate-500">(you)</span>
@@ -941,19 +947,15 @@ export default function Onboarding() {
                   </p>
 
                   {safeError && (
-                    <div
-                      role="alert"
-                      className="flex items-start gap-2 rounded-lg border border-red-500/30 bg-red-500/5 p-3"
-                    >
-                      <AlertCircle className="h-4 w-4 text-red-400 shrink-0 mt-0.5" />
-                      <p className="text-sm text-red-400">{safeError}</p>
-                    </div>
+                    <Notice tone={safeCancelled ? "info" : "error"}>{safeError}</Notice>
                   )}
 
                   <div className="flex gap-3 pt-2">
                     <Button
                       variant="secondary"
-                      onClick={() => setHasSafe(null)}
+                      aria-label="Back"
+                      disabled={deploying}
+                      onClick={() => { setHasSafe(null); setSafeError(null); }}
                       className="w-12 shrink-0"
                     >
                       <ArrowLeft className="h-4 w-4" />

@@ -5,7 +5,7 @@ import schema from '../schema';
 import { createFullOrgSetup, createTestBeneficiary, createTestDisbursement, signIn, TEST_WALLETS } from './factories';
 import { encodeAbiParameters, encodeEventTopics, parseAbi } from 'viem';
 import { feeIdentity } from '../../shared/executionFee';
-const provider = vi.hoisted(() => ({ sendTransaction: vi.fn(), getStatus: vi.fn(), configurationError: false }));
+const provider = vi.hoisted(() => ({ sendTransaction: vi.fn(), getStatus: vi.fn(), getCapabilities: vi.fn(), getBalance: vi.fn(), configurationError: false }));
 vi.mock('../lib/managedRelay', () => ({ managedRelay: () => { if (provider.configurationError) throw new Error('Provider unavailable'); return provider; } }));
 const chain = vi.hoisted(() => ({ getBlockNumber: vi.fn(), getLogs: vi.fn(), getTransactionReceipt: vi.fn(), getBlock: vi.fn(), getChainId: vi.fn() }));
 vi.mock('../lib/safeVerification', () => ({ getChainClient: () => chain }));
@@ -26,6 +26,25 @@ async function setup() {
   return { t, ids, args };
 }
 afterEach(() => { provider.configurationError = false; vi.clearAllTimers(); vi.unstubAllEnvs(); vi.useRealTimers(); vi.clearAllMocks(); vi.unstubAllGlobals(); });
+
+it('checks deployed relay configuration without submitting a transaction or exposing its key', async () => {
+  const t = convexTest(schema);
+  vi.stubEnv('GELATO_API_KEY', 'private-relay-test-key');
+  vi.stubEnv('GELATO_1_FEE_COLLECTOR', fee.collector);
+  vi.stubEnv('GELATO_1_FEE_USDC', fee.amount);
+  provider.getCapabilities.mockResolvedValue({ 1: { feeCollector: fee.collector, tokens: [{ address: fee.tokenAddress, decimals: 6 }] } });
+  provider.getBalance.mockResolvedValue({ balance: 1n, decimals: 6, unit: 'USDC' });
+  expect(await t.action(internal.relayExecutor.configurationCheck, { chainId: 1, token: 'usdc' })).toEqual({ status: 'ready', chainId: 1, fee });
+  provider.getBalance.mockResolvedValue({ balance: 0n, decimals: 6, unit: 'USDC' });
+  await expect(t.action(internal.relayExecutor.configurationCheck, { chainId: 1, token: 'USDC' })).rejects.toThrow('billing attention');
+  provider.getBalance.mockResolvedValue({ balance: 1n });
+  provider.getCapabilities.mockResolvedValue({ 1: { feeCollector: TEST_WALLETS.viewer, tokens: [] } });
+  await expect(t.action(internal.relayExecutor.configurationCheck, { chainId: 1, token: 'USDC' })).rejects.toThrow('does not support');
+  provider.getCapabilities.mockRejectedValue(new Error('https://rpc.invalid/?apiKey=private-relay-test-key'));
+  await expect(t.action(internal.relayExecutor.configurationCheck, { chainId: 1, token: 'USDC' })).rejects.toThrow('could not be reached');
+  expect(provider.sendTransaction).not.toHaveBeenCalled();
+  expect(await t.run(ctx => ctx.db.query('relayJobs').collect())).toHaveLength(0);
+});
 describe('managed relay durability and authorization', () => {
   it('reserves once and allows only one provider submission claim', async () => {
     vi.useFakeTimers();

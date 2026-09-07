@@ -1,5 +1,6 @@
 import { submissionNeedsAttention, walletSendDeclined } from '../shared/paymentQueue';
 import { resolveFundingAccount } from "./lib/fundingAccount";
+import { reportPage } from './lib/reportPagination';
 import { queueReportSource } from './lib/reportIndex';
 import { settlementBlockValidator, assertSameSettlement } from './lib/settlementBlock';
 import { environmentValidator } from "./lib/activityEnvironment";
@@ -34,16 +35,6 @@ import {
 import { internal } from "./_generated/api";
 import { isUpcomingPayment, isOverdueScheduledPayment } from "../shared/paymentQueue";
 
-type DisbursementStatus =
-  | "draft"
-  | "pending"
-  | "proposed"
-  | "scheduled"
-  | "relaying"
-  | "executed"
-  | "failed"
-  | "cancelled";
-
 // List disbursements for an org with filtering, searching, sorting, and pagination
 export const list = query({
   args: {
@@ -64,23 +55,13 @@ export const list = query({
     dateTo: v.optional(v.number()), // timestamp
     // Search
     search: v.optional(v.string()),
-    // Sorting
-    sortBy: v.optional(
-      v.union(
-        v.literal("createdAt"),
-        v.literal("amount"),
-        v.literal("status"),
-        v.literal("scheduledAt"),
-      ),
-    ),
     sortOrder: v.optional(v.union(v.literal("asc"), v.literal("desc"))),
     // Pagination
-    cursor: v.optional(v.string()), // Last item ID from previous page
+    cursor: v.optional(v.string()), // Opaque database continuation cursor
     limit: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
     const limit = Math.max(1, Math.min(100, Math.floor(args.limit ?? 20)));
-    const sortBy = args.sortBy ?? "createdAt";
     const sortOrder = args.sortOrder ?? "desc";
     const searchLower = args.search?.toLowerCase().trim() || null;
 
@@ -93,33 +74,28 @@ export const list = query({
       "viewer",
     ]);
 
-    // ── Candidate fetch (M-01: index pushdown for single-status filters)
-    const statusList =
-      args.status && args.status.length > 0 ? args.status : null;
-    let candidates;
     if (args.recurringPaymentId) {
       const series = await ctx.db.get(args.recurringPaymentId);
       if (!series || series.orgId !== args.orgId) throw new Error('Schedule not found in this workspace');
-      candidates = await ctx.db.query('disbursements').withIndex('by_recurring_pay_date', q => q.eq('recurringPaymentId', args.recurringPaymentId!)).filter(q => q.eq(q.field('orgId'), args.orgId)).collect();
-      if (statusList) candidates = candidates.filter(d => statusList.includes(d.status) || (args.includeRelayExceptions && submissionNeedsAttention(d)) || (args.includeOverdueScheduled && isOverdueScheduledPayment(d, Date.now())));
-    } else if (statusList && statusList.length === 1 && !args.includeRelayExceptions && !args.includeOverdueScheduled) {
-      candidates = await ctx.db
-        .query("disbursements")
-        .withIndex("by_org_status", (q) =>
-          q
-            .eq("orgId", args.orgId)
-            .eq("status", statusList[0] as DisbursementStatus),
-        )
-        .collect();
-    } else {
-      candidates = await ctx.db
-        .query("disbursements")
-        .withIndex("by_org", (q) => q.eq("orgId", args.orgId))
-        .collect();
-      if (statusList) {
-        candidates = candidates.filter((d) => statusList.includes(d.status) || (args.includeRelayExceptions && submissionNeedsAttention(d)) || (args.includeOverdueScheduled && isOverdueScheduledPayment(d, Date.now())));
-      }
     }
+    const statusList = args.status?.length ? args.status : null;
+    // Bound each read even for sparse filters. Continuation cursors retain access
+    // to all history without collecting the organization on every page load.
+    const candidatePage = await ctx.db.query('disbursements')
+      .withIndex('by_org_created', q => q.eq('orgId', args.orgId))
+      .filter(q => q.and(
+        args.recurringPaymentId ? q.eq(q.field('recurringPaymentId'), args.recurringPaymentId) : true,
+        args.token ? q.eq(q.field('token'), args.token.trim().toUpperCase()) : true,
+        args.chainId !== undefined ? q.eq(q.field('chainId'), args.chainId) : true,
+        args.dateFrom !== undefined ? q.gte(q.field('createdAt'), args.dateFrom) : true,
+        args.dateTo !== undefined ? q.lte(q.field('createdAt'), args.dateTo + 86400000) : true,
+        statusList ? q.or(...statusList.map(status => q.eq(q.field('status'), status)),
+          args.includeRelayExceptions ? q.eq(q.field('status'), 'relaying') : false,
+          args.includeOverdueScheduled ? q.neq(q.field('scheduledAt'), undefined) : false) : true,
+      ))
+      .order(sortOrder)
+      .paginate(reportPage(args.cursor, limit));
+    const candidates = candidatePage.page.filter(d => !statusList || statusList.includes(d.status) || (args.includeRelayExceptions && submissionNeedsAttention(d)) || (args.includeOverdueScheduled && isOverdueScheduledPayment(d, Date.now())));
 
     // ── Cheap row-level filters (no joins required)
     let filtered = args.type
@@ -128,7 +104,7 @@ export const list = query({
 
     if (args.environment) filtered = filtered.filter(d => chainEnvironment(d.chainId) === args.environment);
     if (args.token) {
-      filtered = filtered.filter((d) => d.token === args.token);
+      filtered = filtered.filter((d) => d.token === args.token!.trim().toUpperCase());
     }
     if (args.upcomingOnly) {
       const now = Date.now();
@@ -202,51 +178,11 @@ export const list = query({
       filtered = matched;
     }
 
-    // ── Sorting on row fields only (displayAmount derives from the row itself)
-    filtered.sort((a, b) => {
-      let comparison = 0;
-      switch (sortBy) {
-        case "createdAt":
-          comparison = a.createdAt - b.createdAt;
-          break;
-        case "amount": {
-          const aAmount = parseFloat(rowDisplayAmount(a) || "0");
-          const bAmount = parseFloat(rowDisplayAmount(b) || "0");
-          comparison = aAmount - bAmount;
-          break;
-        }
-        case "status":
-          comparison = a.status.localeCompare(b.status);
-          break;
-        case "scheduledAt": {
-          const aScheduled = a.scheduledAt;
-          const bScheduled = b.scheduledAt;
-          const aNull = aScheduled == null;
-          const bNull = bScheduled == null;
-          if (aNull && bNull) return 0;
-          if (aNull) return 1;
-          if (bNull) return -1;
-          comparison = aScheduled - bScheduled;
-          break;
-        }
-      }
-      return sortOrder === "desc" ? -comparison : comparison;
-    });
-
-    const totalCount = filtered.length;
-
-    let startIndex = 0;
-    if (args.cursor) {
-      const cursorIndex = filtered.findIndex((d) => d._id === args.cursor);
-      if (cursorIndex !== -1) {
-        startIndex = cursorIndex + 1;
-      }
-    }
-
-    const page = filtered.slice(startIndex, startIndex + limit);
-    const hasMore = startIndex + limit < totalCount;
-    const nextCursor =
-      hasMore && page.length > 0 ? page[page.length - 1]._id : null;
+    const page = filtered;
+    const hasMore = !candidatePage.isDone;
+    const nextCursor = hasMore ? candidatePage.continueCursor : null;
+    // A page count is not a workspace total. Only a complete first page knows it.
+    const totalCount = !args.cursor && !hasMore ? page.length : null;
 
     // ── Enrich ONLY the returned page (≤ limit beneficiary reads / batch joins)
     const items = await Promise.all(
@@ -351,6 +287,8 @@ export const create = mutation({
     scheduledAt: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
+    const token = args.token.trim().toUpperCase();
+    if (!configuredTokenAddress(args.chainId, token)) throw new Error("Unsupported payment currency for this network");
     const now = Date.now();
 
     const { user } = await requireOrgAccess(
@@ -372,17 +310,17 @@ export const create = mutation({
       throw new Error("Beneficiary is not active");
     }
 
-    assertPayoutInstructions(beneficiary, args);
+    assertPayoutInstructions(beneficiary, { ...args, token });
     assertApprovedRecipient(beneficiary);
     // H-02/H-03: server-side validation of money math and destination address
-    assertValidAmount(args.amount, args.token);
+    assertValidAmount(args.amount, token);
     assertValidAddress(beneficiary.walletAddress, "beneficiary wallet address");
 
     await assertMemberPaymentPolicy(
       ctx,
       args.orgId,
       user._id,
-      args.token,
+      token,
       args.amount,
       args.scheduledAt ?? now,
     );
@@ -394,8 +332,8 @@ export const create = mutation({
       recipientAddress: beneficiary.walletAddress,
       recipientName: beneficiary.name,
       payoutVersion: beneficiary.payoutVersion,
-      token: args.token,
-      tokenAddress: configuredTokenAddress(args.chainId, args.token),
+      token: token,
+      tokenAddress: configuredTokenAddress(args.chainId, token),
       amount: args.amount,
       memo: args.memo,
       scheduledAt: args.scheduledAt,
@@ -415,7 +353,7 @@ export const create = mutation({
       objectId: disbursementId,
       metadata: {
         beneficiaryId: args.beneficiaryId,
-        token: args.token,
+        token: token,
         amount: args.amount,
       },
       timestamp: now,
@@ -838,6 +776,8 @@ export const createBatch = mutation({
     scheduledAt: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
+    const token = args.token.trim().toUpperCase();
+    if (!configuredTokenAddress(args.chainId, token)) throw new Error("Unsupported payment currency for this network");
     const now = Date.now();
 
     const { user } = await requireOrgAccess(
@@ -883,16 +823,16 @@ export const createBatch = mutation({
         throw new Error(`Beneficiary is not active: ${beneficiary.name}`);
       }
 
-      assertPayoutInstructions(beneficiary, args);
+      assertPayoutInstructions(beneficiary, { ...args, token });
       assertApprovedRecipient(beneficiary);
       // H-02/H-03: strict amount + address validation (no float math)
-      assertValidAmount(recipient.amount, args.token);
+      assertValidAmount(recipient.amount, token);
       assertValidAddress(
         beneficiary.walletAddress,
         "beneficiary wallet address",
       );
 
-      totalBaseUnits += amountToBaseUnits(recipient.amount, args.token);
+      totalBaseUnits += amountToBaseUnits(recipient.amount, token);
       recipientData.push({
         beneficiaryId: recipient.beneficiaryId,
         recipientAddress: beneficiary.walletAddress,
@@ -902,13 +842,13 @@ export const createBatch = mutation({
       });
     }
 
-    const totalAmount = formatBaseUnits(totalBaseUnits, args.token);
+    const totalAmount = formatBaseUnits(totalBaseUnits, token);
 
     await assertMemberPaymentPolicy(
       ctx,
       args.orgId,
       user._id,
-      args.token,
+      token,
       totalAmount,
       args.scheduledAt ?? now,
     );
@@ -918,8 +858,8 @@ export const createBatch = mutation({
       safeId: safe._id,
       chainId: args.chainId,
       type: "batch",
-      token: args.token,
-      tokenAddress: configuredTokenAddress(args.chainId, args.token),
+      token: token,
+      tokenAddress: configuredTokenAddress(args.chainId, token),
       totalAmount,
       memo: args.memo,
       scheduledAt: args.scheduledAt,
@@ -951,7 +891,7 @@ export const createBatch = mutation({
       objectId: disbursementId,
       metadata: {
         type: "batch",
-        token: args.token,
+        token: token,
         totalAmount: totalAmount.toString(),
         recipientCount: args.recipients.length,
       },

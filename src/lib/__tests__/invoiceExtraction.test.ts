@@ -5,6 +5,18 @@ import {
   invoiceFileType,
 } from "../../../shared/invoiceSource";
 
+it.each(["1.500 EUR", "EUR 1,500"])("leaves ambiguous thousands/decimal notation for review: %s", amount => {
+  const result = extractInvoiceSuggestions(`Amount due: ${amount}`);
+  expect(result.amount).toBeUndefined();
+  expect(result.warnings.join(" ")).toMatch(/ambiguous/);
+});
+
+it("recognizes WebP with arbitrary binary RIFF size bytes", () => {
+  // C2 A0 decodes to one UTF-8 codepoint, but still occupies two bytes.
+  const bytes = new Uint8Array([82, 73, 70, 70, 0xc2, 0xa0, 0, 0, 87, 69, 66, 80]);
+  expect(invoiceFileType(bytes, "image/webp")).toBe("image/webp");
+});
+
 it("extracts explicitly labeled fields and ignores unsolicited payment addresses", () => {
   expect(
     extractInvoiceSuggestions(

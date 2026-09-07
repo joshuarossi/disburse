@@ -21,6 +21,7 @@ export const syncForOrg = action({
     force: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
+    await ctx.runQuery(internal.depositsData.authorizeSync, { orgId: args.orgId, sessionToken: args.sessionToken, force: args.force === true });
     const safes = await ctx.runQuery(api.safes.getForOrg, {
       orgId: args.orgId,
       sessionToken: args.sessionToken,

@@ -1,3 +1,4 @@
+import { ORG_READER_ROLES } from '../shared/roles';
 import { v } from "convex/values";
 import {
   internalMutation,
@@ -15,7 +16,7 @@ import { appendAudit } from "./audit";
 import { assertValidAddress } from "./lib/validation";
 import { fingerprint } from "../shared/fingerprint";
 
-const readers = ["admin", "approver", "initiator", "clerk", "viewer"] as const;
+
 export async function invitationAvailable(
   ctx: QueryCtx,
   invitation: Doc<"teamInvitations"> | null,
@@ -236,7 +237,7 @@ export const register = internalMutation({
 export const list = query({
   args: { orgId: v.id("orgs"), sessionToken: v.string() },
   handler: async (ctx, args) => {
-    await requireOrgAccess(ctx, args.orgId, args.sessionToken, [...readers]);
+    await requireOrgAccess(ctx, args.orgId, args.sessionToken, [...ORG_READER_ROLES]);
     const rows = await ctx.db
       .query("teamInvitations")
       .withIndex("by_org", (q) => q.eq("orgId", args.orgId))

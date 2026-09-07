@@ -1,3 +1,4 @@
+import { PAYMENT_OPERATOR_ROLES } from '../shared/roles';
 import { resolveFundingAccount, recurringFundingId } from "./lib/fundingAccount";
 import { configuredTokenAddress } from "../shared/assets";
 import {
@@ -42,7 +43,7 @@ const cadenceValidator = v.union(
   v.literal("biweekly"),
   v.literal("monthly"),
 );
-const writers = ["admin", "approver", "initiator"] as const;
+
 
 type RunInput = {
   orgId: Id<"orgs">;
@@ -231,7 +232,7 @@ export const create = mutation({
       ctx,
       args.orgId,
       args.sessionToken,
-      [...writers],
+      [...PAYMENT_OPERATOR_ROLES],
     );
     return createRunWithSeries(ctx, args, user._id);
   },
@@ -261,7 +262,7 @@ export const createGrouped = mutation({
       ctx,
       args.orgId,
       args.sessionToken,
-      [...writers],
+      [...PAYMENT_OPERATOR_ROLES],
     );
     if (!args.name.trim() || args.name.trim().length > 120)
       throw new Error("Give this pay run a name of 1 to 120 characters");
@@ -371,7 +372,7 @@ export const listRecurring = query({
             ...series,
             nextDraftAt: series.nextPayDate - PREPARATION_LEAD_MS,
             ownerName: owner?.name ?? "Schedule creator",
-            coordinatorActive: owner?.status === 'active' && writers.some(role => role === owner.role),
+            coordinatorActive: owner?.status === 'active' && PAYMENT_OPERATOR_ROLES.some(role => role === owner.role),
             latestPayment:
               latest?.orgId === args.orgId
                 ? {
@@ -410,7 +411,7 @@ export const setRecurringStatus = mutation({
       ctx,
       series.orgId,
       args.sessionToken,
-      [...writers],
+      [...PAYMENT_OPERATOR_ROLES],
     );
     if (series.status === args.status) return;
     const now = Date.now();
@@ -472,7 +473,7 @@ export const prepareNext = internalMutation({
     if (
       !membership ||
       membership.status !== "active" ||
-      !writers.some((role) => role === membership.role)
+      !PAYMENT_OPERATOR_ROLES.some((role) => role === membership.role)
     )
       reason =
         "The schedule owner no longer has permission to create payments.";
@@ -577,7 +578,7 @@ export const updateRecurring = mutation({
       ctx,
       series.orgId,
       args.sessionToken,
-      [...writers],
+      [...PAYMENT_OPERATOR_ROLES],
     );
     assertFutureSchedule(args.nextPayDate, Date.now());
     const fields = {
@@ -663,7 +664,7 @@ export const updateDraft = mutation({
       ctx,
       payment.orgId,
       args.sessionToken,
-      [...writers],
+      [...PAYMENT_OPERATOR_ROLES],
     );
     if (
       payment.status !== "draft" ||

@@ -203,12 +203,44 @@
       "subtitle": "Guias de configuração, conexões de carteira e fluxos de pagamento.",
       "sections": {
         "gettingStarted": {
-          "title": "Primeiros passos",
-          "body": "Conecte seu Safe, adicione beneficiários e execute um desembolso de teste em minutos."
+          "title": "Conecte sua conta",
+          "body": "Entre com uma carteira da sua organização. A carteira pede a assinatura de uma mensagem de acesso; entrar não envia nenhum pagamento. Em Configurações, vincule sua conta Safe existente. Os proprietários e o número mínimo de assinaturas controlam os pagamentos. Nunca compartilhe uma frase de recuperação ou chave privada com a equipe ou o suporte."
+        },
+        "recipients": {
+          "title": "Importe destinatários e instruções de pagamento",
+          "body": "Abra Destinatários e selecione Importar. Cole ou envie um arquivo CSV e associe as colunas de nome, e-mail, endereço, moeda e rede. Revise duplicatas e dados incompletos antes de salvar. É possível importar registros sem endereço, mas cada destinatário precisa de instruções completas antes de preparar um pagamento. Em geral, esses dados precisam ser adicionados separadamente às exportações de folha de pagamento."
         },
         "workflows": {
-          "title": "Pagamentos e relatórios",
-          "body": "Agende, agrupe e aprove desembolsos com exportações prontas para finanças."
+          "title": "Prepare um pagamento ou um lote",
+          "body": "Selecione Novo pagamento e escolha destinatários salvos. Informe o valor exato que cada pessoa deve receber. As instruções salvas determinam a moeda, a rede e o endereço. Moedas ou redes diferentes geram lotes separados, cada um com sua própria aprovação e liquidação. Salvar um rascunho não movimenta fundos."
+        },
+        "bills": {
+          "title": "Pague uma fatura de fornecedor",
+          "body": "Registre o fornecedor, o número da fatura, o valor e o vencimento em Contas a pagar. Prepare o pagamento a partir da fatura para manter os registros vinculados. A fatura só é marcada como paga após a verificação da liquidação do pagamento associado."
+        },
+        "approvals": {
+          "title": "Revise e aprove",
+          "body": "Abra o pagamento para revisar destinatários, valores, conta de origem e a taxa separada. Os proprietários assinam nas próprias carteiras. O Disburse mostra as aprovações necessárias e as verifica antes do envio. Um membro autorizado pode usar um limite de gastos concedido; um lote delegado solicita uma assinatura por destinatário e outra para a taxa, quando aplicável."
+        },
+        "schedules": {
+          "title": "Agende e repita pagamentos",
+          "body": "Escolha uma data futura e conclua as aprovações antes dela. Quando configurado, o serviço de pagamentos envia os pagamentos agendados elegíveis no vencimento. As instruções recorrentes geram um novo rascunho a cada ciclo; cada rascunho exige nova revisão e autorização. Revise instruções pausadas quando dados ou permissões mudarem. Cancelar uma instrução não invalida uma proposta já assinada no Safe."
+        },
+        "fees": {
+          "title": "Entenda os valores e as taxas",
+          "body": "Os destinatários recebem os valores informados. A taxa revisada é adicionada separadamente ao débito da conta e conta para os limites de gastos. Uma taxa em outra moeda exige saldo e, para pagamentos delegados, um limite nessa moeda. Nos fluxos compatíveis com taxas gerenciadas, o membro não precisa enviar uma transação pagando gás nativo. O cliente paga as próprias taxas."
+        },
+        "recovery": {
+          "title": "Resolva um pagamento que precisa de atenção",
+          "body": "Em Pagamentos, abra Precisa de atenção. Verificar liquidação confere o envio original sem repeti-lo. Retome apenas quando o aplicativo confirmar que pode tentar novamente a autorização original. Não prepare um substituto enquanto o resultado for incerto. Vincular um comprovante permite conciliar um pagamento delegado existente mesmo quando não é possível preparar novos pagamentos."
+        },
+        "billing": {
+          "title": "Teste, renovação e acesso",
+          "body": "O teste oferece 30 dias de Pro. Ao terminar, passam a valer os recursos do plano gratuito: você pode continuar gerenciando seus fundos e enviando pagamentos, pagando as próprias taxas. As assinaturas pagas cobrem 30 dias e não são renovadas automaticamente. Renove em Configurações, em Plano e cobrança. Se o pagamento da assinatura foi interrompido, verifique o comprovante salvo antes de pagar novamente. Os fundos permanecem no seu Safe."
+        },
+        "reports": {
+          "title": "Concilie seus registros",
+          "body": "Relatórios mostra entradas, pagamentos enviados, taxas e variação líquida separadamente para cada moeda. Aplique os filtros antes de exportar e confira o escopo indicado. As exportações de pagamentos incluem totais por destinatário e taxas; as referências das transações permitem conferir os registros com a liquidação."
         }
       }
     },
@@ -289,6 +321,7 @@
       "subtitle": "Conecte sua carteira para começar",
       "connectWallet": "Conectar Carteira",
       "wrongNetwork": "Rede incorreta",
+      "signInCancelled": "Login cancelado. Selecione Tentar novamente quando quiser continuar.",
       "signingIn": "Entrando...",
       "terms": "Ao conectar, você concorda com nossos",
       "termsOfService": "Termos de Serviço",

@@ -186,7 +186,7 @@ export function planRecipientImport(
       ? (Object.keys(labels) as Array<keyof ImportedRecipient>).flatMap(
           (field) => {
             const before =
-              existing[field] == null ? "" : String(existing[field]);
+              field === "type" ? existing.type ?? "individual" : existing[field] == null ? "" : String(existing[field]);
             const after =
               proposed[field] == null ? "" : String(proposed[field]);
             if (

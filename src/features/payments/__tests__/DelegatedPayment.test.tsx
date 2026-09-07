@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, waitFor, cleanup } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { getFunctionName } from 'convex/server';
+import { ConvexError } from 'convex/values';
 import type { Doc } from '../../../../convex/_generated/dataModel';
 import { DelegatedPayment } from '../DelegatedPayment';
 
@@ -30,6 +31,16 @@ beforeEach(() => {
 });
 afterEach(() => { cleanup(); vi.resetAllMocks(); });
 describe('delegated payment signing story', () => {
+  it('links a reserved authorization back to its original payment before asking for signatures', async () => {
+    mock.quote.mockRejectedValue(new ConvexError({ code: 'ALLOWANCE_AUTHORIZATION_RESERVED', message: 'An earlier payment still holds this authorization.', disbursementId: 'original-payment' }));
+    render(<DelegatedPayment {...props} payment={{ ...payment, orgId: 'org1' } as Doc<'disbursements'>} />);
+    fireEvent.click(screen.getByText('Pay with a spending allowance'));
+    fireEvent.click(screen.getByRole('button', { name: 'Check my allowance' }));
+    const link = await screen.findByRole('link', { name: 'Open the original payment' });
+    expect(link).toHaveAttribute('href', '/org/org1/disbursements?focus=original-payment');
+    expect(mock.sign).not.toHaveBeenCalled();
+    expect(mock.prepare).not.toHaveBeenCalled();
+  });
   it('collects every recipient authorization and the fee before submitting once', async () => {
     render(<DelegatedPayment {...props} />);
     await review();
@@ -40,11 +51,11 @@ describe('delegated payment signing story', () => {
     await screen.findByText(/Payment submitted/);
   });
   it('does not submit or request the fee signature when a recipient signature is rejected', async () => {
-    mock.sign.mockResolvedValueOnce('first-signature').mockRejectedValueOnce(new Error('User rejected signature'));
+    mock.sign.mockResolvedValueOnce('first-signature').mockRejectedValueOnce({ cause: { code: 4001 } });
     render(<DelegatedPayment {...props} />);
     await review();
     fireEvent.click(screen.getByRole('button', { name: 'Pay using allowance' }));
-    await screen.findByRole('alert');
+    expect(await screen.findByRole('status')).toHaveTextContent('Wallet confirmation cancelled');
     expect(mock.sign).toHaveBeenCalledTimes(2);
     expect(mock.prepare).not.toHaveBeenCalled();
     expect(screen.getByRole('button', { name: 'Pay using allowance' })).toBeEnabled();

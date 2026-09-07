@@ -203,12 +203,44 @@
       "subtitle": "Guías de configuración, conexiones de billetera y flujos de pagos.",
       "sections": {
         "gettingStarted": {
-          "title": "Primeros pasos",
-          "body": "Conecta tu Safe, agrega beneficiarios y ejecuta un desembolso de prueba en minutos."
+          "title": "Conecta tu cuenta",
+          "body": "Inicia sesión con una cartera de tu organización. La cartera te pide firmar un mensaje de acceso; iniciar sesión no envía ningún pago. En Configuración, vincula tu cuenta Safe existente. Los propietarios y el umbral de firmas controlan los pagos. Nunca compartas una frase de recuperación ni una clave privada con tu equipo o con soporte."
+        },
+        "recipients": {
+          "title": "Importa destinatarios e instrucciones de pago",
+          "body": "Abre Destinatarios y selecciona Importar. Pega o sube un archivo CSV y asigna las columnas de nombre, correo, dirección, moneda y red. Revisa los duplicados y los datos incompletos antes de guardar. Puedes importar registros sin dirección, pero cada destinatario necesita instrucciones completas para preparar un pago. Normalmente hay que añadir estos datos por separado a las exportaciones de nómina."
         },
         "workflows": {
-          "title": "Pagos e informes",
-          "body": "Programa, agrupa y aprueba desembolsos con exportaciones listas para finanzas."
+          "title": "Prepara un pago o un lote",
+          "body": "Selecciona Nuevo pago y elige destinatarios guardados. Introduce el importe exacto que debe recibir cada persona. Sus instrucciones guardadas determinan la moneda, la red y la dirección. Las monedas o redes diferentes generan lotes separados, cada uno con su propia aprobación y liquidación. Guardar un borrador no mueve fondos."
+        },
+        "bills": {
+          "title": "Paga una factura de proveedor",
+          "body": "Registra el proveedor, el número de factura, el importe y el vencimiento en Facturas por pagar. Prepara el pago desde la factura para mantener los registros vinculados. La factura se marca como pagada solo cuando se verifica la liquidación del pago asociado."
+        },
+        "approvals": {
+          "title": "Revisa y aprueba",
+          "body": "Abre el pago para revisar los destinatarios, los importes, la cuenta de origen y la comisión por separado. Los propietarios firman con sus carteras. Disburse muestra las aprobaciones necesarias y las verifica antes del envío. Un miembro autorizado puede usar un límite de gasto concedido; un lote delegado solicita una firma por destinatario y otra para la comisión, si corresponde."
+        },
+        "schedules": {
+          "title": "Programa y repite pagos",
+          "body": "Elige una fecha futura y completa las aprobaciones antes de esa fecha. Si el servicio de pagos está configurado, envía los pagos programados aptos cuando vencen. Las instrucciones recurrentes generan un borrador nuevo en cada ciclo; cada borrador requiere revisión y autorización nuevas. Revisa las instrucciones pausadas cuando cambien los datos o permisos. Cancelar una instrucción no invalida una propuesta ya firmada en Safe."
+        },
+        "fees": {
+          "title": "Comprende los importes y las comisiones",
+          "body": "Los destinatarios reciben los importes introducidos. La comisión revisada se añade por separado al débito de la cuenta y cuenta para los límites de gasto. Si la comisión usa otra moneda, hace falta saldo y, para pagos delegados, un límite en esa moneda. En los flujos compatibles con comisiones gestionadas, el miembro no necesita enviar una transacción pagando gas nativo. El cliente cubre sus propias comisiones."
+        },
+        "recovery": {
+          "title": "Resuelve un pago que necesita atención",
+          "body": "En Pagos, abre Necesita atención. Comprobar liquidación verifica el envío original sin repetirlo. Reanuda solo cuando la aplicación confirme que puede volver a intentar la autorización original. No prepares un reemplazo mientras el resultado sea incierto. Vincular un comprobante permite conciliar un pago delegado existente aunque no se puedan preparar pagos nuevos."
+        },
+        "billing": {
+          "title": "Prueba, renovación y acceso",
+          "body": "La prueba ofrece 30 días de Pro. Al finalizar, se aplican las funciones del plan gratuito: puedes seguir gestionando tus fondos y enviando pagos, y pagas tus propias comisiones. Las suscripciones de pago cubren 30 días y no se renuevan automáticamente. Renueva en Configuración, en Plan y facturación. Si el pago de la suscripción se interrumpió, verifica el comprobante guardado antes de pagar de nuevo. Los fondos permanecen en tu Safe."
+        },
+        "reports": {
+          "title": "Concilia tus registros",
+          "body": "Informes muestra entradas, pagos salientes, comisiones y cambio neto por separado para cada moneda. Aplica los filtros antes de exportar y revisa el alcance indicado. Las exportaciones de pagos incluyen los totales por destinatario y las comisiones; las referencias de las transacciones permiten cotejar los registros con su liquidación."
         }
       }
     },
@@ -289,6 +321,7 @@
       "subtitle": "Conecta tu billetera para comenzar",
       "connectWallet": "Conectar billetera",
       "wrongNetwork": "Red incorrecta",
+      "signInCancelled": "Inicio de sesión cancelado. Selecciona Intentar de nuevo cuando quieras continuar.",
       "signingIn": "Iniciando sesión...",
       "terms": "Al conectar, aceptas nuestros",
       "termsOfService": "Términos de Servicio",

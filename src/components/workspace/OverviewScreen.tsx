@@ -614,8 +614,9 @@ export function OverviewScreen({
       </div>
       {model.limitedHistory && (
         <p className="workspace-description mt-5">
-          Payment summaries cover the latest 5,000 records. Use Reports for the
-          full history.
+          This overview is a partial summary of up to 5,000 payments, 1,000 recipients,
+          1,000 bills and 100 accounts. Open the corresponding lists or Reports for
+          the full records. Available-to-spend estimates are withheld.
         </p>
       )}
     </>

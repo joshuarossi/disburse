@@ -1,5 +1,7 @@
 # Managed payment execution
 
+For operator setup and a read-only check of deployed configuration, follow [Gelato V2 setup](GELATO_V2_SETUP.md).
+
 Disburse uses Gelato Turbo Relayer through `@gelatocloud/gasless` 0.0.12. Gelato manages network submission and gas. Disburse does not run an operator wallet, store an operator private key, or allocate network transaction nonces.
 
 The deprecated Safe Relay Kit and `call-with-sync-fee` submission paths have been removed. Existing legacy task-status lookup remains solely for historical records. Old signed SyncFee proposals cannot be converted without new owner approval.

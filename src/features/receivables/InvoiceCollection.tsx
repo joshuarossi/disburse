@@ -4,6 +4,7 @@ import { api } from "../../../convex/_generated/api";
 import type { Doc } from "../../../convex/_generated/dataModel";
 import { useSessionToken } from "@/lib/session";
 import { Notice } from "@/components/workspace/WorkspacePrimitives";
+import { walletDeclined, walletErrorMessage } from "@/lib/walletErrors";
 
 export function InvoiceCollection({
   invoice,
@@ -51,8 +52,18 @@ export function InvoiceCollection({
           onClick={() =>
             run(async () => {
               const call = await nativeSweep(args!);
-              await switchChainAsync({ chainId: call.chainId });
-              const hash = await sendTransactionAsync(call);
+              let sendStarted = false;
+              let hash: `0x${string}`;
+              try {
+                await switchChainAsync({ chainId: call.chainId });
+                sendStarted = true;
+                hash = await sendTransactionAsync(call);
+              } catch (error) {
+                if (walletDeclined(error)) return { tone: "info", message: "Collection cancelled. Your invoice payment is still available to collect when you are ready." };
+                throw new Error(sendStarted
+                  ? "Your wallet did not confirm whether collection was submitted. Check your wallet activity and refresh this invoice before trying again."
+                  : walletErrorMessage(error, "Could not connect to the collection network. Check your wallet connection and try again."));
+              }
               if (!client)
                 throw new Error(
                   `Collection submitted. Check payments for confirmation. Transaction: ${hash}`,

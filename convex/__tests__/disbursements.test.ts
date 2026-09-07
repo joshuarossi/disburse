@@ -3,6 +3,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { api, internal } from '../_generated/api';
 import { Doc } from '../_generated/dataModel';
 import schema from '../schema';
+import { CHAIN_TOKENS } from '../../shared/chains';
 import {
   createTestUser,
   createTestOrg,
@@ -21,6 +22,22 @@ const SAFE_TX_HASH = '0x' + 'ab'.repeat(32);
 const TX_HASH = '0x' + 'cd'.repeat(32);
 beforeEach(() => vi.useFakeTimers());
 afterEach(() => { vi.clearAllTimers(); vi.useRealTimers(); });
+
+it.each(['single', 'batch'])('canonicalizes a %s API payment currency before recording its token address', async kind => {
+  const t = convexTest(schema);
+  const ids = await t.run(async ctx => {
+    const org = await createFullOrgSetup(ctx, { walletAddress: TEST_WALLETS.admin });
+    return { ...org, beneficiaryId: await createTestBeneficiary(ctx, org.orgId) };
+  });
+  const { sessionToken } = await signIn(t, 'admin');
+  const create = (token: string) => kind === 'single'
+    ? t.mutation(api.disbursements.create, { orgId: ids.orgId, sessionToken, chainId: 11155111, beneficiaryId: ids.beneficiaryId, amount: '1', token })
+    : t.mutation(api.disbursements.createBatch, { orgId: ids.orgId, sessionToken, chainId: 11155111, recipients: [{ beneficiaryId: ids.beneficiaryId, amount: '1' }], token });
+  const result = await create(' usdc ');
+  expect(await t.run(ctx => ctx.db.get(result.disbursementId))).toMatchObject({ token: 'USDC', tokenAddress: CHAIN_TOKENS[11155111].USDC.address });
+  await expect(create('UNKNOWN')).rejects.toThrow(/Unsupported payment currency/);
+  expect(await t.run(ctx => ctx.db.query('disbursements').collect())).toHaveLength(1);
+});
 
 describe('Disbursements', () => {
   describe('create', () => {
@@ -681,8 +698,14 @@ describe('Disbursements', () => {
       });
 
       expect(result.items.length).toBe(5);
-      expect(result.totalCount).toBe(10);
+      expect(result.totalCount).toBeNull();
       expect(result.hasMore).toBe(true);
+      const next = await t.query(api.disbursements.list, { orgId: orgId! as any, sessionToken: admin.sessionToken, limit: 5, cursor: result.nextCursor! });
+      expect(next.items).toHaveLength(5);
+      expect(new Set([...result.items, ...next.items].map(p => p._id)).size).toBe(10);
+      const last = await t.query(api.disbursements.list, { orgId: orgId! as any, sessionToken: admin.sessionToken, limit: 5, cursor: next.nextCursor! });
+      expect(last.items).toHaveLength(0);
+      expect(last.hasMore).toBe(false);
     });
 
     it('allows viewer to list', async () => {

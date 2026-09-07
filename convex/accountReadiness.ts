@@ -1,3 +1,4 @@
+import { PAYMENT_OPERATOR_ROLES } from '../shared/roles';
 import { v } from "convex/values";
 import { formatUnits, parseAbi, type Address } from "viem";
 import { action, internalQuery } from "./_generated/server";
@@ -16,7 +17,7 @@ import { chainEnvironment } from "../shared/assets";
 import type { AccountReadiness } from "../shared/accountReadiness";
 
 const args = { safeId: v.id("safes"), sessionToken: v.string() };
-const writers = ["admin", "approver", "initiator"];
+
 const abi = parseAbi([
   "function getOwners() view returns (address[])",
   "function getThreshold() view returns (uint256)",
@@ -47,7 +48,7 @@ export const context = internalQuery({
         .map(async (m) => ({
           wallet: (await ctx.db.get(m.userId))?.walletAddress.toLowerCase(),
           name: m.name ?? null,
-          canApprove: writers.includes(m.role),
+          canApprove: PAYMENT_OPERATOR_ROLES.includes(m.role),
         })),
     );
     let fee: AccountReadiness["managed"]["fee"] = null;
@@ -66,7 +67,7 @@ export const context = internalQuery({
       accountNames: accountNames.filter(a => a.chainId === safe.chainId).map(a => ({ address: a.safeAddress.toLowerCase(), name: a.name })),
       people,
       userWallet: user.walletAddress,
-      canPrepare: writers.includes(membership.role),
+      canPrepare: PAYMENT_OPERATOR_ROLES.includes(membership.role),
       managed: { fee, error },
     };
   },

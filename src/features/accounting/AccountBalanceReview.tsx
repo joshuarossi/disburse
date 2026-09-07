@@ -65,7 +65,7 @@ export function AccountBalanceReview({ orgId, environment, canReview }: { orgId:
                 opening_block: result.opening.blockNumber, opening_hash: result.opening.blockHash, closing_block: result.closing.blockNumber, closing_hash: result.closing.blockHash,
                 movements: result.movementCount, unresolved: result.unresolvedCount, report_revision: result.reportRevision,
                 history_through_utc: new Date(result.historyThrough).toISOString(), checked_utc: new Date(result.checkedAt).toISOString(), status: result.status };
-              exportToCsv(`disburse_balance_check_${result._id}`, [row], Object.keys(row).map(key => ({ key, label: key })));
+              exportToCsv(`disburse_balance_check_${result._id}`, [row], Object.keys(row).map(key => ({ key, label: key, numeric: key.endsWith('_units') })));
             }}>Download balance evidence</button></div>
         </section>;
       })}

@@ -1,3 +1,4 @@
+import { ACCOUNTING_EDITOR_ROLES, ORG_READER_ROLES } from '../shared/roles';
 import { v } from 'convex/values';
 import { mutation, query, type MutationCtx, type QueryCtx } from './_generated/server';
 import type { Doc, Id } from './_generated/dataModel';
@@ -10,8 +11,8 @@ import { reportPage } from './lib/reportPagination';
 import { chainEnvironment, identifyAsset } from '../shared/assets';
 import { formatUnits } from 'viem';
 
-const readers = ['admin', 'approver', 'initiator', 'clerk', 'viewer'] as const;
-const accountants = ['admin', 'approver', 'clerk'] as const;
+
+
 const access = { orgId: v.id('orgs'), sessionToken: v.string() };
 const canonicalJson = (value: unknown) => JSON.stringify(value, (_key, item) =>
   item && typeof item === 'object' && !Array.isArray(item)
@@ -41,11 +42,11 @@ async function audit(ctx: MutationCtx, orgId: Id<'orgs'>, userId: Id<'users'>, a
 export const configuration = query({
   args: access,
   handler: async (ctx, args) => {
-    const { membership } = await requireOrgAccess(ctx, args.orgId, args.sessionToken, [...readers]);
+    const { membership } = await requireOrgAccess(ctx, args.orgId, args.sessionToken, [...ORG_READER_ROLES]);
     const profile = await ctx.db.query('accountingProfiles').withIndex('by_org', q => q.eq('orgId', args.orgId)).unique();
     const accounts = await ctx.db.query('accountingAccounts').withIndex('by_org', q => q.eq('orgId', args.orgId)).take(1001);
     if (accounts.length > 1000) throw new Error('This chart exceeds the 1,000-account review limit');
-    return { profile, accounts, canConfigure: membership.role === 'admin', canReview: accountants.some(role => role === membership.role) };
+    return { profile, accounts, canConfigure: membership.role === 'admin', canReview: ACCOUNTING_EDITOR_ROLES.some(role => role === membership.role) };
   },
 });
 
@@ -110,7 +111,7 @@ export const importAccounts = mutation({
 export const sourceDetails = query({
   args: { ...access, source: accountingSource },
   handler: async (ctx, args) => {
-    await requireOrgAccess(ctx, args.orgId, args.sessionToken, [...readers]);
+    await requireOrgAccess(ctx, args.orgId, args.sessionToken, [...ORG_READER_ROLES]);
     let fact;
     try { fact = await loadAccountingFact(ctx, args.orgId, args.source); }
     catch (error) {
@@ -127,7 +128,7 @@ export const sourceDetails = query({
 export const review = mutation({
   args: { ...access, ...reviewInput, expectedProfileVersion: v.number(), replaces: v.optional(v.id('accountingEntries')), correctionReason: v.optional(v.string()) },
   handler: async (ctx, args) => {
-    const { user } = await requireOrgAccess(ctx, args.orgId, args.sessionToken, [...accountants]);
+    const { user } = await requireOrgAccess(ctx, args.orgId, args.sessionToken, [...ACCOUNTING_EDITOR_ROLES]);
     const profile = await profileFor(ctx, args.orgId);
     if (profile.version !== args.expectedProfileVersion) throw new Error('The chart or accounting settings changed. Review the current mappings.');
     const fact = await loadAccountingFact(ctx, args.orgId, args.source);
@@ -218,7 +219,7 @@ export const review = mutation({
 export const listEntries = query({
   args: { ...access, environment, state: v.optional(v.union(v.literal('ready'), v.literal('exported'), v.literal('reconciled'), v.literal('void'))), cursor: v.optional(v.string()) },
   handler: async (ctx, args) => {
-    await requireOrgAccess(ctx, args.orgId, args.sessionToken, [...readers]);
+    await requireOrgAccess(ctx, args.orgId, args.sessionToken, [...ORG_READER_ROLES]);
     const base = args.state ? ctx.db.query('accountingEntries').withIndex('by_org_state', q => q.eq('orgId', args.orgId).eq('state', args.state!))
       : ctx.db.query('accountingEntries').withIndex('by_org_date', q => q.eq('orgId', args.orgId));
     return base.filter(q => q.eq(q.field('fact.environment'), args.environment)).order('desc').paginate(reportPage(args.cursor, 50));
@@ -228,7 +229,7 @@ export const listEntries = query({
 export const listReceipts = query({
   args: { ...access, environment, cursor: v.optional(v.string()) },
   handler: async (ctx, args) => {
-    await requireOrgAccess(ctx, args.orgId, args.sessionToken, [...readers]);
+    await requireOrgAccess(ctx, args.orgId, args.sessionToken, [...ORG_READER_ROLES]);
     const page = await ctx.db.query('receivableEvents').withIndex('by_org_time', q => q.eq('orgId', args.orgId))
       .order('desc').paginate(reportPage(args.cursor, 50));
     const items = [];
@@ -259,7 +260,7 @@ export const listReceipts = query({
 export const createExport = mutation({
   args: { ...access, environment, requestId: v.string(), entryIds: v.array(v.id('accountingEntries')) },
   handler: async (ctx, args) => {
-    const { user } = await requireOrgAccess(ctx, args.orgId, args.sessionToken, [...accountants]);
+    const { user } = await requireOrgAccess(ctx, args.orgId, args.sessionToken, [...ACCOUNTING_EDITOR_ROLES]);
     const requestId = text(args.requestId, 'Export request ID', 100, 16);
     if (!args.entryIds.length || args.entryIds.length > 100 || new Set(args.entryIds).size !== args.entryIds.length)
       throw new Error('Choose between 1 and 100 different journals for one export');
@@ -300,7 +301,7 @@ export const createExport = mutation({
 export const listExports = query({
   args: { ...access, environment, cursor: v.optional(v.string()) },
   handler: async (ctx, args) => {
-    await requireOrgAccess(ctx, args.orgId, args.sessionToken, [...readers]);
+    await requireOrgAccess(ctx, args.orgId, args.sessionToken, [...ORG_READER_ROLES]);
     return ctx.db.query('accountingExports').withIndex('by_org', q => q.eq('orgId', args.orgId))
       .filter(q => q.eq(q.field('environment'), args.environment)).order('desc').paginate(reportPage(args.cursor, 30));
   },
@@ -311,7 +312,7 @@ export const exportDetails = query({
   handler: async (ctx, args) => {
     const batch = await ctx.db.get(args.exportId);
     if (!batch) throw new Error('Export not found');
-    await requireOrgAccess(ctx, batch.orgId, args.sessionToken, [...readers]);
+    await requireOrgAccess(ctx, batch.orgId, args.sessionToken, [...ORG_READER_ROLES]);
     const entries = await Promise.all(batch.entryIds.map(id => ctx.db.get(id)));
     if (entries.some(entry => !entry || entry.orgId !== batch.orgId || entry.exportId !== batch._id))
       throw new Error('Export journal evidence is incomplete');
@@ -324,7 +325,7 @@ export const confirmImport = mutation({
   handler: async (ctx, args) => {
     const batch = await ctx.db.get(args.exportId);
     if (!batch) throw new Error('Export not found');
-    const { user } = await requireOrgAccess(ctx, batch.orgId, args.sessionToken, [...accountants]);
+    const { user } = await requireOrgAccess(ctx, batch.orgId, args.sessionToken, [...ACCOUNTING_EDITOR_ROLES]);
     const reference = text(args.reference, 'Import reference from your books', 200);
     if (batch.importedAt) {
       if (batch.importedReference !== reference) throw new Error('This export already has a confirmed import reference');

@@ -1,5 +1,26 @@
-import { describe, expect, it } from "vitest";
-import { parseCsvText, validateCsvRow } from "../csv";
+import { describe, expect, it, vi } from "vitest";
+import { exportToCsv, parseCsvText, validateCsvRow } from "../csv";
+
+it("exports negative reconciliation units as numbers while protecting formula-like text", async () => {
+  let output: Blob | undefined;
+  const createObjectURL = vi.fn((blob: Blob) => { output = blob; return 'blob:csv-test'; });
+  vi.stubGlobal('URL', { createObjectURL, revokeObjectURL: vi.fn() });
+  const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
+  try {
+    exportToCsv('balances', [{ difference: '-5', name: '-5', unsafe: '-5+SUM(1,2)' }], [
+      { key: 'difference', label: 'Difference', numeric: true },
+      { key: 'name', label: 'Label' },
+      { key: 'unsafe', label: 'Unsafe', numeric: true },
+    ]);
+    const text = await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result));
+      reader.onerror = reject;
+      reader.readAsText(output!);
+    });
+    expect(text).toBe('Difference,Label,Unsafe\n-5,\'-5,"\'-5+SUM(1,2)"');
+  } finally { click.mockRestore(); vi.unstubAllGlobals(); }
+});
 
 const header = "type,name,wallet_address,notes";
 const address = "0x" + "1".repeat(40);

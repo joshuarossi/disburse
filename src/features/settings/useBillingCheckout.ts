@@ -16,7 +16,7 @@ import {
   withBillingLock,
   type PendingBilling,
 } from "./pendingBilling";
-import { walletDeclined } from "@/lib/walletErrors";
+import { walletDeclined, walletErrorMessage } from "@/lib/walletErrors";
 import { hasPaidTerm, PLAN_LIMITS } from "../../../shared/billing";
 export function useBillingCheckout({
   orgId,
@@ -339,9 +339,7 @@ export function useBillingCheckout({
             ? "The wallet response was interrupted. The original request is saved. Check your wallet activity and verify its receipt before sending another payment."
             : walletDeclined(error)
               ? "Wallet approval declined. No subscription payment was submitted."
-              : error instanceof Error
-                ? error.message
-                : "Could not start checkout.",
+              : walletErrorMessage(error, "Could not start checkout. Check your wallet connection and try again."),
       );
       setPaymentStep(requested || submitted ? "confirm" : "select");
     } finally {

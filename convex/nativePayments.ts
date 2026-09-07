@@ -1,6 +1,6 @@
 import { readSettlementBlock } from "./lib/settlementBlock";
 import { v } from "convex/values";
-import { matchesAccountExecution } from "../shared/accountExecution";
+import { accountExecutionOutcome, matchesAccountExecution } from "../shared/accountExecution";
 import {
   action,
   internalAction,
@@ -212,6 +212,23 @@ export const recheck = mutation({
   },
 });
 
+/** Only reconciliation may record a confirmed Safe ExecutionFailure. The Safe
+ * consumed this proposal's nonce, so the old signatures cannot be retried. */
+export const confirmFailure = internalMutation({
+  args: { disbursementId: v.id("disbursements"), safeTxHash: v.string(), txHash: v.string() },
+  handler: async (ctx, args) => {
+    const payment = await ctx.db.get(args.disbursementId);
+    if (!payment || payment.status !== "relaying" || !payment.nativeExecution || payment.allowanceExecution || payment.safeTxHash !== args.safeTxHash) return;
+    if (payment.txHash && payment.txHash.toLowerCase() !== args.txHash.toLowerCase()) throw new Error("Original broadcast cannot be replaced");
+    await ctx.db.patch(payment._id, {
+      status: "failed", txHash: args.txHash, nativeRecoveryAt: undefined,
+      relayStatus: "Execution failed", relayError: "The account confirmed that this payment failed and consumed its transaction number. Prepare a new payment to try again.",
+      updatedAt: Date.now(), followupAt: Date.now(),
+    });
+    await appendAudit(ctx, { orgId: payment.orgId, actorUserId: payment.createdBy, action: "disbursement.execution_failed", objectType: "disbursement", objectId: payment._id, metadata: { txHash: args.txHash, safeTxHash: args.safeTxHash } });
+  },
+});
+
 export const reconcile = internalAction({
   args: { disbursementId: v.id("disbursements") },
   handler: async (ctx, args): Promise<void> => {
@@ -296,6 +313,12 @@ export const reconcile = internalAction({
         receipt.blockNumber,
         await client.getBlockNumber(),
       );
+      if (receipt.status === "success" && receipt.logs.some(log =>
+        log.address.toLowerCase() === expected.safeAddress.toLowerCase() &&
+        accountExecutionOutcome(log, p.safeTxHash!) === "failure")) {
+        await ctx.runMutation(internal.nativePayments.confirmFailure, { ...identity, txHash });
+        return;
+      }
       const tokenAddress =
         expected.tokenAddress ??
         configuredTokenAddress(expected.chainId, expected.token);

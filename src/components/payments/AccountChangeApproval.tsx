@@ -1,11 +1,11 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useAccount, useSwitchChain } from "wagmi";
 import {
   signAccountApproval,
   sendApprovedAccountPayment,
 } from "@/lib/accountApproval";
-import { walletDeclined } from "@/lib/walletErrors";
+import { walletDeclined, walletErrorMessage } from "@/lib/walletErrors";
 import { ApprovalPathReview } from "@/features/payments/ApprovalPathReview";
 import { Button } from "@/components/ui/button";
 import type { AccountApprovalView } from "../../../shared/accountApprovalView";
@@ -90,18 +90,25 @@ export function AccountChangeApproval({
   const [pathRequest, setPathRequest] = useState<AccountApprovalView | null>(
     null,
   );
+  const confirmingWallet = useRef(false);
   const prepareWallet = async () => {
     if (!address) throw new Error("Connect your approver wallet");
-    if (connectedChain !== chainId) await switchChainAsync({ chainId });
+    if (connectedChain !== chainId) {
+      confirmingWallet.current = true;
+      await switchChainAsync({ chainId });
+      confirmingWallet.current = false;
+    }
   };
   const sign = async (request: AccountApprovalView, path: string[]) => {
     await prepareWallet();
+    confirmingWallet.current = true;
     const signature = await signAccountApproval(
       chainId,
       address!,
       request.proposal,
       path,
     );
+    confirmingWallet.current = false;
     await approve({ safeTxHash: request.proposal.safeTxHash, path, signature });
     setPathRequest(null);
     setMessage(`Your ${subject} approval is saved.`);
@@ -161,9 +168,10 @@ export function AccountChangeApproval({
                 attemptId: prepared.attemptId,
                 rejected: true,
               });
-              throw new Error(
+              setMessage(
                 `Wallet approval declined. Your ${subject} and account approvals are saved. You can retry this original request.`,
               );
+              return;
             }
             throw new Error(
               `The wallet response was interrupted. Check the original ${subject} submission before trying again.`,
@@ -176,14 +184,11 @@ export function AccountChangeApproval({
         );
       }
     } catch (e) {
-      setError(
-        walletDeclined(e)
-          ? "Wallet approval declined. No approval was added."
-          : e instanceof Error
-            ? e.message
-            : `Could not update this ${subject}`,
-      );
+      const fallback = `Could not update this ${subject}. Check its status before trying again.`;
+      if (confirmingWallet.current && walletDeclined(e)) setMessage(walletErrorMessage(e, ''));
+      else setError(walletDeclined(e) ? fallback : walletErrorMessage(e, fallback));
     } finally {
+      confirmingWallet.current = false;
       setBusy(false);
     }
   };
@@ -193,7 +198,7 @@ export function AccountChangeApproval({
   return (
     <div className="space-y-3">
       {error && (
-        <p role="alert" className="text-sm text-red-400">
+        <p role="alert" className="min-w-0 break-words text-sm text-red-400">
           {error}
         </p>
       )}

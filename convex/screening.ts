@@ -1,5 +1,5 @@
 "use node";
-import { v } from "convex/values";
+import { ConvexError, v } from "convex/values";
 import { action, internalAction } from "./_generated/server";
 import { internal } from "./_generated/api";
 import type { Doc, Id } from "./_generated/dataModel";
@@ -112,6 +112,12 @@ export const screenBeneficiary = internalAction({
       });
       return { status, matchCount: evidence.matches.length };
     } catch (e) {
+      if (e instanceof ConvexError && e.data?.code === "SCREENING_DATASET_CHANGED") {
+        await ctx.scheduler.runAfter(0, internal.screening.screenBeneficiary, {
+          beneficiaryId: args.beneficiaryId, orgId: args.orgId,
+        });
+        return { status: "pending", matchCount: 0 };
+      }
       const error =
         e instanceof Error ? e.message : "Screening did not complete.";
       // A result for a concurrently edited recipient cannot replace newer evidence.

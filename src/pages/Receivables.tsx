@@ -61,6 +61,8 @@ function InvoiceEditor({
   const [busy, setBusy] = useState(false),
     [error, setError] = useState("");
   const safe = safes.find((s) => s._id === safeId);
+  const supportedCurrencies = Object.values(getTokensForChain(safe?.chainId ?? 0));
+  const currencyAvailable = supportedCurrencies.some(t => t.symbol === currency);
   const configurations = useQuery(
     api.receivables.configuration,
     token ? { orgId, sessionToken: token } : "skip",
@@ -86,6 +88,8 @@ function InvoiceEditor({
         onSubmit={async (e) => {
           e.preventDefault();
           if (!token || busy || !safeId) return;
+          if (!safe) { setError("Choose an active receiving account before saving this draft."); return; }
+          if (!currencyAvailable) { setError("Choose an account that supports the invoice currency, or explicitly update the currency agreed with your customer."); return; }
           setBusy(true);
           setError("");
           try {
@@ -117,6 +121,7 @@ function InvoiceEditor({
           link.
         </p>
         {error && <Notice>{error}</Notice>}
+        {safeId && !safe && <Notice tone="info">The saved receiving account is archived or unavailable. Choose an active account to continue. Your invoice details are kept.</Notice>}
         {!safes.length && (
           <Notice tone="info">
             Connect a business account before creating an invoice.{" "}
@@ -175,9 +180,9 @@ function InvoiceEditor({
                 value={safeId}
                 onChange={(e) => {
                   setSafe(e.target.value as Id<"safes">);
-                  setCurrency("USDC");
                 }}
               >
+                {!safe && <option value={safeId} disabled>{safeId ? "Saved account unavailable. Choose an account" : "Choose a receiving account"}</option>}
                 {safes.map((s) => (
                   <option key={s._id} value={s._id}>
                     {getChainName(s.chainId!)} · {s.safeAddress.slice(-6)}
@@ -192,7 +197,8 @@ function InvoiceEditor({
                 value={currency}
                 onChange={(e) => setCurrency(e.target.value)}
               >
-                {Object.values(getTokensForChain(safe?.chainId ?? 0)).map(
+                {!currencyAvailable && <option value={currency} disabled>{currency} · choose a compatible account or currency</option>}
+                {supportedCurrencies.map(
                   (t) => (
                     <option key={t.symbol}>{t.symbol}</option>
                   ),
@@ -318,7 +324,7 @@ function InvoiceEditor({
           </button>
           <button
             className="workspace-button workspace-button-primary"
-            disabled={busy || !safeId}
+            disabled={busy || !safe || !currencyAvailable}
           >
             {busy ? "Saving…" : "Save draft"}
           </button>
@@ -354,7 +360,7 @@ function InvoiceDetails({
   );
   const [busy, setBusy] = useState(false),
     [message, setMessage] = useState(""),
-    [messageTone, setMessageTone] = useState<"error" | "success">("success"),
+    [messageTone, setMessageTone] = useState<"error" | "success" | "info">("success"),
     [voiding, setVoiding] = useState(false);
   const run = async (work: () => Promise<unknown>, success: string) => {
     if (busy || !args) return;
@@ -363,6 +369,7 @@ function InvoiceDetails({
     setMessageTone("success");
     try {
       const result = await work();
+      if (result && typeof result === "object" && "tone" in result && result.tone === "info") setMessageTone("info");
       setMessage(result && typeof result === "object" && "message" in result && typeof result.message === "string" ? result.message : success);
     } catch (e) {
       setMessageTone("error");

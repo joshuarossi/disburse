@@ -1,3 +1,4 @@
+import { ORG_READER_ROLES, PAYMENT_OPERATOR_ROLES } from '../shared/roles';
 import { v } from "convex/values";
 import {
   internalMutation,
@@ -16,8 +17,8 @@ import { fingerprint } from "../shared/fingerprint";
 import type { Doc } from "./_generated/dataModel";
 import { chainEnvironment } from "../shared/assets";
 
-const readers = ["admin", "approver", "initiator", "clerk", "viewer"] as const;
-const writers = ["admin", "approver", "initiator"];
+
+
 const inputKey = (p: Doc<"disbursements">, safe: Doc<"safes"> | null) =>
   fingerprint({
     status: p.status,
@@ -147,7 +148,7 @@ export const record = internalMutation({
     const currentOwners = new Set(args.owners.map((o) => o.toLowerCase()));
     const assignedUserIds = [];
     for (const member of members) {
-      if (member.status !== "active" || !writers.includes(member.role))
+      if (member.status !== "active" || !PAYMENT_OPERATOR_ROLES.includes(member.role))
         continue;
       const user = await ctx.db.get(member.userId);
       if (
@@ -206,7 +207,7 @@ export const list = query({
       ctx,
       args.orgId,
       args.sessionToken,
-      [...readers],
+      [...ORG_READER_ROLES],
     );
     const page = await ctx.db
       .query("paymentNotifications")
@@ -238,7 +239,7 @@ export const list = query({
         )
         .first();
       const assigned =
-        writers.includes(membership.role) &&
+        PAYMENT_OPERATOR_ROLES.includes(membership.role) &&
         (membership.role === "admin" || n.assignedUserIds.includes(user._id));
       items.push({
         id: n._id,
@@ -271,7 +272,7 @@ export const markRead = mutation({
     const n = await ctx.db.get(args.notificationId);
     if (!n) return false;
     const { user } = await requireOrgAccess(ctx, n.orgId, args.sessionToken, [
-      ...readers,
+      ...ORG_READER_ROLES,
     ]);
     if (n.revision !== args.revision) return false;
     const old = await ctx.db

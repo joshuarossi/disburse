@@ -1,3 +1,4 @@
+import { ORG_READER_ROLES, RECIPIENT_EDITOR_ROLES } from '../shared/roles';
 import { v } from "convex/values";
 import {
   internalMutation,
@@ -22,8 +23,8 @@ import {
   type SupportedChainId,
 } from "../shared/chains";
 
-const writers = ["admin", "initiator", "clerk"] as const;
-const readers = ["admin", "approver", "initiator", "clerk", "viewer"] as const;
+
+
 const identity = {
   beneficiaryId: v.id("beneficiaries"),
   sessionToken: v.string(),
@@ -87,7 +88,7 @@ async function state(
   if (
     !member ||
     member.status !== "active" ||
-    !writers.some((role) => role === member.role)
+    !RECIPIENT_EDITOR_ROLES.some((role) => role === member.role)
   )
     return "unavailable" as const;
   return "requested" as const;
@@ -106,7 +107,7 @@ export const register = internalMutation({
       ctx,
       recipient.orgId,
       args.sessionToken,
-      [...writers],
+      [...RECIPIENT_EDITOR_ROLES],
     );
     if (recipient.pendingPayoutChangeId)
       throw new Error(
@@ -188,7 +189,7 @@ export const history = query({
       ctx,
       recipient.orgId,
       args.sessionToken,
-      [...readers],
+      [...ORG_READER_ROLES],
     );
     const requests = await ctx.db
       .query("recipientCollections")
@@ -199,8 +200,8 @@ export const history = query({
       canCreate:
         recipient.isActive &&
         !recipient.pendingPayoutChangeId &&
-        writers.some((role) => role === membership.role),
-      canManage: writers.some((role) => role === membership.role),
+        RECIPIENT_EDITOR_ROLES.some((role) => role === membership.role),
+      canManage: RECIPIENT_EDITOR_ROLES.some((role) => role === membership.role),
       requests: await Promise.all(
         requests.map(async (r) => ({
           id: r._id,
@@ -223,7 +224,7 @@ export const revoke = mutation({
       ctx,
       request.orgId,
       args.sessionToken,
-      [...writers],
+      [...RECIPIENT_EDITOR_ROLES],
     );
     if (request.status === "revoked") return;
     if (request.status !== "requested")

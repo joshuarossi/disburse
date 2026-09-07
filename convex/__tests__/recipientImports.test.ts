@@ -63,6 +63,14 @@ async function setup() {
   return { t, ids, args, plan, request };
 }
 
+it("does not report an implicit individual type as an edit to a legacy recipient", async () => {
+  const { t, ids, plan } = await setup();
+  await t.run(ctx => ctx.db.patch(ids.recipientId, { type: undefined }));
+  const [entry] = await plan([{ name: "Maya Chen", email: "maya@example.com", sourceSystem: "gusto", sourceId: "0012", type: "individual" }]);
+  expect(entry.differences).not.toEqual(expect.arrayContaining([expect.objectContaining({ field: "type" })]));
+  expect(entry.differences).toHaveLength(0);
+});
+
 it("matches a payroll employee by stable ID after an email change and keeps leading zeros", async () => {
   const { t, ids, plan, request } = await setup();
   const rows = [

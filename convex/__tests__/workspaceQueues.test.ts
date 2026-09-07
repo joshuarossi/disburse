@@ -4,6 +4,17 @@ import schema from '../schema';
 import { api } from '../_generated/api';
 import { createFullOrgSetup, createTestBeneficiary, createTestDisbursement, signIn, TEST_WALLETS } from './factories';
 
+it('marks a bounded overview as partial and withholds available-to-spend estimates', async () => {
+  const t = convexTest(schema);
+  const ids = await t.run(async ctx => {
+    const ids = await createFullOrgSetup(ctx, { walletAddress: TEST_WALLETS.admin });
+    for (let i = 0; i < 1001; i++) await createTestBeneficiary(ctx, ids.orgId);
+    return ids;
+  });
+  const { sessionToken } = await signIn(t, 'admin');
+  expect(await t.query(api.workspace.overview, { orgId: ids.orgId, sessionToken })).toMatchObject({ limitedHistory: true, plansIncomplete: true, recipientCount: 1000 });
+});
+
 it('keeps overview and upcoming filters aligned while retaining overdue instructions for review', async () => {
   const t = convexTest(schema);
   const ids = await t.run(async ctx => {

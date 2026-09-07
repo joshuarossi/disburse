@@ -1,3 +1,4 @@
+import { ORG_READER_ROLES, RECORD_EDITOR_ROLES } from '../shared/roles';
 import { environmentValidator } from "./lib/activityEnvironment";
 import { v } from "convex/values";
 import {
@@ -14,14 +15,14 @@ import { amountToBaseUnits, formatBaseUnits } from "./lib/validation";
 import { receivableAmounts, receivableStatus } from "../shared/receivables";
 import { internal } from "./_generated/api";
 import { assertSameSettlement, validateSettlementBlock } from './lib/settlementBlock';
-const readers = ["admin", "approver", "initiator", "clerk", "viewer"] as const;
-const writers = ["admin", "approver", "initiator", "clerk"] as const;
+
+
 const scope = { orgId: v.id("orgs"), sessionToken: v.string() };
 const identity = { invoiceId: v.id("receivables"), sessionToken: v.string() };
 export const configuration = query({
   args: scope,
   handler: async (ctx, args) => {
-    await requireOrgAccess(ctx, args.orgId, args.sessionToken, [...readers]);
+    await requireOrgAccess(ctx, args.orgId, args.sessionToken, [...ORG_READER_ROLES]);
     const safes = await ctx.db
       .query("safes")
       .withIndex("by_org", (q) => q.eq("orgId", args.orgId))
@@ -70,7 +71,7 @@ export const create = mutation({
       ctx,
       args.orgId,
       args.sessionToken,
-      [...writers],
+      [...RECORD_EDITOR_ROLES],
     );
     const editing = args.invoiceId ? await ctx.db.get(args.invoiceId) : null;
     if (
@@ -189,7 +190,7 @@ export const create = mutation({
 export const list = query({
   args: { ...scope, environment: v.optional(environmentValidator) },
   handler: async (ctx, args) => {
-    await requireOrgAccess(ctx, args.orgId, args.sessionToken, [...readers]);
+    await requireOrgAccess(ctx, args.orgId, args.sessionToken, [...ORG_READER_ROLES]);
     const invoices = await ctx.db
       .query("receivables")
       .withIndex("by_org", (q) => q.eq("orgId", args.orgId))
@@ -211,7 +212,7 @@ export const get = query({
   handler: async (ctx, args) => {
     const i = await ctx.db.get(args.invoiceId);
     if (!i) throw new Error("Invoice not found.");
-    await requireOrgAccess(ctx, i.orgId, args.sessionToken, [...readers]);
+    await requireOrgAccess(ctx, i.orgId, args.sessionToken, [...ORG_READER_ROLES]);
     return i;
   },
 });
@@ -220,7 +221,7 @@ export const forOperation = query({
   handler: async (ctx, args) => {
     const i = await ctx.db.get(args.invoiceId);
     if (!i) throw new Error("Invoice not found.");
-    await requireOrgAccess(ctx, i.orgId, args.sessionToken, [...writers]);
+    await requireOrgAccess(ctx, i.orgId, args.sessionToken, [...RECORD_EDITOR_ROLES]);
     return i;
   },
 });
@@ -229,7 +230,7 @@ export const receipts = query({
   handler: async (ctx, args) => {
     const i = await ctx.db.get(args.invoiceId);
     if (!i) throw new Error("Invoice not found.");
-    await requireOrgAccess(ctx, i.orgId, args.sessionToken, [...readers]);
+    await requireOrgAccess(ctx, i.orgId, args.sessionToken, [...ORG_READER_ROLES]);
     return ctx.db
       .query("receivableEvents")
       .withIndex("by_invoice", (q) => q.eq("invoiceId", i._id))
@@ -274,7 +275,7 @@ export const voidInvoice = mutation({
     const i = await ctx.db.get(args.invoiceId);
     if (!i) throw new Error("Invoice not found.");
     const { user } = await requireOrgAccess(ctx, i.orgId, args.sessionToken, [
-      ...writers,
+      ...RECORD_EDITOR_ROLES,
     ]);
     if (BigInt(i.received) > 0n)
       throw new Error(
@@ -314,7 +315,7 @@ export const publish = internalMutation({
     const i = await ctx.db.get(args.invoiceId);
     if (!i) throw new Error("Invoice not found.");
     const { user } = await requireOrgAccess(ctx, i.orgId, args.sessionToken, [
-      ...writers,
+      ...RECORD_EDITOR_ROLES,
     ]);
     if (i.state === "issued") return i.publicToken!;
     if (

@@ -57,7 +57,7 @@ export function readQueryFixture(reference: any, args: any) {
     case "teamInvitations:get":
       value = scenario === "invite-expired" ? null : scenario === "invite-accepted" ? { status: "accepted" } : { status: "pending", organizationName: org.name, role: "initiator", maskedEmail: "j…@northstar.co", expiresAt: Date.now() + 6 * 86400_000, expectedWallet: scenario === "invite-wrong-wallet" ? "0x2222222222222222222222222222222222222222" : undefined }; break;
     case "receivables:list":
-      value = { items: (scenario === 'empty' ? [] : customerInvoices).map(row => { const i = scenario === 'ar-void' ? { ...row, state: 'void' } : row; return { ...i, status: receivableStatus(i), amounts: receivableAmounts(i) }; }), limited: false }; break;
+      value = { items: (scenario === 'empty' ? [] : customerInvoices).map(row => { const i = scenario === 'ar-void' ? { ...row, state: 'void' } : scenario === 'ar-archived-account' ? { ...row, safeId: 'archived-safe', token: 'USDT', tokenAddress: configuredTokenAddress(8453, 'USDT') } : row; return { ...i, status: receivableStatus(i), amounts: receivableAmounts(i) }; }), limited: false }; break;
     case "receivables:configuration":
       value = [{ chainId: 8453, canIssue: true, collectionFeeMode: "wallet" }]; break;
     case "receivables:receipts":
@@ -93,6 +93,7 @@ export function readQueryFixture(reference: any, args: any) {
       break;
     case "beneficiaries:list":
       value = scenario === "changed-directory" ? recipients.map((r, i) => i === 0 ? { ...r, walletAddress: "0x9999999999999999999999999999999999999999" } : r) : scenario?.startsWith('payout-review') ? recipients.map((r, i) => i === 0 ? { ...r, pendingPayoutChangeId: 'change1' } : r) : recipients;
+      if (scenario === 'draft-archived-recipient') value = recipients.slice(1);
       break;
     case 'recipientReviews:get': {
       const recipient = recipients.find(r => r._id === args.beneficiaryId)!;
@@ -335,6 +336,10 @@ const disabled = async () => {
   );
 };
 export function useMutation(reference?: any) {
+  if (sessionStorage.getItem('qa:scenario')?.startsWith('onboarding-wallet-')) {
+    if (getFunctionName(reference) === 'orgs:create') return async () => ({ orgId: 'demo' });
+    if (getFunctionName(reference) === 'orgs:updateOwnProfile') return async () => null;
+  }
   if (reference && getFunctionName(reference).startsWith('licenseAdmin:') && sessionStorage.getItem('qa:scenario') === 'license-operator') return async (args: any) => { const result = await licenseMutationFixture(getFunctionName(reference), args); cache.clear(); fixtureRevision++; fixtureListeners.forEach(listener => listener()); return result; };
   if (reference && (sessionStorage.getItem('qa:scenario') === 'multiple-accounts' || sessionStorage.getItem('qa:scenario')?.startsWith('accounting'))) return async (args: any) => {
     sessionStorage.setItem('qa:lastMutation', JSON.stringify({ name: getFunctionName(reference), args }));

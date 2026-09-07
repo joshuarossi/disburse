@@ -1,5 +1,5 @@
 import { appendAudit } from "./audit";
-import { v } from "convex/values";
+import { ConvexError, v } from "convex/values";
 import { internalMutation, mutation } from "./_generated/server";
 import { requireOrgAccess } from "./lib/rbac";
 import {
@@ -14,6 +14,7 @@ import {
   screeningIssue,
 } from "../shared/screeningEvidence";
 import { SCREENING_ENGINE } from "../shared/sanctions";
+import { SCREENING_REVIEWER_ROLES } from "../shared/roles";
 
 export const beginScreening = internalMutation({
   args: { orgId: v.id("orgs"), beneficiaryId: v.id("beneficiaries") },
@@ -78,9 +79,7 @@ export const upsertScreeningResult = internalMutation({
         dataset.engine !== SCREENING_ENGINE ||
         source?.activeDatasetId !== dataset._id
       )
-        throw new Error(
-          "The OFAC list changed during screening. Run the check again.",
-        );
+        throw new ConvexError({ code: "SCREENING_DATASET_CHANGED", message: "The OFAC list changed during screening. Run the check again." });
       if ((args.status === "clear") !== (args.matches.length === 0))
         throw new Error("Screening status does not match its evidence.");
     }
@@ -118,12 +117,20 @@ export const upsertScreeningResult = internalMutation({
       screenedAt: now,
       error,
     });
+    // An outage is an attempted check, not new evidence about this recipient.
+    // Keep the last successful evidence and its review, while lastError keeps
+    // false-positive/clear results unavailable for payment until a check succeeds.
+    if (args.status === "unavailable" && existing?.engine === SCREENING_ENGINE && existing.inputFingerprint === args.expectedFingerprint && existing.status !== "unavailable") {
+      await ctx.db.patch(existing._id, { lastError: error });
+      await ctx.db.patch(recipient._id, { nextScreeningAt: now + 60_000 });
+      return existing._id;
+    }
     const carryDecision =
       args.status !== "unavailable" &&
       existing?.engine === SCREENING_ENGINE &&
       existing.inputFingerprint === args.expectedFingerprint &&
       existing.matchFingerprint === matchFingerprint &&
-      (existing.reviewExpiresAt ?? 0) > now &&
+      (existing.status === "confirmed_match" || (existing.reviewExpiresAt ?? 0) > now) &&
       ["false_positive", "confirmed_match"].includes(existing.status);
     const fields = {
       runId,
@@ -152,7 +159,7 @@ export const upsertScreeningResult = internalMutation({
       nextScreeningAt:
         now +
         (error
-          ? 3600_000
+          ? 60_000
           : Math.min(12, (org?.screeningMaxAgeHours ?? 24) / 2) * 3600_000),
     });
     return resultId;
@@ -175,7 +182,7 @@ export const reviewScreeningResult = mutation({
       ctx,
       result.orgId,
       args.sessionToken,
-      ["admin", "approver"],
+      SCREENING_REVIEWER_ROLES,
     );
     const recipient = await ctx.db.get(result.beneficiaryId),
       org = await ctx.db.get(result.orgId),

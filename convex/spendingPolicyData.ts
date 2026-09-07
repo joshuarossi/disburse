@@ -1,3 +1,5 @@
+import { accountChangeProgress } from './lib/accountChangeLifecycle';
+import { ORG_READER_ROLES } from '../shared/roles';
 import { v } from "convex/values";
 import {
   internalMutation,
@@ -23,13 +25,7 @@ export const policyIdentity = {
   policyChangeId: v.id("spendingPolicyChanges"),
   sessionToken: v.string(),
 };
-const readRoles = [
-  "admin",
-  "approver",
-  "initiator",
-  "clerk",
-  "viewer",
-] as const;
+
 async function account(
   ctx: QueryCtx,
   safeId: Id<"safes">,
@@ -43,7 +39,7 @@ async function account(
         ctx,
         safe.orgId,
         sessionToken,
-        manage ? ["admin"] : [...readRoles],
+        manage ? ["admin"] : [...ORG_READER_ROLES],
       )
     : undefined;
   return { safe, access };
@@ -589,29 +585,14 @@ export const checkpoint = internalMutation({
     )
       return;
     const e = p.execution;
-    if (
-      (e.txHash &&
-        args.txHash &&
-        e.txHash.toLowerCase() !== args.txHash.toLowerCase()) ||
-      (e.providerId && args.providerId && e.providerId !== args.providerId)
-    )
-      throw new Error("The original submission cannot be replaced");
-    if (args.txHash) assertValidTxHash(args.txHash);
-    const checks = e.checks + 1;
-    const searchFromBlock =
-      args.searchFromBlock &&
-      BigInt(args.searchFromBlock) > BigInt(e.searchFromBlock)
-        ? args.searchFromBlock
-        : e.searchFromBlock;
+    const progress = accountChangeProgress(e, args);
+    const { checks } = progress;
     await ctx.db.patch(p._id, {
       status: args.outcome ?? p.status,
       execution: {
         ...e,
         phase: e.phase === "prepared" ? "prepared" : "submitted",
-        providerId: e.providerId ?? args.providerId,
-        txHash: e.txHash ?? args.txHash,
-        searchFromBlock,
-        checks,
+        ...progress,
       },
       txHash: args.outcome ? (args.txHash ?? e.txHash) : p.txHash,
       appliedAt: args.outcome === "applied" ? args.appliedAt : undefined,

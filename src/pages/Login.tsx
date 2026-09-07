@@ -7,6 +7,8 @@ import { useMutation, useQuery } from 'convex/react';
 import { api } from '../../convex/_generated/api';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft } from 'lucide-react';
+import { Notice } from '@/components/workspace/WorkspacePrimitives';
+import { walletDeclined } from '@/lib/walletErrors';
 import {
   useSessionToken,
   saveSessionToken,
@@ -24,6 +26,7 @@ export default function Login() {
   const activeAddress = useRef(address);
   activeAddress.current = address;
   const [signInError, setSignInError] = useState<string | null>(null);
+  const [signInCancelled, setSignInCancelled] = useState(false);
   const location = useLocation();
   const requestedPath = location.state?.returnTo;
   const returnTo =
@@ -56,6 +59,7 @@ export default function Login() {
     signingRef.current = true;
     signInAttemptedRef.current = true;
     setSignInError(null);
+    setSignInCancelled(false);
     setIsSigningIn(true);
 
     try {
@@ -81,10 +85,14 @@ export default function Login() {
       // Redirect now that we hold a valid token
       navigate(returnTo, { replace: true });
     } catch (error) {
-      console.error('Sign in failed:', error);
+      const cancelled = walletDeclined(error);
+      if (!cancelled) console.error('Sign in failed:', error);
       clearSessionToken();
+      setSignInCancelled(cancelled);
       setSignInError(
-        t('auth.login.signInFailed', {
+        cancelled ? t('auth.login.signInCancelled', {
+          defaultValue: 'Sign-in cancelled. Select Try again when you are ready.',
+        }) : t('auth.login.signInFailed', {
           defaultValue:
             'Sign-in was not completed. Try again when you are ready.',
         }),
@@ -243,10 +251,10 @@ export default function Login() {
 
           {signInError && (
             <div className="mt-4 text-center">
-              <p role="alert" className="mb-3 text-sm text-red-400">
+              <Notice tone={signInCancelled ? 'info' : 'error'}>
                 {signInError}
-              </p>
-              <Button onClick={handleSignIn} disabled={isSigningIn}>
+              </Notice>
+              <Button className="mt-3" onClick={handleSignIn} disabled={isSigningIn}>
                 {t('common.retry', { defaultValue: 'Try again' })}
               </Button>
             </div>

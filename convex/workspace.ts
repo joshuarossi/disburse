@@ -22,7 +22,7 @@ export const overview = query({
       "clerk",
       "viewer",
     ]);
-    const [payments, recipients, bills, safes] = await Promise.all([
+    const [payments, recipientPage, billPage, safePage] = await Promise.all([
       ctx.db
         .query("disbursements")
         .withIndex("by_org", (q) => q.eq("orgId", args.orgId))
@@ -31,16 +31,18 @@ export const overview = query({
       ctx.db
         .query("beneficiaries")
         .withIndex("by_org", (q) => q.eq("orgId", args.orgId))
-        .collect(),
+        .take(1001),
       ctx.db
         .query("invoices")
         .withIndex("by_org", (q) => q.eq("orgId", args.orgId))
-        .collect(),
+        .take(1001),
       ctx.db
         .query("safes")
         .withIndex("by_org", (q) => q.eq("orgId", args.orgId))
-        .collect(),
+        .take(101),
     ]);
+    const recipients = recipientPage.slice(0, 1000), bills = billPage.slice(0, 1000), safes = safePage.slice(0, 100);
+    const limitedHistory = payments.length > 5000 || recipientPage.length > 1000 || billPage.length > 1000 || safePage.length > 100;
     const environment = args.environment ?? "production";
     const scoped = payments
       .slice(0, 5000)
@@ -83,7 +85,7 @@ export const overview = query({
       string,
       { safeId: string; token: string; units: bigint }
     >();
-    let plansIncomplete = payments.length > 5000;
+    let plansIncomplete = limitedHistory;
     let unquotedFees = false;
     for (const payment of scoped) {
       if (["executed", "cancelled"].includes(payment.status)) continue;
@@ -161,7 +163,7 @@ export const overview = query({
       upcoming: await Promise.all(scheduled.slice(0, 4).map(decorate)),
       recent: await Promise.all(scoped.slice(0, 6).map(decorate)),
       bills: unpaid.sort((a, b) => a.dueDate - b.dueDate).slice(0, 4),
-      limitedHistory: payments.length > 5000,
+      limitedHistory,
     };
   },
 });

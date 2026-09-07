@@ -236,12 +236,12 @@ export default function Disbursements() {
           <EmptyState
             icon={ListChecks}
             title={
-              search || view !== "all"
+              result.hasMore ? "No matching payments on this page" : search || view !== "all"
                 ? "No payments in this view"
                 : "Your first payment starts here"
             }
             description={
-              search || view !== "all"
+              result.hasMore ? "Continue to the next page to check more history, or narrow your filters." : search || view !== "all"
                 ? "Try another filter or search term."
                 : "Pay one person or a whole team using saved recipients. Review the amounts and choose when to pay."
             }
@@ -340,7 +340,7 @@ export default function Disbursements() {
         )}
         <div className="workspace-table-footer">
           <span>
-            {result?.totalCount ?? 0} payments · Page {cursorHistory.length}
+            {result?.items.length ?? 0} payments on this page · Page {cursorHistory.length}
           </span>
           <div className="flex gap-2">
             <button

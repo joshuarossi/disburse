@@ -1,3 +1,4 @@
+import { ORG_READER_ROLES, RECORD_EDITOR_ROLES } from '../shared/roles';
 import { v } from "convex/values";
 import { internalMutation, internalQuery, query } from "./_generated/server";
 import type { MutationCtx } from "./_generated/server";
@@ -11,12 +12,12 @@ import {
   invoiceFileName,
 } from "../shared/invoiceSource";
 
-const writers = ["admin", "approver", "initiator", "clerk"] as const;
-const readers = [...writers, "viewer"] as const;
+
+
 export const uploadAccess = internalQuery({
   args: { orgId: v.id("orgs"), sessionToken: v.string() },
   handler: async (ctx, args) => {
-    await requireOrgAccess(ctx, args.orgId, args.sessionToken, [...writers]);
+    await requireOrgAccess(ctx, args.orgId, args.sessionToken, [...RECORD_EDITOR_ROLES]);
   },
 });
 export const record = internalMutation({
@@ -35,7 +36,7 @@ export const record = internalMutation({
       ctx,
       args.orgId,
       args.sessionToken,
-      [...writers],
+      [...RECORD_EDITOR_ROLES],
     );
     if (
       !/^[a-f0-9-]{32,64}$/i.test(args.requestId) ||
@@ -163,7 +164,7 @@ export const list = query({
   handler: async (ctx, args) => {
     const invoice = await ctx.db.get(args.invoiceId);
     if (!invoice) return [];
-    await requireOrgAccess(ctx, invoice.orgId, args.sessionToken, [...readers]);
+    await requireOrgAccess(ctx, invoice.orgId, args.sessionToken, [...ORG_READER_ROLES]);
     const rows = await ctx.db
       .query("invoiceFiles")
       .withIndex("by_invoice", (q) => q.eq("invoiceId", invoice._id))
@@ -187,7 +188,7 @@ export const downloadAccess = internalQuery({
       ctx,
       file.orgId,
       args.sessionToken,
-      [...readers],
+      [...ORG_READER_ROLES],
     );
     if (
       !file.invoiceId &&
@@ -206,7 +207,7 @@ export const discard = internalMutation({
       ctx,
       file.orgId,
       args.sessionToken,
-      [...writers],
+      [...RECORD_EDITOR_ROLES],
     );
     if (file.uploadedBy !== user._id || file.invoiceId)
       throw new Error("Saved source documents are retained with the bill.");

@@ -1,4 +1,5 @@
 import { delegatedIntentValidator } from "./lib/delegatedIntent";
+import { assertAllowanceReservationsAvailable } from "./lib/delegationReservations";
 import { assertBatchContract } from "./lib/accountChange";
 import { queueReportSource } from "./lib/reportIndex";
 import {
@@ -394,12 +395,26 @@ export const quote = action({
       }),
       args.feeMode,
     );
+    const prefix = `${result.chainId}:${result.module.toLowerCase()}:${result.safeAddress.toLowerCase()}:${result.delegate.toLowerCase()}:`;
+    const keys = [result.nonce, ...result.additionalTransfers.map(t => t.nonce)].map(nonce => `${prefix}${result.tokenAddress.toLowerCase()}:${nonce}`);
+    if (result.fee) keys.push(`${prefix}${result.fee.tokenAddress.toLowerCase()}:${result.feeNonce}`);
+    // Catch conflicts before asking the member to sign. Claim rechecks atomically.
+    await ctx.runQuery(internal.delegatedPayments.checkReservations, { disbursementId: args.disbursementId, keys });
     if (result.fee)
       await ctx.runAction(internal.relayExecutor.validateFee, {
         chainId: result.chainId,
         fee: result.fee,
       });
     return result;
+  },
+});
+
+export const checkReservations = internalQuery({
+  args: { disbursementId: v.id("disbursements"), keys: v.array(v.string()) },
+  handler: async (ctx, args) => {
+    const payment = await ctx.db.get(args.disbursementId);
+    if (!payment) throw new Error("Payment not found.");
+    await assertAllowanceReservationsAvailable(ctx, payment.orgId, args.keys);
   },
 });
 
@@ -646,15 +661,6 @@ export const claim = internalMutation({
     )
       throw new Error("Funding instructions changed after review.");
     const key = `${payment.chainId}:${args.intent.module.toLowerCase()}:${safe.safeAddress.toLowerCase()}:${args.intent.delegate.toLowerCase()}:${args.intent.tokenAddress.toLowerCase()}:${args.intent.nonce}`;
-    if (
-      await ctx.db
-        .query("disbursements")
-        .withIndex("by_delegation_key", (q) => q.eq("delegationKey", key))
-        .first()
-    )
-      throw new Error(
-        "Another payment already reserved this allowance authorization.",
-      );
     const reservationKeys = [
       key,
       ...(args.intent.additionalTransfers ?? []).map(
@@ -666,22 +672,8 @@ export const claim = internalMutation({
       reservationKeys.push(
         `${payment.chainId}:${args.intent.module.toLowerCase()}:${safe.safeAddress.toLowerCase()}:${args.intent.delegate.toLowerCase()}:${fee.tokenAddress.toLowerCase()}:${fee.nonce}`,
       );
+    await assertAllowanceReservationsAvailable(ctx, payment.orgId, reservationKeys);
     for (const reservedKey of reservationKeys) {
-      if (
-        (await ctx.db
-          .query("delegationReservations")
-          .withIndex("by_key", (q) => q.eq("key", reservedKey))
-          .first()) ||
-        (await ctx.db
-          .query("disbursements")
-          .withIndex("by_delegation_key", (q) =>
-            q.eq("delegationKey", reservedKey),
-          )
-          .first())
-      )
-        throw new Error(
-          "Another payment already reserved this allowance authorization.",
-        );
       await ctx.db.insert("delegationReservations", {
         key: reservedKey,
         disbursementId: payment._id,

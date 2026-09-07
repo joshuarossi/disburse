@@ -81,7 +81,7 @@ function ReviewControls({
         />
       </label>
       <label className="block">
-        <span className="finance-label">Review period</span>
+        <span className="finance-label">False-positive clearance period</span>
         <select
           className="finance-field"
           value={days}
@@ -193,7 +193,8 @@ export function ScreeningEvidence({
             Last check {new Date(result.screenedAt).toLocaleString()}
           </p>
         )}
-        {result?.reviewExpiresAt && (
+        {result?.status === 'confirmed_match' && <p className="text-xs text-slate-400">Confirmed matches remain blocked while the recipient details and match evidence are unchanged.</p>}
+        {result?.status === 'false_positive' && result.reviewExpiresAt && (
           <p className="text-xs text-slate-400">
             Decision valid until {formatDate(result.reviewExpiresAt)}, while the
             reviewed details and evidence remain unchanged.
@@ -324,8 +325,8 @@ export function ScreeningEvidence({
               <li key={d._id}>
                 <strong>{labels[d.status]}</strong>
                 <p className="text-xs text-slate-400">
-                  {new Date(d.reviewedAt).toLocaleString()} · Valid until{" "}
-                  {formatDate(d.expiresAt)}
+                  {new Date(d.reviewedAt).toLocaleString()}
+                  {d.status === 'false_positive' && <> · Valid until {formatDate(d.expiresAt)}</>}
                 </p>
                 <p className="mt-1 whitespace-pre-wrap">{d.reason}</p>
               </li>
