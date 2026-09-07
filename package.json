@@ -7,7 +7,7 @@
   "scripts": {
     "dev": "vite",
     "dev:convex": "convex dev",
-    "deploy": "convex deploy --cmd 'bun run build:release' --cmd-url-env-var-name VITE_CONVEX_URL --typecheck enable",
+    "deploy": "bun scripts/deploy.mjs",
     "build": "bun run release:config && vite build",
     "build:check": "bun run typecheck && bun run build",
     "build:release": "bun run build:check",

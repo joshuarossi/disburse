@@ -10,7 +10,7 @@ Local release verification passed 644 unit/integration tests, 267 browser storie
 bun install --frozen-lockfile
 bun run check
 bun run test:contracts
-node --test scripts/check-release-config.test.mjs
+node --test scripts/check-release-config.test.mjs scripts/deploy.test.mjs
 bunx playwright install chromium
 bun run test:e2e
 bun run build:release
@@ -24,6 +24,8 @@ Both `build` and `build:release` check the public Convex URL, WalletConnect proj
 
 The existing Pages integration initially reported a successful PR preview while publishing a blank page. An actual Chromium navigation found `No address provided to ConvexReactClient`; the preview build had no Convex URL. The ordinary build now fails on that missing configuration. Configure the isolated preview backend and public settings before treating the Cloudflare build status as working-app evidence.
 
+On September 7, the corrected deploy command completed locally against an isolated cloud preview, including the release build, schema/functions and preview sign-in settings. Fifteen release configuration and deployment tests passed. A snapshot of the existing production deployment was exported with file storage before changing its hosting configuration. These checks do not establish that the Pages-hosted build has succeeded.
+
 ## Cloudflare Pages configuration
 
 | Setting | Value |
@@ -35,9 +37,11 @@ The existing Pages integration initially reported a successful PR preview while 
 | Build command | `bun run deploy` |
 | Output directory | `dist` |
 
-Set `CONVEX_DEPLOY_KEY` in the hosting secret store. Scope the production key to production builds. PR builds must use an isolated preview deploy key or a separate test project's deployment key. Never give an unreviewed PR a production key. If the hosting integration is already active, check its branch and preview settings before merging this PR.
+Set `CONVEX_DEPLOY_KEY` separately in the hosting secret store for each environment. Production builds require a `prod:` deployment key. PR builds require a `preview:<team>:<project>|...` project preview key. The deploy script rejects missing keys and keys assigned to the wrong environment before calling Convex. Never give an unreviewed PR a production key. The script and Pages project both use `main` as the production branch.
 
-`bun run deploy` calls the pinned Convex CLI with `--cmd 'bun run build:release' --cmd-url-env-var-name VITE_CONVEX_URL --typecheck enable`. Convex selects the backend target and supplies its URL to the build, then publishes the functions and schema. Pages publishes `dist` only after that command succeeds. This coordinates the releases but is not an atomic deployment across both providers.
+`bun run deploy` calls the pinned Convex CLI with `--cmd 'bun run build:release' --cmd-url-env-var-name VITE_CONVEX_URL --typecheck enable`. Convex selects the backend target and supplies its URL to the build, then publishes the functions and schema. Pages publishes `dist` only after that command succeeds. This coordinates the releases but is not an atomic deployment across both providers. Local deploys retain the CLI's interactive target confirmation; `bun run deploy --dry-run --yes` checks the plan without publishing.
+
+Convex 1.31.7 does not detect `CF_PAGES_BRANCH`. The script passes it explicitly with that version's `--preview-create` flag. Treat these preview backends as disposable, with no customer data. After a successful preview deployment, the script configures its exact Pages deployment and branch-alias hosts in `SIWE_ALLOWED_DOMAINS`, along with `SIWE_DOMAIN` and `PUBLIC_APP_URL`. A configuration failure also fails the Pages build. Production backend settings are managed separately and are never copied from a preview. [Cloudflare preview aliases](https://developers.cloudflare.com/pages/configuration/preview-deployments/).
 
 Do not retain a development `VITE_CONVEX_SITE_URL` in production or preview build settings. Omit it for ordinary Convex hosting so the client derives the matching `.convex.site` origin. If using a custom HTTP-action domain, configure and verify it on the selected backend. `public/_redirects` supplies the SPA fallback for direct app links. [Convex deploy command](https://docs.convex.dev/cli/reference/deploy), [Cloudflare build configuration](https://developers.cloudflare.com/pages/configuration/build-configuration/).
 
