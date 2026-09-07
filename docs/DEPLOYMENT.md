@@ -18,7 +18,9 @@ bun run build:release
 
 Use Bun 1.4.0, as pinned in `package.json`. CI installs Chromium with its OS dependencies. The browser suite uses local fixtures; the separate built-app Sepolia runners exercise actual development-backend and network settlement. See [the runner guide](../scripts/README.md).
 
-`build:release` checks the public Convex URL, WalletConnect project ID, explicit relay setting and optional HTTP-action URL before typechecking and building. It rejects a `.convex.site` URL for a different deployment and service-secret names exposed through `VITE_`. It cannot prove that a provider credential works. `build` remains available for ordinary local compilation; QA mode is serve-only and cannot produce a deployment artifact.
+Both `build` and `build:release` check the public Convex URL, WalletConnect project ID, explicit relay setting and optional HTTP-action URL before building. `build:release` also typechecks. The checks reject a `.convex.site` URL for a different deployment and service-secret names exposed through `VITE_`. They cannot prove that a provider credential works. QA mode is serve-only and cannot produce a deployment artifact.
+
+The existing Pages integration initially reported a successful PR preview while publishing a blank page. An actual Chromium navigation found `No address provided to ConvexReactClient`; the preview build had no Convex URL. The ordinary build now fails on that missing configuration. Configure the isolated preview backend and public settings before treating the Cloudflare build status as working-app evidence.
 
 ## Cloudflare Pages configuration
 
