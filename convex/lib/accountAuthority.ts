@@ -11,6 +11,13 @@ export const authorityAbi = parseAbi([
 const handlerSlot = keccak256(stringToHex('fallback_manager.handler.address'));
 export type AuthorityNode = { address: string; owners: string[]; threshold: number; nonce: number; contracts: string[] };
 export type AccountAuthority = { root: string; blockNumber: string; nodes: AuthorityNode[] };
+/** EIP-7702 preserves the EOA key even when eth_getCode returns a delegation
+ * indicator. Count only its verified ECDSA signature, not arbitrary execution
+ * authority from the delegated implementation. Ordinary contracts stay nested.
+ * https://eips.ethereum.org/EIPS/eip-7702#delegation-indicator */
+function isKeySigner(code: string | undefined) {
+  return !code || code === '0x' || /^0xef0100[\da-f]{40}$/i.test(code) && !/0{40}$/.test(code);
+}
 export async function assertSignatureHandler(client: ReturnType<typeof getChainClient>, address: Address, chainId: number, blockNumber: bigint) {
   const slot = await client.getStorageAt({ address, slot: handlerSlot, blockNumber });
   if (!slot || slot.length !== 66) throw new Error('Could not verify the owning account signature handler');
@@ -48,7 +55,7 @@ export async function readAccountAuthority(chainId: number, root: string, atBloc
     nodes.set(address, node);
     const codes = await Promise.all(owners.map(owner => client.getCode({ address: owner, blockNumber })));
     for (let i = 0; i < owners.length; i++) {
-      if (!codes[i] || codes[i] === '0x') continue;
+      if (isKeySigner(codes[i])) continue;
       node.contracts.push(owners[i].toLowerCase());
       await visit(owners[i], [...ancestors, address]);
     }
