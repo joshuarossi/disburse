@@ -1,7 +1,7 @@
-import { convexTest } from "convex-test";
-import { describe, it, expect } from "vitest";
-import { api } from "../_generated/api";
-import schema from "../schema";
+import { convexTest } from 'convex-test';
+import { describe, it, expect, vi } from 'vitest';
+import { api } from '../_generated/api';
+import schema from '../schema';
 import {
   createFullOrgSetup,
   createTestUser,
@@ -9,11 +9,11 @@ import {
   createTestSafe,
   signIn,
   TEST_WALLETS,
-} from "./factories";
+} from './factories';
 
-describe("Safes", () => {
-  describe("getForOrg", () => {
-    it("returns array of safes (one per chain)", async () => {
+describe('Safes', () => {
+  describe('getForOrg', () => {
+    it('returns the active funding accounts', async () => {
       const t = convexTest(schema);
 
       let orgId: string;
@@ -24,7 +24,7 @@ describe("Safes", () => {
         orgId = setup.orgId;
       });
 
-      const admin = await signIn(t, "admin");
+      const admin = await signIn(t, 'admin');
 
       const safes = await t.query(api.safes.getForOrg, {
         orgId: orgId! as any,
@@ -37,8 +37,8 @@ describe("Safes", () => {
     });
   });
 
-  describe("getForOrgAndChain", () => {
-    it("returns safe for org on given chain", async () => {
+  describe('getForOrgAndChain', () => {
+    it('returns safe for org on given chain', async () => {
       const t = convexTest(schema);
 
       let orgId: string;
@@ -49,7 +49,7 @@ describe("Safes", () => {
         orgId = setup.orgId;
       });
 
-      const admin = await signIn(t, "admin");
+      const admin = await signIn(t, 'admin');
 
       const safe = await t.query(api.safes.getForOrgAndChain, {
         orgId: orgId! as any,
@@ -61,7 +61,7 @@ describe("Safes", () => {
       expect(safe?.chainId).toBe(11155111);
     });
 
-    it("returns null when no safe linked for chain", async () => {
+    it('returns null when no safe linked for chain', async () => {
       const t = convexTest(schema);
 
       let orgId: string;
@@ -72,7 +72,7 @@ describe("Safes", () => {
         orgId = setup.orgId;
       });
 
-      const admin = await signIn(t, "admin");
+      const admin = await signIn(t, 'admin');
 
       const safe = await t.query(api.safes.getForOrgAndChain, {
         orgId: orgId! as any,
@@ -84,22 +84,24 @@ describe("Safes", () => {
     });
   });
 
-  describe("link (multi-chain)", () => {
-    it("allows linking same Safe address on another chain", async () => {
+  describe('link (multi-chain)', () => {
+    it('allows linking same Safe address on another chain', async () => {
       const t = convexTest(schema);
 
       let orgId: string;
-      const safeAddress = "0xabcdef1234567890abcdef1234567890abcdef12";
+      const safeAddress = '0xabcdef1234567890abcdef1234567890abcdef12';
       await t.run(async (ctx) => {
-        const userId = await createTestUser(ctx, { walletAddress: TEST_WALLETS.admin });
+        const userId = await createTestUser(ctx, {
+          walletAddress: TEST_WALLETS.admin,
+        });
         const { orgId: id } = await createTestOrg(ctx, userId);
         orgId = id;
         await createTestSafe(ctx, id, { chainId: 11155111, safeAddress });
       });
 
-      const admin = await signIn(t, "admin");
+      const admin = await signIn(t, 'admin');
 
-      const linkResult = await t.mutation(api.safes.link, {
+      const linkResult = await t.action(api.safes.link, {
         orgId: orgId! as any,
         sessionToken: admin.sessionToken,
         chainId: 1,
@@ -114,11 +116,13 @@ describe("Safes", () => {
       });
 
       expect(safes.length).toBe(2);
-      expect(safes.every((s) => s?.safeAddress === safeAddress.toLowerCase())).toBe(true);
+      expect(
+        safes.every((s) => s?.safeAddress === safeAddress.toLowerCase()),
+      ).toBe(true);
       expect(safes.map((s) => s?.chainId).sort()).toEqual([1, 11155111]);
     });
 
-    it("throws when linking different address and org already has a safe", async () => {
+    it('rejects a malformed Safe address', async () => {
       const t = convexTest(schema);
 
       let orgId: string;
@@ -129,57 +133,80 @@ describe("Safes", () => {
         orgId = setup.orgId;
       });
 
-      const admin = await signIn(t, "admin");
+      const admin = await signIn(t, 'admin');
 
       await expect(
-        t.mutation(api.safes.link, {
+        t.action(api.safes.link, {
           orgId: orgId! as any,
           sessionToken: admin.sessionToken,
           chainId: 1,
-          safeAddress: "0xdifferentaddress123456789012345678901234",
-        })
-      ).rejects.toThrow(/same across all chains/);
+          safeAddress: '0xdifferentaddress123456789012345678901234',
+        }),
+      ).rejects.toThrow(/Invalid Safe address/);
     });
 
-    it("throws when chain already has a safe linked", async () => {
+    it('rejects linking the same account twice on one network', async () => {
       const t = convexTest(schema);
 
       let orgId: string;
-      const safeAddress = "0xsameaddress12345678901234567890123456";
+      const safeAddress = '0x1234567890123456789012345678901234567890';
       await t.run(async (ctx) => {
-        const userId = await createTestUser(ctx, { walletAddress: TEST_WALLETS.admin });
+        const userId = await createTestUser(ctx, {
+          walletAddress: TEST_WALLETS.admin,
+        });
         const { orgId: id } = await createTestOrg(ctx, userId);
         orgId = id;
         await createTestSafe(ctx, id, { chainId: 11155111, safeAddress });
       });
 
-      const admin = await signIn(t, "admin");
+      const admin = await signIn(t, 'admin');
 
       await expect(
-        t.mutation(api.safes.link, {
+        t.action(api.safes.link, {
           orgId: orgId! as any,
           sessionToken: admin.sessionToken,
           chainId: 11155111,
           safeAddress,
-        })
+        }),
       ).rejects.toThrow(/already linked for this chain/);
     });
   });
 
-  describe("unlink", () => {
-    it("removes one chain only; other chains remain", async () => {
+  it('connects Payroll beside Operations on the same network and restores the original ID after unlinking', async () => {
+    const t = convexTest(schema);
+    const ids = await t.run(ctx => createFullOrgSetup(ctx, { walletAddress: TEST_WALLETS.admin }));
+    const { sessionToken } = await signIn(t, 'admin');
+    const input = { orgId: ids.orgId, sessionToken, chainId: 11155111,
+      safeAddress: '0x9999999999999999999999999999999999999999', name: 'Payroll' };
+    const linked = await t.action(api.safes.link, input);
+    expect(await t.query(api.safes.getForOrg, { orgId: ids.orgId, sessionToken })).toHaveLength(2);
+    await expect(t.query(api.safes.getForOrgAndChain, { orgId: ids.orgId, sessionToken, chainId: 11155111 })).rejects.toThrow('Choose a funding account');
+    await t.mutation(api.safes.unlink, { safeId: linked.safeId, sessionToken });
+    const restored = await t.action(api.safes.link, input);
+    expect(restored.safeId).toBe(linked.safeId);
+    expect(await t.run(ctx => ctx.db.query('safes').collect())).toHaveLength(2);
+    expect(await t.run(ctx => ctx.db.get(linked.safeId))).toMatchObject({ name: 'Payroll', isActive: true });
+  });
+
+  describe('unlink', () => {
+    it('removes one chain only; other chains remain', async () => {
       const t = convexTest(schema);
 
-      const safeAddress = "0xunlinktest12345678901234567890123456";
+      const safeAddress = '0xunlinktest12345678901234567890123456';
       const { orgId, safeIdSepolia } = await t.run(async (ctx) => {
-        const userId = await createTestUser(ctx, { walletAddress: TEST_WALLETS.admin });
+        const userId = await createTestUser(ctx, {
+          walletAddress: TEST_WALLETS.admin,
+        });
         const { orgId: id } = await createTestOrg(ctx, userId);
-        const safeIdSepolia = await createTestSafe(ctx, id, { chainId: 11155111, safeAddress });
+        const safeIdSepolia = await createTestSafe(ctx, id, {
+          chainId: 11155111,
+          safeAddress,
+        });
         await createTestSafe(ctx, id, { chainId: 1, safeAddress });
         return { orgId: id, safeIdSepolia };
       });
 
-      const admin = await signIn(t, "admin");
+      const admin = await signIn(t, 'admin');
 
       await t.mutation(api.safes.unlink, {
         safeId: safeIdSepolia as any,
@@ -210,3 +237,10 @@ describe("Safes", () => {
     });
   });
 });
+
+vi.mock('../lib/safeVerification', () => ({
+  verifySafeOwnership: vi.fn(async () => ({
+    owners: ['0x7e5f4552091a69125d5dfcb7b8c2659029395bdf'],
+    threshold: 1,
+  })),
+}));

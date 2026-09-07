@@ -1,13 +1,13 @@
-@import "tailwindcss";
+@import 'tailwindcss';
 
 @theme {
   --font-sans: 'Plus Jakarta Sans', system-ui, sans-serif;
-  
+
   /* Accent colors - teal/cyan gradient (same for both themes) */
   --color-accent-400: #2dd4bf;
   --color-accent-500: #14b8a6;
   --color-accent-600: #0d9488;
-  
+
   /* Theme-aware colors using CSS variables */
   --color-navy-950: var(--color-bg-primary);
   --color-navy-900: var(--color-bg-secondary);
@@ -25,7 +25,7 @@
 
   /* Theme CSS Variables */
   :root,
-  [data-theme="dark"] {
+  [data-theme='dark'] {
     /* Dark theme colors */
     --color-bg-primary: #0a0f1a;
     --color-bg-secondary: #0f172a;
@@ -39,7 +39,7 @@
     --color-border-hover: rgba(255, 255, 255, 0.2);
   }
 
-  [data-theme="light"] {
+  [data-theme='light'] {
     /* Light theme colors - darker text for better contrast */
     --color-bg-primary: #ffffff;
     --color-bg-secondary: #f8f9fa;
@@ -60,53 +60,200 @@
     margin: 0;
     min-height: 100vh;
     overflow-x: hidden;
-    transition: background-color 0.2s ease, color 0.2s ease;
+    transition:
+      background-color 0.2s ease,
+      color 0.2s ease;
   }
-  
+
   /* Override Tailwind text color utilities in light mode with !important for maximum specificity */
-  [data-theme="light"] .text-white,
-  [data-theme="light"] .text-slate-50,
-  [data-theme="light"] .text-slate-100,
-  [data-theme="light"] .text-slate-200 {
+  [data-theme='light'] .text-white,
+  [data-theme='light'] .text-slate-50,
+  [data-theme='light'] .text-slate-100,
+  [data-theme='light'] .text-slate-200 {
     color: var(--color-text-primary) !important;
   }
-  
-  [data-theme="light"] .text-slate-300 {
+
+  [data-theme='light'] .text-slate-300 {
     color: var(--color-text-secondary) !important;
   }
-  
-  [data-theme="light"] .text-slate-400 {
+
+  [data-theme='light'] .text-slate-400 {
     color: var(--color-text-tertiary) !important;
   }
-  
-  [data-theme="light"] .text-slate-500 {
+
+  [data-theme='light'] .text-slate-500 {
     color: var(--color-text-quaternary) !important;
   }
-  
-  [data-theme="light"] .text-gray-50,
-  [data-theme="light"] .text-gray-100,
-  [data-theme="light"] .text-gray-200,
-  [data-theme="light"] .text-gray-300 {
+
+  [data-theme='light'] .text-gray-50,
+  [data-theme='light'] .text-gray-100,
+  [data-theme='light'] .text-gray-200,
+  [data-theme='light'] .text-gray-300 {
     color: var(--color-text-secondary) !important;
   }
-  
-  [data-theme="light"] .text-gray-400 {
+
+  [data-theme='light'] .text-gray-400 {
     color: var(--color-text-tertiary) !important;
   }
-  
-  [data-theme="light"] .text-gray-500 {
+
+  [data-theme='light'] .text-gray-500 {
     color: var(--color-text-quaternary) !important;
   }
-  
+
   /* Also ensure table cells and other common elements have proper contrast */
-  [data-theme="light"] td,
-  [data-theme="light"] th,
-  [data-theme="light"] p,
-  [data-theme="light"] span:not([class*="text-"]):not([class*="bg-"]) {
+  [data-theme='light'] td,
+  [data-theme='light'] th,
+  [data-theme='light'] p,
+  [data-theme='light'] span:not([class*='text-']):not([class*='bg-']) {
     color: inherit;
   }
-  
+
   html {
     overflow-x: hidden;
   }
+}
+
+/* Finance workspace surfaces share theme tokens with the rest of the app. */
+.finance-workspace {
+  max-width: 1320px;
+  margin: 0 auto;
+  padding: 8px 0 40px;
+}
+.finance-eyebrow {
+  color: var(--color-text-quaternary);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+.finance-panel {
+  background: var(--color-bg-secondary);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+}
+.finance-field {
+  display: block;
+  width: 100%;
+  min-height: 42px;
+  border-radius: 7px;
+  border: 1px solid var(--color-border-hover);
+  background: var(--color-bg-primary);
+  color: var(--color-text-primary);
+  padding: 9px 12px;
+  font-size: 14px;
+}
+.finance-field:focus {
+  outline: 2px solid #14b8a6;
+  outline-offset: 2px;
+}
+.finance-label {
+  display: block;
+  color: var(--color-text-secondary);
+  font-size: 12px;
+  font-weight: 600;
+  margin-bottom: 7px;
+}
+.finance-dialog {
+  width: min(920px, calc(100vw - 32px));
+  max-height: calc(100dvh - 40px);
+  margin: auto;
+  border: 1px solid var(--color-border);
+  border-radius: 14px;
+  padding: 0;
+  color: var(--color-text-primary);
+  background: var(--color-bg-secondary);
+  box-shadow: 0 24px 90px #0005;
+}
+.finance-dialog::backdrop {
+  background: #02061799;
+  backdrop-filter: blur(3px);
+}
+.finance-table {
+  width: 100%;
+  text-align: left;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.finance-table th {
+  padding: 12px 20px;
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  font-weight: 600;
+  color: var(--color-text-quaternary);
+  background: var(--color-bg-primary);
+}
+.finance-table td {
+  padding: 17px 20px;
+  border-top: 1px solid var(--color-border);
+  color: var(--color-text-secondary);
+}
+.finance-table tbody tr:hover {
+  background: var(--color-bg-tertiary);
+}
+.finance-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border-radius: 5px;
+  padding: 4px 8px;
+  background: var(--color-bg-tertiary);
+  color: var(--color-text-secondary);
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.finance-step {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--color-text-quaternary);
+}
+.finance-step[data-active='true'] {
+  color: #0d9488;
+  font-weight: 600;
+}
+.finance-workspace input[type='checkbox'],
+.finance-dialog input[type='checkbox'] {
+  accent-color: #0d9488;
+  width: 16px;
+  height: 16px;
+}
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+@import './workspace.css';
+
+[data-theme='light'] .billing-trial-badge {
+  color: #854d0e;
+  background-color: #fef9c3;
+}
+
+/* Public pages share the workspace's blue accent, with readable light-theme text. */
+[data-theme='light'] .marketing-site {
+  --color-accent-400: #1d4ed8;
+  --color-accent-500: #1d4ed8;
+  --color-accent-600: #1e40af;
+}
+[data-theme='light'] .marketing-site .workspace-ui-button.bg-gradient-to-r,
+[data-theme='light'] .marketing-site .bg-accent-500 {
+  color: #fff;
+}
+.marketing-site .marketing-cta :is(h2, p, .text-white) {
+  color: #fff !important;
+}
+.marketing-cta > .bg-gradient-to-br {
+  background: linear-gradient(135deg, #1e40af, #1d4ed8);
+}
+.marketing-cta .workspace-ui-button {
+  background: #fff;
+  color: #1e40af !important;
+  border-color: transparent;
 }

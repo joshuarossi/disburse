@@ -172,7 +172,7 @@
       "subtitle": "Elige un plan que se adapte a tu equipo y paga con stablecoins.",
       "popular": "Más popular",
       "cta": "Iniciar prueba gratis",
-      "note": "Todos los planes incluyen herramientas básicas de tesorería, registros de auditoría y flujos de cumplimiento."
+      "note": "Los pagos básicos siguen disponibles sin suscripción. Tú pagas todas las comisiones de red y de los proveedores. Sin cargos automáticos de suscripción."
     },
     "cta": {
       "badge": "Prueba gratuita de 30 días",
@@ -278,7 +278,7 @@
         },
         "billing": {
           "title": "Facturación y pagos",
-          "body": "Las suscripciones se renuevan mensualmente salvo cancelación. Eres responsable de las autorizaciones y comisiones de pago."
+          "body": "Las suscripciones cubren 30 días por pago verificado y no se renuevan automáticamente. Las comisiones de pago y de red son independientes. Usted es responsable de revisar las autorizaciones de pago y las comisiones."
         }
       }
     }
@@ -609,6 +609,8 @@
     },
     "summary": {
       "showing": "Mostrando {{count}} transacción",
+      "showing_one": "Mostrando {{count}} transacción",
+      "showing_other": "Mostrando {{count}} transacciones",
       "total": "Total",
       "beneficiaries": "{{count}} beneficiarios",
       "events": "{{count}} eventos"
@@ -727,7 +729,7 @@
       "description": "Tu preferencia de tema se guardará y se aplicará en todas las páginas."
     },
     "billing": {
-      "title": "Facturación y Suscripción",
+      "title": "Plan y facturación",
       "subtitle": "Gestiona tu suscripción y pago",
       "currentPlan": "Plan Actual",
       "users": "Usuarios",
@@ -741,46 +743,26 @@
       "subscribe": "Suscribirse",
       "upgrade": "Actualizar",
       "downgradeNA": "Degradar N/D",
-      "currentPlan": "Plan Actual",
       "plans": {
         "starter": {
           "name": "Starter",
           "description": "Para individuos",
-          "price": "${{price}}/mes",
-          "features": {
-            "users": "1 usuario",
-            "safe": "1 Safe",
-            "beneficiaries": "25 beneficiarios",
-            "disbursements": "Desembolsos únicos",
-            "audit": "Registros de auditoría",
-            "export": "Exportación CSV"
-          }
+          "price": "US$ {{price}} / 30 días"
         },
         "team": {
           "name": "Team",
           "description": "Para equipos pequeños",
-          "price": "${{price}}/mes",
-          "features": {
-            "users": "5 usuarios",
-            "safe": "1 Safe",
-            "beneficiaries": "100 beneficiarios",
-            "roles": "Los 5 roles",
-            "multisig": "Aprobación multi-firma",
-            "everything": "Todo en Starter"
-          }
+          "price": "US$ {{price}} / 30 días"
         },
         "pro": {
           "name": "Pro",
           "description": "Para equipos en crecimiento",
-          "price": "${{price}}/mes",
-          "features": {
-            "users": "Usuarios ilimitados",
-            "safe": "1 Safe",
-            "beneficiaries": "Beneficiarios ilimitados",
-            "reports": "Informes profesionales",
-            "support": "Soporte prioritario",
-            "everything": "Todo en Team"
-          }
+          "price": "US$ {{price}} / 30 días"
+        },
+        "free": {
+          "name": "Gratis",
+          "description": "Para una sola persona",
+          "price": "$0 / para siempre"
         }
       },
       "payment": {
@@ -806,20 +788,55 @@
         "viewTransaction": "Ver Transacción",
         "done": "Hecho"
       },
-      "info": "Paga con stablecoins (USDC, USDT) en Ethereum Sepolia. Todos los planes incluyen una garantía de devolución de dinero de 30 días."
+      "info": "Paga con stablecoins (USDC, USDT) en Ethereum Sepolia. Todos los planes incluyen una garantía de devolución de dinero de 30 días.",
+      "usageTitle": "Uso del espacio de trabajo",
+      "memberSeats": "Plazas del equipo",
+      "savedRecipients": "Destinatarios guardados",
+      "connectedAccounts": "Cuentas conectadas",
+      "usedOf": "{{used}} de {{limit}} en uso",
+      "noPlanLimit": "{{used}} · sin límite del plan",
+      "seatBreakdown": "{{active}} activos · {{pending}} invitaciones pendientes",
+      "archivedCount": "Incluye {{count}} registros archivados",
+      "accountsIncluded": "Incluye cuentas comerciales y de prueba",
+      "usageUnavailable": "No se pudo calcular el uso. Actualiza para volver a intentarlo; el plan y la renovación siguen disponibles.",
+      "trialEnd": "La prueba termina el {{date}}. Elige un plan para seguir enviando pagos.",
+      "paidEnd": "El acceso pagado termina el {{date}}. Esta fecha incluye el tiempo pagado no utilizado.",
+      "expiryPolicy": "La gestión de fondos y los pagos siguen disponibles al finalizar la prueba o el período pagado. Los límites del plan se aplican a miembros y destinatarios guardados. Tus cuentas y fondos permanecen bajo tu control.",
+      "included": "Todos los planes incluyen pagos individuales y por lotes, programación, aprobaciones y exportaciones contables. Tú pagas las comisiones de red y de los proveedores, que se muestran por separado antes de aprobar.",
+      "trialTerms": "Elige un plan para 30 días de acceso pagado. No hay renovación ni cargos automáticos. Los días de prueba no utilizados no se convierten en crédito pagado.",
+      "paidTerms": "Paga por períodos de 30 días. No hay renovación ni cargos automáticos. Renovar antes conserva el tiempo pagado restante; cambiar de plan convierte ese tiempo en crédito a la nueva tarifa. Los cargos de red y del proveedor son independientes.",
+      "features": {
+        "members_one": "{{count}} miembro del equipo",
+        "members_other": "{{count}} miembros del equipo",
+        "membersUnlimited": "Sin límite de miembros del plan",
+        "recipients": "{{count}} destinatarios guardados",
+        "recipientsUnlimited": "Sin límite de destinatarios del plan",
+        "accounts": "Cuentas comerciales separadas",
+        "payments": "Pagos individuales y por lotes",
+        "schedules": "Pagos programados y recurrentes",
+        "controls": "Aprobaciones y límites de pago",
+        "records": "Registros de auditoría y exportaciones contables"
+      },
+      "noSubscriptionCharge": "Sin cargo de suscripción",
+      "freePolicy": "La gestión de fondos y los pagos siguen disponibles con el acceso gratuito. Tus cuentas y fondos permanecen bajo tu control.",
+      "fallbackPolicy": "Después de este período, el acceso {{tier}} continúa automáticamente. La gestión de fondos y los pagos siguen disponibles.",
+      "complimentaryEnd": "El acceso de cortesía termina el {{date}}.",
+      "includedFree": "Incluido sin cargo",
+      "freeTerms": "Tu acceso actual no requiere una suscripción de pago. Tú pagas todas las comisiones de red y de los proveedores. Disburse no custodia tus fondos ni cubre estas comisiones.",
+      "overLimitPolicy": "El uso guardado supera los límites de este plan. Los miembros y destinatarios existentes siguen disponibles. Para añadir destinatarios o aceptar invitaciones debe haber espacio dentro de los límites del plan."
     },
     "screening": {
       "title": "Verificación de Sanciones",
       "subtitle": "Configurar la aplicación de verificación SDN",
       "enforcement": "Nivel de Aplicación",
-      "enforcementDescription": "Controla cómo la verificación de sanciones afecta los desembolsos",
+      "enforcementDescription": "Controla cómo afectan a los pagos las coincidencias, las verificaciones pendientes, los resultados desactualizados y las verificaciones no disponibles.",
       "options": {
         "off": "Desactivado",
-        "offDescription": "La verificación está desactivada. No se realizan verificaciones.",
+        "offDescription": "Sin bloqueos ni confirmaciones de pago. Las verificaciones y el historial siguen disponibles.",
         "warn": "Advertir",
-        "warnDescription": "Mostrar advertencias para coincidencias pero permitir que los desembolsos continúen.",
+        "warnDescription": "Muestra advertencias y exige confirmarlas antes de continuar.",
         "block": "Bloquear",
-        "blockDescription": "Bloquear desembolsos con coincidencias SDN no resueltas. Se requiere revisión del administrador."
+        "blockDescription": "Bloquea los pagos hasta que la verificación esté actualizada y se revisen las coincidencias pendientes."
       },
       "adminOnly": "Solo los administradores pueden cambiar la configuración de aplicación de verificación",
       "saving": "Guardando...",
@@ -872,7 +889,8 @@
     "title": "Verificación",
     "checking": "Verificando...",
     "pending": "Pendiente",
-    "clear": "Sin coincidencias",
+    "clear": "Sin coincidencias en la lista",
+    "scope": "Nombres e identificadores de moneda digital publicados en la lista SDN de OFAC. No verifica la titularidad de la dirección ni analiza la exposición de transacciones.",
     "potentialMatch": "Posible coincidencia",
     "confirmedMatch": "Coincidencia confirmada",
     "falsePositive": "Falso positivo",

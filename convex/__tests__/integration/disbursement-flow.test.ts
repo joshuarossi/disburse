@@ -1,18 +1,23 @@
-import { convexTest } from "convex-test";
-import { describe, it, expect } from "vitest";
-import { api } from "../../_generated/api";
-import schema from "../../schema";
-import { createFullOrgSetup, createTestBeneficiary, signIn, TEST_WALLETS } from "../factories";
+import { convexTest } from 'convex-test';
+import { describe, it, expect } from 'vitest';
+import { api, internal } from '../../_generated/api';
+import schema from '../../schema';
+import {
+  createFullOrgSetup,
+  createTestBeneficiary,
+  signIn,
+  TEST_WALLETS,
+} from '../factories';
 
 // updateStatus hash-integrity validation requires well-formed 32-byte hashes
-const SAFE_TX_HASH = "0x" + "ab".repeat(32);
-const TX_HASH = "0x" + "cd".repeat(32);
+const SAFE_TX_HASH = '0x' + 'ab'.repeat(32);
+const TX_HASH = '0x' + 'cd'.repeat(32);
 
 // Beneficiary destination addresses are validated server-side on creation
-const ALICE_ADDRESS = "0x" + "a".repeat(39) + "1";
+const ALICE_ADDRESS = '0x' + 'a'.repeat(39) + '1';
 
-describe("Integration: Disbursement Flow", () => {
-  it("complete disbursement: draft -> proposed -> executed", async () => {
+describe('Integration: Disbursement Flow', () => {
+  it('complete disbursement: draft -> proposed -> executed', async () => {
     const t = convexTest(schema);
 
     // Setup: Create org with Safe and beneficiary
@@ -24,12 +29,12 @@ describe("Integration: Disbursement Flow", () => {
       });
       orgId = setup.orgId;
       beneficiaryId = await createTestBeneficiary(ctx, orgId as any, {
-        name: "Contractor Payment",
-        type: "individual",
+        name: 'Contractor Payment',
+        type: 'individual',
       });
     });
 
-    const admin = await signIn(t, "admin");
+    const admin = await signIn(t, 'admin');
 
     // Step 1: Create draft disbursement
     const createResult = await t.mutation(api.disbursements.create, {
@@ -37,9 +42,9 @@ describe("Integration: Disbursement Flow", () => {
       sessionToken: admin.sessionToken,
       chainId: 11155111,
       beneficiaryId: beneficiaryId! as any,
-      token: "USDC",
-      amount: "1500.00",
-      memo: "January invoice payment",
+      token: 'USDC',
+      amount: '1500.00',
+      memo: 'January invoice payment',
     });
 
     expect(createResult.disbursementId).toBeDefined();
@@ -50,16 +55,16 @@ describe("Integration: Disbursement Flow", () => {
       sessionToken: admin.sessionToken,
     });
 
-    expect(disbursement?.status).toBe("draft");
-    expect(disbursement?.token).toBe("USDC");
-    expect(disbursement?.amount).toBe("1500.00");
+    expect(disbursement?.status).toBe('draft');
+    expect(disbursement?.token).toBe('USDC');
+    expect(disbursement?.amount).toBe('1500.00');
 
     // Step 2: Propose to Safe (after Safe tx is created)
     const safeTxHash = SAFE_TX_HASH;
     await t.mutation(api.disbursements.updateStatus, {
       disbursementId: createResult.disbursementId as any,
       sessionToken: admin.sessionToken,
-      status: "proposed",
+      status: 'proposed',
       safeTxHash,
     });
 
@@ -69,15 +74,15 @@ describe("Integration: Disbursement Flow", () => {
       sessionToken: admin.sessionToken,
     });
 
-    expect(disbursement?.status).toBe("proposed");
+    expect(disbursement?.status).toBe('proposed');
     expect(disbursement?.safeTxHash).toBe(safeTxHash);
 
     // Step 3: Execute (after Safe tx is executed)
     const txHash = TX_HASH;
-    await t.mutation(api.disbursements.updateStatus, {
+    await t.mutation(internal.disbursements.confirmExecution, {
       disbursementId: createResult.disbursementId as any,
       sessionToken: admin.sessionToken,
-      status: "executed",
+      safeTxHash: SAFE_TX_HASH,
       txHash,
     });
 
@@ -87,28 +92,34 @@ describe("Integration: Disbursement Flow", () => {
       sessionToken: admin.sessionToken,
     });
 
-    expect(disbursement?.status).toBe("executed");
+    expect(disbursement?.status).toBe('executed');
     expect(disbursement?.txHash).toBe(txHash);
 
     // Verify complete audit trail
     await t.run(async (ctx) => {
       const logs = await ctx.db
-        .query("auditLog")
-        .withIndex("by_org", (q) => q.eq("orgId", orgId as any))
+        .query('auditLog')
+        .withIndex('by_org', (q) => q.eq('orgId', orgId as any))
         .collect();
 
       const disbursementLogs = logs.filter((l) =>
-        l.action.startsWith("disbursement.")
+        l.action.startsWith('disbursement.'),
       );
 
       expect(disbursementLogs.length).toBe(3);
-      expect(disbursementLogs.some((l) => l.action === "disbursement.created")).toBe(true);
-      expect(disbursementLogs.some((l) => l.action === "disbursement.proposed")).toBe(true);
-      expect(disbursementLogs.some((l) => l.action === "disbursement.executed")).toBe(true);
+      expect(
+        disbursementLogs.some((l) => l.action === 'disbursement.created'),
+      ).toBe(true);
+      expect(
+        disbursementLogs.some((l) => l.action === 'disbursement.proposed'),
+      ).toBe(true);
+      expect(
+        disbursementLogs.some((l) => l.action === 'disbursement.executed'),
+      ).toBe(true);
     });
   });
 
-  it("failed disbursement: draft -> proposed -> failed", async () => {
+  it('failed disbursement: draft -> proposed -> failed', async () => {
     const t = convexTest(schema);
 
     let orgId: string;
@@ -121,7 +132,7 @@ describe("Integration: Disbursement Flow", () => {
       beneficiaryId = await createTestBeneficiary(ctx, orgId as any);
     });
 
-    const admin = await signIn(t, "admin");
+    const admin = await signIn(t, 'admin');
 
     // Create and propose
     const createResult = await t.mutation(api.disbursements.create, {
@@ -129,14 +140,14 @@ describe("Integration: Disbursement Flow", () => {
       sessionToken: admin.sessionToken,
       chainId: 11155111,
       beneficiaryId: beneficiaryId! as any,
-      token: "USDT",
-      amount: "500",
+      token: 'USDT',
+      amount: '500',
     });
 
     await t.mutation(api.disbursements.updateStatus, {
       disbursementId: createResult.disbursementId as any,
       sessionToken: admin.sessionToken,
-      status: "proposed",
+      status: 'proposed',
       safeTxHash: SAFE_TX_HASH,
     });
 
@@ -144,7 +155,7 @@ describe("Integration: Disbursement Flow", () => {
     await t.mutation(api.disbursements.updateStatus, {
       disbursementId: createResult.disbursementId as any,
       sessionToken: admin.sessionToken,
-      status: "failed",
+      status: 'failed',
     });
 
     const disbursement = await t.query(api.disbursements.get, {
@@ -152,10 +163,10 @@ describe("Integration: Disbursement Flow", () => {
       sessionToken: admin.sessionToken,
     });
 
-    expect(disbursement?.status).toBe("failed");
+    expect(disbursement?.status).toBe('failed');
   });
 
-  it("cancelled disbursement: draft -> cancelled", async () => {
+  it('cancelled disbursement: draft -> cancelled', async () => {
     const t = convexTest(schema);
 
     let orgId: string;
@@ -168,7 +179,7 @@ describe("Integration: Disbursement Flow", () => {
       beneficiaryId = await createTestBeneficiary(ctx, orgId as any);
     });
 
-    const admin = await signIn(t, "admin");
+    const admin = await signIn(t, 'admin');
 
     // Create draft
     const createResult = await t.mutation(api.disbursements.create, {
@@ -176,15 +187,15 @@ describe("Integration: Disbursement Flow", () => {
       sessionToken: admin.sessionToken,
       chainId: 11155111,
       beneficiaryId: beneficiaryId! as any,
-      token: "USDC",
-      amount: "100",
+      token: 'USDC',
+      amount: '100',
     });
 
     // Cancel before proposing
     await t.mutation(api.disbursements.updateStatus, {
       disbursementId: createResult.disbursementId as any,
       sessionToken: admin.sessionToken,
-      status: "cancelled",
+      status: 'cancelled',
     });
 
     const disbursement = await t.query(api.disbursements.get, {
@@ -192,10 +203,10 @@ describe("Integration: Disbursement Flow", () => {
       sessionToken: admin.sessionToken,
     });
 
-    expect(disbursement?.status).toBe("cancelled");
+    expect(disbursement?.status).toBe('cancelled');
   });
 
-  it("multiple disbursements with filtering", async () => {
+  it('multiple disbursements with filtering', async () => {
     const t = convexTest(schema);
 
     let orgId: string;
@@ -208,7 +219,7 @@ describe("Integration: Disbursement Flow", () => {
       beneficiaryId = await createTestBeneficiary(ctx, orgId as any);
     });
 
-    const admin = await signIn(t, "admin");
+    const admin = await signIn(t, 'admin');
 
     // Create multiple disbursements with different statuses
     const draft1 = await t.mutation(api.disbursements.create, {
@@ -216,8 +227,8 @@ describe("Integration: Disbursement Flow", () => {
       sessionToken: admin.sessionToken,
       chainId: 11155111,
       beneficiaryId: beneficiaryId! as any,
-      token: "USDC",
-      amount: "100",
+      token: 'USDC',
+      amount: '100',
     });
 
     await t.mutation(api.disbursements.create, {
@@ -225,23 +236,23 @@ describe("Integration: Disbursement Flow", () => {
       sessionToken: admin.sessionToken,
       chainId: 11155111,
       beneficiaryId: beneficiaryId! as any,
-      token: "USDC",
-      amount: "200",
+      token: 'USDC',
+      amount: '200',
     });
 
     // Propose one
     await t.mutation(api.disbursements.updateStatus, {
       disbursementId: draft1.disbursementId as any,
       sessionToken: admin.sessionToken,
-      status: "proposed",
+      status: 'proposed',
       safeTxHash: SAFE_TX_HASH,
     });
 
     // Execute it
-    await t.mutation(api.disbursements.updateStatus, {
+    await t.mutation(internal.disbursements.confirmExecution, {
       disbursementId: draft1.disbursementId as any,
       sessionToken: admin.sessionToken,
-      status: "executed",
+      safeTxHash: SAFE_TX_HASH,
       txHash: TX_HASH,
     });
 
@@ -249,7 +260,7 @@ describe("Integration: Disbursement Flow", () => {
     const drafts = await t.query(api.disbursements.list, {
       orgId: orgId! as any,
       sessionToken: admin.sessionToken,
-      status: ["draft"],
+      status: ['draft'],
     });
     expect(drafts.items.length).toBe(1);
 
@@ -257,10 +268,10 @@ describe("Integration: Disbursement Flow", () => {
     const executed = await t.query(api.disbursements.list, {
       orgId: orgId! as any,
       sessionToken: admin.sessionToken,
-      status: ["executed"],
+      status: ['executed'],
     });
     expect(executed.items.length).toBe(1);
-    expect(executed.items[0].amount).toBe("100");
+    expect(executed.items[0].amount).toBe('100');
 
     // All disbursements
     const all = await t.query(api.disbursements.list, {
@@ -271,7 +282,7 @@ describe("Integration: Disbursement Flow", () => {
     expect(all.totalCount).toBe(2);
   });
 
-  it("disbursement includes beneficiary details", async () => {
+  it('disbursement includes beneficiary details', async () => {
     const t = convexTest(schema);
 
     let orgId: string;
@@ -282,21 +293,21 @@ describe("Integration: Disbursement Flow", () => {
       });
       orgId = setup.orgId;
       beneficiaryId = await createTestBeneficiary(ctx, orgId as any, {
-        name: "Alice Smith",
+        name: 'Alice Smith',
         walletAddress: ALICE_ADDRESS,
-        type: "individual",
+        type: 'individual',
       });
     });
 
-    const admin = await signIn(t, "admin");
+    const admin = await signIn(t, 'admin');
 
     const createResult = await t.mutation(api.disbursements.create, {
       orgId: orgId! as any,
       sessionToken: admin.sessionToken,
       chainId: 11155111,
       beneficiaryId: beneficiaryId! as any,
-      token: "USDC",
-      amount: "50",
+      token: 'USDC',
+      amount: '50',
     });
 
     const disbursement = await t.query(api.disbursements.get, {
@@ -305,7 +316,10 @@ describe("Integration: Disbursement Flow", () => {
     });
 
     expect(disbursement?.beneficiary).not.toBeNull();
-    expect(disbursement?.beneficiary?.name).toBe("Alice Smith");
+    expect(disbursement?.beneficiary?.name).toBe('Alice Smith');
     expect(disbursement?.beneficiary?.walletAddress).toBe(ALICE_ADDRESS);
   });
 });
+import { beforeEach, afterEach, vi } from 'vitest';
+beforeEach(() => vi.useFakeTimers());
+afterEach(() => { vi.clearAllTimers(); vi.useRealTimers(); });

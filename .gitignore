@@ -30,5 +30,11 @@ dist-ssr
 .env
 .env.local
 .env.*.local
+.env.*
+!.env.example
 sdn_enhanced.xml
 code-review-report.html
+
+# Browser test artifacts
+/test-results/
+/playwright-report/

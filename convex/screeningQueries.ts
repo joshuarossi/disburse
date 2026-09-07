@@ -2,61 +2,13 @@ import { v } from "convex/values";
 import { internalQuery, query } from "./_generated/server";
 import { Id } from "./_generated/dataModel";
 import { requireOrgAccess } from "./lib/rbac";
-
-// ─── Internal queries (used by screening actions) ───────────────────────────────
-
-// Search SDN entries by name using full-text search index.
-// Returns candidate matches (up to 256) for the given search terms.
-export const searchSdnByName = internalQuery({
-  args: {
-    searchTerms: v.array(v.string()),
-  },
-  handler: async (ctx, args) => {
-    const allCandidates = [];
-
-    for (const term of args.searchTerms) {
-      if (!term.trim()) continue;
-      const results = await ctx.db
-        .query("sdnEntries")
-        .withSearchIndex("search_primaryName", (q) => q.search("primaryName", term))
-        .take(64);
-      allCandidates.push(...results);
-    }
-
-    // Deduplicate by sdnId
-    const seen = new Set<number>();
-    return allCandidates.filter((entry) => {
-      if (seen.has(entry.sdnId)) return false;
-      seen.add(entry.sdnId);
-      return true;
-    });
-  },
-});
-
-export const getBeneficiary = internalQuery({
-  args: {
-    beneficiaryId: v.id("beneficiaries"),
-  },
-  handler: async (ctx, args) => {
-    return await ctx.db.get(args.beneficiaryId);
-  },
-});
-
-export const getActiveBeneficiariesForOrg = internalQuery({
-  args: {
-    orgId: v.id("orgs"),
-  },
-  handler: async (ctx, args) => {
-    return await ctx.db
-      .query("beneficiaries")
-      .withIndex("by_org_active", (q) =>
-        q.eq("orgId", args.orgId).eq("isActive", true)
-      )
-      .collect();
-  },
-});
-
-// Internal query to verify access to a beneficiary's org
+import { sourceRecord } from "./ofacData";
+import {
+  screeningEvidenceKey,
+  screeningIssue,
+} from "../shared/screeningEvidence";
+import { checkRecipientScreening } from "./lib/screeningPolicy";
+const readers = ["admin", "approver", "initiator", "clerk", "viewer"] as const;
 export const verifyBeneficiaryAccess = internalQuery({
   args: {
     beneficiaryId: v.id("beneficiaries"),
@@ -67,95 +19,138 @@ export const verifyBeneficiaryAccess = internalQuery({
         v.literal("approver"),
         v.literal("initiator"),
         v.literal("clerk"),
-        v.literal("viewer")
-      )
+        v.literal("viewer"),
+      ),
     ),
   },
   handler: async (ctx, args): Promise<{ orgId: Id<"orgs"> }> => {
-    const beneficiary = await ctx.db.get(args.beneficiaryId);
-    if (!beneficiary) throw new Error("Beneficiary not found");
-
-    await requireOrgAccess(ctx, beneficiary.orgId, args.sessionToken, args.allowedRoles);
-    return { orgId: beneficiary.orgId };
+    const recipient = await ctx.db.get(args.beneficiaryId);
+    if (!recipient) throw new Error("Recipient not found.");
+    await requireOrgAccess(
+      ctx,
+      recipient.orgId,
+      args.sessionToken,
+      args.allowedRoles,
+    );
+    return { orgId: recipient.orgId };
   },
 });
-
-// ─── Public queries ─────────────────────────────────────────────────────────────
-
-// Get screening result for a single beneficiary
 export const getScreeningResult = query({
-  args: {
-    beneficiaryId: v.id("beneficiaries"),
-    sessionToken: v.string(),
-  },
+  args: { beneficiaryId: v.id("beneficiaries"), sessionToken: v.string() },
   handler: async (ctx, args) => {
-
-    const beneficiary = await ctx.db.get(args.beneficiaryId);
-    if (!beneficiary) return null;
-
-    await requireOrgAccess(ctx, beneficiary.orgId, args.sessionToken, [
-      "admin", "approver", "initiator", "clerk", "viewer",
-    ]);
-
-    return await ctx.db
+    const recipient = await ctx.db.get(args.beneficiaryId);
+    if (!recipient) return null;
+    const { membership } = await requireOrgAccess(
+      ctx,
+      recipient.orgId,
+      args.sessionToken,
+      [...readers],
+    );
+    const result = await ctx.db
       .query("screeningResults")
-      .filter((q) => q.eq(q.field("beneficiaryId"), args.beneficiaryId))
-      .first();
+      .withIndex("by_beneficiary", (q) => q.eq("beneficiaryId", recipient._id))
+      .unique();
+    const source = await sourceRecord(ctx),
+      org = await ctx.db.get(recipient.orgId);
+    if (!result)
+      return {
+        _id: undefined,
+        runId: undefined,
+        datasetId: undefined,
+        status: "pending" as const,
+        matches: [],
+        screenedAt: undefined,
+        reviewedAt: undefined,
+        reviewExpiresAt: undefined,
+        issue: screeningIssue(
+          recipient,
+          null,
+          source,
+          org?.screeningMaxAgeHours,
+        ),
+        evidenceKey: undefined,
+        input: undefined,
+        dataset: null,
+        canReview: false,
+        canRerun: membership.role !== "viewer",
+        decisions: [],
+        checks: [],
+      };
+    const run = result.runId ? await ctx.db.get(result.runId) : null;
+    const dataset = result.datasetId
+      ? await ctx.db.get(result.datasetId)
+      : null;
+    const issue = screeningIssue(
+      recipient,
+      result,
+      source,
+      org?.screeningMaxAgeHours,
+    );
+    const decisions = await ctx.db
+      .query("screeningDecisions")
+      .withIndex("by_recipient", (q) => q.eq("beneficiaryId", recipient._id))
+      .order("desc")
+      .take(10);
+    const checks = await ctx.db
+      .query("screeningRuns")
+      .withIndex("by_recipient", (q) => q.eq("beneficiaryId", recipient._id))
+      .order("desc")
+      .take(5);
+    return {
+      ...result,
+      issue,
+      evidenceKey: screeningEvidenceKey(result),
+      input: run?.input,
+      dataset,
+      canReview:
+        ["admin", "approver"].includes(membership.role) &&
+        !screeningIssue(
+          recipient,
+          { ...result, status: "clear" },
+          source,
+          org?.screeningMaxAgeHours,
+        ),
+      canRerun: membership.role !== "viewer",
+      decisions,
+      checks: checks.map((c) => ({
+        id: c._id,
+        screenedAt: c.screenedAt,
+        status: c.status,
+        datasetId: c.datasetId,
+        matchCount: c.matches.length,
+        error: c.error,
+      })),
+    };
   },
 });
-
-// Get screening results for all beneficiaries in an org
 export const listScreeningResults = query({
   args: {
     orgId: v.id("orgs"),
     sessionToken: v.string(),
-    statusFilter: v.optional(
-      v.union(
-        v.literal("clear"),
-        v.literal("potential_match"),
-        v.literal("confirmed_match"),
-        v.literal("false_positive"),
-        v.literal("pending")
-      )
-    ),
+    statusFilter: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-
-    await requireOrgAccess(ctx, args.orgId, args.sessionToken, [
-      "admin", "approver", "initiator", "clerk", "viewer",
-    ]);
-
+    await requireOrgAccess(ctx, args.orgId, args.sessionToken, [...readers]);
     const results = await ctx.db
       .query("screeningResults")
-      .filter((q) => q.eq(q.field("orgId"), args.orgId))
-      .collect();
-
-    if (args.statusFilter && args.statusFilter !== "pending") {
-      return results.filter((r) => r.status === args.statusFilter);
-    }
-
-    return results;
+      .withIndex("by_org", (q) => q.eq("orgId", args.orgId))
+      .take(1001);
+    if (results.length > 1000)
+      throw new Error(
+        "Open recipient records to review a directory larger than 1,000 screening results.",
+      );
+    return args.statusFilter && args.statusFilter !== "pending"
+      ? results.filter((r) => r.status === args.statusFilter)
+      : results;
   },
 });
-
-// Get screening enforcement setting for an org
 export const getScreeningEnforcement = query({
-  args: {
-    orgId: v.id("orgs"),
-    sessionToken: v.string(),
-  },
+  args: { orgId: v.id("orgs"), sessionToken: v.string() },
   handler: async (ctx, args) => {
-
-    await requireOrgAccess(ctx, args.orgId, args.sessionToken, [
-      "admin", "approver", "initiator", "clerk", "viewer",
-    ]);
-
-    const org = await ctx.db.get(args.orgId);
-    return org?.screeningEnforcement ?? "off";
+    await requireOrgAccess(ctx, args.orgId, args.sessionToken, [...readers]);
+    return (await ctx.db.get(args.orgId))?.screeningEnforcement ?? "off";
   },
 });
-
-// Check if beneficiaries are flagged before creating a disbursement
 export const checkBeneficiaries = query({
   args: {
     orgId: v.id("orgs"),
@@ -163,120 +158,31 @@ export const checkBeneficiaries = query({
     beneficiaryIds: v.array(v.id("beneficiaries")),
   },
   handler: async (ctx, args) => {
-
-    // Check access
-    await requireOrgAccess(ctx, args.orgId, args.sessionToken, [
-      "admin", "approver", "initiator", "clerk", "viewer",
-    ]);
-
-    // Get org enforcement setting
-    const org = await ctx.db.get(args.orgId);
-    const enforcement = org?.screeningEnforcement ?? "off";
-
-    if (enforcement === "off") return { clear: true, flagged: [], enforcement };
-
-    // Check screening results for each beneficiary
-    const flagged: Array<{
-      beneficiaryId: string;
-      beneficiaryName: string;
-      status: string;
-    }> = [];
-
-    for (const beneficiaryId of args.beneficiaryIds) {
-      const result = await ctx.db
-        .query("screeningResults")
-        .filter((q) => q.eq(q.field("beneficiaryId"), beneficiaryId))
-        .first();
-
-      if (
-        result &&
-        (result.status === "potential_match" || result.status === "confirmed_match")
-      ) {
-        const beneficiary = await ctx.db.get(result.beneficiaryId);
-        flagged.push({
-          beneficiaryId,
-          beneficiaryName: beneficiary?.name ?? "Unknown",
-          status: result.status,
-        });
-      }
-    }
-
-    return {
-      clear: flagged.length === 0,
-      flagged,
-      enforcement,
-    };
+    await requireOrgAccess(ctx, args.orgId, args.sessionToken, [...readers]);
+    return checkRecipientScreening(ctx, args.orgId, args.beneficiaryIds);
   },
 });
-
-// Check if any recipients of a disbursement are flagged
 export const checkDisbursementRecipients = query({
-  args: {
-    disbursementId: v.id("disbursements"),
-    sessionToken: v.string(),
-  },
+  args: { disbursementId: v.id("disbursements"), sessionToken: v.string() },
   handler: async (ctx, args) => {
-    const disbursement = await ctx.db.get(args.disbursementId);
-    if (!disbursement) return { clear: true, flagged: [], enforcement: "off" as const };
-
-    // Check access
-    await requireOrgAccess(ctx, disbursement.orgId, args.sessionToken, [
-      "admin", "approver", "initiator", "clerk", "viewer",
-    ]);
-
-    // Get org enforcement setting
-    const org = await ctx.db.get(disbursement.orgId);
-    const enforcement = org?.screeningEnforcement ?? "off";
-
-    if (enforcement === "off") return { clear: true, flagged: [], enforcement };
-
-    // Collect beneficiary IDs
-    const beneficiaryIds: string[] = [];
-
-    if (disbursement.type === "batch") {
-      const recipients = await ctx.db
-        .query("disbursementRecipients")
-        .withIndex("by_disbursement", (q) =>
-          q.eq("disbursementId", args.disbursementId)
-        )
-        .collect();
-      for (const r of recipients) {
-        beneficiaryIds.push(r.beneficiaryId);
-      }
-    } else if (disbursement.beneficiaryId) {
-      beneficiaryIds.push(disbursement.beneficiaryId);
-    }
-
-    // Check screening results for each
-    const flagged: Array<{
-      beneficiaryId: string;
-      beneficiaryName: string;
-      status: string;
-    }> = [];
-
-    for (const beneficiaryId of beneficiaryIds) {
-      const result = await ctx.db
-        .query("screeningResults")
-        .filter((q) => q.eq(q.field("beneficiaryId"), beneficiaryId))
-        .first();
-
-      if (
-        result &&
-        (result.status === "potential_match" || result.status === "confirmed_match")
-      ) {
-        const beneficiary = await ctx.db.get(result.beneficiaryId);
-        flagged.push({
-          beneficiaryId,
-          beneficiaryName: beneficiary?.name ?? "Unknown",
-          status: result.status,
-        });
-      }
-    }
-
-    return {
-      clear: flagged.length === 0,
-      flagged,
-      enforcement,
-    };
+    const payment = await ctx.db.get(args.disbursementId);
+    if (!payment) throw new Error("Payment not found.");
+    await requireOrgAccess(ctx, payment.orgId, args.sessionToken, [...readers]);
+    const recipients =
+      payment.type === "batch"
+        ? await ctx.db
+            .query("disbursementRecipients")
+            .withIndex("by_disbursement", (q) =>
+              q.eq("disbursementId", payment._id),
+            )
+            .take(1001)
+        : payment.beneficiaryId
+          ? [{ beneficiaryId: payment.beneficiaryId }]
+          : [];
+    return checkRecipientScreening(
+      ctx,
+      payment.orgId,
+      recipients.map((r) => r.beneficiaryId),
+    );
   },
 });

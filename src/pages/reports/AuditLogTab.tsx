@@ -1,13 +1,13 @@
-import { useMemo, useState } from 'react';
-import { useQuery } from 'convex/react';
-import { useTranslation } from 'react-i18next';
-import { cn } from '@/lib/utils';
-import { Button } from '@/components/ui/button';
-import { Id } from '../../../convex/_generated/dataModel';
-import { api } from '../../../convex/_generated/api';
-import { getSessionToken } from '@/lib/session';
-import { exportToCsv, generateFilename } from '@/lib/csv';
-import { ClipboardList, Download, Filter, Loader2, X } from 'lucide-react';
+import { useMemo, useState } from "react";
+import { useQuery } from "convex/react";
+import { useTranslation } from "react-i18next";
+import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
+import { Id } from "../../../convex/_generated/dataModel";
+import { api } from "../../../convex/_generated/api";
+import { getSessionToken } from "@/lib/session";
+import { exportToCsv, generateFilename } from "@/lib/csv";
+import { ClipboardList, Download, Filter, Loader2, X } from "lucide-react";
 
 interface AuditLogTabProps {
   orgId: string | undefined;
@@ -19,57 +19,82 @@ export function AuditLogTab({ orgId, address }: AuditLogTabProps) {
 
   // Filter state
   const [showFilters, setShowFilters] = useState(false);
-  const [dateFrom, setDateFrom] = useState('');
-  const [dateTo, setDateTo] = useState('');
-  const [userFilter, setUserFilter] = useState('');
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
+  const [userFilter, setUserFilter] = useState("");
   const [actionFilter, setActionFilter] = useState<string[]>([]);
 
   const ACTION_CATEGORIES = [
-    { category: t('reports.auditActions.disbursement'), actions: ['disbursement.created', 'disbursement.pending', 'disbursement.proposed', 'disbursement.executed', 'disbursement.failed', 'disbursement.cancelled'] },
-    { category: t('reports.auditActions.beneficiary'), actions: ['beneficiary.created', 'beneficiary.updated'] },
-    { category: t('reports.auditActions.team'), actions: ['member.invited', 'member.roleUpdated', 'member.removed'] },
-    { category: t('reports.auditActions.safe'), actions: ['safe.linked', 'safe.unlinked'] },
-    { category: t('reports.auditActions.org'), actions: ['org.created', 'org.updated'] },
+    {
+      category: t("reports.auditActions.disbursement"),
+      actions: [
+        "disbursement.created",
+        "disbursement.pending",
+        "disbursement.proposed",
+        "disbursement.executed",
+        "disbursement.failed",
+        "disbursement.cancelled",
+      ],
+    },
+    {
+      category: t("reports.auditActions.beneficiary"),
+      actions: ["beneficiary.created", "beneficiary.updated"],
+    },
+    {
+      category: t("reports.auditActions.team"),
+      actions: ["member.invited", "member.roleUpdated", "member.removed"],
+    },
+    {
+      category: t("reports.auditActions.safe"),
+      actions: ["safe.linked", "safe.unlinked"],
+    },
+    {
+      category: t("reports.auditActions.org"),
+      actions: ["org.created", "org.updated"],
+    },
   ];
 
   // Query args
   const queryArgs = useMemo(() => {
     if (!orgId || !address) return null;
     return {
-      orgId: orgId as Id<'orgs'>,
+      orgId: orgId as Id<"orgs">,
       sessionToken: getSessionToken() ?? "",
       startDate: dateFrom ? new Date(dateFrom).getTime() : undefined,
       endDate: dateTo ? new Date(dateTo).getTime() : undefined,
-      userId: userFilter ? userFilter as Id<'users'> : undefined,
+      userId: userFilter ? (userFilter as Id<"users">) : undefined,
       actionType: actionFilter.length > 0 ? actionFilter : undefined,
     };
   }, [orgId, address, dateFrom, dateTo, userFilter, actionFilter]);
 
-  const reportData = useQuery(
-    api.audit.list,
-    queryArgs ?? 'skip'
-  );
+  const reportData = useQuery(api.audit.list, queryArgs ?? "skip");
 
   const members = useQuery(
     api.orgs.listMembers,
     orgId && address && getSessionToken()
-      ? { orgId: orgId as Id<'orgs'>, sessionToken: getSessionToken() ?? "" }
-      : 'skip'
+      ? { orgId: orgId as Id<"orgs">, sessionToken: getSessionToken() ?? "" }
+      : "skip",
   );
 
   const isLoading = reportData === undefined;
-  const activeFilterCount = [dateFrom || dateTo, userFilter, actionFilter.length > 0].filter(Boolean).length;
+  const activeFilterCount = [
+    dateFrom || dateTo,
+    userFilter,
+    actionFilter.length > 0,
+  ].filter(Boolean).length;
 
   const toggleAction = (action: string) => {
     setActionFilter((prev) =>
-      prev.includes(action) ? prev.filter((a) => a !== action) : [...prev, action]
+      prev.includes(action)
+        ? prev.filter((a) => a !== action)
+        : [...prev, action],
     );
   };
 
   const clearFilters = () => {
-    setDateFrom('');
-    setDateTo('');
-    setUserFilter('');
+    setDateFrom("");
+    setDateTo("");
+    setUserFilter("");
     setActionFilter([]);
   };
 
@@ -77,33 +102,37 @@ export function AuditLogTab({ orgId, address }: AuditLogTabProps) {
     if (!reportData?.length) return;
 
     const columns = [
-      { key: 'timestamp', label: t('reports.export.timestamp') },
-      { key: 'user', label: t('reports.export.user') },
-      { key: 'wallet', label: t('reports.export.wallet') },
-      { key: 'action', label: t('reports.export.action') },
-      { key: 'details', label: t('reports.export.details') },
+      { key: "timestamp", label: t("reports.export.timestamp") },
+      { key: "user", label: t("reports.export.user") },
+      { key: "wallet", label: t("reports.export.wallet") },
+      { key: "action", label: t("reports.export.action") },
+      { key: "details", label: t("reports.export.details") },
     ];
 
     const rows = reportData.map((item) => ({
       timestamp: new Date(item.timestamp).toLocaleString(),
-      user: item.actor?.walletAddress || 'System',
-      wallet: item.actor?.walletAddress || '',
+      user: item.actor?.walletAddress || "System",
+      wallet: item.actor?.walletAddress || "",
       action: formatAction(item.action),
       details: formatDetails(item),
     }));
 
-    exportToCsv(generateFilename('audit_log'), rows, columns);
+    exportToCsv(generateFilename("audit_log"), rows, columns);
   };
 
   const formatAction = (action: string): string => {
-    const parts = action.split('.');
+    const parts = action.split(".");
     if (parts.length === 2) {
       return `${parts[0].charAt(0).toUpperCase() + parts[0].slice(1)} ${parts[1].charAt(0).toUpperCase() + parts[1].slice(1)}`;
     }
     return action;
   };
 
-  const formatDetails = (item: { objectType: string; objectId: string; metadata?: unknown }): string => {
+  const formatDetails = (item: {
+    objectType: string;
+    objectId: string;
+    metadata?: unknown;
+  }): string => {
     const meta = item.metadata as Record<string, unknown> | undefined;
     if (meta?.beneficiaryName) return `Beneficiary: ${meta.beneficiaryName}`;
     if (meta?.memberName) return `Member: ${meta.memberName}`;
@@ -118,14 +147,14 @@ export function AuditLogTab({ orgId, address }: AuditLogTabProps) {
         <button
           onClick={() => setShowFilters(!showFilters)}
           className={cn(
-            'flex items-center gap-2 rounded-lg border px-4 py-2 text-sm font-medium transition-colors',
+            "flex items-center gap-2 rounded-lg border px-4 py-2 text-sm font-medium transition-colors",
             activeFilterCount > 0
-              ? 'border-accent-500/50 bg-accent-500/10 text-accent-400'
-              : 'border-white/10 text-slate-400 hover:bg-navy-800 hover:text-white'
+              ? "border-accent-500/50 bg-accent-500/10 text-accent-400"
+              : "border-white/10 text-slate-400 hover:bg-navy-800 hover:text-white",
           )}
         >
           <Filter className="h-4 w-4" />
-          {t('common.filters')}
+          {t("common.filters")}
           {activeFilterCount > 0 && (
             <span className="rounded-full bg-accent-500 px-2 py-0.5 text-xs text-navy-950">
               {activeFilterCount}
@@ -139,7 +168,7 @@ export function AuditLogTab({ orgId, address }: AuditLogTabProps) {
             className="flex items-center gap-1 text-sm text-slate-400 hover:text-white"
           >
             <X className="h-4 w-4" />
-            {t('common.clearAll')}
+            {t("common.clearAll")}
           </button>
         )}
 
@@ -151,7 +180,7 @@ export function AuditLogTab({ orgId, address }: AuditLogTabProps) {
             size="sm"
           >
             <Download className="mr-2 h-4 w-4" />
-            {t('reports.export.csv')}
+            {t("reports.export.csv")}
           </Button>
         </div>
       </div>
@@ -163,18 +192,22 @@ export function AuditLogTab({ orgId, address }: AuditLogTabProps) {
             {/* Date Range */}
             <div className="space-y-2">
               <label className="text-sm font-medium text-slate-300">
-                {t('reports.filters.dateRange')}
+                {t("reports.filters.dateRange")}
               </label>
-              <div className="flex items-center gap-2">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
                 <input
                   type="date"
+                  aria-label="Start date"
                   value={dateFrom}
                   onChange={(e) => setDateFrom(e.target.value)}
                   className="flex-1 rounded-lg border border-white/10 bg-navy-800 px-3 py-2 text-sm text-white"
                 />
-                <span className="text-slate-500">{t('disbursements.filters.to')}</span>
+                <span className="text-slate-500">
+                  {t("disbursements.filters.to")}
+                </span>
                 <input
                   type="date"
+                  aria-label="End date"
                   value={dateTo}
                   onChange={(e) => setDateTo(e.target.value)}
                   className="flex-1 rounded-lg border border-white/10 bg-navy-800 px-3 py-2 text-sm text-white"
@@ -185,19 +218,20 @@ export function AuditLogTab({ orgId, address }: AuditLogTabProps) {
             {/* User */}
             <div className="space-y-2">
               <label className="text-sm font-medium text-slate-300">
-                {t('reports.filters.user')}
+                {t("reports.filters.user")}
               </label>
               <select
+                aria-label={t("reports.filters.user")}
                 value={userFilter}
                 onChange={(e) => setUserFilter(e.target.value)}
                 className="w-full rounded-lg border border-white/10 bg-navy-800 px-3 py-2 text-sm text-white"
               >
-                <option value="">{t('reports.filters.allUsers')}</option>
+                <option value="">{t("reports.filters.allUsers")}</option>
                 {members?.map((m) => {
                   if (!m) return null;
                   return (
                     <option key={m.userId} value={m.userId}>
-                      {m.name || m.walletAddress?.slice(0, 10) + '...'}
+                      {m.name || m.walletAddress?.slice(0, 10) + "..."}
                     </option>
                   );
                 })}
@@ -207,25 +241,27 @@ export function AuditLogTab({ orgId, address }: AuditLogTabProps) {
             {/* Action Type */}
             <div className="space-y-2 sm:col-span-2 lg:col-span-1">
               <label className="text-sm font-medium text-slate-300">
-                {t('reports.filters.actionType')}
+                {t("reports.filters.actionType")}
               </label>
               <div className="space-y-2">
                 {ACTION_CATEGORIES.map((cat) => (
                   <div key={cat.category}>
-                    <p className="text-xs text-slate-500 mb-1">{cat.category}</p>
+                    <p className="text-xs text-slate-500 mb-1">
+                      {cat.category}
+                    </p>
                     <div className="flex flex-wrap gap-1">
                       {cat.actions.map((action) => (
                         <button
                           key={action}
                           onClick={() => toggleAction(action)}
                           className={cn(
-                            'rounded-full px-2 py-0.5 text-xs font-medium transition-colors',
+                            "rounded-full px-2 py-0.5 text-xs font-medium transition-colors",
                             actionFilter.includes(action)
-                              ? 'bg-accent-500/20 text-accent-400'
-                              : 'bg-navy-800 text-slate-400 hover:text-white'
+                              ? "bg-accent-500/20 text-accent-400"
+                              : "bg-navy-800 text-slate-400 hover:text-white",
                           )}
                         >
-                          {action.split('.')[1]}
+                          {action.split(".")[1]}
                         </button>
                       ))}
                     </div>
@@ -245,8 +281,12 @@ export function AuditLogTab({ orgId, address }: AuditLogTabProps) {
       ) : !reportData?.length ? (
         <div className="rounded-xl border border-dashed border-white/20 bg-navy-900/30 p-12 text-center">
           <ClipboardList className="mx-auto h-12 w-12 text-slate-600" />
-          <h3 className="mt-4 text-lg font-medium text-white">{t('reports.empty.audit.title')}</h3>
-          <p className="mt-2 text-slate-400">{t('reports.empty.audit.description')}</p>
+          <h3 className="mt-4 text-lg font-medium text-white">
+            {t("reports.empty.audit.title")}
+          </h3>
+          <p className="mt-2 text-slate-400">
+            {t("reports.empty.audit.description")}
+          </p>
         </div>
       ) : (
         <>
@@ -256,16 +296,16 @@ export function AuditLogTab({ orgId, address }: AuditLogTabProps) {
               <thead className="bg-navy-900/50">
                 <tr>
                   <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-400">
-                    {t('reports.table.timestamp')}
+                    {t("reports.table.timestamp")}
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-400">
-                    {t('reports.table.user')}
+                    {t("reports.table.user")}
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-400">
-                    {t('reports.table.action')}
+                    {t("reports.table.action")}
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-400">
-                    {t('reports.table.details')}
+                    {t("reports.table.details")}
                   </th>
                 </tr>
               </thead>
@@ -279,7 +319,7 @@ export function AuditLogTab({ orgId, address }: AuditLogTabProps) {
                       <p className="font-mono text-xs text-slate-300">
                         {item.actor?.walletAddress
                           ? `${item.actor.walletAddress.slice(0, 6)}...${item.actor.walletAddress.slice(-4)}`
-                          : 'System'}
+                          : "System"}
                       </p>
                     </td>
                     <td className="whitespace-nowrap px-4 py-3">
@@ -299,7 +339,10 @@ export function AuditLogTab({ orgId, address }: AuditLogTabProps) {
           {/* Mobile Cards */}
           <div className="lg:hidden space-y-3">
             {reportData.map((item) => (
-              <div key={item._id} className="rounded-xl border border-white/10 bg-navy-900/50 p-4">
+              <div
+                key={item._id}
+                className="rounded-xl border border-white/10 bg-navy-900/50 p-4"
+              >
                 <div className="flex items-start justify-between">
                   <div>
                     <span className="inline-flex items-center rounded-full bg-navy-800 px-2.5 py-0.5 text-xs font-medium text-slate-300">
@@ -314,7 +357,7 @@ export function AuditLogTab({ orgId, address }: AuditLogTabProps) {
                   <span className="font-mono">
                     {item.actor?.walletAddress
                       ? `${item.actor.walletAddress.slice(0, 6)}...${item.actor.walletAddress.slice(-4)}`
-                      : 'System'}
+                      : "System"}
                   </span>
                   <span>{new Date(item.timestamp).toLocaleString()}</span>
                 </div>
@@ -325,7 +368,7 @@ export function AuditLogTab({ orgId, address }: AuditLogTabProps) {
           {/* Summary */}
           <div className="rounded-xl border border-white/10 bg-navy-900/50 p-4">
             <p className="text-sm text-slate-400">
-              {t('reports.summary.events', { count: reportData.length })}
+              {t("reports.summary.events", { count: reportData.length })}
             </p>
           </div>
         </>
@@ -337,4 +380,3 @@ export function AuditLogTab({ orgId, address }: AuditLogTabProps) {
 // ============================================================================
 // Shared Components
 // ============================================================================
-

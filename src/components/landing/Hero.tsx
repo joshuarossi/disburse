@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { useTranslation } from 'react-i18next'
-import { Button } from '@/components/ui/button'
+import { buttonVariants } from '@/components/ui/button'
 import { ArrowRight, Shield } from 'lucide-react'
 
 export function Hero() {
@@ -70,28 +70,21 @@ export function Hero() {
             transition={{ duration: 0.5, delay: 0.3 }}
             className="mt-10 flex flex-col gap-4 sm:flex-row"
           >
-            <Link to="/login">
-              <Button size="lg" className="group">
+            <Link to="/login" className={buttonVariants({ size: 'lg', className: 'group' })}>
                 {t('landing.hero.tryForFree')}
                 <ArrowRight className="transition-transform group-hover:translate-x-1" />
-              </Button>
-            </Link>
-            <a href="#features">
-              <Button variant="secondary" size="lg">
+              </Link>
+            <a href="#features" className={buttonVariants({ size: 'lg', variant: 'secondary' })}>
                 {t('landing.hero.learnMore')}
-              </Button>
-            </a>
+              </a>
           </motion.div>
 
           {/* Trust indicators */}
           <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ duration: 0.5, delay: 0.5 }}
             className="mt-16 flex flex-col items-center gap-4"
           >
             <p className="text-sm text-slate-500">{t('landing.hero.trustIndicators')}</p>
-            <div className="flex items-center gap-8 opacity-60">
+            <div className="flex items-center gap-8">
               <div className="flex items-center gap-2 text-slate-400">
                 <svg className="h-6 w-6" viewBox="0 0 24 24" fill="currentColor">
                   <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>

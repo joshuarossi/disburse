@@ -1,20 +1,123 @@
-# TODOS
+# Disburse v2 implementation TODO
 
-- Failed transactions should be able to be retried ✅
-- Find out how to get Safe wallet to pay gas fees for tx's (using Gelato) ✅
-- Multi Chain, balances across all chains, beneficiary chain specification + token preference ✅
-- Scheduled Payments (using Gelato) ✅
-- Tags, creating groups of users, so that I can create batches quickly to a given group ✅
-- Fix batch naming for disbursement list/reports ✅
-- update logo to take you to the landing page ✅
-- update error messages to be nice toasts ✅
-- add infura for RPC  ✅
-- Calendar + Forecasted amount of required funds ✅
-- Improved Onboarding Experience, collect name, create team, setup safe ✅
-- Automatically add disburse as a business beneficiary, with a configurable address and chain ✅
-- Fix linting errors ✅
-- Charts showing balances over time, and disbursements and deposits by day (bar chart) for the dashboard ✅
-- Fix MultiSig/Teams/Roles/Safe, right now our permissions do not match those of Safe, we need to align those
-- Emails
-- test trial end for feature restriction, how would that work
-- Invoices
+This is the active program. Historical POC checkmarks are preserved in [the archive](docs/TODOS_POC_ARCHIVE.md), not treated as launch evidence. Findings and acceptance criteria: [readiness review](docs/READINESS_REVIEW_2026-09-06.md).
+
+Latest implementation and acceptance evidence: [September 6 fix pass](docs/READINESS_FIX_PASS_2026-09-06.md). Completed items below have code and verification evidence. Partial work remains unchecked.
+
+Product direction: target a fresh v2 setup. Preserving POC behavior and migrating unused POC records are not release requirements. Keep payment evidence, audit history and recovery controls needed for ordinary ongoing use; do not erase an existing workspace without a separate reset instruction.
+
+## P0 — trust and correctness
+
+- [x] R01 Separate production, testnet and unknown-network payment activity in navigation, balances, reports and exports. Business activity is the default. Recipients, bills and team settings remain shared, as the activity notice explains.
+- [x] R02 Use configured chain + token contract identities for accounting; exclude same-symbol impostors from canonical totals. Pin contracts on new payments. Historical payments without a contract use the existing configured asset for their chain and symbol.
+- [x] R03 Restore and verify Team's Members, Payment limits and Delegated spending in development and built browser sessions. Deferred the large policy dependency and fixed the observed Safe API checksum failure. The earlier module-download failure did not recur in current sessions; its original cause was not established.
+- [x] R04 Keep navigation available when a page fails; make errors and recovery specific to the attempted action. Forced module-download failure, navigation and reload recovery pass in the browser.
+- [x] R05 Verify current account identity, exact balances, supported currencies, owner thresholds and app approval access before preparation. Show managed-fee availability, per-currency shortfalls including all batch fees, refresh failures and native test-gas requirements. Reuse the check in Accounts. Live checks verified all four business accounts after adding Base RPC fallback; live managed settlement remains Q02.
+- [x] R06 Store the exact server-built payment and direct/nested signatures in one in-app approval flow. New payments no longer depend on a Safe service POST. Resume the original hash after interruption; retain read-only recovery of earlier signed evidence. Concurrent nonce/signature writes and changed intent have regression coverage.
+- [ ] R07 Rehearse interrupted native broadcasts and managed submissions; expose recovery tied to the original transaction. Native recovery now saves a block checkpoint, checks the original Safe hash in the service or network logs, and verifies receipts in a bounded background queue. A real 0.000001 Sepolia USDC payment reconciled with its broadcast hash withheld from the app. Built-browser native rejection/reload/retry passed for nested owner and delegated payments. The delegated payment reached Paid through background module-log recovery with its wallet hash withheld and browser closed. Managed lost-response recovery now checks both Safe event encodings without resubmitting; live managed-provider interruption remains acceptance work.
+- [x] R08 Require reviewed payout records; new/imported details and replacements enter a durable review queue. Keep approved instructions unchanged until review, require another approver when available and independent-channel evidence for every approval. Payment snapshots carry the reviewed version; proposal, approval, native/delegated preparation and managed submission reject stale instructions. Full-address lookalike warnings, unsolicited dust isolation, legacy first review, decision replay and queued-send holds have regression coverage. This is app enforcement; previously signed Safe transactions retain their on-chain authority.
+- [x] R09 Save deposit pages and continuation atomically, with a completed scan watermark, per-transfer/account identity, legacy-record reconciliation, incremental overlap and periodic full scans. Resume after interruption, respect provider backoff and pause archived accounts. Migrated deprecated Safe URLs to current endpoints without following arbitrary redirects. Tests cover 30 pages, equal timestamps and separate logs; all four connected business-account scans completed after live rate-limit retries.
+- [x] R10 Replace vulnerable legacy Safe allowance modules for new grants and payments. Pin the fixed 1.0.0 release and full runtime hash on five verified networks; reject legacy policy approval and queued submission while preserving revocation and existing-payment reconciliation. Source compilation matches deployed executable code. Existing on-chain grants require owner-reviewed replacement; no production grant was changed.
+
+## P1 — main finance workflow
+
+- [x] U01 New payment now follows recipients + amounts → timing → review. Saved instructions cannot be turned off; collapsed defaults apply only to missing preferences. Mixed groups retain exact assets, full addresses are reviewable and draft saving is explicit. Desktop/light and mobile/dark stories and accessibility checks pass.
+- [x] U02 Separate approvals, drafts and payment exceptions on Overview. Show current balances, planned payments and the remaining amount by account/currency, using the same live account checks. Missing history prevents a complete-plan total; unquoted fees and the absence of fund reservations are explicit. Upcoming payments and overdue bills remain actionable.
+- [x] U03 Consolidate payment history under Payments. Schedules shows recurring instructions, the next draft/pay date, schedule owner and latest generated payment. Link to the exact payment or its schedule-filtered history, with organization-bound filtering.
+- [x] U04 Overview now counts reviewed recipients, not merely saved addresses. Recipient review status controls selection; account identity, funding, fee availability and approval access are checked separately in the payment flow.
+- [x] U05 Add reviewed create/update/skip imports with source employee/vendor IDs, including leading zeros and changed emails. Preview full differences; preserve blank fields and approved payout instructions. Conflicting identities, duplicate rows and stale previews are blocked. A durable import receipt recovers lost responses without repeating writes. Browser checks cover desktop/light, mobile/dark and recovery. Imports are bounded to 500 rows against a directory of at most 10,000 records; larger directories and imports remain scale work.
+- [x] U06 Add private recipient detail forms with seven-day expiry, replacement/revocation, directory tracking and request history. Exact currency/network choices are limited to active accounts in the selected environment. Changes to the recipient or requester access invalidate open links. Submissions enter payout review without replacing approved details; retries preserve one submission and receipt. Verified a real built-browser submission and reload against the isolated Sepolia QA organization. Links are copied for sharing; no email delivery is implied.
+- [x] U07 Add email-first invitations with seven-day expiry, encrypted retry-safe delivery, verified email-to-SIWE-wallet binding, optional required wallet, explicit acceptance and seat reservations. Track provider submission, mail-server delivery, bounce and acceptance separately. Resends invalidate old links; revoked/expired links and removed inviters cannot grant access. Wallet invitations remain available with honest sharing instructions. Eleven backend and six browser stories pass; actual mail-provider delivery is separately recorded in the invitation guide.
+- [x] U08 Add per-member access summaries with payment permissions, currency/per-payment/monthly app limits, current account owners and approval thresholds, and remaining/resetting contract grants. Verify one member without scanning the full grant directory; show dormant/legacy grants and failed checks explicitly. Use the selected activity environment as the default account. Eight browser stories and live Base/Sepolia checks pass; batch RPC reads and Base fallback resolved rate-limit failures found during live review.
+- [x] U09 Add admin-managed business account names, audit changes and reuse live approval/balance checks in Accounts. Add-funds guidance preserves the exact network and supported assets; unavailable checks offer refresh. Naming does not change account authority.
+- [x] U11 Support separate Operations, Payroll and Reserves accounts on the same network. Bind payments, bill preparation, draft edits and recurring instructions to the selected account, require a choice when ambiguous, and retain account identity in history and exports. Six backend and four browser stories pass. See [company accounts](docs/FUNDING_ACCOUNTS.md).
+- [x] U12 Implement nested payment signing with bounded, pinned authority discovery, persisted leaf signatures, correct contract-signature offsets and on-chain threshold checks. Nested-only linking and two real Sepolia payments passed, including two-wallet built-browser rejection/reload/retry. Parent balances and transaction nonce stay independent. See [company accounts](docs/FUNDING_ACCOUNTS.md).
+- [x] U13 Replace the direct-owner Safe service policy queue with persisted in-app requests, shared payment/policy nonce reservations, direct/nested approvals and exact fee consent. Grants to one owner of a multisig are permitted; unilateral owners cannot be described as restricted by an allowance. Revocation survives subscription expiry. Native/managed submissions retain recovery. Seventeen backend stories and a real built-browser Sepolia grant → two parent approvals → rejected send/reload/retry → receipt → revoke cycle pass; the test allowance is revoked and account balances are unchanged. See [policy acceptance](docs/SPENDING_POLICY_APPROVALS.md).
+- [x] U14 Add in-app cancellation of signed payments and reserved policy requests with direct/nested approvals, original-nonce replacement, explicit fee review and receipt-based status. Retain original evidence and payment budget until confirmation; reconcile the original if it executes first. Unsigned payment drafts withdraw without gas; policy creation reserves a nonce and requires account cancellation. Fifteen backend and four browser stories plus a two-wallet built Sepolia cancellation pass. See [cancellation acceptance](docs/ACCOUNT_CANCELLATIONS.md).
+- [x] U10 Show exact draft and approval times, coordinator and verified current approvers. Add background in-app review, approaching-deadline, missed-deadline, failure and paused-preparation reminders with personal read receipts, daily late escalation and original-payment recovery links. Ten backend and seven browser stories pass, including races and failed checks; actual background reminders verified in the built workspace. Email/push delivery is not implied. See the [reminder guide](docs/PAYMENT_REMINDERS.md).
+
+## P1 — accounts payable and accounting
+
+- [x] F01 Add private source invoice documents and local PDF/text extraction with reviewed field suggestions. Keep recipient selection, explicit source review, duplicate checks, payment locks and settlement links. Upload and bill receipts recover interrupted responses; sources remain with voided/paid bills. Twelve backend/parser and five real-PDF browser stories pass; actual storage round trip verified in the isolated QA organization. Scanned images require manual entry. See the [source guide](docs/INVOICE_SOURCES.md).
+- [x] F02 Add exact observed-asset filters alongside supported currencies. Canonical currency filters exclude same-symbol impostors; other received assets retain full contract/network identity and stay out of totals. Preserve archived labels, saved history during refresh, manual retry and the next background retry time. Backend and light/desktop + dark/mobile browser stories pass; visual review also removed fiat formatting from unrecognized assets.
+- [ ] F03 Reconcile verified account movements with the customer's existing U.S. GAAP books. Implemented: incoming/outgoing history, payment/fee matching, settlement dates, bill/invoice book references, chart imports and versioned mappings, reviewed functional-currency values, payable/receivable and internal-transfer treatment, customer overpayment liabilities, balanced journals, closed periods, immutable exports, linked corrections and historical opening/closing unit checks. Backend/browser stories and six hosted QA checks pass, including seven real Sepolia movements reconciled to historical balances. Remaining acceptance: actual external-ledger import, customer-specific asset classification/recognition review and a full accountant-led close. The customer's ledger remains the book of record. See [accounting reconciliation](docs/ACCOUNTING_RECONCILIATION.md).
+- [x] F04 Replace obsolete per-network account limits and plan-exclusive core-feature claims with consistent finance terms. Show actual members, reserved invitation seats, saved/archived recipients and connected accounts. Trial and paid access fall back to Free; core payment and scheduled-send expiry gates are removed; three locales preserve the USD price and 30-day period. Backend and five browser stories pass. The public offer is Free, Team and Pro; existing paid receipts retain their terms.
+- [ ] F05 Evaluate pricing against actual pilot usage and support costs; avoid unbounded support promises.
+
+## P1 — accounts receivable (additional feature)
+
+Build details and research: [receivables design](docs/ACCOUNTS_RECEIVABLE.md).
+
+- [x] A01 Compare unique EOAs, Safe per invoice, payment-router references and deterministic forwarders; document custody, cost and recovery tradeoffs.
+- [x] A02 Build an immutable, permissionless forwarder factory. Each invoice address must route only to its fixed organization Safe; no operator signing key or arbitrary withdrawal.
+- [x] A03 Pin factory code and address derivation; bind each invoice to organization, Safe, chain, canonical token and unique salt.
+- [x] A04 Build invoice drafts, numbered customer invoices, due dates, immutable issued instructions and a shareable payment page.
+- [x] A05 Track unpaid, partial, paid, overpaid and overdue from confirmed token transfers, independently of forwarding status. Retain late payments on voided invoices.
+- [x] A06 Add bounded background monitoring, duplicate-event protection, confirmation policy, visible sync errors and manual refresh.
+- [ ] A07 Native-wallet collection is implemented and paid by the customer. The sponsored managed adapter has been removed. Build a managed collection transaction with explicitly authorized stablecoin fees charged to the company account; preserve the gross invoice principal and record the fee separately. Free software usage never covers network or provider fees.
+- [x] A08 Show receiving address, exact requested asset/network, amount remaining, receipt history and funds awaiting forwarding; provide printable invoice and payment QR.
+- [x] A09 Validate wrong token/network, repeated/partial payments, duplicate scans, unauthorized access, factory mismatch and permissionless sweep behavior.
+- [x] A10 Demonstrate a real Sepolia payment to a unique invoice address, forward to the QA Safe and reconcile the invoice. Payment and first collection succeeded; full 0.010001 USDC principal reconciled.
+- [ ] A11 Verify customer-funded managed collection, fee limits, dust handling and recovery without duplicate fees. Independent contract review and live provider reconciliation remain required. See [customer-paid collection](docs/INVOICE_COLLECTIONS.md).
+- [ ] A12 Receivable accounting and account mappings are implemented: original receipt reduces a reviewed receivable or records a customer liability; forwarding is an internal transfer shared with its Safe deposit. Overpayments require a separate liability value. Remaining: invoice attachments, reminders, refunds/credit notes and external-ledger acceptance.
+- [ ] A13 Benchmark cheaper receiving-contract deployments and grouped collections. Preserve immutable destinations and ordinary-transfer support; compare first and repeat collection costs across intended production networks.
+
+## P2 — scale and consistent architecture
+
+- [x] S01 Replace payment/deposit report scans with a resumable activity index, atomic exact-value aggregates, indexed cursor pages and complete bounded exports. Source revisions stop changed/partial downloads; interrupted indexing retains recorded entries and exposes recovery. Full code/browser checks and actual development-database settlement reconciliation pass. Limits and remaining live visual recheck are recorded in the [report guide](docs/FINANCE_REPORTS.md).
+- [ ] S02 Share account readiness, asset identity, payable-state and recovery definitions across screens and services. Shared asset identity and activity scope drive reports and workspace views. Payment/policy/cancellation share canonical account calls and approvals; managed/native allowance execution shares one intent validator and call builder. The common payable guard includes reviewed instructions and cancellation holds. Broader readiness and recovery presentation consolidation remain.
+- [ ] S03 Load-test representative histories, archived/migrated records and simultaneous approvals.
+- [x] S04 Defer wallet connectors until account-access routes; remove the Safe SDK from payment preparation and defer account creation. Theme/language preferences no longer require a wallet provider. Fresh built public routes and two signed-in wallet sessions pass. Homepage compressed JavaScript fell from 836,770 to 224,097 bytes (73%); login still loads the required connectors. Large on-demand SDK chunks remain visible in build warnings.
+- [ ] S05 Finish localized copy and consistent finance terminology, singular/plural labels and responsive visual polish.
+
+## Acceptance and launch evidence
+
+- [ ] Q01 Direct/nested owner signing, rejection and reload recovery passed through two isolated EIP-1193 wallets in the actual built app with real Sepolia settlement. The delegated flow also passed signature/send declines, reload and missing-hash recovery with the browser closed; see [delegated payment acceptance](docs/DELEGATED_PAYMENTS.md). Extension/mobile connector compatibility remains separate acceptance.
+- [ ] Q02 Complete live managed stablecoin-fee settlement and exact principal/fee reconciliation.
+- [ ] Q03 Verify scheduled execution once with browsers closed, cancellation, missed approvals and provider outages.
+- [ ] Q04 Complete real subscription activation, renewal, upgrade credit, expired access and replay rejection. Database-backed checkout now fixes the reviewed terms, coordinates administrators/browsers, reserves the original wallet nonce and recovers missing hashes after session/trial expiry. Confirmed replacements and exact reverts release attempts without another send. Eight backend and eight frontend tests plus thirteen billing browser stories pass. The actual signed-in build also passed the unconfigured-checkout check. Live paid settlement remains unverified; the development billing destination is unconfigured. Core operations continue on Free after expiry. See [checkout recovery](docs/BILLING_CHECKOUT.md).
+- [ ] Q05 Run a complete finance cycle with a second approver: repeated import → bills/payroll → approval → settlement → export.
+- [ ] Q06 Verify built desktop/mobile app and both themes against these user stories.
+- [ ] Q07 Rehearse migration, backup/restore and incident monitoring; obtain security review proportionate to funds at risk. Record external rollout work separately from code completion.
+- [ ] Q08 Validate willingness to pay and repeat use with design partners; track preparation time, errors, approval delay and support cost.
+
+## P2 — provider integrations (included in v2)
+
+- [ ] Y01 Research yield/staking providers by supported asset/network, noncustodial authority, withdrawal terms, contract risks and integration availability. Label lending/vault products accurately.
+- [ ] Y02 Build provider adapters for position discovery, deposit/withdraw quotes, approvals, transaction tracking, earnings and accounting. Disburse must not operate the strategy or take custody.
+- [ ] Y03 Add an Earn flow showing provider, underlying activity, variable rate, fees, withdrawal delay and funds available for payments. Require reviewed limits and team authorization.
+- [ ] Y04 Test rejected/stale quotes, withdrawal delays, provider outages, depegs and position reconciliation. Do not treat invested balances as immediately spendable payroll funds.
+- [ ] C01 Research swap/bridge providers and select adapters by asset/network coverage, route availability, fees and noncustodial execution.
+- [ ] C02 Build conversion quotes with source/destination accounts, minimum received, expiry, slippage, allowance limits and complete costs.
+- [ ] C03 Add reviewed swap/bridge execution, durable transaction tracking, partial-route/recovery handling and accounting for fees and asset movements.
+- [ ] C04 Keep conversion separate from recipient instructions: convert funding with explicit approval, then pay the exact requested currency/network.
+- [ ] C05 Validate mainnet/testnet separation, provider failures, delayed bridges, refunds and stale quotes before enabling each integration.
+
+## Follow-on integrations
+
+- [ ] Fiat on/off-ramp integrations and direct payroll/accounting connections, with separate provider and reconciliation acceptance.
+
+## Screening service and recipient assurance
+
+Findings and options: [screening review](docs/SCREENING_REVIEW.md). The existing beneficiary directory is the payment destination source; screening supplies additional evidence about those records.
+
+- [x] K01 Close bulk-screening authorization and cross-organization query/write gaps; refuse to record a clear name result when the imported OFAC list is empty. Add regression tests.
+- [x] K02 Label the current feature accurately as OFAC SDN name screening, not wallet-address screening or a guarantee that a recipient is safe.
+- [x] K03 Version and atomically refresh the OFAC dataset with resumable chunks, publication checksums and bounded retention. Alias-aware Unicode search refuses incomplete or overly broad checks. Source freshness, coverage and errors are visible. The official September 4 snapshot activated in development with all 19,329 records and 55,046 search parts; live alias retrieval passed.
+- [x] K04 Screen exact listed EVM address identities with source currency/network evidence. Preserve other-network and ambiguous-label distinctions; testnet identifiers do not imply production matches. Live checks passed for a published ETH address, the same bytes on Base and Sepolia separation. Address ownership remains a separate review.
+- [x] K05 Compare Chainalysis, TRM, Elliptic and OpenSanctions using current primary documentation, including monitoring, evidence, public unit pricing and embedded-service terms. Recommendations and cost examples are in the screening review. Paid APIs and partnerships are not enabled by this research.
+- [x] K06 Store immutable versioned checks and reasoned seven/thirty-day decisions. Changed recipient details or match evidence reopen review; stale screens and older background attempts cannot overwrite current evidence. Exact listed-network identifiers cannot receive a name false-positive override. Decision history and evidence are visible in the recipient view.
+- [x] K07 Apply customer-controlled freshness and warn/block behavior to missing, changed, stale, unavailable and expired checks. The shared server payment gate enforces Block; Warn requires current-evidence acknowledgement in the payment UI. Background rescreening and source refresh run without browsers. Tests and live source/recipient checks passed. Direct Safe authority remains outside these app controls.
+
+## Commercial model (confirmed direction)
+
+Product usefulness, reliability and affordability come first. Tier boundaries and add-on prices remain hypotheses; do not add friction or new charges while proving the workflows. Compare team size and advanced controls as possible tier dimensions, including solo businesses and accountants managing several clients. Measure the first funded invoice's deployment cost separately from later forwarding costs.
+
+- [ ] B01 Validate Free, Team and Pro packaging against convenience and customer value. Core money management and payments remain available after expiry; paid capacity and future specialized services are separate choices. Customers pay all network and provider fees. Invoice service pricing remains open.
+- [ ] B02 Disclose actual network/provider charges separately from Disburse service fees. Never label a fixed service charge as an exact gas reimbursement.
+- [ ] B03 Optional invoicing, yield, conversion, bridge and future managed-gas services may carry their own reviewed service fees. Bind any fee, provider quote, minimum received and expiry to approval. No new service fee is activated by this plan.
+- [ ] B04 Keep provider adapters independent of fee policy so a future Disburse service can use external execution services without changing custody or consent semantics.
+- [x] B05 Add operator-only trial changes, dated/lifetime complimentary grants, immutable custom free tiers and future-only signup programs, including 30 days Pro then lifetime Free. Keep grants separate from paid receipts and preserve account ownership. Existing members/recipients remain after downgrades. Remove old core-payment expiry gates and new Starter checkout because its limits are included in Free. See [licensing controls](docs/LICENSE_MANAGEMENT.md).
+- [ ] B06 Measure contribution margin for each service: customer service revenue less provider/network costs, execution failures and support. Seek replacement, wholesale or revenue-share economics before stacking another fee onto a retail provider price.
+- [ ] B07 Build provider integrations first. Operate a replacement service only when demonstrated demand, reliability and economics justify the operational responsibilities; retain provider fallback and customer consent.
+- [ ] B08 Evaluate convenience as a paid service in its own right: a reviewed provider integration can justify a fee without replacing that provider. Validate total cost and time saved; do not claim to be the cheapest without a workload-specific comparison.

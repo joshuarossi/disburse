@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { useTranslation } from 'react-i18next'
-import { Button } from '@/components/ui/button'
+import { buttonVariants } from '@/components/ui/button'
 import { ArrowRight, Sparkles } from 'lucide-react'
 
 export function CTA() {
@@ -14,7 +14,7 @@ export function CTA() {
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
           transition={{ duration: 0.5 }}
-          className="relative overflow-hidden rounded-3xl"
+          className="marketing-cta relative overflow-hidden rounded-3xl"
         >
           {/* Background gradient */}
           <div className="absolute inset-0 bg-gradient-to-br from-accent-600 via-accent-500 to-accent-400" />
@@ -45,15 +45,10 @@ export function CTA() {
               </p>
 
               <div className="mt-10 flex flex-col items-center justify-center gap-4 sm:flex-row">
-                <Link to="/login">
-                  <Button 
-                    size="lg" 
-                    className="group bg-white text-accent-600 hover:bg-white/90 shadow-xl"
-                  >
+                <Link to="/login" className={buttonVariants({ size: 'lg', className: 'group bg-white text-accent-600 hover:bg-white/90 shadow-xl' })}>
                     {t('landing.cta.tryForFree')}
                     <ArrowRight className="transition-transform group-hover:translate-x-1" />
-                  </Button>
-                </Link>
+                  </Link>
               </div>
 
               <p className="mt-6 text-sm text-white/60">

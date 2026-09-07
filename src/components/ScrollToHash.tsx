@@ -1,30 +1,37 @@
-import { useEffect } from 'react'
-import { useLocation } from 'react-router-dom'
+import { useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
 
 export function ScrollToHash() {
-  const { hash } = useLocation()
+  const { hash } = useLocation();
 
   useEffect(() => {
-    if (!hash) return
+    if (!hash) return;
 
-    const id = decodeURIComponent(hash.replace('#', ''))
-    let attempts = 0
+    let id: string;
+    try {
+      id = decodeURIComponent(hash.slice(1));
+    } catch {
+      return;
+    }
+    let timer: number | undefined;
+    let attempts = 0;
 
     const scrollToElement = () => {
-      const element = document.getElementById(id)
+      const element = document.getElementById(id);
       if (element) {
-        element.scrollIntoView({ behavior: 'smooth', block: 'start' })
-        return
+        element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        return;
       }
 
-      attempts += 1
+      attempts += 1;
       if (attempts < 8) {
-        window.setTimeout(scrollToElement, 150)
+        timer = window.setTimeout(scrollToElement, 150);
       }
-    }
+    };
 
-    scrollToElement()
-  }, [hash])
+    scrollToElement();
+    return () => window.clearTimeout(timer);
+  }, [hash]);
 
-  return null
+  return null;
 }

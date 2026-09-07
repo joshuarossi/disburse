@@ -1,14 +1,54 @@
-import { defineConfig } from 'vite'
-import react from '@vitejs/plugin-react'
-import tailwindcss from '@tailwindcss/vite'
-import path from 'path'
+import { defineConfig } from 'vite';
+import react from '@vitejs/plugin-react';
+import tailwindcss from '@tailwindcss/vite';
+import path from 'path';
 
-// https://vite.dev/config/
-export default defineConfig({
-  plugins: [react(), tailwindcss()],
-  resolve: {
-    alias: {
-      '@': path.resolve(__dirname, './src'),
-    },
-  },
-})
+export default defineConfig(({ command, mode }) => {
+  // QA is a local serve-only sandbox. Production builds always use real auth and services.
+  if (command === 'build' && mode === 'qa')
+    throw new Error(
+      'QA mode is local and serve-only. Use the normal production build.',
+    );
+  const qa = command === 'serve' && mode === 'qa';
+  const root = path.resolve(__dirname, 'src/dev/qa');
+  return {
+    plugins: [
+      qa && {
+        name: 'isolated-visual-qa',
+        enforce: 'pre' as const,
+        resolveId(source: string, importer?: string) {
+          if (importer?.startsWith(root)) return null;
+          if (source.endsWith('/providers/WalletRoutes')) return path.join(root, 'WalletRoutes.tsx');
+          if (
+            source === '@/lib/convex' ||
+            /\/src\/lib\/convex(?:\.ts)?$/.test(source)
+          )
+            return path.join(root, 'client.ts');
+          if (/\/src\/lib\/session(?:\.ts)?$/.test(source))
+            return path.join(root, 'session.ts');
+          if (source === 'convex/react') return path.join(root, 'convex.tsx');
+          if (
+            source === '@/lib/safeAllowance' ||
+            /\/src\/lib\/safeAllowance(?:\.ts)?$/.test(source)
+          )
+            return path.join(root, 'allowances.ts');
+          if (source === '@/lib/delegatedTransfer' || /\/src\/lib\/delegatedTransfer(?:\.ts)?$/.test(source)) return path.join(root, 'delegatedTransfer.ts');
+          if (source === '@/lib/accountApproval' || /\/src\/lib\/accountApproval(?:\.ts)?$/.test(source)) return path.join(root, 'accountApproval.ts');
+          if (source === 'wagmi') return path.join(root, 'wagmi.ts');
+          if (
+            source === '@/lib/session' ||
+            (importer?.endsWith('/src/main.tsx') && source === './providers')
+          )
+            return path.join(
+              root,
+              source === './providers' ? 'Providers.tsx' : 'session.ts',
+            );
+          return null;
+        },
+      },
+      react(),
+      tailwindcss(),
+    ],
+    resolve: { alias: { '@': path.resolve(__dirname, './src') } },
+  };
+});

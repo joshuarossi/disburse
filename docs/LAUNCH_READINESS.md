@@ -1,0 +1,81 @@
+# Disburse v2 launch review
+
+Updated September 6, 2026. **Public mainnet launch: not ready.** The product is suitable for a supervised demonstration and further testnet acceptance. Calling the full v2 program complete would overstate the evidence.
+
+The release candidate now has a [deployment runbook](DEPLOYMENT.md), pinned build runtime, checked public configuration and a coordinated Convex/Cloudflare build command. A production-target Convex dry run passed. No production deployment or restore rehearsal was performed by that check.
+
+The [latest fix pass](READINESS_FIX_PASS_2026-09-06.md) completed early account readiness, reviewed payout changes, recipient imports/collection, invitations, member access summaries, payment reminders, invoice source documents, OFAC evidence/policy controls and indexed account history. Operations and Payroll can now coexist on the same network, with exact funding selection retained through payments and schedules. [Accounting reconciliation](ACCOUNTING_RECONCILIATION.md) now includes chart imports, external book references, reviewed values, obligation settlement, internal transfers, balanced exports, corrections, period controls and historical balance checks. Actual external-ledger import and accountant-led close acceptance remain unfinished.
+
+The active implementation program is [TODOS.md](../TODOS.md). Accounts receivable has been added and verified on Sepolia: unique invoice addresses, confirmed receipt tracking, full-principal collection to the Safe, public payment pages and draft/issue/void flows. The latest completed check passed **644 tests across 76 files**, typecheck and lint. The full browser pass completed **267 stories**. Real built-app Sepolia acceptance now covers nested payments, spending-policy grants/revocations, signed cancellation and delegated native-fee payment recovery with the browser closed. See [company accounts](FUNDING_ACCOUNTS.md) and [delegated payment acceptance](DELEGATED_PAYMENTS.md). The normal build passed. Yield and conversion provider integrations remain unbuilt. The receiving contract still needs independent review and live managed-collection acceptance before real-money enablement. The v2 target is a fresh setup; preserving unused POC behavior is not a release requirement.
+
+## Product assessment
+
+Disburse now has a coherent finance workflow: reusable recipients, import mapping, bills, one payment builder for one or many recipients, reviewable drafts, approval progress, recurring instructions, accounts, reports and team controls. Routine owner approvals, spending-policy approval and delegated single and batch payments have in-app interfaces. The implementation now preserves each recipient's requested currency/network instead of allowing a batch-level choice to replace it.
+
+That is a substantial improvement over the POC. It is not yet a product that a finance team should depend on for unattended payroll. The remaining acceptance gaps are live external-service behavior, real browser-wallet workflows, accounting integration and evidence for customer demand. An attractive interface and passing fixtures do not resolve those gaps.
+
+The intended experience is familiar finance work with stablecoin settlement underneath. Asset/network choices belong in funding and payout instructions, with clear review when they affect a payment. Teams should not need to learn Safe Apps, workspaces or transaction construction to pay a saved vendor. Advanced account authority still needs an honest explanation: app roles do not restrict Safe owners, and the published allowance module permits transfers to arbitrary recipients outside Disburse.
+
+## What changed and what was proved
+
+| Area | Implemented result | Evidence and limit |
+| --- | --- | --- |
+| Recipient instructions | Currency/network preserved through import, drafts and recurrence; explicit mapping for unfamiliar CSV/TSV headers | Backend regressions and browser mapping story; a real customer export is still needed |
+| Payment preparation | Saved instructions group mixed recipients into compatible drafts atomically; separate approvals/execution shown | Exact decimals, preference-change rollback, cross-network accounts and aggregate-limit tests; mixed live settlement not yet exercised |
+| Owner approvals | Named approval progress and current threshold; blocked execution until signatures and nonce permit | Real two-owner bill settlement plus nested payments and cancellation through two isolated EIP-1193 wallets in the built app; extension/mobile connectors remain unverified |
+| Delegation | In-app policy queue, member limits, nonce reservations and receipt checks; new authorizations require the fixed allowance-module 1.0.0 release | Fixed runtime verified on five networks and source compilation checked; built-app native allowance payment and background recovery passed on the current release, with the test grant revoked afterward |
+| Safe identity | Published singleton and proxy-runtime verification on linking and payment preflight | Six identity regressions and live isolated Safe verification; supported versions are deliberately limited |
+| Invoice reconciliation | Paid follows verified payment receipt | Owner and delegate bill payments reconciled in the real development database |
+| Recovery | Server-built payment proposals and direct/nested signatures persist in the app; no Safe service POST for new payment approvals. Managed and native execution have durable queues and in-app checks of the original transaction. | Lost-response regressions plus a real withheld-hash Sepolia payment reconciled to paid; built-browser owner rejection/reload/retry also passed; delegated signing and missing-hash recovery also passed with the browser closed; live managed interruption remains open |
+| Trial/licensing | Free core access after expiry, operator-only trial/grant/tier controls, verified paid receipts and replay protection | Backend and browser stories plus a real built-app complimentary Pro grant, billing reload and restoration; paid checkout recovery is covered, while live paid subscription settlement remains unverified |
+| Named accounts | Multiple accounts on one network, explicit payment and bill funding, pinned recurring account and account-aware history | Six focused backend and four browser stories; nested linking, signatures and two real payments now pass; nested grant and revoke approvals also passed through two built-browser wallets with real Sepolia receipts |
+| Account history and books | Exact payment/fee matching, settlement dates, reviewed mappings and book values, balanced exports and linked corrections; historical period unit checks | Six actual development QA checks passed; seven Sepolia movements reconcile exactly to period-end USDC balances. Books/import acknowledgment were synthetic. Actual external-ledger import and accounting-policy acceptance remain F03 |
+| Visual/UI | Theme control, responsive payment/member/report/accounting flows, history coverage and explicit unmatched-payment review | Full 267-story browser pass; inspected theme screenshots and two real signed-in built wallet sessions; remaining acceptance is tracked in Q06 |
+| Code/build | 644 tests across 76 files, frontend/Convex typecheck, lint and checked build | Local/dev evidence; public pages load 73% less compressed JavaScript; large on-demand connector/Safe chunks remain |
+
+The detailed story matrix is [USER_STORY_QA.md](USER_STORY_QA.md). Public transaction receipts and reproduction instructions are in [QA_V2.md](QA_V2.md). Architecture and migration limits are in [ARCHITECTURE_V2.md](ARCHITECTURE_V2.md).
+
+## Launch blockers
+
+| Blocker | Why it matters | Required completion evidence |
+| --- | --- | --- |
+| Accounting reconciliation | Exact chain movements, book references, mappings, reviewed functional-currency values, internal transfers and accounting export controls are implemented. An actual external-ledger import and accountant-led close remain unverified. | Match an existing payable/receivable without duplicating the original entry; reconcile opening/closing balances and test repeated/corrected exports |
+| Managed stablecoin-fee acceptance | Turbo Relayer, explicit stablecoin fee binding and durable recovery are implemented and regression-tested; a live provider settlement has not been proved. | Successful live payment with exact principal/fee reconciliation and interrupted-submission recovery |
+| Unattended scheduled payments | The scheduler has validation/claim/reconciliation tests but no observed supported live relay settlement with browsers closed. | Due payment executes once; cancellation, missed approval, provider timeout and retry are exercised |
+| Real wallet workflow acceptance | Two isolated wallets completed built-app nested payments, policy approvals, cancellation and delegated payment signing with real Sepolia settlement. Signature/send rejection, reload and delegated recovery with the browser closed passed. Extension/mobile connector compatibility and the complete second-approver finance cycle remain unverified. | Connected browser import → draft → owner/delegate authorization → receipt → export, including rejected signatures and recovery |
+| Subscription checkout | Trial, expiry, renewal and replay protection have automated coverage; actual checkout activation and renewal remain unverified. Usage and billing copy explain the free fallback and customer-paid fees. Team and Pro remain 50/99 USDC; the former Starter limits are included in Free. | Real test receipt activation, renewal and upgrade credit; rejected replay, expired access and clear billing terms |
+| Ambiguous submission operations | A provider may accept a request before the process stores its ID. A durable exception queue, independent settlement lookup and safe resume rules are implemented; live outage rehearsal and external alert delivery remain unverified. | Durable attempts and reconciliation procedure; interrupted-broadcast rehearsal without duplicate economic payment |
+| Production rollout and operations | No production deployment, migration rehearsal, backup/restore rehearsal or independent security review was completed. | Reviewed target configuration/schema, restore evidence, monitoring and an owner for payment incidents; security assessment proportionate to customer funds |
+| Receivable forwarding | Unique-address receipt and native collection work on Sepolia; customer-authorized stablecoin-fee collection and dust/recovery controls remain open. The sponsored collection adapter has been removed. | Automatic collection under provider failure/retry, bounded operating cost and independent contract review |
+
+The managed relay implementation follows Gelato's replacement path: Turbo Relayer submission with the stablecoin fee explicitly bound in the approved payment. The migration is implemented; live settlement evidence is still required. The provider references used during implementation are the [legacy SDK notice](https://github.com/gelatodigital/relay-sdk), [migration guide](https://github.com/gelatodigital/gelato-migration-erc2271-syncfee) and [Turbo Relayer quick start](https://docs.gelato.cloud/gasless-with-relay/gelato-turbo-relayer/quick-start).
+
+## Remaining v2 feature work
+
+Yield/lending provider adapters and the Earn flow are not built. Swap/bridge quotes, reviewed execution and durable conversion recovery are not built. Direct payroll/accounting API connections remain follow-on work; current recipient onboarding uses reviewed imports and collection forms. Receivable journal reconciliation is implemented; external-ledger acceptance, invoice attachments/reminders, refunds/credit notes and collection-cost optimization remain tracked work. Shared readiness/recovery consolidation, representative load tests, broader connector optimization and final localization/polish remain open. Nested-only linking and payment signatures are implemented and verified; nested grant/revoke administration is complete; signed account cancellation is implemented and verified through both parent signers on Sepolia. See [cancellation evidence](ACCOUNT_CANCELLATIONS.md).
+
+Minimum two-confirmation settlement is now implemented for owner and delegate payments. A deeper per-chain reorg/finality policy remains production work. Contract-owner signatures, delegated batches above 200 recipients and unsupported Safe versions are compatibility limits, not features to imply are universally supported.
+
+## Competitive position and pricing
+
+The strongest initial customer is a small finance team already paying contractors/vendors in stablecoins and already comfortable with non-custodial company accounts. For a domestic business satisfied with bank payroll, Disburse currently offers too little reason to switch. It complements Gusto's payroll calculations and QuickBooks' ledger; it does not replace tax, benefits or accounting services.
+
+Request's documented Safe App workflow runs inside Safe, and its separate Business Account must be evaluated separately. Disburse's full finance interface above Safe is a useful UX hypothesis. Non-custody and batch transfers alone are not unique. Coinshift and Request already overlap with important parts of the proposition. [Request Safe workflow](https://help.request.finance/en/articles/8622172-how-do-i-pay-with-safe-wallet-formerly-gnosis-safe), [Coinshift overview](https://docs.coinshift.xyz/business/about-us/overview).
+
+The current public offer is Free plus Team/Pro at 50/99 USDC per workspace per 30 days. New Starter checkout is disabled because its former limits are included in Free. Keep Team at 50 for an initial paid pilot, with provider fees visible. Do not treat 99 for unrestricted usage as proven economics; the unsupported priority-support promise has been removed. Published reference prices range from Request Starter at $42/month billed annually, to BILL Essentials at $49/user/month; scope differs substantially. [Request pricing](https://www.requestfinance.com/pricing), [BILL pricing](https://www.bill.com/product/pricing). Full terms, Gusto/Ramp comparisons and the proposed pricing experiment are in [BILLING_AND_PRICING.md](BILLING_AND_PRICING.md).
+
+## Will it find users?
+
+There is a plausible buyer problem, but no evidence here establishes acquisition or retention. The strongest promise is fewer address mistakes, less preparation work, clear approvals and reconciled payments. The product must demonstrate those benefits against a customer's existing monthly process.
+
+Recruit five design partners from existing Safe/stablecoin businesses. Observe their current payment cycle before migration. Import a real export, preserve their payout instructions, and complete two cycles with them. Measure preparation time, approval delay, correction rate, reconciliation effort and support cost. Ask them to pay and choose the next cycle without prompting. Do not send outreach or claim partnerships without authorization.
+
+Market volume is supporting context, not the product's TAM. No verified count of qualified buyers or measured willingness to pay was established. The scenarios in [MARKET_RESEARCH.md](MARKET_RESEARCH.md) are assumptions, not forecasts.
+
+## Native-fee acceptance update
+
+A fresh 0.010001 USDC invoice settled on Sepolia with native ETH gas, two confirmations, exact recipient balance verification, paid invoice and matching accounting record. A repeat check did not resubmit. Transaction: `0xb843b021f4866b265b869dc3280785c0ea5391922e71b4fe08c1f1bb5b288016`. This used the isolated QA wallet and SDK, not browser-extension signing or the managed relay. See [USER_STORY_QA.md](USER_STORY_QA.md).
+
+## Release decision
+
+Continue controlled testnet acceptance. Do not announce a reliable unattended-payroll product or market stablecoin-paid gas as verified before live managed-relay acceptance passes. A limited paid pilot becomes reasonable after the supported relay and billing setup work, real wallet stories pass, and operators can recover uncertain payments safely. Public mainnet launch requires closing the operational and rollout blockers above.

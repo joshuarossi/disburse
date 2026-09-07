@@ -1,12 +1,12 @@
-import { v } from "convex/values";
-import { query, MutationCtx } from "./_generated/server";
-import { requireOrgAccess } from "./lib/rbac";
-import { Id } from "./_generated/dataModel";
+import { v } from 'convex/values';
+import { query, MutationCtx } from './_generated/server';
+import { requireOrgAccess } from './lib/rbac';
+import { Id } from './_generated/dataModel';
 
 // ─── Append-only audit writer (M-06) ──────────────────────────────────────────
 //
 // All audit entries MUST be written through appendAudit(). It:
-//   - normalizes metadata to the flat primitive map the schema enforces
+//   - normalizes new metadata to a flat primitive map (legacy structured events remain readable)
 //     (arrays/objects are JSON.stringify-ed, undefined values dropped)
 //   - stamps the server-side time when the caller doesn't provide one
 //   - is the single choke point for future hardening (signing, export, etc.)
@@ -14,22 +14,28 @@ import { Id } from "./_generated/dataModel";
 export type AuditValue = string | number | boolean | null;
 
 interface AuditEntry {
-  orgId: Id<"orgs">;
-  actorUserId: Id<"users">;
+  orgId: Id<'orgs'>;
+  actorUserId: Id<'users'>;
   action: string;
   objectType: string;
   objectId: string;
-  metadata?: Record<string, AuditValue | AuditValue[] | Record<string, AuditValue> | undefined>;
+  metadata?: Record<
+    string,
+    AuditValue | AuditValue[] | Record<string, AuditValue> | undefined
+  >;
   timestamp?: number;
 }
 
-export async function appendAudit(ctx: MutationCtx, entry: AuditEntry): Promise<void> {
+export async function appendAudit(
+  ctx: MutationCtx,
+  entry: AuditEntry,
+): Promise<void> {
   let metadata: Record<string, AuditValue> | undefined;
   if (entry.metadata) {
     metadata = {};
     for (const [key, value] of Object.entries(entry.metadata)) {
       if (value === undefined) continue;
-      if (value !== null && typeof value === "object") {
+      if (value !== null && typeof value === 'object') {
         metadata[key] = JSON.stringify(value);
       } else {
         metadata[key] = value;
@@ -37,7 +43,7 @@ export async function appendAudit(ctx: MutationCtx, entry: AuditEntry): Promise<
     }
   }
 
-  await ctx.db.insert("auditLog", {
+  await ctx.db.insert('auditLog', {
     orgId: entry.orgId,
     actorUserId: entry.actorUserId,
     action: entry.action,
@@ -51,22 +57,28 @@ export async function appendAudit(ctx: MutationCtx, entry: AuditEntry): Promise<
 // List audit logs for an org
 export const list = query({
   args: {
-    orgId: v.id("orgs"),
+    orgId: v.id('orgs'),
     sessionToken: v.string(),
     limit: v.optional(v.number()),
     startDate: v.optional(v.number()),
     endDate: v.optional(v.number()),
-    userId: v.optional(v.id("users")),
+    userId: v.optional(v.id('users')),
     actionType: v.optional(v.array(v.string())),
   },
   handler: async (ctx, args) => {
     // Any member can view audit logs
-    await requireOrgAccess(ctx, args.orgId, args.sessionToken, ["admin", "approver", "initiator", "clerk", "viewer"]);
+    await requireOrgAccess(ctx, args.orgId, args.sessionToken, [
+      'admin',
+      'approver',
+      'initiator',
+      'clerk',
+      'viewer',
+    ]);
 
     const auditQuery = ctx.db
-      .query("auditLog")
-      .withIndex("by_org_timestamp", (q) => q.eq("orgId", args.orgId))
-      .order("desc");
+      .query('auditLog')
+      .withIndex('by_org_timestamp', (q) => q.eq('orgId', args.orgId))
+      .order('desc');
 
     const logs = await auditQuery.collect();
 
@@ -90,7 +102,9 @@ export const list = query({
 
     // Action type filter
     if (args.actionType && args.actionType.length > 0) {
-      filtered = filtered.filter((log) => args.actionType!.includes(log.action));
+      filtered = filtered.filter((log) =>
+        args.actionType!.includes(log.action),
+      );
     }
 
     // Apply limit
@@ -104,7 +118,7 @@ export const list = query({
           ...log,
           actor: user ? { walletAddress: user.walletAddress } : null,
         };
-      })
+      }),
     );
 
     return enriched;

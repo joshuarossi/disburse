@@ -1,11 +1,11 @@
-import { Id } from "../_generated/dataModel";
-import { MutationCtx } from "../_generated/server";
-import { api } from "../_generated/api";
-import { privateKeyToAccount, type PrivateKeyAccount } from "viem/accounts";
+import { Id, Doc } from '../_generated/dataModel';
+import { MutationCtx } from '../_generated/server';
+import { api } from '../_generated/api';
+import { privateKeyToAccount, type PrivateKeyAccount } from 'viem/accounts';
 
-type Role = "admin" | "approver" | "initiator" | "clerk" | "viewer";
-type Plan = "trial" | "starter" | "team" | "pro";
-type BeneficiaryType = "individual" | "business";
+type Role = 'admin' | 'approver' | 'initiator' | 'clerk' | 'viewer';
+type Plan = 'trial' | 'starter' | 'team' | 'pro';
+type BeneficiaryType = 'individual' | 'business';
 
 // ─── Signed-auth helpers ─────────────────────────────────────────────────────
 // Backend identity now comes exclusively from server-verified SIWE sessions.
@@ -13,12 +13,15 @@ type BeneficiaryType = "individual" | "business";
 // sign message with a viem account → verifySignature → session token.
 
 const TEST_PRIVATE_KEYS = {
-  admin: "0x0000000000000000000000000000000000000000000000000000000000000001",
-  approver: "0x0000000000000000000000000000000000000000000000000000000000000002",
-  initiator: "0x0000000000000000000000000000000000000000000000000000000000000003",
-  clerk: "0x0000000000000000000000000000000000000000000000000000000000000004",
-  viewer: "0x0000000000000000000000000000000000000000000000000000000000000005",
-  nonMember: "0x0000000000000000000000000000000000000000000000000000000000000006",
+  admin: '0x0000000000000000000000000000000000000000000000000000000000000001',
+  approver:
+    '0x0000000000000000000000000000000000000000000000000000000000000002',
+  initiator:
+    '0x0000000000000000000000000000000000000000000000000000000000000003',
+  clerk: '0x0000000000000000000000000000000000000000000000000000000000000004',
+  viewer: '0x0000000000000000000000000000000000000000000000000000000000000005',
+  nonMember:
+    '0x0000000000000000000000000000000000000000000000000000000000000006',
 } as const;
 
 export type TestRoleName = keyof typeof TEST_PRIVATE_KEYS;
@@ -29,7 +32,7 @@ export const TEST_ACCOUNTS: Record<TestRoleName, PrivateKeyAccount> =
     Object.entries(TEST_PRIVATE_KEYS).map(([role, key]) => [
       role,
       privateKeyToAccount(key as `0x${string}`),
-    ])
+    ]),
   ) as Record<TestRoleName, PrivateKeyAccount>;
 
 /**
@@ -41,8 +44,12 @@ export async function signIn(
   t: {
     mutation: (...callArgs: any[]) => Promise<any>;
   },
-  roleName: TestRoleName
-): Promise<{ sessionToken: string; userId: Id<"users">; walletAddress: string }> {
+  roleName: TestRoleName,
+): Promise<{
+  sessionToken: string;
+  userId: Id<'users'>;
+  walletAddress: string;
+}> {
   const account = TEST_ACCOUNTS[roleName];
   const walletAddress = account.address;
 
@@ -59,7 +66,7 @@ export async function signIn(
     walletAddress,
     signature,
     message,
-  })) as { token: string; userId: Id<"users"> };
+  })) as { token: string; userId: Id<'users'> };
 
   return {
     sessionToken: result.token,
@@ -76,12 +83,14 @@ export async function createTestUser(
   overrides: {
     walletAddress?: string;
     email?: string;
-  } = {}
-): Promise<Id<"users">> {
+  } = {},
+): Promise<Id<'users'>> {
   const now = Date.now();
-  const userId = await ctx.db.insert("users", {
+  const userId = await ctx.db.insert('users', {
     // Production stores addresses lowercase — match that here
-    walletAddress: (overrides.walletAddress || `0x${randomHex(40)}`).toLowerCase(),
+    walletAddress: (
+      overrides.walletAddress || `0x${randomHex(40)}`
+    ).toLowerCase(),
     email: overrides.email,
     createdAt: now,
   });
@@ -93,46 +102,48 @@ export async function createTestUser(
  */
 export async function createTestOrg(
   ctx: MutationCtx,
-  userId: Id<"users">,
+  userId: Id<'users'>,
   overrides: {
     name?: string;
     role?: Role;
     plan?: Plan;
     trialEndsAt?: number;
     paidThroughAt?: number;
-    billingStatus?: "active" | "trial" | "expired" | "cancelled";
-  } = {}
+    billingStatus?: 'active' | 'trial' | 'expired' | 'cancelled';
+  } = {},
 ): Promise<{
-  orgId: Id<"orgs">;
-  membershipId: Id<"orgMemberships">;
-  billingId: Id<"billing">;
+  orgId: Id<'orgs'>;
+  membershipId: Id<'orgMemberships'>;
+  billingId: Id<'billing'>;
 }> {
   const now = Date.now();
-  
+
   // Create org
-  const orgId = await ctx.db.insert("orgs", {
+  const orgId = await ctx.db.insert('orgs', {
     name: overrides.name || `Test Org ${randomHex(8)}`,
     createdBy: userId,
     createdAt: now,
   });
 
   // Create membership
-  const membershipId = await ctx.db.insert("orgMemberships", {
+  const membershipId = await ctx.db.insert('orgMemberships', {
     orgId,
     userId,
-    role: overrides.role || "admin",
-    status: "active",
+    role: overrides.role || 'admin',
+    status: 'active',
     createdAt: now,
   });
 
   // Create billing record
-  const plan = overrides.plan || "trial";
-  const billingId = await ctx.db.insert("billing", {
+  const plan = overrides.plan || 'trial';
+  const billingId = await ctx.db.insert('billing', {
     orgId,
     plan,
-    trialEndsAt: overrides.trialEndsAt ?? (plan === "trial" ? now + 30 * 24 * 60 * 60 * 1000 : undefined),
-    paidThroughAt: overrides.paidThroughAt,
-    status: overrides.billingStatus || (plan === "trial" ? "trial" : "active"),
+    trialEndsAt:
+      overrides.trialEndsAt ??
+      (plan === 'trial' ? now + 30 * 24 * 60 * 60 * 1000 : undefined),
+    paidThroughAt: overrides.paidThroughAt ?? (plan !== 'trial' ? now + 30 * 86400000 : undefined),
+    status: overrides.billingStatus || (plan === 'trial' ? 'trial' : 'active'),
     createdAt: now,
     updatedAt: now,
   });
@@ -145,19 +156,19 @@ export async function createTestOrg(
  */
 export async function createTestMembership(
   ctx: MutationCtx,
-  orgId: Id<"orgs">,
-  userId: Id<"users">,
+  orgId: Id<'orgs'>,
+  userId: Id<'users'>,
   overrides: {
     role?: Role;
-    status?: "active" | "invited" | "removed";
-  } = {}
-): Promise<Id<"orgMemberships">> {
+    status?: 'active' | 'invited' | 'removed';
+  } = {},
+): Promise<Id<'orgMemberships'>> {
   const now = Date.now();
-  return await ctx.db.insert("orgMemberships", {
+  return await ctx.db.insert('orgMemberships', {
     orgId,
     userId,
-    role: overrides.role || "viewer",
-    status: overrides.status || "active",
+    role: overrides.role || 'viewer',
+    status: overrides.status || 'active',
     createdAt: now,
   });
 }
@@ -167,14 +178,14 @@ export async function createTestMembership(
  */
 export async function createTestSafe(
   ctx: MutationCtx,
-  orgId: Id<"orgs">,
+  orgId: Id<'orgs'>,
   overrides: {
     chainId?: number;
     safeAddress?: string;
-  } = {}
-): Promise<Id<"safes">> {
+  } = {},
+): Promise<Id<'safes'>> {
   const now = Date.now();
-  return await ctx.db.insert("safes", {
+  return await ctx.db.insert('safes', {
     orgId,
     chainId: overrides.chainId || 11155111, // Sepolia
     safeAddress: overrides.safeAddress || `0x${randomHex(40)}`,
@@ -187,23 +198,26 @@ export async function createTestSafe(
  */
 export async function createTestBeneficiary(
   ctx: MutationCtx,
-  orgId: Id<"orgs">,
+  orgId: Id<'orgs'>,
   overrides: {
     type?: BeneficiaryType;
     name?: string;
     walletAddress?: string;
     notes?: string;
     isActive?: boolean;
-  } = {}
-): Promise<Id<"beneficiaries">> {
+    payoutReviewStatus?: 'approved' | 'unreviewed';
+  } = {},
+): Promise<Id<'beneficiaries'>> {
   const now = Date.now();
-  return await ctx.db.insert("beneficiaries", {
+  return await ctx.db.insert('beneficiaries', {
     orgId,
-    type: overrides.type ?? "individual", // Optional in schema but we always set it in tests
+    type: overrides.type ?? 'individual', // Optional in schema but we always set it in tests
     name: overrides.name || `Test Beneficiary ${randomHex(8)}`,
     walletAddress: overrides.walletAddress || `0x${randomHex(40)}`,
     notes: overrides.notes,
     isActive: overrides.isActive ?? true,
+    payoutReviewStatus: overrides.payoutReviewStatus ?? 'approved',
+    payoutVersion: overrides.payoutReviewStatus === 'unreviewed' ? 0 : 1,
     createdAt: now,
     updatedAt: now,
   });
@@ -214,34 +228,38 @@ export async function createTestBeneficiary(
  */
 export async function createTestDisbursement(
   ctx: MutationCtx,
-  orgId: Id<"orgs">,
-  safeId: Id<"safes">,
-  beneficiaryId: Id<"beneficiaries">,
-  createdBy: Id<"users">,
+  orgId: Id<'orgs'>,
+  safeId: Id<'safes'>,
+  beneficiaryId: Id<'beneficiaries'>,
+  createdBy: Id<'users'>,
   overrides: {
     token?: string;
     amount?: string;
     memo?: string;
-    status?: "draft" | "pending" | "proposed" | "executed" | "failed" | "cancelled";
+    status?: Doc<'disbursements'>['status'];
     safeTxHash?: string;
     txHash?: string;
-    type?: "single" | "batch";
-  } = {}
-): Promise<Id<"disbursements">> {
+    type?: 'single' | 'batch';
+  } = {},
+): Promise<Id<'disbursements'>> {
   const safe = await ctx.db.get(safeId);
+  const beneficiary = await ctx.db.get(beneficiaryId);
   const chainId = safe?.chainId ?? 11155111;
   const now = Date.now();
-  return await ctx.db.insert("disbursements", {
+  return await ctx.db.insert('disbursements', {
     orgId,
     safeId,
     chainId,
-    beneficiaryId: overrides.type === "batch" ? undefined : beneficiaryId,
-    token: overrides.token || "USDC",
-    amount: overrides.type === "batch" ? undefined : (overrides.amount || "100"),
-    totalAmount: overrides.type === "batch" ? (overrides.amount || "100") : undefined,
-    type: overrides.type || "single",
+    beneficiaryId: overrides.type === 'batch' ? undefined : beneficiaryId,
+    recipientAddress: overrides.type === 'batch' ? undefined : beneficiary?.walletAddress,
+    payoutVersion: overrides.type === 'batch' ? undefined : beneficiary?.payoutVersion,
+    token: overrides.token || 'USDC',
+    amount: overrides.type === 'batch' ? undefined : overrides.amount || '100',
+    totalAmount:
+      overrides.type === 'batch' ? overrides.amount || '100' : undefined,
+    type: overrides.type || 'single',
     memo: overrides.memo,
-    status: overrides.status || "draft",
+    status: overrides.status || 'draft',
     safeTxHash: overrides.safeTxHash,
     txHash: overrides.txHash,
     createdBy,
@@ -255,41 +273,43 @@ export async function createTestDisbursement(
  */
 export async function createTestBatchDisbursement(
   ctx: MutationCtx,
-  orgId: Id<"orgs">,
-  safeId: Id<"safes">,
+  orgId: Id<'orgs'>,
+  safeId: Id<'safes'>,
   recipientData: Array<{
-    beneficiaryId: Id<"beneficiaries">;
+    beneficiaryId: Id<'beneficiaries'>;
     amount: string;
   }>,
-  createdBy: Id<"users">,
+  createdBy: Id<'users'>,
   overrides: {
     token?: string;
     memo?: string;
-    status?: "draft" | "pending" | "proposed" | "executed" | "failed" | "cancelled";
+    status?: Doc<'disbursements'>['status'];
     safeTxHash?: string;
     txHash?: string;
-  } = {}
+  } = {},
 ): Promise<{
-  disbursementId: Id<"disbursements">;
-  recipientIds: Id<"disbursementRecipients">[];
+  disbursementId: Id<'disbursements'>;
+  recipientIds: Id<'disbursementRecipients'>[];
 }> {
   const safe = await ctx.db.get(safeId);
   const chainId = safe?.chainId ?? 11155111;
   const now = Date.now();
-  
+
   // Calculate total
-  const totalAmount = recipientData.reduce((sum, r) => sum + parseFloat(r.amount), 0).toString();
-  
+  const totalAmount = recipientData
+    .reduce((sum, r) => sum + parseFloat(r.amount), 0)
+    .toString();
+
   // Create disbursement
-  const disbursementId = await ctx.db.insert("disbursements", {
+  const disbursementId = await ctx.db.insert('disbursements', {
     orgId,
     safeId,
     chainId,
-    type: "batch",
-    token: overrides.token || "USDC",
+    type: 'batch',
+    token: overrides.token || 'USDC',
     totalAmount,
     memo: overrides.memo,
-    status: overrides.status || "draft",
+    status: overrides.status || 'draft',
     safeTxHash: overrides.safeTxHash,
     txHash: overrides.txHash,
     createdBy,
@@ -298,18 +318,19 @@ export async function createTestBatchDisbursement(
   });
 
   // Create recipients
-  const recipientIds: Id<"disbursementRecipients">[] = [];
+  const recipientIds: Id<'disbursementRecipients'>[] = [];
   for (const recipient of recipientData) {
     // Get beneficiary to get wallet address
     const beneficiary = await ctx.db.get(recipient.beneficiaryId);
     if (!beneficiary) {
       throw new Error(`Beneficiary ${recipient.beneficiaryId} not found`);
     }
-    
-    const recipientId = await ctx.db.insert("disbursementRecipients", {
+
+    const recipientId = await ctx.db.insert('disbursementRecipients', {
       disbursementId,
       beneficiaryId: recipient.beneficiaryId,
       recipientAddress: beneficiary.walletAddress,
+      payoutVersion: beneficiary.payoutVersion,
       amount: recipient.amount,
       createdAt: now,
     });
@@ -324,16 +345,16 @@ export async function createTestBatchDisbursement(
  */
 export async function createTestSession(
   ctx: MutationCtx,
-  userId: Id<"users">,
+  userId: Id<'users'>,
   walletAddress: string,
   overrides: {
     nonce?: string;
     tokenHash?: string;
     expiresAt?: number;
-  } = {}
-): Promise<Id<"sessions">> {
+  } = {},
+): Promise<Id<'sessions'>> {
   const now = Date.now();
-  return await ctx.db.insert("sessions", {
+  return await ctx.db.insert('sessions', {
     userId,
     walletAddress: walletAddress.toLowerCase(),
     // Authenticated session by default (tokenHash set); pass nonce-only rows
@@ -350,21 +371,21 @@ export async function createTestSession(
  */
 export async function createTestAuditLog(
   ctx: MutationCtx,
-  orgId: Id<"orgs">,
-  actorUserId: Id<"users">,
+  orgId: Id<'orgs'>,
+  actorUserId: Id<'users'>,
   overrides: {
     action?: string;
     objectType?: string;
     objectId?: string;
     metadata?: Record<string, string | number | boolean | null>;
-  } = {}
-): Promise<Id<"auditLog">> {
-  return await ctx.db.insert("auditLog", {
+  } = {},
+): Promise<Id<'auditLog'>> {
+  return await ctx.db.insert('auditLog', {
     orgId,
     actorUserId,
-    action: overrides.action || "test.action",
-    objectType: overrides.objectType || "test",
-    objectId: overrides.objectId || "test-id",
+    action: overrides.action || 'test.action',
+    objectType: overrides.objectType || 'test',
+    objectId: overrides.objectId || 'test-id',
     metadata: overrides.metadata,
     timestamp: Date.now(),
   });
@@ -380,19 +401,19 @@ export async function createFullOrgSetup(
     orgName?: string;
     role?: Role;
     plan?: Plan;
-  } = {}
+  } = {},
 ): Promise<{
-  userId: Id<"users">;
+  userId: Id<'users'>;
   walletAddress: string;
-  orgId: Id<"orgs">;
-  membershipId: Id<"orgMemberships">;
-  billingId: Id<"billing">;
-  safeId: Id<"safes">;
+  orgId: Id<'orgs'>;
+  membershipId: Id<'orgMemberships'>;
+  billingId: Id<'billing'>;
+  safeId: Id<'safes'>;
   safeAddress: string;
 }> {
   const walletAddress = overrides.walletAddress || `0x${randomHex(40)}`;
   const safeAddress = `0x${randomHex(40)}`;
-  
+
   const userId = await createTestUser(ctx, { walletAddress });
   const { orgId, membershipId, billingId } = await createTestOrg(ctx, userId, {
     name: overrides.orgName,
@@ -416,8 +437,8 @@ export async function createFullOrgSetup(
  * Generate random hex string
  */
 function randomHex(length: number): string {
-  const chars = "0123456789abcdef";
-  let result = "";
+  const chars = '0123456789abcdef';
+  let result = '';
   for (let i = 0; i < length; i++) {
     result += chars[Math.floor(Math.random() * chars.length)];
   }

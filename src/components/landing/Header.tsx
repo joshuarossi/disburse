@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { Button } from '@/components/ui/button'
+import { buttonVariants } from '@/components/ui/button'
 import { LanguageSwitcher } from '@/components/ui/LanguageSwitcher'
 import { ThemeSwitcher } from '@/components/ui/ThemeSwitcher'
 
@@ -43,14 +43,10 @@ export function Header() {
           <div className="flex items-center gap-3">
             <ThemeSwitcher variant="ghost" size="sm" />
             <LanguageSwitcher variant="ghost" size="sm" />
-            <Link to="/login">
-              <Button variant="ghost" size="sm">
+            <Link to="/login" className={buttonVariants({ size: 'sm', variant: 'ghost' })}>
                 {t('landing.header.login')}
-              </Button>
-            </Link>
-            <Link to="/login">
-              <Button size="sm">{t('landing.header.tryForFree')}</Button>
-            </Link>
+              </Link>
+            <Link to="/login" className={buttonVariants({ size: 'sm' })}>{t('landing.header.tryForFree')}</Link>
           </div>
         </nav>
       </div>

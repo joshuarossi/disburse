@@ -1,75 +1,56 @@
+import { finishBillingCheckout } from "./lib/billingCheckout";
 import { appendAudit } from "./audit";
 import { v } from "convex/values";
-import { mutation, query, action, internalQuery, internalMutation } from "./_generated/server";
+import {
+  mutation,
+  query,
+  action,
+  internalQuery,
+  internalMutation,
+} from "./_generated/server";
 import { requireOrgAccess } from "./lib/rbac";
 import { Id } from "./_generated/dataModel";
-import { QueryCtx } from "./_generated/server";
+import { QueryCtx, MutationCtx } from "./_generated/server";
 import { internal } from "./_generated/api";
-import { createPublicClient, http } from "viem";
+import { verifyBillingReceipt } from "./lib/billingReceipt";
 import { isValidTxHash } from "./lib/validation";
+import {
+  paymentConfiguration,
+  getPaymentChainId,
+  getTreasuryAddress,
+  PAYMENT_TOKEN_BY_CHAIN,
+} from "./lib/billingConfiguration";
+import { teamSeats } from "./lib/teamSeats";
 
 // Plan types
 export type PlanType = "trial" | "starter" | "team" | "pro";
 
-// Tier limits configuration
-export const PLAN_LIMITS = {
-  trial: {
-    maxUsers: 5, // Same as Team tier during trial
-    maxBeneficiaries: 100,
-    price: 0,
-  },
-  starter: {
-    maxUsers: 1,
-    maxBeneficiaries: 25,
-    price: 25,
-  },
-  team: {
-    maxUsers: 5,
-    maxBeneficiaries: 100,
-    price: 50,
-  },
-  pro: {
-    maxUsers: Infinity,
-    maxBeneficiaries: Infinity,
-    price: 99,
-  },
-} as const;
+export { PLAN_LIMITS } from "../shared/billing";
+import { PLAN_LIMITS, billingAccess, renewalEnd, hasPaidTerm } from "../shared/billing";
 
-// Helper to get tier limits for an org
 export async function getOrgLimits(ctx: QueryCtx, orgId: Id<"orgs">) {
   const billing = await ctx.db
     .query("billing")
     .withIndex("by_org", (q) => q.eq("orgId", orgId))
     .first();
-
-  if (!billing) {
-    return PLAN_LIMITS.trial;
-  }
-
-  // Check if trial/subscription is still active
-  const now = Date.now();
-  if (billing.status === "trial" && billing.trialEndsAt && now > billing.trialEndsAt) {
-    // Trial expired - return most restrictive limits
-    return { maxUsers: 0, maxBeneficiaries: 0, price: 0 };
-  }
-  if (billing.status === "active" && billing.paidThroughAt && now > billing.paidThroughAt) {
-    // Subscription expired - return most restrictive limits
-    return { maxUsers: 0, maxBeneficiaries: 0, price: 0 };
-  }
-
-  return PLAN_LIMITS[billing.plan] || PLAN_LIMITS.trial;
+  const access = billingAccess(billing);
+  return access.limits;
 }
 
-// Get billing info for an org
 export const get = query({
   args: {
     orgId: v.id("orgs"),
     sessionToken: v.string(),
   },
   handler: async (ctx, args) => {
-
     // Any member can view billing
-    await requireOrgAccess(ctx, args.orgId, args.sessionToken, ["admin", "approver", "initiator", "clerk", "viewer"]);
+    await requireOrgAccess(ctx, args.orgId, args.sessionToken, [
+      "admin",
+      "approver",
+      "initiator",
+      "clerk",
+      "viewer",
+    ]);
 
     const billing = await ctx.db
       .query("billing")
@@ -80,27 +61,44 @@ export const get = query({
       return null;
     }
 
-    // Calculate days remaining
-    const now = Date.now();
-    let daysRemaining = 0;
-    let isActive = false;
-
-    if (billing.status === "trial" && billing.trialEndsAt) {
-      daysRemaining = Math.max(0, Math.ceil((billing.trialEndsAt - now) / (24 * 60 * 60 * 1000)));
-      isActive = daysRemaining > 0;
-    } else if (billing.status === "active" && billing.paidThroughAt) {
-      daysRemaining = Math.max(0, Math.ceil((billing.paidThroughAt - now) / (24 * 60 * 60 * 1000)));
-      isActive = daysRemaining > 0;
-    }
-
-    // Get limits for current plan
-    const limits = PLAN_LIMITS[billing.plan] || PLAN_LIMITS.trial;
+    // Share invitation seat accounting. An unavailable usage count must not hide renewal.
+    const usage = await Promise.all([
+      teamSeats(ctx, args.orgId),
+      ctx.db
+        .query("beneficiaries")
+        .withIndex("by_org", (q) => q.eq("orgId", args.orgId))
+        .take(10001),
+      ctx.db
+        .query("safes")
+        .withIndex("by_org", (q) => q.eq("orgId", args.orgId))
+        .take(1001),
+    ])
+      .then(([seats, recipients, accounts]) =>
+        recipients.length > 10000 || accounts.length > 1000
+          ? null
+          : {
+              activeMembers: seats.active,
+              reservedSeats: seats.reserved,
+              pendingInvitations: seats.reserved - seats.active,
+              recipients: recipients.length,
+              archivedRecipients: recipients.filter((r) => r.isActive === false)
+                .length,
+              activeAccounts: accounts.filter((a) => a.isActive !== false)
+                .length,
+            },
+      )
+      .catch(() => null);
 
     return {
       ...billing,
-      daysRemaining,
-      isActive,
-      limits,
+      ...billingAccess(billing),
+      usage,
+      paymentConfig: paymentConfiguration(),
+      payments: await ctx.db
+        .query("billingPayments")
+        .withIndex("by_org", (q) => q.eq("orgId", args.orgId))
+        .order("desc")
+        .take(50),
     };
   },
 });
@@ -110,57 +108,30 @@ export const get = query({
 // treasury address has been verified against the claimed txHash. The client
 // can no longer declare its own paidThroughAt.
 
-// ERC-20 Transfer event topic (keccak256("Transfer(address,address,address)"))
-const TRANSFER_TOPIC = "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef";
-
-const PAYMENT_TOKEN_BY_CHAIN: Record<number, string> = {
-  1: "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48", // USDC (Ethereum mainnet)
-};
-
-const RPC_URL_BY_CHAIN: Record<number, string> = {
-  1: "https://ethereum-rpc.publicnode.com",
-};
-
 export const PLAN_PERIOD_DAYS = 30;
-
-function getTreasuryAddress(): string {
-  const raw = (
-    process.env.DISBURSE_BENEFICIARY_ADDRESS ??
-    process.env.VITE_DISBURSE_BENEFICIARY_ADDRESS ??
-    ""
-  )
-    .toString()
-    .trim();
-  if (!raw.startsWith("0x") || raw.length !== 42) {
-    throw new Error(
-      "Subscription payments are not configured (missing DISBURSE_BENEFICIARY_ADDRESS)"
-    );
-  }
-  return raw.toLowerCase();
-}
-
-function getPaymentChainId(): number {
-  const raw = (
-    process.env.DISBURSE_BENEFICIARY_CHAIN_ID ??
-    process.env.VITE_DISBURSE_BENEFICIARY_CHAIN_ID ??
-    "1"
-  ).toString();
-  const n = Number(raw);
-  return Number.isInteger(n) && n > 0 ? n : 1;
-}
 
 // Admin gate for billing actions (actions cannot touch the DB directly)
 export const assertBillingAdmin = internalQuery({
   args: { orgId: v.id("orgs"), sessionToken: v.string() },
   handler: async (ctx, args) => {
-    await requireOrgAccess(ctx, args.orgId, args.sessionToken, ["admin"]);
-    return { ok: true };
+    const { user } = await requireOrgAccess(
+      ctx,
+      args.orgId,
+      args.sessionToken,
+      ["admin"],
+    );
+    const safes = await ctx.db
+      .query("safes")
+      .withIndex("by_org", (q) => q.eq("orgId", args.orgId))
+      .collect();
+    return { walletAddress: user.walletAddress, safes };
   },
 });
 
 // Persist a verified payment. Internal so only the verification action writes it.
 export const recordVerifiedPayment = internalMutation({
   args: {
+    checkoutId: v.optional(v.id("billingCheckouts")),
     orgId: v.id("orgs"),
     txHash: v.string(),
     chainId: v.number(),
@@ -172,13 +143,41 @@ export const recordVerifiedPayment = internalMutation({
     // Idempotency / double-spend guard: a txHash funds exactly one period
     const existing = await ctx.db
       .query("billingPayments")
-      .withIndex("by_tx", (q) => q.eq("txHash", args.txHash))
+      .withIndex("by_tx", (q) => q.eq("txHash", args.txHash.toLowerCase()))
       .first();
     if (existing) {
+      if (
+        existing.orgId === args.orgId &&
+        existing.plan === args.plan &&
+        existing.chainId === args.chainId &&
+        (!args.checkoutId || existing.checkoutId === args.checkoutId)
+      )
+        return { verified: true };
       throw new Error("Payment transaction has already been used");
     }
 
     const now = Date.now();
+    if (args.checkoutId) {
+      const checkout = await ctx.db.get(args.checkoutId);
+      if (
+        !checkout ||
+        checkout.orgId !== args.orgId ||
+        checkout.plan !== args.plan ||
+        checkout.chainId !== args.chainId ||
+        checkout.tokenAddress.toLowerCase() !==
+          args.tokenAddress.toLowerCase() ||
+        BigInt(checkout.amountRaw) !== BigInt(args.amountRaw) ||
+        (checkout.txHash &&
+          checkout.txHash.toLowerCase() !== args.txHash.toLowerCase()) ||
+        !["requested", "submitted"].includes(checkout.status)
+      )
+        throw new Error("Verified payment does not match this checkout");
+      await ctx.db.patch(checkout._id, {
+        status: "submitted",
+        txHash: args.txHash.toLowerCase(),
+        updatedAt: now,
+      });
+    }
     await ctx.db.insert("billingPayments", {
       ...args,
       paidThroughAt: now + PLAN_PERIOD_DAYS * 24 * 60 * 60 * 1000,
@@ -202,7 +201,7 @@ export const verifySubscriptionPayment = action({
   },
   handler: async (ctx, args) => {
     // Only org admins may initiate a subscription payment
-    await ctx.runQuery(internal.billing.assertBillingAdmin, {
+    const payer = await ctx.runQuery(internal.billing.assertBillingAdmin, {
       orgId: args.orgId,
       sessionToken: args.sessionToken,
     });
@@ -218,57 +217,24 @@ export const verifySubscriptionPayment = action({
     }
     const treasury = getTreasuryAddress();
 
-    const rpcUrl =
-      process.env[`RPC_URL_${chainId}` as "RPC_URL_1"] ?? RPC_URL_BY_CHAIN[chainId];
-    if (!rpcUrl) {
-      throw new Error(`No RPC configured for chain ${chainId}`);
-    }
-
-    const client = createPublicClient({ transport: http(rpcUrl) });
-
-    let receipt;
-    try {
-      receipt = await client.getTransactionReceipt({
-        hash: args.txHash as `0x${string}`,
-      });
-    } catch {
-      throw new Error(
-        "Transaction not found or not yet confirmed. Try again after it is mined."
-      );
-    }
-
-    if (receipt.status !== "success") {
-      throw new Error("Payment transaction reverted");
-    }
-
-    // Reject stale payments (7 days) so old transfers can't be replayed later
-    const block = await client.getBlock({ blockNumber: receipt.blockNumber });
-    const ageSeconds = Date.now() / 1000 - Number(block.timestamp);
-    if (ageSeconds > 7 * 24 * 60 * 60) {
-      throw new Error("Payment transaction is older than 7 days");
-    }
-
-    // Sum ERC-20 Transfer logs to the treasury for this token
-    const toPadded = "0x" + treasury.replace("0x", "").padStart(64, "0");
-    let amountRaw = 0n;
-    for (const log of receipt.logs) {
-      if (log.address.toLowerCase() !== tokenAddress.toLowerCase()) continue;
-      if ((log.topics[0] ?? "") !== TRANSFER_TOPIC) continue;
-      if ((log.topics[2] ?? "").toLowerCase() !== toPadded) continue;
-      amountRaw += BigInt(log.data);
-    }
-
-    const requiredRaw =
-      BigInt(Math.round(PLAN_LIMITS[args.plan].price)) * 1_000_000n; // USDC = 6 decimals
-    if (amountRaw < requiredRaw) {
-      throw new Error(
-        `Payment insufficient: received ${amountRaw} base units, required ${requiredRaw}`
-      );
-    }
+    const { amountRaw } = await verifyBillingReceipt({
+      chainId,
+      tokenAddress,
+      treasury,
+      txHash: args.txHash,
+      amountRaw: String(BigInt(PLAN_LIMITS[args.plan].price) * 1_000_000n),
+      maxAgeDays: 7,
+      allowedPayers: [
+        payer.walletAddress,
+        ...payer.safes
+          .filter((s) => s.chainId === chainId)
+          .map((s) => s.safeAddress),
+      ],
+    });
 
     await ctx.runMutation(internal.billing.recordVerifiedPayment, {
       orgId: args.orgId,
-      txHash: args.txHash,
+      txHash: args.txHash.toLowerCase(),
       chainId,
       plan: args.plan,
       tokenAddress,
@@ -280,139 +246,143 @@ export const verifySubscriptionPayment = action({
 });
 
 // Subscribe to a plan — requires a server-verified on-chain payment.
+async function redeemVerifiedPayment(
+  ctx: MutationCtx,
+  args: { orgId: Id<"orgs">; plan: "starter" | "team" | "pro"; txHash: string },
+  actorUserId: Id<"users">,
+) {
+  const now = Date.now();
+
+  if (!isValidTxHash(args.txHash)) {
+    throw new Error("Invalid transaction hash");
+  }
+
+  const billing = await ctx.db
+    .query("billing")
+    .withIndex("by_org", (q) => q.eq("orgId", args.orgId))
+    .first();
+
+  if (!billing) {
+    throw new Error("Billing record not found");
+  }
+
+  // C-03: activation requires a previously verified on-chain payment
+  const payment = await ctx.db
+    .query("billingPayments")
+    .withIndex("by_tx", (q) => q.eq("txHash", args.txHash.toLowerCase()))
+    .first();
+
+  if (!payment) {
+    throw new Error(
+      "Payment not verified. Call verifySubscriptionPayment first; the transaction must transfer the plan price to the Disburse treasury.",
+    );
+  }
+  if (payment.orgId !== args.orgId || payment.plan !== args.plan) {
+    throw new Error(
+      "Verified payment does not match this organization or plan",
+    );
+  }
+
+  if (payment.redeemedAt !== undefined) {
+    await finishBillingCheckout(ctx, payment);
+    return { success: true };
+  }
+  const history = await ctx.db
+    .query("auditLog")
+    .withIndex("by_org", (q) => q.eq("orgId", args.orgId))
+    .collect();
+  if (
+    history.some(
+      (entry) =>
+        ["billing.subscribed", "billing.upgraded"].includes(entry.action) &&
+        String(entry.metadata?.txHash ?? "").toLowerCase() ===
+          args.txHash.toLowerCase(),
+    )
+  ) {
+    await ctx.db.patch(payment._id, { redeemedAt: now });
+    await finishBillingCheckout(ctx, payment);
+    return { success: true };
+  }
+  if (
+    hasPaidTerm(billing, now) &&
+    PLAN_LIMITS[args.plan].price < PLAN_LIMITS[billing.plan].price
+  )
+    throw new Error("Choose a lower plan after the current paid period ends.");
+  const previousPlan = billing.plan;
+  const paidThroughAt = renewalEnd(billing, args.plan, now);
+  await ctx.db.patch(payment._id, { redeemedAt: now, paidThroughAt });
+  await finishBillingCheckout(ctx, payment);
+
+  await ctx.db.patch(billing._id, {
+    plan: args.plan,
+    status: "active",
+    paidThroughAt,
+    licenseGrant: undefined,
+    licenseRevision: (billing.licenseRevision ?? 0) + 1,
+    updatedAt: now,
+  });
+
+  // Audit log
+  await appendAudit(ctx, {
+    orgId: args.orgId,
+    actorUserId,
+    action: "billing.subscribed",
+    objectType: "billing",
+    objectId: billing._id,
+    metadata: {
+      previousPlan,
+      newPlan: args.plan,
+      txHash: args.txHash,
+      paidThroughAt,
+      price: PLAN_LIMITS[args.plan].price,
+      serverVerified: true,
+      replacedGrant: billing.licenseGrant?.kind,
+    },
+    timestamp: now,
+  });
+
+  return { success: true };
+}
+
 export const subscribe = mutation({
   args: {
     orgId: v.id("orgs"),
     sessionToken: v.string(),
-    plan: v.union(
-      v.literal("starter"),
-      v.literal("team"),
-      v.literal("pro")
-    ),
+    plan: v.union(v.literal("starter"), v.literal("team"), v.literal("pro")),
     txHash: v.string(),
   },
   handler: async (ctx, args) => {
-    const now = Date.now();
-
-    // Only admin can change subscription
-    const { user } = await requireOrgAccess(ctx, args.orgId, args.sessionToken, ["admin"]);
-
-    if (!isValidTxHash(args.txHash)) {
-      throw new Error("Invalid transaction hash");
-    }
-
-    const billing = await ctx.db
-      .query("billing")
-      .withIndex("by_org", (q) => q.eq("orgId", args.orgId))
-      .first();
-
-    if (!billing) {
-      throw new Error("Billing record not found");
-    }
-
-    // C-03: activation requires a previously verified on-chain payment
-    const payment = await ctx.db
-      .query("billingPayments")
-      .withIndex("by_tx", (q) => q.eq("txHash", args.txHash))
-      .first();
-
-    if (!payment) {
-      throw new Error(
-        "Payment not verified. Call verifySubscriptionPayment first; the transaction must transfer the plan price to the Disburse treasury."
-      );
-    }
-    if (payment.orgId !== args.orgId || payment.plan !== args.plan) {
-      throw new Error("Verified payment does not match this organization or plan");
-    }
-
-    const previousPlan = billing.plan;
-
-    await ctx.db.patch(billing._id, {
-      plan: args.plan,
-      status: "active",
-      paidThroughAt: payment.paidThroughAt,
-      updatedAt: now,
-    });
-
-    // Audit log
-    await appendAudit(ctx, {
-      orgId: args.orgId,
-      actorUserId: user._id,
-      action: "billing.subscribed",
-      objectType: "billing",
-      objectId: billing._id,
-      metadata: {
-        previousPlan,
-        newPlan: args.plan,
-        txHash: args.txHash,
-        paidThroughAt: payment.paidThroughAt,
-        price: PLAN_LIMITS[args.plan].price,
-        serverVerified: true,
-      },
-      timestamp: now,
-    });
-
-    return { success: true };
+    const { user } = await requireOrgAccess(
+      ctx,
+      args.orgId,
+      args.sessionToken,
+      ["admin"],
+    );
+    return redeemVerifiedPayment(ctx, args, user._id);
   },
 });
 
-// Legacy alias: upgrade straight to pro. Same server-verified payment
-// requirement as `subscribe` — the client can no longer self-declare payment.
-export const upgradeToPro = mutation({
-  args: {
-    orgId: v.id("orgs"),
-    sessionToken: v.string(),
-    txHash: v.string(),
-  },
+// A verified checkout settles even after its browser session or trial expires.
+export const redeemCheckout = internalMutation({
+  args: { checkoutId: v.id("billingCheckouts") },
   handler: async (ctx, args) => {
-    const now = Date.now();
-
-    // Only admin can upgrade
-    const { user } = await requireOrgAccess(ctx, args.orgId, args.sessionToken, ["admin"]);
-
-    if (!isValidTxHash(args.txHash)) {
-      throw new Error("Invalid transaction hash");
-    }
-
-    const billing = await ctx.db
-      .query("billing")
-      .withIndex("by_org", (q) => q.eq("orgId", args.orgId))
-      .first();
-
-    if (!billing) {
-      throw new Error("Billing record not found");
-    }
-
+    const checkout = await ctx.db.get(args.checkoutId);
+    if (
+      !checkout?.txHash ||
+      !["submitted", "applied"].includes(checkout.status)
+    )
+      throw new Error("Checkout has no verified payment");
     const payment = await ctx.db
       .query("billingPayments")
-      .withIndex("by_tx", (q) => q.eq("txHash", args.txHash))
-      .first();
-
-    if (!payment || payment.orgId !== args.orgId || payment.plan !== "pro") {
-      throw new Error(
-        "Payment not verified for the pro plan. Call verifySubscriptionPayment first."
-      );
-    }
-
-    await ctx.db.patch(billing._id, {
-      plan: "pro",
-      status: "active",
-      paidThroughAt: payment.paidThroughAt,
-      updatedAt: now,
-    });
-
-    // Audit log
-    await appendAudit(ctx, {
-      orgId: args.orgId,
-      actorUserId: user._id,
-      action: "billing.upgraded",
-      objectType: "billing",
-      objectId: billing._id,
-      metadata: { txHash: args.txHash, paidThroughAt: payment.paidThroughAt, serverVerified: true },
-      timestamp: now,
-    });
-
-    return { success: true };
+      .withIndex("by_tx", (q) => q.eq("txHash", checkout.txHash!))
+      .unique();
+    if (payment?.checkoutId !== checkout._id)
+      throw new Error("Checkout payment has not been verified");
+    return redeemVerifiedPayment(
+      ctx,
+      { orgId: checkout.orgId, plan: checkout.plan, txHash: checkout.txHash },
+      checkout.createdBy,
+    );
   },
 });
 
@@ -434,21 +404,7 @@ export const isActive = query({
       .withIndex("by_org", (q) => q.eq("orgId", args.orgId))
       .first();
 
-    if (!billing) {
-      return false;
-    }
-
-    const now = Date.now();
-
-    if (billing.status === "trial" && billing.trialEndsAt) {
-      return now < billing.trialEndsAt;
-    }
-
-    if (billing.status === "active" && billing.paidThroughAt) {
-      return now < billing.paidThroughAt;
-    }
-
-    return false;
+    return billingAccess(billing).isActive;
   },
 });
 

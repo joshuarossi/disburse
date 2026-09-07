@@ -1,16 +1,14 @@
 import { ReactNode, useEffect, useState } from 'react';
-import { useAccount } from 'wagmi';
 import { useQuery, useMutation } from 'convex/react';
 import { api } from '../../convex/_generated/api';
 import { ThemeContext, Theme } from '../lib/theme';
-import { getSessionToken } from '@/lib/session';
+import { useSessionToken } from '@/lib/session';
 
 interface ThemeProviderProps {
   children: ReactNode;
 }
 
 export function ThemeProvider({ children }: ThemeProviderProps) {
-  const { address } = useAccount();
   const [theme, setThemeState] = useState<Theme>(() => {
     // Initialize from localStorage or system preference
     const stored = localStorage.getItem('theme') as Theme | null;
@@ -21,13 +19,13 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
     if (window.matchMedia('(prefers-color-scheme: light)').matches) {
       return 'light';
     }
-    return 'dark'; // Default
+    return 'light'; // Finance workspace defaults to a light reading surface
   });
 
-  const token = getSessionToken();
+  const token = useSessionToken();
   const session = useQuery(
     api.auth.validateSession,
-    address && token ? { token } : 'skip'
+    token ? { token } : 'skip',
   );
 
   const updatePreferredTheme = useMutation(api.users.updatePreferredTheme);
@@ -51,7 +49,7 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
     setThemeState(newTheme);
 
     // Save to backend if user is authenticated (identity from session token)
-    if (address && token) {
+    if (session && token) {
       try {
         await updatePreferredTheme({
           sessionToken: token,

@@ -1,6 +1,6 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
-import { verifyMessage } from "viem";
+import { verifyMessage } from "./lib/signatures";
 import { assertValidAddress } from "./lib/validation";
 import { hashSessionToken } from "./lib/rbac";
 import { getOrCreateUser } from "./lib/users";
@@ -9,14 +9,14 @@ const NONCE_TTL_MS = 10 * 60 * 1000; // pending sign-in nonces
 const SESSION_TTL_MS = 7 * 24 * 60 * 60 * 1000; // authenticated sessions
 
 // Domains allowed inside the signed SIWE message. Comma-separated env var;
-// when unset (local dev), domain enforcement is skipped and logged.
-function getAllowedDomains(): string[] | null {
+// Defaults to the domain the server uses to build challenges; never skips verification.
+function getAllowedDomains(): string[] {
   const raw = process.env.SIWE_ALLOWED_DOMAINS ?? "";
   const domains = raw
     .split(",")
     .map((d) => d.trim().toLowerCase())
     .filter(Boolean);
-  return domains.length > 0 ? domains : null;
+  return domains.length > 0 ? domains : [(process.env.SIWE_DOMAIN ?? "app.disburse.xyz").toLowerCase()];
 }
 
 function buildSiweMessage(opts: {
@@ -179,14 +179,8 @@ export const verifySignature = mutation({
 
     // Domain allowlist (enforced in production via SIWE_ALLOWED_DOMAINS)
     const allowedDomains = getAllowedDomains();
-    if (allowedDomains) {
-      if (!allowedDomains.includes(parsed.domain)) {
-        throw new Error(`Untrusted domain in sign-in message: ${parsed.domain}`);
-      }
-    } else {
-      console.warn(
-        "[Auth] SIWE_ALLOWED_DOMAINS not set — skipping domain verification"
-      );
+    if (!allowedDomains.includes(parsed.domain)) {
+      throw new Error(`Untrusted domain in sign-in message: ${parsed.domain}`);
     }
 
     // Message must not already be expired per its own Expiration Time

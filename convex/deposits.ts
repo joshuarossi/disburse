@@ -1,206 +1,161 @@
 "use node";
-
+import { env as serverEnvironment } from "node:process";
 import { v } from "convex/values";
-import { action } from "./_generated/server";
-import { getAddress, formatUnits } from "viem";
-import { api } from "./_generated/api";
-
-const SAFE_TX_SERVICE_URL_BY_CHAIN: Record<number, string> = {
-  1: "https://safe-transaction-mainnet.safe.global/api",
-  137: "https://safe-transaction-polygon.safe.global/api",
-  8453: "https://safe-transaction-base.safe.global/api",
-  42161: "https://safe-transaction-arbitrum.safe.global/api",
-  11155111: "https://safe-transaction-sepolia.safe.global/api",
-  84532: "https://safe-transaction-base-sepolia.safe.global/api",
-};
-
-const SYNC_THROTTLE_MS = 10 * 60 * 1000;
-const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
-// M-02 fix: bound the pagination loop so a Safe with a huge history cannot
-// run an unbounded number of API calls inside a single action invocation.
-const MAX_PAGES_PER_SAFE = 25;
-
-function getSafeTxServiceUrl(chainId: number): string {
-  const url = SAFE_TX_SERVICE_URL_BY_CHAIN[chainId];
-  if (!url) {
-    throw new Error(`Unsupported chain for Safe: ${chainId}`);
-  }
-  return url;
-}
-
-function normalizeTimestamp(value: unknown): number | null {
-  if (typeof value === "number" && Number.isFinite(value)) {
-    return value < 1_000_000_000_000 ? value * 1000 : value;
-  }
-  if (typeof value === "string") {
-    const parsed = Date.parse(value);
-    return Number.isNaN(parsed) ? null : parsed;
-  }
-  return null;
-}
-
-type IncomingTransfer = {
-  executionDate?: string;
-  timestamp?: number;
-  date?: string;
-  transactionHash?: string;
-  txHash?: string;
-  from?: string;
-  to?: string;
-  value?: string | number;
-  amount?: string | number;
-  tokenAddress?: string | null;
-  tokenInfo?: {
-    address?: string;
-    symbol?: string;
-    decimals?: number;
-  };
-  blockNumber?: number;
-};
+import { action, internalAction } from "./_generated/server";
+import { api, internal } from "./_generated/api";
+import { environmentValidator } from "./lib/activityEnvironment";
+import { chainEnvironment } from "../shared/assets";
+import {
+  DEPOSIT_PAGE_SIZE,
+  depositScanUrl,
+  validateDepositCursor,
+  parseDeposit,
+  parseAccountTransfer,
+} from "./lib/depositSync";
 
 export const syncForOrg = action({
   args: {
     orgId: v.id("orgs"),
     sessionToken: v.string(),
+    environment: v.optional(environmentValidator),
+    force: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
     const safes = await ctx.runQuery(api.safes.getForOrg, {
       orgId: args.orgId,
       sessionToken: args.sessionToken,
     });
-
-    const apiKey = process.env.SAFE_TX_SERVICE_API_KEY;
-
-    let inserted = 0;
-
+    let queued = 0;
     for (const safe of safes) {
-      const safeAddress = getAddress(safe.safeAddress);
-      const baseUrl = getSafeTxServiceUrl(safe.chainId);
-      const lastSyncedAt = await ctx.runQuery(api.depositsData.getSyncForSafe, {
-        orgId: args.orgId,
-        sessionToken: args.sessionToken,
-        safeId: safe._id,
-      });
-
-      if (lastSyncedAt && Date.now() - lastSyncedAt < SYNC_THROTTLE_MS) {
+      if (
+        args.environment &&
+        chainEnvironment(safe.chainId) !== args.environment
+      )
         continue;
-      }
-
-      const latestTimestamp = await ctx.runQuery(api.depositsData.getLatestForSafe, {
-        orgId: args.orgId,
-        sessionToken: args.sessionToken,
-        safeId: safe._id,
-      });
-
-      const sinceTimestamp = Math.max(safe.createdAt ?? 0, latestTimestamp ?? 0);
-
-      let nextUrl: string | null = `${baseUrl}/v1/safes/${safeAddress}/incoming-transfers/`;
-      const syncAttemptAt = Date.now();
-      let pageCount = 0;
-
-      while (nextUrl) {
-        if (pageCount >= MAX_PAGES_PER_SAFE) {
-          console.warn("[Deposits] Pagination cap reached; remaining transfers will sync on next run", {
-            safeAddress,
-            chainId: safe.chainId,
-            maxPages: MAX_PAGES_PER_SAFE,
-          });
-          break;
-        }
-        pageCount += 1;
-
-        const response = await fetch(nextUrl, {
-          headers: apiKey ? { Authorization: `Bearer ${apiKey}` } : undefined,
-        });
-
-        if (!response.ok) {
-          const errorBody = await response.text().catch(() => "");
-          console.error("[Deposits] Failed to fetch incoming transfers", {
-            safeAddress,
-            chainId: safe.chainId,
-            status: response.status,
-            body: errorBody,
-          });
-          break;
-        }
-
-        const payload = await response.json();
-        const results: IncomingTransfer[] = payload?.results ?? [];
-        nextUrl = payload?.next ?? null;
-
-        if (!Array.isArray(results) || results.length === 0) {
-          break;
-        }
-
-        for (const transfer of results) {
-          const eventTimestamp =
-            normalizeTimestamp(transfer.executionDate) ??
-            normalizeTimestamp(transfer.timestamp) ??
-            normalizeTimestamp(transfer.date);
-
-          if (!eventTimestamp) {
-            continue;
-          }
-
-          if (eventTimestamp <= sinceTimestamp) {
-            nextUrl = null;
-            break;
-          }
-
-          const rawValue = transfer.value ?? transfer.amount ?? "0";
-          const amountRaw = String(rawValue);
-
-          const tokenAddress =
-            transfer.tokenAddress ??
-            transfer.tokenInfo?.address ??
-            ZERO_ADDRESS;
-
-          const decimals = transfer.tokenInfo?.decimals ?? 18;
-          let amount = amountRaw;
-
-          try {
-            amount = formatUnits(BigInt(amountRaw), decimals);
-          } catch {
-            amount = amountRaw;
-          }
-
-          const txHash = transfer.transactionHash ?? transfer.txHash ?? "";
-          if (!txHash) continue;
-
-          const toAddress = transfer.to ?? safe.safeAddress;
-          const result = await ctx.runMutation(api.depositsData.upsertDeposit, {
-            orgId: safe.orgId,
-            safeId: safe._id,
-            chainId: safe.chainId,
-            safeAddress: safe.safeAddress,
-            tokenAddress,
-            tokenSymbol: transfer.tokenInfo?.symbol ?? "ETH",
-            decimals,
-            amountRaw,
-            amount,
-            txHash,
-            blockNumber: transfer.blockNumber,
-            timestamp: eventTimestamp,
-            fromAddress: transfer.from,
-            toAddress,
-            source: "safe_tx_service",
-            sessionToken: args.sessionToken,
-          });
-          if (result.inserted) {
-            inserted += 1;
-          }
-        }
-      }
-
-      await ctx.runMutation(api.depositsData.upsertSyncForSafe, {
-        orgId: args.orgId,
-        sessionToken: args.sessionToken,
-        safeId: safe._id,
-        chainId: safe.chainId,
-        lastSyncedAt: syncAttemptAt,
-      });
+      if (
+        await ctx.runMutation(internal.depositsData.requestSync, {
+          safeId: safe._id,
+          force: args.force,
+        })
+      )
+        queued++;
     }
+    return {
+      inserted: 0,
+      queued,
+      errors: [] as Array<{ chainId: number; message: string }>,
+    };
+  },
+});
 
-    return { inserted };
+export const process = internalAction({
+  args: { syncId: v.id("depositSyncs") },
+  handler: async (ctx, args): Promise<void> => {
+    for (let page = 0; page < 4; page++) {
+      const state = await ctx.runMutation(
+        internal.depositsData.claimPage,
+        args,
+      );
+      if (!state?.scan) return;
+      const identity = {
+        ...args,
+        generation: state.generation!,
+        cursor: state.scan.cursor,
+        leaseUntil: state.leaseUntil,
+      };
+      try {
+        const cursor = validateDepositCursor(
+          state.scan.cursor,
+          depositScanUrl(
+            state.chainId,
+            state.safeAddress,
+            state.scan.from,
+            state.scan.through,
+            state.scan.scope ?? 'incoming',
+          ),
+        );
+        const response = await fetch(cursor, {
+          headers: serverEnvironment.SAFE_TX_SERVICE_API_KEY
+            ? {
+                Authorization: `Bearer ${serverEnvironment.SAFE_TX_SERVICE_API_KEY}`,
+              }
+            : undefined,
+          signal: AbortSignal.timeout(15_000),
+          redirect: "error",
+        });
+        if (!response.ok) {
+          const retry = response.headers.get("Retry-After");
+          const retryAfterMs = retry
+            ? /^\d+$/.test(retry)
+              ? Number(retry) * 1000
+              : Date.parse(retry) - Date.now()
+            : undefined;
+          await ctx.runMutation(internal.depositsData.failed, {
+            ...identity,
+            retryAfterMs: Number.isFinite(retryAfterMs)
+              ? Math.max(0, retryAfterMs!)
+              : undefined,
+            error: `Deposit history unavailable (HTTP ${response.status}). Retry resumes the unfinished scan.`,
+          });
+          return;
+        }
+        const payload = await response.json();
+        if (
+          !Array.isArray(payload.results) ||
+          payload.results.length > DEPOSIT_PAGE_SIZE ||
+          (payload.next != null && typeof payload.next !== "string") ||
+          (payload.next && !payload.results.length)
+        )
+          throw new Error("Invalid history page");
+        const next = payload.next
+          ? validateDepositCursor(payload.next, cursor, cursor)
+          : null;
+        const transfers = payload.results
+          .map((transfer: Parameters<typeof parseDeposit>[0]) =>
+            (state.scan!.scope === 'all' ? parseAccountTransfer : parseDeposit)(
+              transfer,
+              state.chainId,
+              state.safeAddress,
+              state.scan!.from,
+              state.scan!.through,
+            ),
+          )
+          .filter((d: ReturnType<typeof parseDeposit>) => d !== null)
+          .map((d: NonNullable<ReturnType<typeof parseDeposit>>) => ({
+            ...d,
+            orgId: state.orgId,
+            safeId: state.safeId,
+            chainId: state.chainId,
+            safeAddress: state.safeAddress,
+          }));
+        const stored = await ctx.runMutation(internal.depositsData.storePage, {
+          ...identity,
+          next,
+          deposits: transfers.filter((t: NonNullable<ReturnType<typeof parseDeposit>>) => t.toAddress === state.safeAddress.toLowerCase()),
+          outgoingTransfers: state.scan.scope === 'all' ? transfers.filter((t: NonNullable<ReturnType<typeof parseDeposit>>) => t.fromAddress === state.safeAddress.toLowerCase()) : [],
+        });
+        if (!stored || !next) return;
+      } catch (error) {
+        console.warn(
+          "Deposit scan failed",
+          error instanceof Error
+            ? error.message.split("\n")[0].slice(0, 240)
+            : "Unknown failure",
+        );
+        const detail =
+          error instanceof Error &&
+          /^(Deposit history|Invalid history page|Invalid deposit history)/.test(
+            error.message,
+          )
+            ? error.message
+            : "Deposit history could not be verified";
+        await ctx.runMutation(internal.depositsData.failed, {
+          ...identity,
+          error: `${detail}. Recorded entries are retained; retry resumes the unfinished scan.`,
+        });
+        return;
+      }
+    }
+    await ctx.scheduler.runAfter(1000, internal.deposits.process, args);
   },
 });

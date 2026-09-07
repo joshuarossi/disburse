@@ -1,6 +1,20 @@
 # Release Notes
 
-## v0.3.0 (Current Release)
+## 2.0.0-rc.1, unreleased
+
+The v2 candidate replaces the POC with a finance workspace above customer-controlled Safe accounts. One payment builder handles a single recipient or a batch and preserves saved payout currency and network. Reviewed recipient imports, bills, recurring instructions, named accounts and direct/nested approvals share that workflow.
+
+The release adds contract-based spending allowances, customer-paid managed fees, durable payment recovery, unique invoice receiving addresses with native-fee collection, and reconciliable accounting exports. Operator-managed trials, complimentary grants and reusable free tiers keep SaaS access separate from fund ownership. Customers pay all network and provider fees.
+
+The old payment screens, deprecated relay submission path and unused Safe API Kit dependency have been removed. Typecheck, lint, backend/frontend tests, receiving-contract tests and browser stories run in CI. Public configuration is checked before the coordinated Convex and Cloudflare Pages release build.
+
+This candidate has passed development and Sepolia acceptance described in [QA evidence](QA_V2.md). Live managed relay/scheduling, paid subscription settlement, extension/mobile wallets and external-ledger acceptance remain open. Mainnet invoice issuance stays disabled pending independent contract review. Yield and conversion adapters are not included. See [launch readiness](LAUNCH_READINESS.md), [deployment](DEPLOYMENT.md) and the [active program](../TODOS.md).
+
+## Historical POC releases
+
+The notes below describe earlier implementations, including APIs replaced in v2.
+
+## v0.3.0
 
 ### 🎉 Major Features
 
@@ -54,7 +68,7 @@
 
 ---
 
-# Unreleased
+# Former POC unreleased work
 
 ### ⚡ Gasless Execution
 

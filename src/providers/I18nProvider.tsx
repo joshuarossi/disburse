@@ -1,9 +1,8 @@
 import { ReactNode, useEffect } from 'react';
-import { useAccount } from 'wagmi';
 import { useQuery } from 'convex/react';
 import { api } from '../../convex/_generated/api';
 import { useTranslation } from 'react-i18next';
-import { getSessionToken } from '@/lib/session';
+import { useSessionToken } from '@/lib/session';
 import '../lib/i18n'; // Initialize i18n
 
 interface I18nProviderProps {
@@ -11,13 +10,12 @@ interface I18nProviderProps {
 }
 
 export function I18nProvider({ children }: I18nProviderProps) {
-  const { address } = useAccount();
   const { i18n } = useTranslation();
 
-  const token = getSessionToken();
+  const token = useSessionToken();
   const session = useQuery(
     api.auth.validateSession,
-    address && token ? { token } : 'skip'
+    token ? { token } : 'skip'
   );
 
   useEffect(() => {

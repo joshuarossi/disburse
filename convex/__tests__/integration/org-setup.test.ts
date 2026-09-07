@@ -1,14 +1,14 @@
-import { convexTest } from "convex-test";
-import { describe, it, expect } from "vitest";
-import { api } from "../../_generated/api";
-import schema from "../../schema";
-import { signIn, TEST_ACCOUNTS, TEST_WALLETS } from "../factories";
+import { convexTest } from 'convex-test';
+import { describe, it, expect, vi } from 'vitest';
+import { api } from '../../_generated/api';
+import schema from '../../schema';
+import { signIn, TEST_ACCOUNTS, TEST_WALLETS } from '../factories';
 
 // billing.subscribe only activates plans backed by a server-verified payment
-const TEAM_PAYMENT_TX = "0x" + "ab".repeat(32);
+const TEAM_PAYMENT_TX = '0x' + 'ab'.repeat(32);
 
-describe("Integration: Organization Setup Flow", () => {
-  it("complete org setup: auth -> create org -> link safe", async () => {
+describe('Integration: Organization Setup Flow', () => {
+  it('complete org setup: auth -> create org -> link safe', async () => {
     const t = convexTest(schema);
 
     // Step 1: Generate nonce (creates user, returns server-built SIWE message)
@@ -32,7 +32,7 @@ describe("Integration: Organization Setup Flow", () => {
 
     // Step 3: Create organization
     const orgResult = await t.mutation(api.orgs.create, {
-      name: "Acme Corporation",
+      name: 'Acme Corporation',
       sessionToken,
     });
 
@@ -44,14 +44,14 @@ describe("Integration: Organization Setup Flow", () => {
       sessionToken,
     });
 
-    expect(billing?.plan).toBe("trial");
-    expect(billing?.status).toBe("trial");
+    expect(billing?.plan).toBe('trial');
+    expect(billing?.status).toBe('trial');
     expect(billing?.daysRemaining).toBeGreaterThan(0);
     expect(billing?.isActive).toBe(true);
 
     // Step 5: Link Safe
-    const safeAddress = "0x1234567890123456789012345678901234567890";
-    const safeResult = await t.mutation(api.safes.link, {
+    const safeAddress = '0x1234567890123456789012345678901234567890';
+    const safeResult = await t.action(api.safes.link, {
       orgId: orgResult.orgId as any,
       sessionToken,
       chainId: 11155111, // Sepolia
@@ -74,37 +74,37 @@ describe("Integration: Organization Setup Flow", () => {
     // Verify complete audit trail
     await t.run(async (ctx) => {
       const logs = await ctx.db
-        .query("auditLog")
-        .withIndex("by_org", (q) => q.eq("orgId", orgResult.orgId as any))
+        .query('auditLog')
+        .withIndex('by_org', (q) => q.eq('orgId', orgResult.orgId as any))
         .collect();
 
       expect(logs.length).toBeGreaterThanOrEqual(2);
-      expect(logs.some((l) => l.action === "org.created")).toBe(true);
-      expect(logs.some((l) => l.action === "safe.linked")).toBe(true);
+      expect(logs.some((l) => l.action === 'org.created')).toBe(true);
+      expect(logs.some((l) => l.action === 'safe.linked')).toBe(true);
     });
   });
 
-  it("multi-user org setup: admin creates org -> invites team", async () => {
+  it('multi-user org setup: admin creates org -> invites team', async () => {
     const t = convexTest(schema);
 
     // Admin sets up org
-    const admin = await signIn(t, "admin");
+    const admin = await signIn(t, 'admin');
 
     const orgResult = await t.mutation(api.orgs.create, {
-      name: "Team Org",
+      name: 'Team Org',
       sessionToken: admin.sessionToken,
     });
 
     // Upgrade to team plan for more users (requires a pre-verified payment row;
     // subscribe no longer accepts a client-declared paidThroughAt)
     await t.run(async (ctx) => {
-      await ctx.db.insert("billingPayments", {
+      await ctx.db.insert('billingPayments', {
         orgId: orgResult.orgId as any,
         txHash: TEAM_PAYMENT_TX,
         chainId: 1,
-        plan: "team",
-        tokenAddress: "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
-        amountRaw: "50000000",
+        plan: 'team',
+        tokenAddress: '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48',
+        amountRaw: '50000000',
         paidThroughAt: Date.now() + 30 * 24 * 60 * 60 * 1000,
         verifiedAt: Date.now(),
       });
@@ -113,7 +113,7 @@ describe("Integration: Organization Setup Flow", () => {
     await t.mutation(api.billing.subscribe, {
       orgId: orgResult.orgId as any,
       sessionToken: admin.sessionToken,
-      plan: "team",
+      plan: 'team',
       txHash: TEAM_PAYMENT_TX,
     });
 
@@ -122,7 +122,7 @@ describe("Integration: Organization Setup Flow", () => {
       orgId: orgResult.orgId as any,
       sessionToken: admin.sessionToken,
       memberWalletAddress: TEST_WALLETS.approver,
-      role: "approver",
+      role: 'approver',
     });
     expect(approverResult.membershipId).toBeDefined();
 
@@ -131,7 +131,7 @@ describe("Integration: Organization Setup Flow", () => {
       orgId: orgResult.orgId as any,
       sessionToken: admin.sessionToken,
       memberWalletAddress: TEST_WALLETS.initiator,
-      role: "initiator",
+      role: 'initiator',
     });
     expect(initiatorResult.membershipId).toBeDefined();
 
@@ -140,7 +140,7 @@ describe("Integration: Organization Setup Flow", () => {
       orgId: orgResult.orgId as any,
       sessionToken: admin.sessionToken,
       memberWalletAddress: TEST_WALLETS.clerk,
-      role: "clerk",
+      role: 'clerk',
     });
     expect(clerkResult.membershipId).toBeDefined();
 
@@ -152,26 +152,26 @@ describe("Integration: Organization Setup Flow", () => {
     });
 
     expect(members.length).toBe(4);
-    expect(members.filter((m) => m?.role === "admin").length).toBe(1);
-    expect(members.filter((m) => m?.role === "approver").length).toBe(1);
-    expect(members.filter((m) => m?.role === "initiator").length).toBe(1);
-    expect(members.filter((m) => m?.role === "clerk").length).toBe(1);
-    expect(members.filter((m) => m?.status === "invited").length).toBe(3);
+    expect(members.filter((m) => m?.role === 'admin').length).toBe(1);
+    expect(members.filter((m) => m?.role === 'approver').length).toBe(1);
+    expect(members.filter((m) => m?.role === 'initiator').length).toBe(1);
+    expect(members.filter((m) => m?.role === 'clerk').length).toBe(1);
+    expect(members.filter((m) => m?.status === 'invited').length).toBe(3);
   });
 
   it("org is visible in user's org list", async () => {
     const t = convexTest(schema);
 
-    const admin = await signIn(t, "admin");
+    const admin = await signIn(t, 'admin');
 
     // Create multiple orgs
     await t.mutation(api.orgs.create, {
-      name: "Org A",
+      name: 'Org A',
       sessionToken: admin.sessionToken,
     });
 
     await t.mutation(api.orgs.create, {
-      name: "Org B",
+      name: 'Org B',
       sessionToken: admin.sessionToken,
     });
 
@@ -181,8 +181,15 @@ describe("Integration: Organization Setup Flow", () => {
     });
 
     expect(orgs.length).toBe(2);
-    expect(orgs.some((o) => o?.name === "Org A")).toBe(true);
-    expect(orgs.some((o) => o?.name === "Org B")).toBe(true);
-    expect(orgs.every((o) => o?.role === "admin")).toBe(true);
+    expect(orgs.some((o) => o?.name === 'Org A')).toBe(true);
+    expect(orgs.some((o) => o?.name === 'Org B')).toBe(true);
+    expect(orgs.every((o) => o?.role === 'admin')).toBe(true);
   });
 });
+
+vi.mock('../../lib/safeVerification', () => ({
+  verifySafeOwnership: vi.fn(async () => ({
+    owners: ['0x7e5f4552091a69125d5dfcb7b8c2659029395bdf'],
+    threshold: 1,
+  })),
+}));

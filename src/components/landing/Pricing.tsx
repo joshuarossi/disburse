@@ -2,8 +2,9 @@ import { motion } from 'framer-motion'
 import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router-dom'
 import { Check } from 'lucide-react'
-import { Button } from '@/components/ui/button'
-import { getPlanFeatureKey, PLANS, type PlanKey } from '@/lib/billingPlans'
+import { buttonVariants } from '@/components/ui/button'
+import { getPlanFeatures, PLANS, type PlanKey } from '@/lib/billingPlans'
+import { AVAILABLE_PAID_PLANS } from '../../../shared/billing'
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -64,7 +65,8 @@ export function Pricing() {
           viewport={{ once: true, margin: '-100px' }}
           className="grid grid-cols-1 gap-8 lg:grid-cols-3"
         >
-          {(Object.entries(PLANS) as [PlanKey, typeof PLANS[PlanKey]][]).map(([key, plan]) => {
+          {(['free', ...AVAILABLE_PAID_PLANS] as const).map(key => {
+            const plan = key === 'free' ? { ...PLANS.starter, price: 0 } : PLANS[key]
             const Icon = plan.icon
 
             return (
@@ -106,23 +108,20 @@ export function Pricing() {
                 </div>
 
                 <ul className="mt-6 space-y-3 text-sm text-slate-300">
-                  {plan.features.map((feature, idx) => {
-                    const featureKey = getPlanFeatureKey(idx)
+                  {getPlanFeatures(key === 'free' ? 'starter' : key as PlanKey).map(feature => {
                     return (
-                      <li key={`${key}-${idx}`} className="flex items-start gap-2">
+                      <li key={feature.key} className="flex items-start gap-2">
                         <Check className={`mt-0.5 h-4 w-4 ${plan.popular ? 'text-accent-400' : 'text-green-400'}`} />
-                        {t(`settings.billing.plans.${key}.features.${featureKey}`, { defaultValue: feature })}
+                        {t(`settings.billing.features.${feature.key}`, { defaultValue: feature.text, count: feature.count })}
                       </li>
                     )
                   })}
                 </ul>
 
                 <div className="mt-8">
-                  <Link to="/login">
-                    <Button className="w-full" variant={plan.popular ? 'default' : 'secondary'}>
+                  <Link to="/login" className={buttonVariants({ variant: plan.popular ? 'default' : 'secondary', className: 'w-full' })}>
                       {t('landing.pricing.cta')}
-                    </Button>
-                  </Link>
+                    </Link>
                 </div>
               </motion.div>
             )

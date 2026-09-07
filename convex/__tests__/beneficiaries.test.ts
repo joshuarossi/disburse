@@ -1,5 +1,5 @@
 import { convexTest } from "convex-test";
-import { describe, it, expect, afterEach } from "vitest";
+import { describe, it, expect, afterEach, beforeEach, vi } from "vitest";
 import { api } from "../_generated/api";
 import { Doc } from "../_generated/dataModel";
 import schema from "../schema";
@@ -13,20 +13,26 @@ import {
   TEST_WALLETS,
 } from "./factories";
 
-// convex-test runs scheduled functions on macrotask timers; give them a beat
-// to finish inside the test lifecycle so their writes don't land post-test.
-function drainScheduled(): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, 25));
+const instances: Array<{ finishAllScheduledFunctions: (advanceTimers: () => void) => Promise<void> }> = [];
+function createHarness() {
+  const t = convexTest(schema);
+  instances.push(t);
+  return t;
+}
+async function drainScheduled() {
+  for (const t of instances) await t.finishAllScheduledFunctions(vi.runAllTimers);
 }
 
-describe("Beneficiaries", () => {
-  // convex-test fires scheduled functions on macrotask timers; drain them
-  // after EVERY test so screening-action writes never land post-test.
-  afterEach(() => new Promise((resolve) => setTimeout(resolve, 30)));
+beforeEach(() => vi.useFakeTimers());
+afterEach(async () => {
+  try { await drainScheduled(); }
+  finally { instances.length = 0; vi.useRealTimers(); }
+});
 
+describe("Beneficiaries", () => {
   describe("create", () => {
     it("creates individual beneficiary", async () => {
-      const t = convexTest(schema);
+      const t = createHarness();
 
       let orgId: string;
       await t.run(async (ctx) => {
@@ -62,7 +68,7 @@ describe("Beneficiaries", () => {
     });
 
     it("creates business beneficiary", async () => {
-      const t = convexTest(schema);
+      const t = createHarness();
 
       let orgId: string;
       await t.run(async (ctx) => {
@@ -92,7 +98,7 @@ describe("Beneficiaries", () => {
     });
 
     it("normalizes wallet address to lowercase", async () => {
-      const t = convexTest(schema);
+      const t = createHarness();
 
       let orgId: string;
       await t.run(async (ctx) => {
@@ -122,7 +128,7 @@ describe("Beneficiaries", () => {
     });
 
     it("rejects malformed beneficiary addresses", async () => {
-      const t = convexTest(schema);
+      const t = createHarness();
 
       let orgId: string;
       await t.run(async (ctx) => {
@@ -147,7 +153,7 @@ describe("Beneficiaries", () => {
     });
 
     it("allows admin to create", async () => {
-      const t = convexTest(schema);
+      const t = createHarness();
 
       let orgId: string;
       await t.run(async (ctx) => {
@@ -174,7 +180,7 @@ describe("Beneficiaries", () => {
     });
 
     it("allows initiator to create", async () => {
-      const t = convexTest(schema);
+      const t = createHarness();
 
       let orgId: string;
       await t.run(async (ctx) => {
@@ -202,7 +208,7 @@ describe("Beneficiaries", () => {
     });
 
     it("allows clerk to create", async () => {
-      const t = convexTest(schema);
+      const t = createHarness();
 
       let orgId: string;
       await t.run(async (ctx) => {
@@ -230,7 +236,7 @@ describe("Beneficiaries", () => {
     });
 
     it("rejects viewer role", async () => {
-      const t = convexTest(schema);
+      const t = createHarness();
 
       let orgId: string;
       await t.run(async (ctx) => {
@@ -256,7 +262,7 @@ describe("Beneficiaries", () => {
     });
 
     it("enforces starter tier limit (25 beneficiaries)", async () => {
-      const t = convexTest(schema);
+      const t = createHarness();
 
       let orgId: string;
       await t.run(async (ctx) => {
@@ -289,7 +295,7 @@ describe("Beneficiaries", () => {
     });
 
     it("enforces team tier limit (100 beneficiaries)", async () => {
-      const t = convexTest(schema);
+      const t = createHarness();
 
       let orgId: string;
       await t.run(async (ctx) => {
@@ -322,7 +328,7 @@ describe("Beneficiaries", () => {
     });
 
     it("allows unlimited beneficiaries for pro tier", async () => {
-      const t = convexTest(schema);
+      const t = createHarness();
 
       let orgId: string;
       await t.run(async (ctx) => {
@@ -357,7 +363,7 @@ describe("Beneficiaries", () => {
     });
 
     it("creates audit log", async () => {
-      const t = convexTest(schema);
+      const t = createHarness();
 
       let orgId: string;
       await t.run(async (ctx) => {
@@ -393,8 +399,8 @@ describe("Beneficiaries", () => {
   });
 
   describe("update", () => {
-    it("updates all fields", async () => {
-      const t = convexTest(schema);
+    it("updates directory fields and requests review of replacement payout details", async () => {
+      const t = createHarness();
 
       let orgId: string;
       let beneficiaryId: string;
@@ -425,13 +431,16 @@ describe("Beneficiaries", () => {
         const beneficiary = await ctx.db.get(beneficiaryId as any) as Doc<"beneficiaries"> | null;
         expect(beneficiary?.type).toBe("business");
         expect(beneficiary?.name).toBe("New Name");
-        expect(beneficiary?.walletAddress).toBe("0x9999999999999999999999999999999999999999");
+        expect(beneficiary?.walletAddress).not.toBe("0x9999999999999999999999999999999999999999");
+        expect(beneficiary?.pendingPayoutChangeId).toBeDefined();
+        const request = await ctx.db.get(beneficiary!.pendingPayoutChangeId!);
+        expect(request?.proposed.walletAddress).toBe("0x9999999999999999999999999999999999999999");
         expect(beneficiary?.notes).toBe("New notes");
       });
     });
 
     it("toggles active status", async () => {
-      const t = convexTest(schema);
+      const t = createHarness();
 
       let orgId: string;
       let beneficiaryId: string;
@@ -473,7 +482,7 @@ describe("Beneficiaries", () => {
     });
 
     it("rejects viewer role", async () => {
-      const t = convexTest(schema);
+      const t = createHarness();
 
       let orgId: string;
       let beneficiaryId: string;
@@ -499,7 +508,7 @@ describe("Beneficiaries", () => {
     });
 
     it("creates audit log", async () => {
-      const t = convexTest(schema);
+      const t = createHarness();
 
       let orgId: string;
       let beneficiaryId: string;
@@ -533,7 +542,7 @@ describe("Beneficiaries", () => {
 
   describe("list", () => {
     it("returns all beneficiaries for org", async () => {
-      const t = convexTest(schema);
+      const t = createHarness();
 
       let orgId: string;
       await t.run(async (ctx) => {
@@ -558,7 +567,7 @@ describe("Beneficiaries", () => {
     });
 
     it("filters by activeOnly", async () => {
-      const t = convexTest(schema);
+      const t = createHarness();
 
       let orgId: string;
       await t.run(async (ctx) => {
@@ -585,7 +594,7 @@ describe("Beneficiaries", () => {
     });
 
     it("allows viewer to list", async () => {
-      const t = convexTest(schema);
+      const t = createHarness();
 
       let orgId: string;
       await t.run(async (ctx) => {
@@ -612,7 +621,7 @@ describe("Beneficiaries", () => {
 
   describe("get", () => {
     it("returns beneficiary with all fields", async () => {
-      const t = convexTest(schema);
+      const t = createHarness();
 
       let beneficiaryId: string;
       await t.run(async (ctx) => {
@@ -640,7 +649,7 @@ describe("Beneficiaries", () => {
     });
 
     it("returns null for non-existent beneficiary", async () => {
-      const t = convexTest(schema);
+      const t = createHarness();
 
       // Create then delete a beneficiary so we hold a well-formed ID that no
       // longer points at any document

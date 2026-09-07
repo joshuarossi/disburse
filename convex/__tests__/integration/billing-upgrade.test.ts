@@ -1,5 +1,5 @@
 import { convexTest } from "convex-test";
-import { describe, it, expect, afterEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { api } from "../../_generated/api";
 import { Id } from "../../_generated/dataModel";
 import { MutationCtx } from "../../_generated/server";
@@ -18,7 +18,7 @@ async function insertVerifiedPayment(
   orgId: Id<"orgs">,
   plan: "starter" | "team" | "pro",
   txHash: string,
-  paidThroughAt: number = Date.now() + 30 * 24 * 60 * 60 * 1000
+  paidThroughAt: number = Date.now() + 30 * 24 * 60 * 60 * 1000,
 ): Promise<void> {
   await ctx.db.insert("billingPayments", {
     orgId,
@@ -33,9 +33,10 @@ async function insertVerifiedPayment(
 }
 
 describe("Integration: Billing Upgrade Flow", () => {
-  // Drain convex-test scheduled functions (beneficiary screening actions)
-  // so their writes never land after a test's transaction has closed.
-  afterEach(() => new Promise((resolve) => setTimeout(resolve, 30)));
+  // Screening jobs are outside these billing stories. Keep them from racing
+  // the database assertions or writing after their test has finished.
+  beforeEach(() => vi.useFakeTimers());
+  afterEach(() => { vi.clearAllTimers(); vi.useRealTimers(); });
 
   it("trial -> starter -> team -> pro upgrade path", async () => {
     const t = convexTest(schema);
@@ -60,7 +61,12 @@ describe("Integration: Billing Upgrade Flow", () => {
 
     // Step 2: Upgrade to starter
     await t.run(async (ctx) => {
-      await insertVerifiedPayment(ctx, orgResult.orgId as any, "starter", STARTER_TX);
+      await insertVerifiedPayment(
+        ctx,
+        orgResult.orgId as any,
+        "starter",
+        STARTER_TX,
+      );
     });
 
     await t.mutation(api.billing.subscribe, {
@@ -147,7 +153,12 @@ describe("Integration: Billing Upgrade Flow", () => {
 
     // Upgrade to starter
     await t.run(async (ctx) => {
-      await insertVerifiedPayment(ctx, orgResult.orgId as any, "starter", STARTER_TX);
+      await insertVerifiedPayment(
+        ctx,
+        orgResult.orgId as any,
+        "starter",
+        STARTER_TX,
+      );
     });
 
     await t.mutation(api.billing.subscribe, {
@@ -172,7 +183,7 @@ describe("Integration: Billing Upgrade Flow", () => {
         type: "individual",
         name: "One Too Many",
         beneficiaryAddress: "0x1111111111111111111111111111111111111111",
-      })
+      }),
     ).rejects.toThrow("maximum of 25 beneficiaries");
 
     // Upgrade to team
@@ -211,7 +222,12 @@ describe("Integration: Billing Upgrade Flow", () => {
     });
 
     await t.run(async (ctx) => {
-      await insertVerifiedPayment(ctx, orgResult.orgId as any, "starter", STARTER_TX);
+      await insertVerifiedPayment(
+        ctx,
+        orgResult.orgId as any,
+        "starter",
+        STARTER_TX,
+      );
     });
 
     await t.mutation(api.billing.subscribe, {
@@ -228,7 +244,7 @@ describe("Integration: Billing Upgrade Flow", () => {
         sessionToken: admin.sessionToken,
         memberWalletAddress: TEST_WALLETS.viewer,
         role: "viewer",
-      })
+      }),
     ).rejects.toThrow("maximum of 1 user");
 
     // Upgrade to team
@@ -265,39 +281,35 @@ describe("Integration: Billing Upgrade Flow", () => {
       sessionToken: admin.sessionToken,
     });
 
-    // Subscribe with an already-expired verified payment
+    // Expire the subscription itself; a purchased period starts at redemption.
     await t.run(async (ctx) => {
-      await insertVerifiedPayment(
-        ctx,
-        orgResult.orgId as any,
-        "starter",
-        STARTER_TX,
-        Date.now() - 1000 // Already expired
-      );
+      const billing = await ctx.db
+        .query("billing")
+        .withIndex("by_org", (q) => q.eq("orgId", orgResult.orgId))
+        .first();
+      await ctx.db.patch(billing!._id, {
+        plan: "starter",
+        status: "active",
+        paidThroughAt: Date.now() - 1000,
+      });
     });
 
-    await t.mutation(api.billing.subscribe, {
-      orgId: orgResult.orgId as any,
-      sessionToken: admin.sessionToken,
-      plan: "starter",
-      txHash: STARTER_TX,
-    });
-
-    // Verify isActive returns false
+    // Core access continues on the free fallback.
     const isActive = await t.query(api.billing.isActive, {
       orgId: orgResult.orgId as any,
       sessionToken: admin.sessionToken,
     });
 
-    expect(isActive).toBe(false);
+    expect(isActive).toBe(true);
 
-    // Verify billing shows isActive false
+    // The paid term ended while core access remains available.
     const billing = await t.query(api.billing.get, {
       orgId: orgResult.orgId as any,
       sessionToken: admin.sessionToken,
     });
 
-    expect(billing?.isActive).toBe(false);
+    expect(billing?.isActive).toBe(true);
+    expect(billing?.source).toBe("free");
     expect(billing?.daysRemaining).toBe(0);
   });
 
@@ -331,7 +343,7 @@ describe("Integration: Billing Upgrade Flow", () => {
       sessionToken: admin.sessionToken,
     });
 
-    expect(isActive).toBe(false);
+    expect(isActive).toBe(true);
 
     const billing = await t.query(api.billing.get, {
       orgId: orgResult.orgId as any,
@@ -339,6 +351,7 @@ describe("Integration: Billing Upgrade Flow", () => {
     });
 
     expect(billing?.plan).toBe("trial");
-    expect(billing?.isActive).toBe(false);
+    expect(billing?.isActive).toBe(true);
+    expect(billing?.source).toBe("free");
   });
 });
