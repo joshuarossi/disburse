@@ -12,6 +12,11 @@ export default defineConfig(({ command, mode }) => {
   const qa = command === 'serve' && mode === 'qa';
   const root = path.resolve(__dirname, 'src/dev/qa');
   return {
+    // File-request failures in QA must not depend on a developer's real backend.
+    // Browser stories intercept this reserved address; it is never used in builds.
+    define: qa ? {
+      'import.meta.env.VITE_CONVEX_SITE_URL': JSON.stringify('https://invoice-storage.example.invalid'),
+    } : undefined,
     plugins: [
       qa && {
         name: 'isolated-visual-qa',
