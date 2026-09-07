@@ -25,6 +25,9 @@ vi.mock('@safe-global/safe-deployments', async original => {
   } };
 });
 vi.mock('../lib/managedRelay', () => ({ managedRelay: () => ({ getCapabilities: async () => ({ 11155111: { feeCollector: TEST_WALLETS.viewer, tokens: [{ address: token, decimals: 6 }] } }), getBalance: async () => ({ balance: 100n }), sendTransaction: state.send, getStatus: state.status }) }));
+// Historical signed-fee fixtures exercise recovery after transport retirement.
+// Production configuration refuses these quotes; serviceBillingBoundary tests the real adapter.
+vi.mock('../lib/relayConfiguration', () => ({ relayConfiguration: () => ({ fee: { token: 'USDC', tokenAddress: token, collector: TEST_WALLETS.viewer, amount: '0.05' } }) }));
 vi.mock('../lib/safeVerification', () => ({ getChainClient: () => ({
   getBlockNumber: async () => 123n, getChainId: async () => 11155111,
   getCode: async ({ address }: { address: string }) => state.badCode ? '0x6001' : address.toLowerCase() === CURRENT_ALLOWANCE.address.toLowerCase() ? runtime.runtime : '0x6000',

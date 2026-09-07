@@ -2,6 +2,7 @@ import { getCompatibilityFallbackHandlerDeployments } from '@safe-global/safe-de
 import { keccak256, parseAbi, stringToHex, type Address } from 'viem';
 import { assertSafeIdentity } from './safeIdentity';
 import { getChainClient } from './safeVerification';
+import { supportedSafe4337Handler } from '../../shared/safe4337';
 
 export const authorityAbi = parseAbi([
   'function getOwners() view returns (address[])', 'function getThreshold() view returns (uint256)', 'function nonce() view returns (uint256)',
@@ -15,6 +16,7 @@ export async function assertSignatureHandler(client: ReturnType<typeof getChainC
   if (!slot || slot.length !== 66) throw new Error('Could not verify the owning account signature handler');
   const handler = `0x${slot.slice(-40)}` as Address;
   const code = await client.getCode({ address: handler, blockNumber });
+  if (supportedSafe4337Handler(chainId, handler, code)) return;
   const deployments = ['1.3.0', '1.4.1'].map(version => getCompatibilityFallbackHandlerDeployments({ version, network: String(chainId) })).filter(d => !!d);
   if (!code || !deployments.some(d => {
     const network = d.networkAddresses[String(chainId)];

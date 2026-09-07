@@ -1,3 +1,4 @@
+import { userErrorMessage } from '@/lib/userErrors';
 import { useState } from "react";
 import { useMutation } from "convex/react";
 import { api } from "../../../convex/_generated/api";
@@ -45,9 +46,7 @@ export function AccountNameEditor({
             onClose();
           } catch (e) {
             setError(
-              e instanceof Error
-                ? e.message
-                : "Could not save the account name. Try again.",
+              userErrorMessage(e, "Could not save the account name. Try again."),
             );
           } finally {
             setSaving(false);

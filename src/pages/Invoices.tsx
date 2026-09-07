@@ -1,3 +1,4 @@
+import { userErrorMessage } from '@/lib/userErrors';
 import { useActivityEnvironment } from "@/features/workspace/ActivityEnvironment";
 import { chainEnvironment } from "../../shared/assets";
 import { useState } from "react";
@@ -143,7 +144,7 @@ export default function Invoices() {
       });
       navigate(`/org/${orgId}/disbursements?focus=${result.disbursementId}`);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Could not prepare payment");
+      setError(userErrorMessage(e, "Could not prepare payment"));
     } finally {
       setBusy(false);
     }
@@ -527,7 +528,7 @@ export default function Invoices() {
                   setParams({ view: "void" });
                 } catch (e) {
                   setError(
-                    e instanceof Error ? e.message : "Could not void bill",
+                    userErrorMessage(e, "Could not void bill"),
                   );
                   setVoiding(null);
                 } finally {

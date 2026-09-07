@@ -1,3 +1,4 @@
+import { userErrorMessage } from '@/lib/userErrors';
 import { useActivityEnvironment } from "@/features/workspace/ActivityEnvironment";
 import { chainEnvironment } from "../../shared/assets";
 import { useState } from "react";
@@ -109,7 +110,7 @@ function InvoiceEditor({
             onClose();
           } catch (e) {
             setError(
-              e instanceof Error ? e.message : "Could not save invoice.",
+              userErrorMessage(e, "Could not save invoice."),
             );
           } finally {
             setBusy(false);
@@ -370,11 +371,11 @@ function InvoiceDetails({
     try {
       const result = await work();
       if (result && typeof result === "object" && "tone" in result && result.tone === "info") setMessageTone("info");
-      setMessage(result && typeof result === "object" && "message" in result && typeof result.message === "string" ? result.message : success);
+      setMessage(result && typeof result === "object" && "message" in result && typeof result.message === "string" ? userErrorMessage({ message: result.message }, success) : success);
     } catch (e) {
       setMessageTone("error");
       setMessage(
-        e instanceof Error ? e.message : "Could not complete the action.",
+        userErrorMessage(e, "Could not complete the action."),
       );
     } finally {
       setBusy(false);

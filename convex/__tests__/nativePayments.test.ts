@@ -149,6 +149,20 @@ it("waits for confirmation depth before finalizing a Safe failure", async () => 
   expect(await t.run(ctx => ctx.db.get(ids.disbursementId))).toMatchObject({ status: "relaying" });
 });
 
+it('does not finalize a Safe failure from a replaced block', async () => {
+  const { t, ids, args } = await setup();
+  await t.action(api.nativePayments.start, args);
+  await t.run(ctx => ctx.db.patch(ids.disbursementId, { txHash }));
+  chain.getBlock.mockResolvedValue({ number: 490n, hash: `0x${'99'.repeat(32)}`, timestamp: BigInt(settledAt / 1000) });
+  chain.getTransactionReceipt.mockResolvedValue({ ...receipt(ids.safeAddress), logs: [{
+    address: ids.safeAddress,
+    topics: encodeEventTopics({ abi: parseAbi(['event ExecutionFailure(bytes32 txHash,uint256 payment)']), eventName: 'ExecutionFailure' }),
+    data: encodeAbiParameters([{ type: 'bytes32' }, { type: 'uint256' }], [safeTxHash, 0n]),
+  }] });
+  await t.action(internal.nativePayments.reconcile, { disbursementId: ids.disbursementId });
+  expect(await t.run(ctx => ctx.db.get(ids.disbursementId))).toMatchObject({ status: 'relaying' });
+});
+
 it("saves a network checkpoint before broadcasting and rejects another claim", async () => {
   const { t, args } = await setup();
   await t.action(api.nativePayments.start, args);

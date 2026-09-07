@@ -12,6 +12,13 @@ import { balanceProof } from './lib/balanceProof';
 import { licenseTierValidator, licenseGrantValidator } from './lib/licenseValidators';
 
 export default defineSchema({
+  customerOperations: defineTable({
+    orgId: v.id('orgs'), userId: v.id('users'), walletAddress: v.string(),
+    record: v.string(), hash: v.string(), chainId: v.number(), safeId: v.optional(v.id('safes')),
+    state: v.union(v.literal('pending'), v.literal('confirmed'), v.literal('failed'), v.literal('expired')),
+    open: v.boolean(), fee: v.string(), feePaid: v.boolean(), feeTxHash: v.optional(v.string()), workTxHash: v.optional(v.string()), workSuccess: v.optional(v.boolean()),
+    createdAt: v.number(), checkedAt: v.optional(v.number()), expiresAt: v.number(), scanFrom: v.string(),
+  }).index('by_owner_open', ['orgId', 'userId', 'open']).index('by_payer_state', ['walletAddress', 'chainId', 'state']).index('by_hash', ['hash']),
   accountBalanceChecks: defineTable({ orgId: v.id('orgs'), ...balanceProof, checkedBy: v.id('users'), checkedAt: v.number() })
     .index('by_org_environment', ['orgId', 'environment']),
   accountingProfiles: defineTable({ orgId: v.id('orgs'), currency: bookCurrency, bookName: v.string(),
@@ -195,7 +202,7 @@ export default defineSchema({
   }).index("by_token_hash", ["tokenHash"]).index("by_org", ["orgId"]).index("by_org_email", ["orgId", "email"]).index("by_org_status", ["orgId", "status"]).index("by_org_request", ["orgId", "requestId"]),
   emailDeliveries: defineTable({
     orgId: v.id("orgs"), invitationId: v.id("teamInvitations"), context: v.string(), sealedPayload: v.optional(v.string()),
-    status: v.union(v.literal("queued"), v.literal("sending"), v.literal("submitted"), v.literal("delivered"), v.literal("bounced"), v.literal("failed"), v.literal("unknown"), v.literal("cancelled")),
+    status: v.union(v.literal("ready_to_share"), v.literal("queued"), v.literal("sending"), v.literal("submitted"), v.literal("delivered"), v.literal("bounced"), v.literal("failed"), v.literal("unknown"), v.literal("cancelled")),
     attempts: v.number(), createdAt: v.number(), updatedAt: v.number(), firstAttemptAt: v.optional(v.number()), leaseUntil: v.optional(v.number()), nextAttemptAt: v.optional(v.number()),
     providerId: v.optional(v.string()), error: v.optional(v.string()), providerEventAt: v.optional(v.number()), providerEventId: v.optional(v.string()),
   }).index("by_next_attempt", ["nextAttemptAt"]).index("by_provider", ["providerId"]),
@@ -384,6 +391,7 @@ export default defineSchema({
   disbursements: defineTable({
     cancellationId: v.optional(v.id('accountCancellations')), cancellationConfirmedAt: v.optional(v.number()),
     settlement: v.optional(settlementBlockValidator),
+    executionFailure: v.optional(v.object({ safeTxHash: v.string(), txHash: v.string(), block: settlementBlockValidator })),
     followupAt: v.optional(v.number()),
     followupAttempt: v.optional(v.number()),
     payoutVersion: v.optional(v.number()),
@@ -473,7 +481,7 @@ export default defineSchema({
     disbursementId: v.id("disbursements"), orgId: v.id("orgs"),
     chainId: v.number(), safeTxHash: v.string(), to: v.string(), data: v.string(),
     searchFromBlock: v.optional(v.string()), provider: v.literal("gelato_turbo"), providerId: v.optional(v.string()), txHash: v.optional(v.string()),
-    status: v.union(v.literal("prepared"), v.literal("submitting"), v.literal("submitted"), v.literal("confirmed"), v.literal("exception")),
+    status: v.union(v.literal("prepared"), v.literal("submitting"), v.literal("submitted"), v.literal("confirmed"), v.literal("failed"), v.literal("exception")),
     neverSubmitted: v.optional(v.boolean()),
     error: v.optional(v.string()), attempts: v.number(), createdAt: v.number(), updatedAt: v.number(),
   }).index("by_payment", ["disbursementId"]).index("by_status", ["status"]).index("by_status_updated", ["status", "updatedAt"]).index("by_org_status", ["orgId", "status"]),

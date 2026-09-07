@@ -1,3 +1,4 @@
+import { userErrorMessage } from '@/lib/userErrors';
 import { useRef, useState } from 'react';
 import { useMutation, useQuery } from 'convex/react';
 import { api } from '../../../convex/_generated/api';
@@ -42,7 +43,7 @@ function AccountingWorkspace({ orgId, environment }: { orgId?: string; environme
     const key = `${orgId}:${environment}:${[...selected].sort().join(',')}`;
     if (request.current?.key !== key) request.current = { key, id: crypto.randomUUID() };
     try { setExportId(await createExport({ ...scope, entryIds: selected, requestId: request.current.id })); setSelected([]); request.current = null; }
-    catch (e) { setError(e instanceof Error ? e.message : 'Could not prepare this export'); }
+    catch (e) { setError(userErrorMessage(e, 'Could not prepare this export')); }
     finally { setBusy(false); }
   };
   const activityRows = activity?.items ?? [];

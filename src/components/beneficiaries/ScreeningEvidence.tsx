@@ -1,3 +1,4 @@
+import { userErrorMessage } from '@/lib/userErrors';
 import { useState } from "react";
 import { useAction, useMutation, useQuery } from "convex/react";
 import type { FunctionReturnType } from "convex/server";
@@ -54,7 +55,7 @@ function ReviewControls({
       });
     } catch (e) {
       setError(
-        e instanceof Error ? e.message : "The review could not be saved.",
+        userErrorMessage(e, "The review could not be saved."),
       );
     } finally {
       setBusy(false);
@@ -156,7 +157,7 @@ export function ScreeningEvidence({
       await rerun({ beneficiaryId, sessionToken });
     } catch (e) {
       setError(
-        e instanceof Error ? e.message : "Screening could not be completed.",
+        userErrorMessage(e, "Screening could not be completed."),
       );
     } finally {
       setBusy(false);

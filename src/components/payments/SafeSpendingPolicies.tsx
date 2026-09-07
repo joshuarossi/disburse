@@ -1,3 +1,4 @@
+import { userErrorMessage } from '@/lib/userErrors';
 import { useState } from "react";
 import { PolicyApprovalQueue } from "./PolicyApprovalQueue";
 import { useAction, useQuery as useConvexQuery } from "convex/react";
@@ -136,7 +137,7 @@ export function SafeSpendingPolicies({
       await snapshot.refetch();
     } catch (e) {
       setError(
-        e instanceof Error ? e.message : "Could not propose the policy change",
+        userErrorMessage(e, "Could not propose the policy change"),
       );
     } finally {
       setBusy(false);
@@ -264,7 +265,7 @@ export function SafeSpendingPolicies({
               </p>
             ) : snapshot.isError ? (
               <p role="alert" className="text-sm text-red-400">
-                Could not verify current allowances: {snapshot.error.message}
+                Could not verify current allowances: {userErrorMessage(snapshot.error, "The account could not be checked. Try again shortly.")}
               </p>
             ) : (
               snapshot.data && (

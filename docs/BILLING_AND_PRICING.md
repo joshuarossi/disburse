@@ -2,6 +2,8 @@
 
 Reviewed September 5, 2026. Prices below are published reference points, not evidence that customers will pay Disburse. The September 6 licensing update below supersedes the earlier expiry policy; external comparisons remain dated reference points.
 
+**September 7 product requirement:** the monthly subscription grants a license to use Disburse. Convex and Cloudflare are its permitted application operating costs. Customers pay every external service cost directly in stablecoins when using that service, including original Safe setup and any paid invoice creation. Product pricing must not absorb service-provider subscriptions or usage bills. Any future Disburse-operated service has separate customer pricing. See [product and service requirements](PRODUCT_AND_SERVICE_REQUIREMENTS.md) and COST01–COST06 in [the TODO](../TODOS.md). This supersedes any earlier suggestion to fund provider execution from subscription revenue.
+
 ## Implemented terms
 
 | Plan | Price per 30 days | Members | Recipients |
@@ -16,7 +18,7 @@ The source of limits and prices is `shared/billing.ts`. The billing period is 30
 
 Access is computed from the current timestamp. An active operator grant takes precedence over a valid paid or trial period. Otherwise the company receives its permanent free fallback, defaulting to one seat and 25 saved recipients. Invalid dates never create perpetual premium access. Existing members and records remain after a downgrade; adding recipients and reserving or accepting invitations requires available capacity. Core payments, scheduling, account access, collection and recovery are no longer gated by subscription expiry.
 
-Customers own their Safe and pay every network and provider fee. A license governs the Disburse interface and services; it does not govern the customer's ownership of funds. The present choice is to keep core money management and payments free. Other tools, including specialized reports, can receive their own tier rules later. No new reporting or screening gate has been introduced. See [company license controls](LICENSE_MANAGEMENT.md).
+Customers own their Safe and pay every network and provider fee in stablecoins. A license governs access to the software; external services have their own customer-paid costs, and the license does not govern ownership of funds. The present choice is to keep core money management and payments free. Other tools, including specialized reports, can receive their own tier rules later. No new reporting or screening gate has been introduced. See [company license controls](LICENSE_MANAGEMENT.md).
 
 Operators can give a company permanent or dated complimentary access, change its trial end date, create custom free tiers, and configure future signups, including 30 days Pro followed by lifetime Free. Paid receipts and grants remain separate. The default signup trial is unchanged until an operator changes the program. Free's current limits cover the old Starter offer, so new Starter checkout is disabled; already prepared checkouts and historical paid receipts retain their original terms.
 
@@ -41,7 +43,7 @@ A five-member Team workspace costs 50 USDC per 30 days. That is inexpensive rela
 
 ## Recommended launch experiment
 
-The integrated workflow itself can be a paid service: customers may prefer Disburse to assembling Safe, spreadsheets, exchanges and several provider interfaces. Operating the underlying infrastructure is not a requirement for charging for useful coordination, controls and convenience. Evaluate affordability using total fees and time saved; being the cheapest remains a comparison to validate, not an established claim.
+The integrated workflow is the software product covered by the license: customers may prefer Disburse to assembling Safe, spreadsheets, exchanges and several provider interfaces. External execution, conversion and other services remain separate. Evaluate affordability using total customer fees and time saved; being the cheapest remains a comparison to validate, not an established claim.
 
 **Updated product direction:** prove the best practical finance experience before optimizing monetization. The current model keeps core payments available on Free, offers paid capacity and convenience, and leaves optional service fees to be decided after the integrations work. Invoice generation/service pricing is undecided. No new add-on fee has been activated. Team size and advanced controls are tier hypotheses, not new enforced limits; consider small businesses and accountants managing multiple client organizations as well as finance teams.
 
@@ -51,7 +53,7 @@ Track subscription contribution independently of optional services. For each ser
 
 Evaluate Team at 50 USDC per workspace per 30 days for a paid pilot with five members and 100 recipients. Compare it against the new Free baseline and test whether the extra team capacity earns its price. Display customer-paid provider/network fees separately. New customers should not be sold the former Starter package when its limits are already included in Free.
 
-Treat Pro's 99 USDC unlimited seats/recipients as unvalidated economics; no priority-support promise is included. Measure onboarding time, monthly support, RPC/relay costs and active recipient counts before promising unlimited service broadly. A later growth tier around 149 USDC is a willingness-to-pay experiment, not a price recommendation established by research. No price increase was applied to existing workspaces.
+Treat Pro's 99 USDC unlimited seats/recipients as unvalidated economics; no priority-support promise is included. Measure onboarding effort, Convex/Cloudflare usage and active recipient counts before promising unrestricted software capacity. Record customers' external service charges separately rather than treating them as Disburse operating costs. A later growth tier around 149 USDC is a willingness-to-pay experiment, not a price recommendation established by research. No price increase was applied to existing workspaces.
 
 Get five design partners through two payment cycles and ask for payment. Record why prospects decline. Compare preparation time, approval delay, correction frequency, reconciliation time and support cost with their existing process. A retained paying customer is stronger evidence than a positive interview or a large stablecoin-volume chart.
 

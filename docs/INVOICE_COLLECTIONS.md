@@ -1,8 +1,8 @@
 # Customer-paid invoice collection
 
-The customer pays every network and provider fee. A free, trial or complimentary software license does not include gas or service fees.
+The customer pays every network and provider fee directly in stablecoins. A free, trial, paid or complimentary software license does not include gas or external service fees. This applies to invoice creation and any receiving-address provisioning as well as collection. See the [product-wide service requirements](PRODUCT_AND_SERVICE_REQUIREMENTS.md).
 
-The current invoice collection flow uses the customer's connected wallet to pay native gas. It verifies the receiving factory and fixed destination before requesting the transaction. The receiving contract forwards the full principal to the company account. Confirmed token transfers determine the collected amount; a successful wallet submission alone does not mark funds collected.
+The current invoice collection flow uses the customer's connected wallet to pay native gas, so it does not yet satisfy the stablecoin-only service-cost requirement. It verifies the receiving factory and fixed destination before requesting the transaction. The receiving contract forwards the full principal to the company account. Confirmed token transfers determine the collected amount; a successful wallet submission alone does not mark funds collected.
 
 The sponsored Gelato collection path has been removed. A provider API key cannot enable automatic customer-fee subsidies. The old timeout-based `forward`, `sweepClaim` and `sweepResult` endpoints are also removed. Earlier submission evidence remains available if an existing record needs recovery.
 

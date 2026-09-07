@@ -1,3 +1,4 @@
+import { userErrorMessage } from '@/lib/userErrors';
 import { useEffect, useState } from 'react';
 import { Notice } from '@/components/workspace/WorkspacePrimitives';
 import { useNavigate } from 'react-router-dom';
@@ -47,7 +48,7 @@ export default function SelectOrg() {
       await acceptInvite({ orgId, sessionToken: token });
     } catch (error) {
       setError(
-        error instanceof Error ? error.message : 'Could not accept invitation',
+        userErrorMessage(error, 'Could not accept invitation'),
       );
     } finally {
       setAccepting('');

@@ -1,3 +1,4 @@
+import { userErrorMessage } from '@/lib/userErrors';
 import { scheduleDateTime } from "@/lib/formatMoney";
 import { useActivityEnvironment } from "@/features/workspace/ActivityEnvironment";
 import { chainEnvironment } from "../../shared/assets";
@@ -83,7 +84,7 @@ export default function PaymentBatches() {
       });
       setConfirm(null);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Could not update schedule");
+      setError(userErrorMessage(e, "Could not update schedule"));
     } finally {
       setBusy(false);
     }

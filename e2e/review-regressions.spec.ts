@@ -1,5 +1,4 @@
-import { expect, test, type Page } from "@playwright/test";
-import AxeBuilder from "@axe-core/playwright";
+import { expect, test } from "@playwright/test";
 
 test.beforeEach(async ({ page }) => {
   await page.route("**/*", (route) =>
@@ -7,100 +6,6 @@ test.beforeEach(async ({ page }) => {
       ? route.continue()
       : route.abort(),
   );
-});
-
-async function accountSetup(page: Page, scenario: string) {
-  await page.addInitScript(
-    (value) => sessionStorage.setItem("qa:scenario", value),
-    scenario,
-  );
-  await page.goto("/onboarding");
-  await page.getByLabel("Name", { exact: true }).fill("Alex Morgan");
-  await page.getByRole("button", { name: "Continue", exact: true }).click();
-  await page
-    .getByLabel("Organization name", { exact: true })
-    .fill("Cancellation QA");
-  await page
-    .getByRole("button", { name: "Create organization", exact: true })
-    .click();
-  await page.getByRole("button", { name: "Skip for now", exact: true }).click();
-  await page.getByRole("button", { name: /No, create one/ }).click();
-  await page.getByRole("button", { name: "Create Safe", exact: true }).click();
-}
-
-for (const theme of ["light", "dark"]) {
-  test(`${theme}: declined account creation preserves settings and retries without raw wallet diagnostics`, async ({
-    page,
-  }, testInfo) => {
-    await page.addInitScript(
-      (value) => localStorage.setItem("theme", value),
-      theme,
-    );
-    await page.setViewportSize(
-      theme === "dark"
-        ? { width: 390, height: 844 }
-        : { width: 1440, height: 1000 },
-    );
-    await accountSetup(page, "onboarding-wallet-declined");
-    await expect(page.getByRole("status")).toContainText(
-      "Account creation cancelled. Your settings are saved here.",
-    );
-    await expect(page.getByRole("alert")).toHaveCount(0);
-    await expect(page.getByLabel("Chain", { exact: true })).toHaveValue("8453");
-    await expect(
-      page.getByRole("button", { name: "Create Safe", exact: true }),
-    ).toBeEnabled();
-    const before = await page.evaluate(() =>
-      sessionStorage.getItem("qa:safeCreation"),
-    );
-    await page
-      .getByRole("button", { name: "Create Safe", exact: true })
-      .click();
-    await expect
-      .poll(() =>
-        page.evaluate(() => sessionStorage.getItem("qa:walletAttempts")),
-      )
-      .toBe("2");
-    expect(
-      await page.evaluate(() => sessionStorage.getItem("qa:safeCreation")),
-    ).toBe(before);
-    await expect(page.locator("body")).not.toContainText("Request Arguments");
-    await expect(page.locator("body")).not.toContainText("viem@");
-    expect(
-      await page.evaluate(
-        () => document.documentElement.scrollWidth <= innerWidth,
-      ),
-    ).toBe(true);
-    expect(
-      (
-        await new AxeBuilder({ page })
-          .withTags(["wcag2a", "wcag2aa", "wcag21aa"])
-          .analyze()
-      ).violations,
-    ).toEqual([]);
-    await page.screenshot({
-      path: testInfo.outputPath(`account-cancelled-${theme}.png`),
-      fullPage: true,
-    });
-  });
-}
-
-test("unknown account-creation response keeps the predicted address and asks for settlement checking", async ({
-  page,
-}) => {
-  await accountSetup(page, "onboarding-wallet-unknown");
-  await expect(page.getByRole("alert")).toContainText(
-    "did not confirm whether account creation was submitted",
-  );
-  await expect(page.getByLabel("Safe address", { exact: true })).toHaveValue(
-    "0x1111111111111111111111111111111111111111",
-  );
-  await expect(
-    page.getByRole("button", { name: "Create Safe", exact: true }),
-  ).toHaveCount(0);
-  expect(
-    await page.evaluate(() => sessionStorage.getItem("qa:walletAttempts")),
-  ).toBe("1");
 });
 
 test("an archived recipient can be explicitly removed from a draft without changing the other amount", async ({
@@ -168,3 +73,27 @@ test("an invoice draft keeps its details while replacing an archived receiving a
     page.getByRole("button", { name: "Save draft", exact: true }),
   ).toBeEnabled();
 });
+
+for (const scenario of ['native-failed', 'relay-failed']) {
+  test(`${scenario}: a confirmed execution failure explains what happened without offering another send`, async ({ page }, testInfo) => {
+    await page.addInitScript(value => {
+      sessionStorage.setItem('qa:scenario', value);
+      localStorage.setItem('theme', value === 'native-failed' ? 'dark' : 'light');
+    }, scenario);
+    await page.setViewportSize(scenario === 'native-failed' ? { width: 390, height: 844 } : { width: 1440, height: 1000 });
+    await page.goto('/org/demo/disbursements?focus=p1');
+    const dialog = page.getByRole('dialog');
+    await expect(dialog.getByRole('alert')).toContainText('No money was sent to the recipients');
+    await expect(dialog.getByRole('alert')).toContainText('Create a new payment');
+    await expect(dialog.getByRole('button', { name: /Retry original payment|Check settlement|Resume payment|Send payment|Cancel payment/ })).toHaveCount(0);
+    await expect(dialog.getByRole('heading', { name: 'Tracking your payment' })).toHaveCount(0);
+    await expect(dialog.getByText('Payment failed', { exact: true })).toBeVisible();
+    await expect(dialog.getByRole('link', { name: 'New payment', exact: true })).toBeVisible();
+    await page.reload();
+    await expect(dialog.getByRole('alert')).toContainText('No money was sent to the recipients');
+    expect(await dialog.evaluate(el => el.scrollWidth <= el.clientWidth)).toBe(true);
+    await page.screenshot({ path: testInfo.outputPath(`${scenario}.png`), fullPage: true });
+    await dialog.getByRole('link', { name: 'New payment', exact: true }).click();
+    await expect(page.getByRole('dialog').getByRole('button', { name: 'Continue to timing', exact: true })).toBeVisible();
+  });
+}

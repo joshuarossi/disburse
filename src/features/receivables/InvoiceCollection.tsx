@@ -66,7 +66,7 @@ export function InvoiceCollection({
               }
               if (!client)
                 throw new Error(
-                  `Collection submitted. Check payments for confirmation. Transaction: ${hash}`,
+                  "Collection submitted. Check your wallet activity and refresh this invoice for confirmation.",
                 );
               try {
                 const receipt = await client.waitForTransactionReceipt({
@@ -75,7 +75,7 @@ export function InvoiceCollection({
                 });
                 if (receipt.status !== "success")
                   throw new Error(
-                    `Collection reverted. Check payments before trying again. Transaction: ${hash}`,
+                    "Collection reverted. Check your wallet activity and refresh this invoice before trying again.",
                   );
               } catch (error) {
                 if (
@@ -84,7 +84,7 @@ export function InvoiceCollection({
                 )
                   throw error;
                 throw new Error(
-                  `Collection confirmation is pending. Check payments before trying again. Transaction: ${hash}`,
+                  "Collection confirmation is pending. Check your wallet activity and refresh this invoice before trying again.",
                 );
               }
               await refresh(args!);

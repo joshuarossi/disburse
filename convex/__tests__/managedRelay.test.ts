@@ -1,5 +1,5 @@
 import { convexTest } from 'convex-test';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { api, internal } from '../_generated/api';
 import schema from '../schema';
 import { createFullOrgSetup, createTestBeneficiary, createTestDisbursement, signIn, TEST_WALLETS } from './factories';
@@ -25,23 +25,17 @@ async function setup() {
   const args = { disbursementId: ids.disbursementId, safeTxHash: hash, sessionToken, chainId: 1, to: ids.to, data: '0x1234' };
   return { t, ids, args };
 }
+beforeEach(() => vi.useFakeTimers());
 afterEach(() => { provider.configurationError = false; vi.clearAllTimers(); vi.unstubAllEnvs(); vi.useRealTimers(); vi.clearAllMocks(); vi.unstubAllGlobals(); });
 
-it('checks deployed relay configuration without submitting a transaction or exposing its key', async () => {
+it('refuses application-funded relay configuration before inspecting a Gas Tank or sending', async () => {
   const t = convexTest(schema);
   vi.stubEnv('GELATO_API_KEY', 'private-relay-test-key');
   vi.stubEnv('GELATO_1_FEE_COLLECTOR', fee.collector);
   vi.stubEnv('GELATO_1_FEE_USDC', fee.amount);
-  provider.getCapabilities.mockResolvedValue({ 1: { feeCollector: fee.collector, tokens: [{ address: fee.tokenAddress, decimals: 6 }] } });
-  provider.getBalance.mockResolvedValue({ balance: 1n, decimals: 6, unit: 'USDC' });
-  expect(await t.action(internal.relayExecutor.configurationCheck, { chainId: 1, token: 'usdc' })).toEqual({ status: 'ready', chainId: 1, fee });
-  provider.getBalance.mockResolvedValue({ balance: 0n, decimals: 6, unit: 'USDC' });
-  await expect(t.action(internal.relayExecutor.configurationCheck, { chainId: 1, token: 'USDC' })).rejects.toThrow('billing attention');
-  provider.getBalance.mockResolvedValue({ balance: 1n });
-  provider.getCapabilities.mockResolvedValue({ 1: { feeCollector: TEST_WALLETS.viewer, tokens: [] } });
-  await expect(t.action(internal.relayExecutor.configurationCheck, { chainId: 1, token: 'USDC' })).rejects.toThrow('does not support');
-  provider.getCapabilities.mockRejectedValue(new Error('https://rpc.invalid/?apiKey=private-relay-test-key'));
-  await expect(t.action(internal.relayExecutor.configurationCheck, { chainId: 1, token: 'USDC' })).rejects.toThrow('could not be reached');
+  await expect(t.action(internal.relayExecutor.configurationCheck, { chainId: 1, token: 'USDC' })).rejects.toThrow('customer-paid execution service');
+  expect(provider.getBalance).not.toHaveBeenCalled();
+  expect(provider.getCapabilities).not.toHaveBeenCalled();
   expect(provider.sendTransaction).not.toHaveBeenCalled();
   expect(await t.run(ctx => ctx.db.query('relayJobs').collect())).toHaveLength(0);
 });
@@ -71,6 +65,8 @@ describe('managed relay durability and authorization', () => {
     await t.mutation(internal.relayJobs.begin, { jobId });
     await t.mutation(internal.relayJobs.update, { jobId, status: 'submitted', providerId: 'request-1' });
     await expect(t.mutation(internal.relayJobs.update, { jobId, status: 'submitted', providerId: 'request-2' })).rejects.toThrow('replaced');
+    await t.mutation(internal.relayJobs.update, { jobId, status: 'submitted', txHash: `0x${'11'.repeat(32)}` });
+    await expect(t.mutation(internal.relayJobs.update, { jobId, status: 'submitted', txHash: `0x${'22'.repeat(32)}` })).rejects.toThrow('Original transaction cannot be replaced');
     expect((await t.run(ctx => ctx.db.get(args.disbursementId)))?.status).toBe('relaying');
   });
   it('rejects unsigned fee changes and includes the fee in member budgets', async () => {
@@ -257,4 +253,40 @@ it('reconciles a lost managed response from SafeL2 execution logs without a prov
   expect(provider.sendTransaction).not.toHaveBeenCalled();
   expect((await t.query(internal.relayJobs.get, { jobId }))?.status).toBe('confirmed');
   expect(await t.run(ctx => ctx.db.get(ids.disbursementId))).toMatchObject({ status: 'executed', txHash });
+});
+
+it.each(['confirmed', 'reorganized', 'unconfirmed', 'wrong account'])('handles a relayed Safe failure using verified intent and canonical evidence: %s', async variant => {
+  vi.useFakeTimers();
+  const { t, ids, args } = await setup();
+  await t.run(ctx => ctx.db.patch(ids.safeId, { chainId: 1 }));
+  const txHash = `0x${'cd'.repeat(32)}` as `0x${string}`, blockHash = `0x${'ef'.repeat(32)}` as `0x${string}`;
+  const event = {
+    address: variant === 'wrong account' ? TEST_WALLETS.viewer : ids.to,
+    topics: encodeEventTopics({ abi: parseAbi(['event ExecutionFailure(bytes32 indexed txHash,uint256 payment)']), eventName: 'ExecutionFailure', args: { txHash: hash as `0x${string}` } }),
+    data: encodeAbiParameters([{ type: 'uint256' }], [0n]), transactionHash: txHash, removed: false,
+  };
+  chain.getBlockNumber.mockResolvedValue(variant === 'unconfirmed' ? 490n : 500n);
+  chain.getChainId.mockResolvedValue(1);
+  chain.getBlock.mockResolvedValue({ number: 490n, hash: variant === 'reorganized' ? `0x${'99'.repeat(32)}` : blockHash, timestamp: 1770000000n });
+  chain.getTransactionReceipt.mockResolvedValue({ status: 'success', blockNumber: 490n, blockHash, logs: [event] });
+  const jobId = await t.mutation(internal.relayJobs.reserve, { ...args, searchFromBlock: '488' });
+  await t.mutation(internal.relayJobs.begin, { jobId });
+  await t.mutation(internal.relayJobs.update, { jobId, status: 'submitted', providerId: 'original-request' });
+  provider.getStatus.mockResolvedValue({ status: 200, chainId: 1, hash: txHash });
+  await t.action(internal.relayExecutor.process, { jobId });
+  const p = await t.run(ctx => ctx.db.get(ids.disbursementId));
+  const job = await t.query(internal.relayJobs.get, { jobId });
+  if (variant === 'confirmed') {
+    expect(p).toMatchObject({ status: 'failed', txHash, relayStatus: 'Execution failed' });
+    expect(job).toMatchObject({ status: 'failed', txHash });
+    await t.mutation(api.relayJobs.recheck, { disbursementId: ids.disbursementId, sessionToken: args.sessionToken });
+    await t.mutation(internal.relayJobs.update, { jobId, status: 'submitted' });
+    expect((await t.query(internal.relayJobs.get, { jobId }))?.status).toBe('failed');
+  } else {
+    expect(p?.status).toBe('relaying');
+    expect(job?.txHash).toBeUndefined();
+    expect(p?.txHash).toBeUndefined();
+  }
+  expect(p?.settlement).toBeUndefined();
+  expect(provider.sendTransaction).not.toHaveBeenCalled();
 });

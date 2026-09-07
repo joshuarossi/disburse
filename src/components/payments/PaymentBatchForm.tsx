@@ -1,3 +1,4 @@
+import { userErrorMessage } from '@/lib/userErrors';
 import { useActivityEnvironment } from "@/features/workspace/ActivityEnvironment";
 import { chainEnvironment } from "../../../shared/assets";
 import { AccountFundingCheck } from "@/features/payments/AccountFundingCheck";
@@ -344,9 +345,7 @@ export function PaymentBatchForm({
       onClose();
     } catch (error) {
       setError(
-        error instanceof Error
-          ? error.message
-          : "Could not save this batch. Try again.",
+        userErrorMessage(error, "Could not save this batch. Try again."),
       );
     } finally {
       savingRef.current = false;

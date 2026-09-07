@@ -11,7 +11,7 @@ for (const [theme, width] of [
   ["light", 1440],
   ["dark", 390],
 ] as const) {
-  test(`email invitation needs no wallet address and keeps failures reviewable in ${theme}`, async ({
+  test(`private invitation needs no wallet address and keeps failures reviewable in ${theme}`, async ({
     page,
   }) => {
     await page.setViewportSize({ width, height: 1000 });
@@ -25,7 +25,7 @@ for (const [theme, width] of [
       .click();
     const dialog = page.getByRole("dialog");
     await expect(
-      dialog.getByRole("radio", { name: "Email invitation", exact: true }),
+      dialog.getByRole("radio", { name: "Private invitation link", exact: true }),
     ).toBeChecked();
     await expect(
       dialog.getByLabel("Sign-in wallet", { exact: true }),
@@ -50,7 +50,7 @@ for (const [theme, width] of [
       fullPage: true,
     });
     await dialog
-      .getByRole("button", { name: "Send invitation", exact: true })
+      .getByRole("button", { name: "Create invitation link", exact: true })
       .click();
     await expect(dialog.getByRole("alert")).toContainText("read-only");
     await expect(dialog.getByLabel("Work email", { exact: true })).toHaveValue(
@@ -134,4 +134,26 @@ test("expired links disclose no invitee and a wallet restriction blocks the wron
     page.getByRole("heading", { name: "Invitation unavailable" }),
   ).toBeVisible();
   await expect(page.getByRole("main")).not.toContainText("northstar.co");
+});
+test('creating an invitation offers a private link and email draft, with a usable clipboard-denied fallback', async ({ page }, testInfo) => {
+  await page.addInitScript(() => {
+    sessionStorage.setItem('qa:scenario', 'invite-share');
+    Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText: async () => { throw new DOMException('Permission denied', 'NotAllowedError'); } } });
+  });
+  await page.setViewportSize({ width: 390, height: 1000 });
+  await page.goto('/org/demo/team');
+  await page.getByRole('button', { name: 'Invite member', exact: true }).click();
+  const dialog = page.getByRole('dialog');
+  await dialog.getByLabel('Full name', { exact: true }).fill('Jordan Patel');
+  await dialog.getByLabel('Work email', { exact: true }).fill('jordan@example.invalid');
+  await dialog.getByRole('button', { name: 'Create invitation link', exact: true }).click();
+  await expect(dialog.getByLabel('Private invitation link', { exact: true })).toHaveValue(/\/invite#[e]{64}$/);
+  await expect(dialog.getByRole('link', { name: 'Open email draft' })).toHaveAttribute('href', /^mailto:jordan%40example\.invalid\?subject=/);
+  await expect(dialog).toContainText('Disburse has not sent an email');
+  await dialog.getByRole('button', { name: 'Copy invitation link', exact: true }).click();
+  await expect(dialog.getByRole('alert')).toContainText('Select the link above and copy it');
+  await expect(dialog).not.toContainText('NotAllowedError');
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  expect((await new AxeBuilder({ page }).include('dialog').withTags(['wcag2a', 'wcag2aa']).analyze()).violations).toEqual([]);
+  await page.screenshot({ path: testInfo.outputPath('private-invitation-clipboard-denied.png'), fullPage: true });
 });

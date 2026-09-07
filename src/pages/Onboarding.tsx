@@ -1,16 +1,16 @@
-import { getPublicClient } from "wagmi/actions";
-import { config } from "@/lib/wagmi";
-import type { SupportedChainId } from "@/lib/chains";
+import { userErrorMessage } from '@/lib/userErrors';
 import { useRef, useState } from "react";
 import { getSessionToken } from "@/lib/session";
-import { useNavigate } from "react-router-dom";
-import { useAccount, useSendTransaction, useSwitchChain } from "wagmi";
+import { useNavigate, useSearchParams } from "react-router-dom";
+import { CustomerPaidSetup } from "@/features/onboarding/CustomerPaidSetup";
+import { useAccount } from "wagmi";
+import { getAddress, isAddress } from "viem";
 import { useMutation, useAction } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { Id } from "../../convex/_generated/dataModel";
 import { Button } from "@/components/ui/button";
 import { Notice } from "@/components/workspace/WorkspacePrimitives";
-import { walletDeclined, walletErrorMessage } from "@/lib/walletErrors";
+import { walletErrorMessage } from "@/lib/walletErrors";
 import { CHAINS_LIST } from "@/lib/chains";
 import {
   ArrowLeft,
@@ -46,11 +46,12 @@ interface TeamMember {
 // ---------------------------------------------------------------------------
 export default function Onboarding() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { address, chain } = useAccount();
-  const { switchChainAsync } = useSwitchChain();
   const setupLock = useRef(false);
   const invitedWallets = useRef(new Set<string>());
   const [ownerWallets, setOwnerWallets] = useState<string[]>([]);
+  const [recoveredOwners, setRecoveredOwners] = useState<string[]>([]);
 
   // ---- profile state ----
   const [name, setName] = useState("");
@@ -58,7 +59,7 @@ export default function Onboarding() {
 
   // ---- org state ----
   const [orgName, setOrgName] = useState("");
-  const [orgId, setOrgId] = useState<string | null>(null);
+  const [orgId, setOrgId] = useState<string | null>(searchParams.get("org"));
 
   // ---- team state ----
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
@@ -73,15 +74,14 @@ export default function Onboarding() {
   // ---- safe state ----
   const [hasSafe, setHasSafe] = useState<boolean | null>(null); // null = not yet chosen
   const [existingSafeAddress, setExistingSafeAddress] = useState("");
-  const [selectedChainId, setSelectedChainId] = useState(chain?.id ?? 1);
+  const [selectedChainId, setSelectedChainId] = useState(chain?.id === 11155111 ? 84532 : chain?.id ?? 8453);
   const [safeThreshold, setSafeThreshold] = useState(1);
   const [deploying, setDeploying] = useState(false);
   const [safeError, setSafeError] = useState<string | null>(null);
-  const [safeCancelled, setSafeCancelled] = useState(false);
   const [linkingExisting, setLinkingExisting] = useState(false);
 
   // ---- nav state ----
-  const [step, setStep] = useState<Step>("profile");
+  const [step, setStep] = useState<Step>(searchParams.has("org") ? "safe" : "profile");
   const [orgError, setOrgError] = useState<string | null>(null);
   const [teamError, setTeamError] = useState<string | null>(null);
 
@@ -91,8 +91,6 @@ export default function Onboarding() {
   const inviteMember = useMutation(api.orgs.inviteMember);
   const linkSafe = useAction(api.safes.link);
 
-  // ---- wagmi tx helpers ----
-  const { sendTransactionAsync } = useSendTransaction();
 
   // ---------------------------------------------------------------------------
   // Handlers
@@ -119,6 +117,7 @@ export default function Onboarding() {
             sessionToken: getSessionToken() ?? "",
           });
       setOrgId(newOrgId);
+      navigate(`/onboarding?org=${newOrgId}`, { replace: true });
 
       // Persist the profile name/email collected in step 1 onto the creator's membership
       if (name.trim() || email.trim()) {
@@ -133,7 +132,7 @@ export default function Onboarding() {
       setStep("team");
     } catch (err) {
       setOrgError(
-        err instanceof Error ? err.message : "Failed to create organization",
+        userErrorMessage(err, "Failed to create organization"),
       );
     } finally {
       setupLock.current = false;
@@ -142,10 +141,16 @@ export default function Onboarding() {
 
   // --- Team: add a member to the local list ---
   const handleAddMember = () => {
-    if (!newMember.walletAddress.trim()) return;
+    const supplied = newMember.walletAddress.trim();
+    if (!supplied) return;
     setTeamError(null);
+    if (!isAddress(supplied, { strict: false }) || /^0x0{40}$/i.test(supplied)) {
+      setTeamError('Enter a valid wallet address for this team member.');
+      return;
+    }
+    const memberAddress = getAddress(supplied.toLowerCase());
 
-    if (newMember.walletAddress.toLowerCase() === address?.toLowerCase()) {
+    if (memberAddress.toLowerCase() === address?.toLowerCase()) {
       setTeamError("You're already a member of this organization.");
       return;
     }
@@ -153,7 +158,7 @@ export default function Onboarding() {
       teamMembers.some(
         (m) =>
           m.walletAddress.toLowerCase() ===
-          newMember.walletAddress.toLowerCase(),
+          memberAddress.toLowerCase(),
       )
     ) {
       setTeamError("This wallet is already in the list.");
@@ -162,7 +167,7 @@ export default function Onboarding() {
 
     setTeamMembers((prev) => [
       ...prev,
-      { ...newMember, walletAddress: newMember.walletAddress.trim() },
+      { ...newMember, walletAddress: memberAddress },
     ]);
     setNewMember({ walletAddress: "", name: "", email: "", role: "approver" });
     setIsAddingMember(false);
@@ -196,7 +201,7 @@ export default function Onboarding() {
       setStep("safe");
     } catch (err) {
       setTeamError(
-        err instanceof Error ? err.message : "Failed to add team members",
+        userErrorMessage(err, "Failed to add team members"),
       );
     } finally {
       setupLock.current = false;
@@ -207,7 +212,6 @@ export default function Onboarding() {
   const handleLinkExisting = async () => {
     if (!orgId || !address || !existingSafeAddress.trim()) return;
     setSafeError(null);
-    setSafeCancelled(false);
     setLinkingExisting(true);
 
     try {
@@ -227,86 +231,7 @@ export default function Onboarding() {
     }
   };
 
-  // --- Safe: deploy a new safe ---
-  const handleCreateNewSafe = async () => {
-    if (!orgId || !address || setupLock.current) return;
-    setupLock.current = true;
-    const deploymentChainId = selectedChainId;
-    let broadcast = false;
-    let sendStarted = false;
-    setSafeError(null);
-    setSafeCancelled(false);
-    setDeploying(true);
-
-    try {
-      // App membership does not grant ownership of funds.
-      const owners = [
-        address,
-        ...teamMembers
-          .filter((member) => ownerWallets.includes(member.walletAddress))
-          .map((member) => member.walletAddress),
-      ];
-      if (chain?.id !== deploymentChainId)
-        await switchChainAsync({ chainId: deploymentChainId });
-      const threshold = Math.min(safeThreshold, owners.length);
-
-      const { predictedAddress, deployTx } = await (await import('@/lib/safeCreation')).createSafe(
-        owners,
-        threshold,
-        "0",
-        deploymentChainId,
-      );
-
-      // Retain the deterministic address even if the wallet loses its response.
-      setExistingSafeAddress(predictedAddress);
-      sendStarted = true;
-      const txHash = await sendTransactionAsync({
-        to: deployTx.to as `0x${string}`,
-        data: deployTx.data as `0x${string}`,
-        value: deployTx.value,
-        chainId: deploymentChainId,
-      });
-
-      broadcast = true;
-      const client = getPublicClient(config, {
-        chainId: deploymentChainId as SupportedChainId,
-      });
-      if (!client)
-        throw new Error("Could not connect to the deployment network");
-      const receipt = await client.waitForTransactionReceipt({ hash: txHash });
-      if (receipt.status !== "success")
-        throw new Error("Account deployment reverted");
-
-      // Link only after the server can verify deployed ownership.
-      await linkSafe({
-        orgId: orgId as Id<"orgs">,
-        sessionToken: getSessionToken() ?? "",
-        safeAddress: predictedAddress,
-        chainId: deploymentChainId,
-      });
-
-      // Navigate to dashboard
-      navigate(`/org/${orgId}/dashboard`);
-    } catch (err) {
-      const cancelled = !broadcast && walletDeclined(err);
-      const needsConfirmation = broadcast || (sendStarted && !cancelled);
-      if (needsConfirmation) setHasSafe(true);
-      setSafeCancelled(cancelled);
-      setSafeError(
-        broadcast
-          ? "Account creation was submitted. Check your wallet activity, then link the account below once it is confirmed."
-          : needsConfirmation
-            ? "Your wallet did not confirm whether account creation was submitted. Check your wallet activity before trying again. If it was confirmed, link the account below."
-            : cancelled
-              ? "Account creation cancelled. Your settings are saved here. Select Create Safe when you are ready to try again."
-              : walletErrorMessage(err, "Could not prepare your account. Check your wallet connection and try again."),
-      );
-    } finally {
-      setupLock.current = false;
-      setDeploying(false);
-    }
-  };
-
+  // Profile entry does not require an on-chain transaction.
   const handleProfileAndAdvance = () => {
     setStep("create-org");
   };
@@ -552,6 +477,7 @@ export default function Onboarding() {
                         </p>
                       </div>
                       <button
+                        aria-label={`Remove ${m.name || 'team member'} from this list`}
                         onClick={() => handleRemoveMember(idx)}
                         className="text-slate-500 hover:text-red-400 transition-colors"
                       >
@@ -718,11 +644,10 @@ export default function Onboarding() {
             <div className="space-y-6">
               <div className="text-center">
                 <h1 className="text-2xl font-bold text-white">
-                  Set up your Safe wallet
+                  Set up your company account
                 </h1>
                 <p className="mt-2 text-slate-400">
-                  A Safe multisig wallet holds your organization's funds. Do you
-                  already have one?
+                  Create an account for your team, or connect one you already control.
                 </p>
               </div>
 
@@ -798,7 +723,7 @@ export default function Onboarding() {
                   </div>
 
                   {safeError && (
-                    <Notice tone={safeCancelled ? "info" : "error"}>{safeError}</Notice>
+                    <Notice tone="error">{safeError}</Notice>
                   )}
 
                   <div className="flex gap-3 pt-2">
@@ -848,7 +773,7 @@ export default function Onboarding() {
                         </span>
                         <span className="text-xs text-slate-500">(you)</span>
                       </div>
-                      {teamMembers.map((m, idx) => (
+                      {[...teamMembers, ...Array.from(new Set([...recoveredOwners, ...ownerWallets])).filter(wallet => wallet.toLowerCase() !== address?.toLowerCase() && !teamMembers.some(member => member.walletAddress.toLowerCase() === wallet.toLowerCase())).map(walletAddress => ({ walletAddress, name: "" }))].map((m, idx) => (
                         <label key={idx} className="flex items-center gap-2">
                           <input
                             type="checkbox"
@@ -940,44 +865,16 @@ export default function Onboarding() {
                     </select>
                   </div>
 
-                  <p className="text-xs text-slate-500">
-                    Clicking "Create Safe" will open a transaction approval in
-                    your wallet (e.g. MetaMask). This deploys the Safe contract
-                    — a small gas fee applies.
-                  </p>
-
-                  {safeError && (
-                    <Notice tone={safeCancelled ? "info" : "error"}>{safeError}</Notice>
-                  )}
-
-                  <div className="flex gap-3 pt-2">
-                    <Button
-                      variant="secondary"
-                      aria-label="Back"
-                      disabled={deploying}
-                      onClick={() => { setHasSafe(null); setSafeError(null); }}
-                      className="w-12 shrink-0"
-                    >
-                      <ArrowLeft className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      onClick={handleCreateNewSafe}
-                      disabled={deploying}
-                      className="flex-1"
-                    >
-                      {deploying ? (
-                        <>
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                          Deploying Safe...
-                        </>
-                      ) : (
-                        <>
-                          <Shield className="h-4 w-4" />
-                          Create Safe
-                        </>
-                      )}
-                    </Button>
-                  </div>
+                  {orgId && address && <CustomerPaidSetup
+                    orgId={orgId as Id<"orgs">}
+                    owners={[address, ...ownerWallets]}
+                    threshold={safeThreshold}
+                    chainId={selectedChainId}
+                    onBusy={setDeploying}
+                    onRestore={saved => { setSelectedChainId(saved.chainId); setSafeThreshold(saved.threshold); setRecoveredOwners(saved.owners); setOwnerWallets(saved.owners.filter(owner => owner.toLowerCase() !== address.toLowerCase())); }}
+                    onComplete={() => navigate(`/org/${orgId}/dashboard`)}
+                  />}
+                  {!deploying && <Button variant="secondary" aria-label="Back" onClick={() => setHasSafe(null)} className="w-12"><ArrowLeft className="h-4 w-4" /></Button>}
                 </div>
               )}
 

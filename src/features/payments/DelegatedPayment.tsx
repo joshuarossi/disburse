@@ -1,3 +1,4 @@
+import { userErrorMessage } from '@/lib/userErrors';
 import { useRef, useState } from "react";
 import { useAction, useMutation } from "convex/react";
 import { ConvexError } from "convex/values";
@@ -165,7 +166,7 @@ export function DelegatedPayment({
       );
     } catch (error) {
       if (error instanceof ConvexError && error.data?.code === 'ALLOWANCE_AUTHORIZATION_RESERVED') {
-        setError(error.data.message);
+        setError(userErrorMessage(error, 'This allowance authorization is already in use. Open the original payment to check its status.'));
         setReservedPaymentId(error.data.disbursementId);
       }
       else if (confirmingWallet && walletDeclined(error)) setMessage(walletErrorMessage(error, ''));

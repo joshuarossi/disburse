@@ -1,3 +1,4 @@
+import { userErrorMessage } from '@/lib/userErrors';
 import { useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { useMutation, useQuery } from "convex/react";
@@ -45,9 +46,7 @@ function Invitation({ token }: { token: string }) {
       setJoined(result.orgId);
     } catch (e) {
       setError(
-        e instanceof Error
-          ? e.message
-          : "The invitation could not be accepted.",
+        userErrorMessage(e, "The invitation could not be accepted."),
       );
     } finally {
       setBusy(false);

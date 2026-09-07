@@ -66,3 +66,13 @@ it("preserves short validation messages and explains pending confirmations", () 
     "already open",
   );
 });
+
+it('handles errors with throwing getters without creating another UI failure', () => {
+  const error = Object.defineProperties({}, { code: { get() { throw new Error('unreadable code'); } }, cause: { get() { throw new Error('unreadable cause'); } }, message: { get() { throw new Error('unreadable message'); } } });
+  expect(walletDeclined(error)).toBe(false);
+  expect(walletErrorMessage(error, 'Could not complete this action.')).toBe('Could not complete this action.');
+});
+it('does not coerce a provider error name with a throwing toString', () => {
+  const error = { name: { toString() { throw new Error('unreadable name'); } } };
+  expect(walletErrorMessage(error, 'Could not complete this action.')).toBe('Could not complete this action.');
+});

@@ -19,7 +19,7 @@ import { getChainClient } from './lib/safeVerification';
 import { assertPaymentReceipt } from './lib/executionReceipt';
 import { assertReceiptConfirmations } from '../shared/confirmations';
 import { CHAIN_TOKENS, type SupportedChainId } from '../shared/chains';
-import { matchesAccountExecution } from '../shared/accountExecution';
+import { accountExecutionOutcome, matchesAccountExecution } from '../shared/accountExecution';
 
 async function proposal(chainId: number, hash: string) {
   const response = await fetch(`${getSafeTxServiceUrl(chainId)}/v2/multisig-transactions/${hash}/`, { signal: AbortSignal.timeout(15000) });
@@ -81,7 +81,7 @@ export const fire = internalAction({ args: { disbursementId: v.id('disbursements
 } });
 export const process = internalAction({ args: { jobId: v.id('relayJobs') }, handler: async (ctx, args): Promise<void> => {
   const job = await ctx.runQuery(internal.relayJobs.get, args);
-  if (!job || job.status === 'confirmed' || job.status === 'exception') return;
+  if (!job || job.status === 'confirmed' || job.status === 'failed' || job.status === 'exception') return;
   let submissionClaimed = false;
   try {
     if (job.status === 'prepared') {
@@ -136,12 +136,18 @@ export const process = internalAction({ args: { jobId: v.id('relayJobs') }, hand
         if (tx.isExecuted && tx.transactionHash) txHash = tx.transactionHash;
       }
     }
-    await ctx.runMutation(internal.relayJobs.update, { ...args, status: 'submitted', txHash });
+    // A provider hash is only a hint. Do not pin it to the payment before the
+    // receipt proves it belongs to the saved authorization.
+    await ctx.runMutation(internal.relayJobs.update, { ...args, status: 'submitted' });
     if (!txHash) return;
     if (allowance) {
       const client = getChainClient(job.chainId);
       const receipt = await client.getTransactionReceipt({ hash: txHash as `0x${string}` });
       if (receipt.status !== 'success') {
+        const transaction = await client.getTransaction({ hash: txHash as `0x${string}` });
+        if (transaction.to?.toLowerCase() !== job.to.toLowerCase() || transaction.input.toLowerCase() !== job.data.toLowerCase() || transaction.value !== 0n) throw new Error('Receipt does not identify the original submission');
+        assertReceiptConfirmations(receipt.blockNumber, await client.getBlockNumber());
+        await readSettlementBlock(client, job.chainId, receipt);
         await ctx.runMutation(internal.relayJobs.update, { ...args, status: 'exception', txHash, error: 'The relayed payment reverted. Neither the recipient payment nor its fee settled.' });
         return;
       }
@@ -151,14 +157,23 @@ export const process = internalAction({ args: { jobId: v.id('relayJobs') }, hand
       await ctx.runMutation(internal.relayJobs.update, { ...args, status: 'confirmed', txHash });
       return;
     }
-    const expected = await ctx.runQuery(internal.disbursements.getForVerification, { disbursementId: job.disbursementId });
-    const token = Object.entries(CHAIN_TOKENS[job.chainId as SupportedChainId] ?? {}).find(([symbol]) => symbol === expected.token)?.[1];
-    if (!token) throw new Error('Unsupported payment currency');
     const client = getChainClient(job.chainId);
     const receipt = await client.getTransactionReceipt({ hash: txHash as `0x${string}` });
     if (receipt.status !== 'success') {
+      const transaction = await client.getTransaction({ hash: txHash as `0x${string}` });
+      if (transaction.to?.toLowerCase() !== job.to.toLowerCase() || transaction.input.toLowerCase() !== job.data.toLowerCase() || transaction.value !== 0n) throw new Error('Receipt does not identify the original submission');
+      assertReceiptConfirmations(receipt.blockNumber, await client.getBlockNumber());
+      await readSettlementBlock(client, job.chainId, receipt);
       await ctx.runMutation(internal.relayJobs.update, { ...args, status: 'exception', txHash, error: 'The transaction reverted. No payment was confirmed.' }); return;
     }
+    if (receipt.logs.some(log => log.address.toLowerCase() === job.to.toLowerCase() && accountExecutionOutcome(log, job.safeTxHash) === 'failure')) {
+      assertReceiptConfirmations(receipt.blockNumber, await client.getBlockNumber());
+      await ctx.runMutation(internal.relayJobs.confirmFailure, { ...args, txHash, safeTxHash: job.safeTxHash, settlement: await readSettlementBlock(client, job.chainId, receipt) });
+      return;
+    }
+    const expected = await ctx.runQuery(internal.disbursements.getForVerification, { disbursementId: job.disbursementId });
+    const token = Object.entries(CHAIN_TOKENS[job.chainId as SupportedChainId] ?? {}).find(([symbol]) => symbol === expected.token)?.[1];
+    if (!token) throw new Error('Unsupported payment currency');
     assertPaymentReceipt(receipt, { ...expected, tokenAddress: token.address });
     assertReceiptConfirmations(receipt.blockNumber, await client.getBlockNumber());
     await ctx.runMutation(internal.disbursements.confirmExecution, { disbursementId: job.disbursementId, txHash, safeTxHash: job.safeTxHash, settlement: await readSettlementBlock(client, job.chainId, receipt) });

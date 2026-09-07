@@ -69,7 +69,7 @@ export function readQueryFixture(reference: any, args: any) {
       break;
     }
     case "relayJobs:paymentStatus":
-      value = scenario === 'preparation' ? { canResume: true, status: 'exception', error: 'No submission was attempted.', updatedAt: Date.now() } : scenario === 'recovery' ? { status: 'exception', error: 'Confirmation is delayed.', updatedAt: Date.now() } : null;
+      value = scenario === 'relay-failed' ? { canResume: false, status: 'failed', error: 'This payment failed. No money was sent to the recipients. Create a new payment to try again.', updatedAt: Date.now() } : scenario === 'preparation' ? { canResume: true, status: 'exception', error: 'No submission was attempted.', updatedAt: Date.now() } : scenario === 'recovery' ? { status: 'exception', error: 'Confirmation is delayed.', updatedAt: Date.now() } : null;
       break;
     case "relayQuotes:preview":
       value = { fee: { token: "USDC", tokenAddress: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913", collector: "0x1111111111111111111111111111111111111111", amount: "0.05" }, identity: "sample-fee", error: null };
@@ -151,6 +151,7 @@ export function readQueryFixture(reference: any, args: any) {
             ...(scenario === "proposal-recovery" ? { status: "pending", safeTxHash: `0x${"ab".repeat(32)}`, preparedProposalAt: Date.now(), executionFee: { token: "USDC", amount: "0.05" } } : {}),
             ...(scenario === "native-recovery" ? { status: "relaying", safeTxHash: `0x${"ab".repeat(32)}`, nativeExecution: { startedAt: Date.now() - 60_000, searchFromBlock: "100", checks: 1 }, relayStatus: "Checking settlement" } : {}),
             ...(scenario === 'native-declined' ? { status: 'relaying', approvalMethod: 'workspace', safeTxHash: `0x${'ab'.repeat(32)}`, nativeExecution: { startedAt: Date.now() - 60_000, searchFromBlock: '100', checks: 1, attemptId: 'declined-attempt', walletRejectedAt: Date.now() - 30_000 }, relayStatus: 'Wallet approval declined' } : {}),
+            ...(['native-failed', 'relay-failed'].includes(scenario ?? '') ? { status: 'failed', executionFailure: { safeTxHash: `0x${'ab'.repeat(32)}`, txHash: `0x${'cd'.repeat(32)}`, block: { blockNumber: '490', blockHash: `0x${'ef'.repeat(32)}`, timestamp: Date.now() - 60_000 } }, approvalMethod: 'workspace', safeTxHash: `0x${'ab'.repeat(32)}`, ...(scenario === 'native-failed' ? { nativeExecution: { startedAt: Date.now() - 60_000, searchFromBlock: '100', checks: 1 } } : {}), relayStatus: 'Execution failed', relayError: 'This payment failed. No money was sent to the recipients. Create a new payment to try again.' } : {}),
             ...(scenario === "delegated-batch" ? { scheduledAt: undefined } : {}),            ...(["recovery", "preparation"].includes(scenario ?? "") ? { status: "relaying", executionFee: { token: "USDC", amount: "0.05" } } : {}),
             ...(scenario === "delegated"
               ? {
@@ -321,6 +322,8 @@ export function readQueryFixture(reference: any, args: any) {
     value = { ...value, items, assets: [asset], totals: [{ ...asset, amount: '1295.250001', inflow: '0', outflow: '1295.250001', net: '-1295.250001' }], excludedCount: items.filter(i => !i.includedInTotals).length };
   }
 
+  if (name === 'customerOperations:current') value = JSON.parse(sessionStorage.getItem('qa:customerOperation') ?? 'null');
+  if (name === 'customerOperations:conflict') value = null;
   if (name === 'receivables:list' && args.environment) value = { ...value, items: value.items.filter((i: any) => chainEnvironment(i.chainId) === args.environment) };
   if (name === 'disbursements:list' && args.environment) {
     const items = value.items.filter((i: any) => chainEnvironment(i.chainId) === args.environment);
@@ -336,9 +339,17 @@ const disabled = async () => {
   );
 };
 export function useMutation(reference?: any) {
-  if (sessionStorage.getItem('qa:scenario')?.startsWith('onboarding-wallet-')) {
+  if (getFunctionName(reference) === 'customerOperations:begin' && sessionStorage.getItem('qa:scenario')?.startsWith('customer-setup-')) return async (args: any) => {
+    if (sessionStorage.getItem('qa:scenario')?.endsWith('save-failed')) throw new Error('Database connection interrupted');
+    const record = JSON.parse(args.record);
+    const operation = { _id: 'setup1', record: args.record, hash: record.quote.hash, chainId: record.intent.chainId, fee: '25000', feePaid: false, state: 'pending', open: true };
+    sessionStorage.setItem('qa:customerOperation', JSON.stringify(operation)); cache.clear(); fixtureRevision++; fixtureListeners.forEach(listener => listener()); return 'setup1';
+  };
+
+  if (sessionStorage.getItem('qa:scenario')?.startsWith('customer-setup-')) {
     if (getFunctionName(reference) === 'orgs:create') return async () => ({ orgId: 'demo' });
     if (getFunctionName(reference) === 'orgs:updateOwnProfile') return async () => null;
+    if (getFunctionName(reference) === 'orgs:inviteMember') return async () => null;
   }
   if (reference && getFunctionName(reference).startsWith('licenseAdmin:') && sessionStorage.getItem('qa:scenario') === 'license-operator') return async (args: any) => { const result = await licenseMutationFixture(getFunctionName(reference), args); cache.clear(); fixtureRevision++; fixtureListeners.forEach(listener => listener()); return result; };
   if (reference && (sessionStorage.getItem('qa:scenario') === 'multiple-accounts' || sessionStorage.getItem('qa:scenario')?.startsWith('accounting'))) return async (args: any) => {
@@ -355,6 +366,21 @@ export function useConvex() {
   } };
 }
 export function useAction(reference: any) {
+  if (getFunctionName(reference) === 'teamInvitationLinks:create' && sessionStorage.getItem('qa:scenario') === 'invite-share') return async () => ({ invitationId: 'qa-invitation', url: `${location.origin}/invite#${'e'.repeat(64)}` });
+  if (sessionStorage.getItem('qa:scenario')?.startsWith('customer-setup-')) {
+    if (getFunctionName(reference) === 'customerExecution:refresh') return async () => {
+      const scenario = sessionStorage.getItem('qa:scenario') ?? '';
+      if (scenario.endsWith('check-outage')) throw new Error('RPC HTTP 503 https://rpc.example/private-key');
+      const state = scenario.endsWith('success') || scenario.endsWith('link-failed') ? 'confirmed' : scenario.endsWith('reverted') ? 'failed' : scenario.endsWith('expired-request') ? 'expired' : 'pending';
+      if (state === 'failed' || state === 'expired') { sessionStorage.removeItem('qa:customerOperation'); cache.clear(); fixtureRevision++; fixtureListeners.forEach(listener => listener()); }
+      return { state, feePaid: state === 'failed' };
+    };
+    if (getFunctionName(reference) === 'customerExecution:completeSetup') return async () => {
+      if (sessionStorage.getItem('qa:scenario')?.endsWith('link-failed')) throw new Error('Database write interrupted https://rpc.invalid/private');
+      sessionStorage.removeItem('qa:customerOperation'); cache.clear(); fixtureRevision++; fixtureListeners.forEach(listener => listener()); return { safeId: 'safe1' };
+    };
+  }
+
   if (['spendingPolicies:approvals', 'accountCancellations:approvals'].includes(getFunctionName(reference))) return async () => {
     const scenario = sessionStorage.getItem('qa:scenario');
     if (scenario === 'policy-approval-outage') throw new Error('Policy reader unavailable');

@@ -1,5 +1,7 @@
 # Subscription checkout and recovery
 
+**September 7 requirement:** the license price and execution-service cost must both be payable from customer stablecoins. The current direct wallet transaction charges native gas, so its existing recovery tests do not establish compliance. COST06 in [the TODO](../TODOS.md) tracks replacement under the [product-wide service requirements](PRODUCT_AND_SERVICE_REQUIREMENTS.md). The license payment is Disburse revenue; its execution costs must go directly to the external service without a Disburse provider bill.
+
 An administrator selects a plan and reviews its price and payment destination. Before opening the wallet, Disburse saves that checkout in the database. The record fixes the organization, plan, chain, USDC contract, amount, destination and paying wallet. A later configuration change cannot redirect or reprice an existing request.
 
 ## One payment request

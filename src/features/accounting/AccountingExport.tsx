@@ -1,3 +1,4 @@
+import { userErrorMessage } from '@/lib/userErrors';
 import { useState } from 'react';
 import { useMutation, useQuery } from 'convex/react';
 import { api } from '../../../convex/_generated/api';
@@ -52,7 +53,7 @@ export function AccountingExport({ exportId, canReview, onClose }: { exportId: I
         : canReview && <form className="space-y-4 border-t border-white/10 pt-4" onSubmit={async e => {
           e.preventDefault(); if (!sessionToken || !checked || busy) return; setBusy(true); setError('');
           try { await confirm({ exportId, sessionToken, reference }); }
-          catch (e) { setError(e instanceof Error ? e.message : 'Could not confirm the import'); } finally { setBusy(false); }
+          catch (e) { setError(userErrorMessage(e, 'Could not confirm the import')); } finally { setBusy(false); }
         }}>
           {error && <Notice>{error}</Notice>}
           <label className="block"><span className="finance-label">Import reference in your books</span><input className="finance-field" value={reference} onChange={e => setReference(e.target.value)} maxLength={200} required /></label>

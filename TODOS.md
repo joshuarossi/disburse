@@ -6,6 +6,19 @@ Latest implementation and acceptance evidence: [September 6 fix pass](docs/READI
 
 Product direction: target a fresh v2 setup. Preserving POC behavior and migrating unused POC records are not release requirements. Keep payment evidence, audit history and recovery controls needed for ordinary ongoing use; do not erase an existing workspace without a separate reset instruction.
 
+## P0 — product and service costs
+
+The September 7 [product-wide requirements](docs/PRODUCT_AND_SERVICE_REQUIREMENTS.md) apply to every feature. The subscription licenses the software. Customers pay all external service costs directly in stablecoins when using each service. Disburse's permitted application operating costs are Convex and Cloudflare. Prior native-gas and sponsored-flow acceptance does not satisfy these requirements.
+
+- [ ] COST01 Select and verify an execution service whose complete charges come directly from the customer's stablecoins. No Disburse Gas Tank, reimbursement, provider subscription or API-usage bill. Verify commercial terms as well as an actual receipt; a free quota is insufficient evidence.
+- [ ] COST02 Build original onboarding from MetaMask with supported stablecoins, zero native tokens and no existing Safe. Quote setup plus initial funding, obtain customer authorization, create/fund the Safe and verify its owners and balances. Recover interrupted setup without another charge or duplicate account. Do not require a native-gas transfer to a predicted address first.
+- [ ] COST03 Apply stablecoin-paid service execution to additional/nested account creation, existing-account setup, payments, grants, revocations and signed cancellations. Preserve current approval thresholds, spending limits and recovery evidence.
+- [ ] COST04 Apply the same cost rule to invoice creation and collection. If creation invokes paid provisioning, quote and charge the issuing customer at creation. Current address prediction does not deploy a contract. Quote any later first-deployment/collection cost in stablecoins, preserve invoice principal, and resolve shared-factory provisioning without Disburse funding. Close A07/A11 with live evidence.
+- [ ] COST05 Remove assumptions that Disburse buys external delivery, RPC, archive, indexing, screening, extraction or connector services. Use software/local or unbilled routes, or a separately quoted customer-paid service. Review the globally configured Resend adapter and all provider overage behavior before enabling them.
+- [ ] COST06 Make subscription checkout pay the license price and all execution costs from customer stablecoins. Receiving the software license price is Disburse product revenue; it must not fund the execution service. Repeat setup, invoice and checkout stories with zero native tokens and no Disburse provider balance.
+
+Completed portions of this cost pass: the app-funded Turbo and outgoing Resend adapters cannot make provider requests; invitations use private sharing; onboarding has USDC quote/sign/recovery code; Circle/Candide executed three real USDC-paid Safe operations, including failure and recovery. Initial onboarding still fails at the live Biconomy provider, and Circle application integration remains open. [September 7 evidence](docs/CUSTOMER_PAID_SERVICES_QA_2026-09-07.md).
+
 ## P0 — trust and correctness
 
 - [x] R01 Separate production, testnet and unknown-network payment activity in navigation, balances, reports and exports. Business activity is the default. Recipients, bills and team settings remain shared, as the activity notice explains.

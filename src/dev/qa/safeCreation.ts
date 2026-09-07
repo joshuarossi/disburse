@@ -4,7 +4,7 @@ export async function createSafe(
   saltNonce: string,
   chainId: number,
 ) {
-  if (!sessionStorage.getItem("qa:scenario")?.startsWith("onboarding-wallet-"))
+  if (!sessionStorage.getItem("qa:scenario")?.startsWith("customer-setup-"))
     throw new Error("Account creation is disabled in visual QA.");
   sessionStorage.setItem(
     "qa:safeCreation",

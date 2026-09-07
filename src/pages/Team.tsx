@@ -1,3 +1,4 @@
+import { userErrorMessage } from '@/lib/userErrors';
 import { lazy, Suspense, useState } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
 import { useAccount } from "wagmi";
@@ -261,7 +262,7 @@ export default function Team() {
             setEditor(null);
             if (created)
               setParams({
-                tab: created === "email" ? "invitations" : "members",
+                tab: created === "link" ? "invitations" : "members",
               });
           }}
         />
@@ -330,9 +331,7 @@ export default function Team() {
                     setRemoved(true);
                   } catch (e) {
                     setError(
-                      e instanceof Error
-                        ? e.message
-                        : "Could not remove member",
+                      userErrorMessage(e, "Could not remove member"),
                     );
                   } finally {
                     setBusy(false);

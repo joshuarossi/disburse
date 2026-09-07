@@ -51,7 +51,7 @@ export const webhook = internalAction({
     let event: ReturnType<Resend["webhooks"]["verify"]>;
     try {
       event = new Resend(
-        process.env.RESEND_API_KEY || "verification-only",
+        "verification-only",
       ).webhooks.verify({
         payload: args.payload,
         headers: {

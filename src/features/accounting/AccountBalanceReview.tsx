@@ -1,3 +1,4 @@
+import { userErrorMessage } from '@/lib/userErrors';
 import { useState } from 'react';
 import { useAction, useQuery } from 'convex/react';
 import { formatUnits } from 'viem';
@@ -26,7 +27,7 @@ export function AccountBalanceReview({ orgId, environment, canReview }: { orgId:
     {canReview && <form className="workspace-panel p-5 space-y-4" onSubmit={async e => {
       e.preventDefault(); if (!sessionToken || !selected || busy) return; setBusy(true); setError('');
       try { await check({ orgId, sessionToken, safeId: selected._id, token, startDate, endDate }); }
-      catch (e) { setError(e instanceof Error ? e.message : 'Account history could not be verified. Refresh it and try again.'); }
+      catch (e) { setError(userErrorMessage(e, 'Account history could not be verified. Refresh it and try again.')); }
       finally { setBusy(false); }
     }}>
       <div className="grid gap-4 sm:grid-cols-2">

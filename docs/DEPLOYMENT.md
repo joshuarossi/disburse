@@ -64,6 +64,8 @@ Public RPC URLs may contain browser-restricted provider identifiers. Never use a
 
 ## Convex configuration
 
+The [product-wide cost requirements](PRODUCT_AND_SERVICE_REQUIREMENTS.md) limit Disburse's application operating costs to Convex and Cloudflare. The configurations below describe current capabilities, not permission to open a paid third-party account. Do not enable customer services through Disburse-funded gas, email, RPC, indexing or other provider usage. MetaMask-and-stablecoins onboarding with zero native gas also remains COST02 in [the TODO](../TODOS.md).
+
 Set these on the selected Convex deployment through its environment settings or the installed CLI's `convex env set`. Setting them only in Cloudflare does not configure backend actions. Do not copy the QA deployment's credentials, wallet files, sessions or journals.
 
 | Area | Server settings and behavior |
@@ -72,12 +74,12 @@ Set these on the selected Convex deployment through its environment settings or 
 | RPC | `RPC_URL_<chainId>` for current reads; `ARCHIVE_RPC_URL_<chainId>` for historical accounting checkpoints. Public defaults are fallbacks. |
 | Licensing | `DISBURSE_LICENSE_OPERATORS` contains the full operator wallet addresses. Empty means no operator. Configure signup trial/free terms through `/admin/licenses`. |
 | Paid subscriptions | `DISBURSE_BENEFICIARY_ADDRESS` is the receiving treasury; `DISBURSE_BENEFICIARY_CHAIN_ID` is `1` or `11155111`. Missing configuration disables new paid checkout. Free access and operator grants remain available. |
-| Managed payments | `GELATO_API_KEY` for production or `GELATO_TESTNET_API_KEY` for test networks; per-chain `GELATO_<chainId>_FEE_COLLECTOR` and `GELATO_<chainId>_FEE_USDC` / `FEE_USDT`. Use the configured provider collector and whole-token decimal fees. Customers authorize and pay the fee. |
+| Managed payments | Turbo is disabled in code before any provider request. Circle/Candide protocol execution is proven on testnet, but application integration is unfinished. No Gas Tank or paid execution API account is required or authorized. See the [provider review](GELATO_V2_SETUP.md). |
 | New workspace defaults | The current backend also reads `VITE_GELATO_DEFAULT_FEE_TOKEN` and `VITE_GELATO_DEFAULT_FEE_MODE`. Set these non-secret defaults on Convex if overriding the built-in USDC/preferred choices. |
-| Email | `RESEND_API_KEY`, `EMAIL_FROM`, `PUBLIC_APP_URL`, `EMAIL_OUTBOX_KEY`, `RESEND_WEBHOOK_SECRET`. The outbox key is an independent 32-byte secret encoded as 64 hex characters. `EMAIL_OUTBOX_PREVIOUS_KEY` supports rotation. |
+| Private invitations | `PUBLIC_APP_URL`, `EMAIL_OUTBOX_KEY` (independent 32-byte secret encoded as 64 hex characters), and optional `EMAIL_OUTBOX_PREVIOUS_KEY` for rotation. No sending account is used. `RESEND_WEBHOOK_SECRET` only verifies historical callbacks. |
 | Receiving invoices | `AR_FACTORY_<chainId>` must match the pinned deployed factory. Keep `AR_MAINNET_ENABLED` unset or `false` until contract review and mainnet acceptance. Current collection uses the customer's native gas wallet. |
 
-Email callbacks use `POST /webhooks/email` on the backend's HTTP-action origin. Verify signatures and delivery events before enabling invitations and reminders. Details are in [team invitations](TEAM_INVITATIONS.md), [managed payments](MANAGED_RELAY.md), [billing checkout](BILLING_CHECKOUT.md), [licensing](LICENSE_MANAGEMENT.md) and [receiving invoices](ACCOUNTS_RECEIVABLE.md).
+Invitations are shared privately by their administrator; the app can open an email draft but never sends through a paid delivery API. Historical callbacks use `POST /webhooks/email` and retain signature verification. Details are in [team invitations](TEAM_INVITATIONS.md), [managed payments](MANAGED_RELAY.md), [billing checkout](BILLING_CHECKOUT.md), [licensing](LICENSE_MANAGEMENT.md) and [receiving invoices](ACCOUNTS_RECEIVABLE.md).
 
 ## Database review and rollout
 
@@ -94,7 +96,7 @@ Email callbacks use `POST /webhooks/email` on the backend's HTTP-action origin. 
 
 | Area | Evidence still needed |
 | --- | --- |
-| Managed fee payment | Real provider settlement, exact principal and fee, interrupted-submission recovery |
+| Managed fee payment | Protocol receipts exist; complete in-app execution, approvals, fee limits and interrupted-submission recovery remain required |
 | Unattended schedule | A due approved payment completes once with browsers closed; provider timeout and cancellation behavior verified |
 | Paid license | Real activation, renewal, upgrade credit and replay rejection |
 | Customer wallet | Browser extension/mobile connector, second approver, rejection, reload and reconciliation |

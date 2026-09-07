@@ -39,6 +39,26 @@ The four older `qa-funded-workspace`, `qa-native-recovery`, `qa-native-fee-accep
 
 Current evidence and remaining acceptance are in [the QA report](../docs/QA_V2.md) and [active TODO](../TODOS.md).
 
+## Customer-paid execution QA
+
+Both runners require the isolated wallet under `.local/qa/wallet.json`. They never print its key or fund an application gas balance. They save each unique run before sending and refuse to resubmit it. Default behavior is simulation; `--execute` explicitly spends test funds. `--status` only checks the original request.
+
+```sh
+bun run qa:customer-setup --run=unique-setup
+bun run qa:customer-setup --run=unique-paid-setup --execute
+bun run qa:customer-setup --run=unique-paid-setup --status
+
+bun run qa:customer-fees --run=unique-payment --safe=<test-safe>
+bun run qa:customer-fees --run=unique-paid-payment --safe=<test-safe> --execute
+bun run qa:customer-fees --run=unique-paid-payment --status
+```
+
+The setup runner uses the application’s quote, permit and authenticated recovery code against the development backend. It requires canonical Base Sepolia USDC and zero native ETH in the signing wallet. A successful quote does not mean the provider accepted execution.
+
+The payment runner exercises the published Safe4337/Circle protocol using an already funded, sole-owner Base Sepolia test Safe. It does not establish complete in-app payment integration or original onboarding. Its deliberate `--force-failure` option exists only to verify fees and recovery after a mined failed operation. Do not copy that simulation bypass into a product flow.
+
+Actual receipts, failure results and remaining work are in [the customer-paid services report](../docs/CUSTOMER_PAID_SERVICES_QA_2026-09-07.md).
+
 ## License acceptance
 
 `bun scripts/qa-license-management.mjs` uses the normal build at `http://127.0.0.1:4190` and the isolated QA company. It temporarily updates the development operator allowlist, then restores it in `finally`. The company grant is restored as well. It cannot send a network transaction. A restricted journal supports `--restore` after an interruption. Run this against a synchronized development backend; `convex codegen` alone generates bindings and does not publish the new function routes.

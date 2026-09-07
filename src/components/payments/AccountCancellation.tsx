@@ -1,3 +1,4 @@
+import { userErrorMessage } from '@/lib/userErrors';
 import { useState } from "react";
 import { useAction, useMutation, useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
@@ -80,7 +81,7 @@ export function AccountCancellation({
       setRetrying(false);
     } catch (e) {
       setError(
-        e instanceof Error ? e.message : "Could not request cancellation",
+        userErrorMessage(e, "Could not request cancellation"),
       );
     } finally {
       setBusy(false);

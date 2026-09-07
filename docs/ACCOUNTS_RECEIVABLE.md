@@ -1,5 +1,7 @@
 # Customer invoices and collections
 
+**September 7 requirement:** invoice creation, receiving-address provisioning and collection follow the [product-wide service boundary](PRODUCT_AND_SERVICE_REQUIREMENTS.md). The issuer pays any creation-service cost in stablecoins when creating the invoice. Current issuance only predicts an address; it has no receiving-contract deployment cost at issuance. First collection deploys that contract, and its full cost must be quoted to and paid by the customer in stablecoins. Current native-wallet collection does not yet satisfy that requirement. Disburse must not fund a factory, collection or indexing service on the customer's behalf.
+
 ## Product behavior
 
 **Invoices** is accounts receivable: create a draft, review its items and receiving account, generate a payment link, share it, and track payment. **Bills** remains accounts payable. The customer can view and print the invoice without creating a Disburse account.

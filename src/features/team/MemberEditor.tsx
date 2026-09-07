@@ -1,3 +1,4 @@
+import { userErrorMessage } from '@/lib/userErrors';
 import { useRef, useState } from "react";
 import { useAction, useMutation } from "convex/react";
 import { api } from "../../../convex/_generated/api";
@@ -8,6 +9,7 @@ import { useSessionToken } from "@/lib/session";
 import { isValidAddress } from "../../../shared/validation";
 
 import { roles, type TeamMember } from "./memberTypes";
+import { InvitationLink } from './InvitationLink';
 export function MemberEditor({
   orgId,
   member,
@@ -17,11 +19,11 @@ export function MemberEditor({
   orgId: Id<"orgs">;
   member?: TeamMember;
   isAdmin: boolean;
-  onClose: (created?: "email" | "wallet") => void;
+  onClose: (created?: "link" | "wallet") => void;
 }) {
   const sessionToken = useSessionToken();
   const invite = useMutation(api.orgs.inviteMember);
-  const emailInvite = useAction(api.teamInvitationEmail.send);
+  const createLink = useAction(api.teamInvitationLinks.create);
   const update = useMutation(api.orgs.updateMember);
   const [name, setName] = useState(member?.name ?? "");
   const [email, setEmail] = useState(member?.email ?? "");
@@ -31,7 +33,8 @@ export function MemberEditor({
   );
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
-  const [method, setMethod] = useState<"email" | "wallet">("email");
+  const [method, setMethod] = useState<"link" | "wallet">("link");
+  const [invitationUrl, setInvitationUrl] = useState('');
   const [bindWallet, setBindWallet] = useState(false);
   const [created, setCreated] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -42,10 +45,11 @@ export function MemberEditor({
       <Dialog title="Invitation created" onClose={() => onClose(method)}>
         <div className="space-y-5 p-6">
           <p>
-            {method === "email"
-              ? `An invitation to ${email.trim()} is queued for delivery. Check Invitations for its delivery and acceptance status.`
+            {method === "link"
+              ? 'Your invitation is ready to share. Your teammate can choose their sign-in wallet when they accept.'
               : "The invitation is ready for this sign-in wallet. Share the sign-in link with your teammate; no email has been sent."}
           </p>
+          {method === 'link' && <InvitationLink url={invitationUrl} email={email.trim()} />}
           {method === "wallet" && (
             <button
               className="workspace-button"
@@ -109,8 +113,8 @@ export function MemberEditor({
                 email,
                 role,
               });
-            else if (method === "email")
-              await emailInvite({
+            else if (method === "link") {
+              const result = await createLink({
                 orgId,
                 sessionToken,
                 requestId: requestId.current,
@@ -119,7 +123,8 @@ export function MemberEditor({
                 role,
                 expectedWallet: bindWallet ? wallet.trim() : undefined,
               });
-            else
+              setInvitationUrl(result.url);
+            } else
               await invite({
                 orgId,
                 sessionToken,
@@ -131,7 +136,7 @@ export function MemberEditor({
             if (member) onClose();
             else setCreated(true);
           } catch (e) {
-            setError(e instanceof Error ? e.message : "Could not save member");
+            setError(userErrorMessage(e, "Could not save member"));
           } finally {
             lock.current = false;
             setBusy(false);
@@ -146,11 +151,11 @@ export function MemberEditor({
               <input
                 type="radio"
                 name="invite-method"
-                value="email"
-                checked={method === "email"}
-                onChange={() => setMethod("email")}
+                value="link"
+                checked={method === "link"}
+                onChange={() => setMethod("link")}
               />
-              Email invitation
+              Private invitation link
             </label>
             <label className="flex items-center gap-2">
               <input
@@ -182,19 +187,19 @@ export function MemberEditor({
               className="finance-field"
               type="email"
               disabled={busy}
-              required={!member && method === "email"}
+              required={!member && method === "link"}
               maxLength={254}
               value={email}
               onChange={(e) => setEmail(e.target.value)}
             />
           </label>
         </div>
-        {!member && method === "email" && (
+        {!member && method === "link" && (
           <div className="space-y-3">
             <p className="workspace-description">
-              Your teammate receives a private link, then signs in and confirms
+              Share a private link with your teammate. They sign in and confirm
               the wallet they will use. You don't need their wallet address to
-              invite them.
+              create the invitation.
             </p>
             <label className="flex items-start gap-2 text-sm">
               <input
@@ -265,8 +270,8 @@ export function MemberEditor({
               ? "Saving…"
               : member
                 ? "Save changes"
-                : method === "email"
-                  ? "Send invitation"
+                : method === "link"
+                  ? "Create invitation link"
                   : "Create invitation"}
           </button>
         </div>

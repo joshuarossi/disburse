@@ -1,3 +1,4 @@
+import { userErrorMessage } from '@/lib/userErrors';
 import { AssetDetails } from "./AssetDetails";
 import { useActivityEnvironment } from "@/features/workspace/ActivityEnvironment";
 import {
@@ -154,7 +155,7 @@ export function TransactionsTab({ orgId, address }: TransactionsTabProps) {
       if (result.errors.length)
         setSyncError(
           result.errors
-            .map((e) => `${getChainName(e.chainId)}: ${e.message}`)
+            .map((e) => `${getChainName(e.chainId)}: ${userErrorMessage({ message: e.message }, "Could not load transactions. Try again shortly.")}`)
             .join(" "),
         );
     } catch {
@@ -291,7 +292,7 @@ export function TransactionsTab({ orgId, address }: TransactionsTabProps) {
     }));
 
     exportToCsv(generateFilename(`transactions_${environment}`), rows, columns);
-    } catch (error) { setExportError(error instanceof Error ? error.message : 'The export could not be completed. Try again.'); }
+    } catch (error) { setExportError(userErrorMessage(error, 'The export could not be completed. Try again.')); }
     finally { setExportCount(null); exportController.current = null; }
   };
 

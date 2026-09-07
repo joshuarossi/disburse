@@ -1,3 +1,4 @@
+import { userErrorMessage } from '@/lib/userErrors';
 import { useEffect, useRef, useState } from "react";
 import { FileText, Upload, Download } from "lucide-react";
 import { useQuery } from "convex/react";
@@ -300,9 +301,7 @@ export function InvoiceAttachments({
                     await downloadInvoiceFile(file.id, file.name, sessionToken);
                   } catch (e) {
                     setError(
-                      e instanceof Error
-                        ? e.message
-                        : "The document could not be downloaded.",
+                      userErrorMessage(e, "The document could not be downloaded."),
                     );
                   } finally {
                     setBusy(null);

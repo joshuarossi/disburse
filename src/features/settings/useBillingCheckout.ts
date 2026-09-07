@@ -1,3 +1,4 @@
+import { userErrorMessage } from '@/lib/userErrors';
 import { ConvexError } from "convex/values";
 import { useEffect, useRef, useState } from "react";
 import { useAction, useMutation, useQuery } from "convex/react";
@@ -105,9 +106,7 @@ export function useBillingCheckout({
       writePendingBilling(orgId, null);
     } catch (error) {
       setBillingError(
-        error instanceof Error
-          ? error.message
-          : "Could not clear billing recovery.",
+        userErrorMessage(error, "Could not clear billing recovery."),
       );
       return;
     }
@@ -183,9 +182,7 @@ export function useBillingCheckout({
       setHasPendingBilling(true);
       setPaymentStep("confirm");
       setBillingError(
-        error instanceof Error
-          ? error.message
-          : "Could not read billing recovery.",
+        userErrorMessage(error, "Could not read billing recovery."),
       );
     }
   };
@@ -419,7 +416,7 @@ export function useBillingCheckout({
           setHasPendingBilling(false);
           setTxHash(undefined);
           setManualTxHash("");
-          setBillingError(err.data.message);
+          setBillingError(userErrorMessage(err, 'Could not prepare checkout. Check the original request before trying again.'));
           setPaymentStep("select");
           return;
         } catch (storageError) {
@@ -428,7 +425,7 @@ export function useBillingCheckout({
       }
       console.error("Failed to subscribe:", err);
       setBillingError(
-        err instanceof Error ? err.message : "Failed to subscribe",
+        userErrorMessage(err, "Failed to subscribe"),
       );
       setPaymentStep("confirm");
     } finally {
@@ -460,9 +457,7 @@ export function useBillingCheckout({
       }
     } catch (error) {
       setBillingError(
-        error instanceof Error
-          ? error.message
-          : "Could not check the original checkout.",
+        userErrorMessage(error, "Could not check the original checkout."),
       );
     } finally {
       setIsVerifying(false);
@@ -478,7 +473,7 @@ export function useBillingCheckout({
       });
     } catch (error) {
       setBillingError(
-        error instanceof Error ? error.message : "Could not discard checkout.",
+        userErrorMessage(error, "Could not discard checkout."),
       );
     } finally {
       setIsVerifying(false);

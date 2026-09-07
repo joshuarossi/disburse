@@ -1,3 +1,4 @@
+import { userErrorMessage } from '@/lib/userErrors';
 import { AccountCancellation } from "@/components/payments/AccountCancellation";
 import { PaymentRecovery } from './PaymentRecovery';
 import { paymentStatus } from '../../../shared/paymentQueue';
@@ -8,6 +9,7 @@ import { DelegatedPayment } from "./DelegatedPayment";
 import { screeningReviewKey } from "../../../shared/screeningReview";
 import { PaymentBatchForm } from "@/components/payments/PaymentBatchForm";
 import { useState } from "react";
+import { Link } from 'react-router-dom';
 import { useQuery as useRemoteQuery } from "@tanstack/react-query";
 import { useAccount } from "wagmi";
 import { useAction, useMutation, useQuery } from "convex/react";
@@ -130,7 +132,7 @@ export function PaymentReview({
       setConfirmCancel(false);
       setChangingDate(false);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Could not update payment");
+      setError(userErrorMessage(e, "Could not update payment"));
     } finally {
       setBusy(false);
     }
@@ -211,6 +213,8 @@ export function PaymentReview({
           {(error || actions.error) && (
             <Notice>{error || actions.error}</Notice>
           )}
+          {payment.status === 'failed' && payment.relayError && <Notice>{userErrorMessage(payment.relayError, 'This payment failed. Review its original receipt before preparing another payment.')}</Notice>}
+          {payment.executionFailure && canManage && <Link className="workspace-button workspace-button-primary" to={`/org/${orgId}/disbursements?new=1`} onClick={onClose}>New payment</Link>}
           {payment.payoutReviewError && <Notice>{payment.payoutReviewError}</Notice>}
           {actions.message && <Notice tone="success">{actions.message}</Notice>}
           {actions.approvalRequest && <ApprovalPathReview key={actions.approvalRequest.paths.map(p => p.path.join(':')).join('|')} paths={actions.approvalRequest.paths} busy={actions.busy} onCancel={actions.dismissApproval} onApprove={path => { const r = actions.approvalRequest!; void actions.run(r.id, r.operation, r.acknowledgedScreening, r.reviewedFeeIdentity, path); }} />}
@@ -299,7 +303,7 @@ export function PaymentReview({
                   </p>
                 ) : approvals.isError ? (
                   <p role="alert" className="mt-3 text-sm text-red-400">
-                    {approvals.error.message}
+                    {userErrorMessage(approvals.error, "Could not load the account approvals. Try again shortly.")}
                   </p>
                 ) : (
                   approvals.data && (
@@ -457,7 +461,7 @@ export function PaymentReview({
               />
             )}
           <PaymentRecovery id={id} canManage={canManage} payment={payment} retryDisabled={locked || screeningBlocked} onRetryNative={payment.allowanceExecution ? undefined : () => void actions.run(id, 'execute', screeningAcknowledged)} />
-          {!recovery && !payment.nativeExecution && payment.relayError && <Notice>{payment.relayError}</Notice>}
+          {payment.relayError && payment.status !== 'failed' && !recovery && !payment.nativeExecution && <Notice>{userErrorMessage(payment.relayError, 'This payment needs review. Check its original settlement before trying again.')}</Notice>}
           {payment.status === "scheduled" && (
             <Notice tone="info">
               This payment is scheduled. Complete all required owner signatures
@@ -528,6 +532,7 @@ export function PaymentReview({
             </a>
           )}
           {canManage &&
+            !payment.executionFailure &&
             payment.safeTxHash &&
             ["proposed", "relaying", "failed", "scheduled"].includes(
               payment.status,
@@ -562,7 +567,7 @@ export function PaymentReview({
                 </div>
               </details>
             )}
-          {!actions.approvalRequest && !payment.cancellationId && <div className="flex flex-wrap items-center justify-between gap-3 border-t border-white/10 pt-5">
+          {!actions.approvalRequest && !payment.cancellationId && !payment.executionFailure && <div className="flex flex-wrap items-center justify-between gap-3 border-t border-white/10 pt-5">
             <div>
               {canManage &&
                 [

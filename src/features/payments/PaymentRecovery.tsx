@@ -1,3 +1,4 @@
+import { userErrorMessage } from '@/lib/userErrors';
 import { useState } from "react";
 import { walletSendDeclined } from '../../../shared/paymentQueue';
 import { useQuery, useMutation } from "convex/react";
@@ -46,7 +47,7 @@ export function PaymentRecovery({
   const [message, setMessage] = useState("");
   const declined = !!native && walletSendDeclined(native);
   const reverted = !!native?.nativeExecution?.revertedAt && !native.txHash;
-  if (!status || status.status === "confirmed") return null;
+  if (!status || status.status === "confirmed" || status.status === "failed") return null;
   return (
     <section
       className="rounded-lg border border-[var(--ws-border)] p-4 space-y-3"
@@ -58,7 +59,7 @@ export function PaymentRecovery({
           : "Tracking your payment"}
       </h3>
       <p className="text-sm text-[var(--ws-muted)]">
-        {reverted ? 'The network transaction reverted. The original authorization is saved for review and retry.' : declined ? 'The wallet declined the send request. Your original payment authorization is saved.' : status.error ??
+        {reverted ? 'The network transaction reverted. The original authorization is saved for review and retry.' : declined ? 'The wallet declined the send request. Your original payment authorization is saved.' : (status.error ? userErrorMessage(status.error, 'We could not verify settlement. Check the original payment again.') : undefined) ??
           (native
             ? "We are checking whether your approved payment settled on the network."
             : "The payment service is processing your approved payment.")}
@@ -88,9 +89,7 @@ export function PaymentRecovery({
               );
             } catch (error) {
               setMessage(
-                error instanceof Error
-                  ? error.message
-                  : "Could not check settlement.",
+                userErrorMessage(error, "Could not check settlement."),
               );
             } finally {
               setBusy(false);

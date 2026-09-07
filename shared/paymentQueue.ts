@@ -6,6 +6,7 @@ type QueuePayment = {
   relayStatus?: string;
   txHash?: string;
   nativeExecution?: { walletRejectedAt?: number; revertedAt?: number };
+  executionFailure?: { safeTxHash: string; txHash: string };
 };
 
 export function walletSendDeclined(payment: QueuePayment) {
@@ -17,6 +18,7 @@ export function submissionNeedsAttention(payment: QueuePayment) {
 }
 
 export function paymentStatus(payment: QueuePayment) {
+  if (payment.status === 'failed' && payment.executionFailure) return { status: 'failed', label: 'Payment failed' };
   if (payment.cancellationId && !payment.cancellationConfirmedAt && !['executed', 'failed'].includes(payment.status)) return { status: 'pending', label: 'Cancellation pending' };
   return { status: submissionNeedsAttention(payment) ? 'failed' : payment.status, label: walletSendDeclined(payment) || payment.nativeExecution?.revertedAt ? 'Ready to retry' : undefined };
 }

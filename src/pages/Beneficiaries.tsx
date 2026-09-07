@@ -1,3 +1,4 @@
+import { userErrorMessage } from '@/lib/userErrors';
 import { useState } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
 import { useMutation, useQuery } from "convex/react";
@@ -123,7 +124,7 @@ export default function Beneficiaries() {
       setArchive(null);
       setSelected((ids) => ids.filter((id) => id !== archive._id));
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Could not update recipient");
+      setError(userErrorMessage(e, "Could not update recipient"));
     } finally {
       setBusy(false);
     }

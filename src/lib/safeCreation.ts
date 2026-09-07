@@ -1,14 +1,10 @@
 import Safe from "@safe-global/protocol-kit";
-import { getAddress } from "viem";
 import { getConnectedProvider } from "./walletProvider";
+import { customerPaidSafeConfig } from '../../shared/safe4337';
 
 /**
- * Deploy a new Safe multisig.  Returns { predictedAddress, deployTx } where
- * deployTx is a plain { to, data, value } the caller can send via wagmi's
- * useSendTransaction.
- *
- * The Safe address is deterministic (CREATE2) so it is known before the
- * deploy tx confirms.  The caller is responsible for sending the transaction.
+ * Prepare the deterministic Safe address and deployment calldata for the
+ * customer-paid setup service. This function never requests a wallet broadcast.
  */
 export async function createSafe(
   owners: string[],
@@ -20,17 +16,18 @@ export async function createSafe(
   deployTx: { to: string; data: string; value: bigint };
 }> {
   const provider = await getConnectedProvider(chainId);
-  const checksummedOwners = owners.map((o) => getAddress(o));
+  const actualChainId = Number(await provider.request({ method: 'eth_chainId' }));
+  if (chainId !== undefined && chainId !== actualChainId) throw new Error('Your wallet changed networks. Select the account network and try again.');
 
   const protocolKit = await Safe.init({
     provider,
     predictedSafe: {
-      safeAccountConfig: {
-        owners: checksummedOwners,
-        threshold,
-      },
+      safeAccountConfig: customerPaidSafeConfig(actualChainId, owners, threshold),
       safeDeploymentConfig: {
         saltNonce,
+        // Keep creation aligned with the implementations verified by the backend.
+        // The SDK default is 1.5.0, which our identity checker does not accept.
+        safeVersion: '1.4.1',
       },
     },
   });

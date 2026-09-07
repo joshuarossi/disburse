@@ -1,3 +1,4 @@
+import { userErrorMessage } from '@/lib/userErrors';
 import { useState } from 'react';
 import { useAction, useMutation, useQuery } from 'convex/react';
 import type { FunctionReturnType } from 'convex/server';
@@ -28,7 +29,7 @@ export function AccountingReview({ orgId, source, onClose }: { orgId: Id<'orgs'>
         {source.kind === 'receipt' && <button className="workspace-button" disabled={verifying} onClick={async () => {
           if (!sessionToken || verifying) return; setVerifying(true); setVerifyError('');
           try { await verifyReceipt({ eventId: source.id as Id<'receivableEvents'>, sessionToken }); }
-          catch (e) { setVerifyError(e instanceof Error ? e.message : 'The original receipt could not be verified'); }
+          catch (e) { setVerifyError(userErrorMessage(e, 'The original receipt could not be verified')); }
           finally { setVerifying(false); }
         }}>{verifying ? 'Verifying original receipt…' : 'Verify original receipt'}</button>}
       </>
@@ -117,7 +118,7 @@ function ReviewForm({ orgId, details, config, onSaved }: { orgId: Id<'orgs'>; de
       assetBookValue: assetValue, obligationBookValue: obligationValue, assetAccount: account(assetId), counterAccount: account(counterId),
       differenceAccount: differenceId ? account(differenceId) : undefined, externalName, companyTransfer: fact.companyTransfer,
       receiptHasExcess, advanceBookValue: advanceValue, advanceAccount: advanceId ? account(advanceId) : undefined });
-  } catch (e) { previewError = e instanceof Error ? e.message : 'Review the journal values'; }
+  } catch (e) { previewError = userErrorMessage(e, 'Review the journal values'); }
   const options = (Object.keys(accountingTreatments) as AccountingTreatment[]).filter(value => value === 'already_recorded'
     || (fact.companyTransfer ? value === 'internal_transfer'
       : fact.direction === 'inflow' ? (value === 'customer_advance' || value === 'existing_receivable' && fact.invoiceAppliedRaw !== '0') : ['existing_payable', 'expense', 'fee'].includes(value)));
@@ -140,7 +141,7 @@ function ReviewForm({ orgId, details, config, onSaved }: { orgId: Id<'orgs'>; de
         bookReference: reference, externalName: externalName || undefined, valuationEvidence: evidence, memo,
         replaces: previous?._id, correctionReason: previous ? reason : undefined });
       onSaved();
-    } catch (e) { setError(e instanceof Error ? e.message : 'Could not save reconciliation'); }
+    } catch (e) { setError(userErrorMessage(e, 'Could not save reconciliation')); }
     finally { setBusy(false); }
   }}>
     <p className="text-sm text-slate-400">Book values are in {profile.currency}. Use the carrying value and obligation balance from {profile.bookName}. The settled quantity remains {fact.amount} {fact.token}.</p>

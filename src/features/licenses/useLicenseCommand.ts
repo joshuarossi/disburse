@@ -1,3 +1,4 @@
+import { userErrorMessage } from '@/lib/userErrors';
 import { useRef, useState } from "react";
 
 export function useLicenseCommand() {
@@ -27,9 +28,7 @@ export function useLicenseCommand() {
       setSuccess(message);
     } catch (error) {
       setError(
-        error instanceof Error
-          ? error.message
-          : "The license change could not be saved.",
+        userErrorMessage(error, "The license change could not be saved."),
       );
     } finally {
       lock.current = false;

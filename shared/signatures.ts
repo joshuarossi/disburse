@@ -1,9 +1,10 @@
 // Static imports are required by the Convex runtime. Viem's recovery helper
 // dynamically imports this same curve implementation and fails in deployed functions.
-import { secp256k1 } from "@noble/curves/secp256k1";
+import { secp256k1 } from "@noble/curves/secp256k1.js";
 import {
   getAddress,
   hashMessage,
+  hexToBytes,
   keccak256,
   type Address,
   type Hex,
@@ -25,9 +26,9 @@ export function recoverAddress({
   const recovery = v >= 27 ? v - 27 : v;
   if (recovery !== 0 && recovery !== 1)
     throw new Error("Invalid signature recovery bit");
-  const publicKey = secp256k1.Signature.fromCompact(signature.slice(2, 130))
+  const publicKey = secp256k1.Signature.fromHex(signature.slice(2, 130), "compact")
     .addRecoveryBit(recovery)
-    .recoverPublicKey(hash.slice(2))
+    .recoverPublicKey(hexToBytes(hash))
     .toHex(false);
   return getAddress(`0x${keccak256(`0x${publicKey.slice(2)}`).slice(-40)}`);
 }
