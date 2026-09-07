@@ -10,7 +10,7 @@ type MarketingShellProps = {
 
 export function MarketingShell({ title, subtitle, children }: MarketingShellProps) {
   return (
-    <div className="min-h-screen" style={{ backgroundColor: 'var(--color-bg-primary)' }}>
+    <div className="marketing-site min-h-screen" style={{ backgroundColor: 'var(--color-bg-primary)' }}>
       <Header />
       <main className="pt-24 pb-24">
         <section className="mx-auto max-w-5xl px-6 lg:px-8">

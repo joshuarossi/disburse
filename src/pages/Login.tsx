@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState, useRef } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { ConnectButton } from '@rainbow-me/rainbowkit';
 import { useAccount, useSignMessage } from 'wagmi';
 import { useTranslation } from 'react-i18next';
@@ -7,6 +7,11 @@ import { useMutation, useQuery } from 'convex/react';
 import { api } from '../../convex/_generated/api';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft } from 'lucide-react';
+import {
+  useSessionToken,
+  saveSessionToken,
+  clearSessionToken,
+} from '@/lib/session';
 
 export default function Login() {
   const { t } = useTranslation();
@@ -15,69 +20,113 @@ export default function Login() {
   const { signMessageAsync } = useSignMessage();
   const [isSigningIn, setIsSigningIn] = useState(false);
   const signInAttemptedRef = useRef(false);
-  
+  const signingRef = useRef(false);
+  const activeAddress = useRef(address);
+  activeAddress.current = address;
+  const [signInError, setSignInError] = useState<string | null>(null);
+  const location = useLocation();
+  const requestedPath = location.state?.returnTo;
+  const returnTo =
+    typeof requestedPath === 'string' &&
+    requestedPath.startsWith('/') &&
+    !requestedPath.startsWith('//')
+      ? requestedPath
+      : '/select-org';
+
   const generateNonce = useMutation(api.auth.generateNonce);
   const verifySignature = useMutation(api.auth.verifySignature);
+  const existingToken = useSessionToken();
   const session = useQuery(
-    api.auth.getSession, 
-    address ? { walletAddress: address } : 'skip'
+    api.auth.validateSession,
+    existingToken ? { token: existingToken } : 'skip',
   );
 
-  // If already authenticated, redirect to select-org
+  // If already authenticated with a valid token, redirect to select-org
   useEffect(() => {
-    if (session) {
-      navigate('/select-org');
+    if (
+      session &&
+      session.walletAddress.toLowerCase() === address?.toLowerCase()
+    ) {
+      navigate(returnTo, { replace: true });
     }
-  }, [session, navigate]);
+  }, [session, address, navigate, returnTo]);
 
   const handleSignIn = useCallback(async () => {
-    if (!address || isSigningIn) return;
+    if (!address || signingRef.current) return;
+    signingRef.current = true;
+    signInAttemptedRef.current = true;
+    setSignInError(null);
     setIsSigningIn(true);
 
     try {
-      // Generate nonce
-      const { nonce } = await generateNonce({ walletAddress: address });
+      clearSessionToken();
 
-      // Create SIWE message
-      const message = `Sign in to Disburse\n\nThis request will not trigger a blockchain transaction or cost any gas fees.\n\nWallet: ${address}\nNonce: ${nonce}`;
+      // Server builds the SIWE message and issues a single-use nonce
+      const { message } = await generateNonce({ walletAddress: address });
 
-      // Sign message
+      // User signs the server-authored message with their wallet
       const signature = await signMessageAsync({ message });
 
-      // Verify with backend
-      await verifySignature({
+      // Backend cryptographically verifies the signature against the claimed
+      // address, consumes the nonce, and returns a one-time opaque session token
+      const result = await verifySignature({
         walletAddress: address,
         signature,
         message,
       });
 
-      // Session query will update and trigger redirect
+      if (activeAddress.current !== address) return;
+      saveSessionToken(result.token);
+
+      // Redirect now that we hold a valid token
+      navigate(returnTo, { replace: true });
     } catch (error) {
       console.error('Sign in failed:', error);
-      // Reset the attempt flag so user can retry
-      signInAttemptedRef.current = false;
+      clearSessionToken();
+      setSignInError(
+        t('auth.login.signInFailed', {
+          defaultValue:
+            'Sign-in was not completed. Try again when you are ready.',
+        }),
+      );
     } finally {
+      signingRef.current = false;
       setIsSigningIn(false);
     }
-  }, [address, isSigningIn, generateNonce, signMessageAsync, verifySignature]);
-
-  // When wallet connects, start SIWE flow (with guard against double-execution)
-  useEffect(() => {
-    if (isConnected && address && !session && !isSigningIn && !signInAttemptedRef.current) {
-      signInAttemptedRef.current = true;
-      handleSignIn();
-    }
-  }, [isConnected, address, session, isSigningIn, handleSignIn]);
+  }, [
+    address,
+    navigate,
+    returnTo,
+    generateNonce,
+    signMessageAsync,
+    verifySignature,
+    t,
+  ]);
 
   // Reset the sign-in attempt flag when wallet disconnects
   useEffect(() => {
-    if (!isConnected) {
-      signInAttemptedRef.current = false;
+    signInAttemptedRef.current = false;
+    setSignInError(null);
+  }, [address]);
+
+  // When wallet connects, start SIWE flow (with guard against double-execution)
+  useEffect(() => {
+    if (
+      isConnected &&
+      address &&
+      (!existingToken || session !== undefined) &&
+      (!session ||
+        session.walletAddress.toLowerCase() !== address.toLowerCase()) &&
+      !isSigningIn &&
+      !signInAttemptedRef.current
+    ) {
+      signInAttemptedRef.current = true;
+      handleSignIn();
     }
-  }, [isConnected]);
+  }, [isConnected, address, existingToken, session, isSigningIn, handleSignIn]);
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center bg-navy-950 px-6">
+    <div className="workspace workspace-entry flex min-h-screen flex-col items-center justify-center bg-navy-950 px-6 py-12">
       {/* Background */}
       <div className="absolute inset-0 -z-10">
         <div className="absolute left-1/2 top-1/2 h-[500px] w-[500px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-accent-500/10 blur-[120px]" />
@@ -149,7 +198,11 @@ export default function Login() {
                     {(() => {
                       if (!connected) {
                         return (
-                          <Button onClick={openConnectModal} size="lg" className="w-full">
+                          <Button
+                            onClick={openConnectModal}
+                            size="lg"
+                            className="w-full"
+                          >
                             {t('auth.login.connectWallet')}
                           </Button>
                         );
@@ -157,7 +210,11 @@ export default function Login() {
 
                       if (chain.unsupported) {
                         return (
-                          <Button onClick={openChainModal} variant="secondary" size="lg">
+                          <Button
+                            onClick={openChainModal}
+                            variant="secondary"
+                            size="lg"
+                          >
                             {t('auth.login.wrongNetwork')}
                           </Button>
                         );
@@ -165,11 +222,15 @@ export default function Login() {
 
                       return (
                         <div className="flex flex-col gap-3">
-                          <Button onClick={openAccountModal} variant="secondary" size="lg">
+                          <Button
+                            onClick={openAccountModal}
+                            variant="secondary"
+                            size="lg"
+                          >
                             {account.displayName}
                           </Button>
                           <p className="text-center text-sm text-slate-400">
-                            {t('auth.login.signingIn')}
+                            {isSigningIn ? t('auth.login.signingIn') : null}
                           </p>
                         </div>
                       );
@@ -180,24 +241,35 @@ export default function Login() {
             </ConnectButton.Custom>
           </div>
 
+          {signInError && (
+            <div className="mt-4 text-center">
+              <p role="alert" className="mb-3 text-sm text-red-400">
+                {signInError}
+              </p>
+              <Button onClick={handleSignIn} disabled={isSigningIn}>
+                {t('common.retry', { defaultValue: 'Try again' })}
+              </Button>
+            </div>
+          )}
+
           <p className="mt-6 text-center text-xs text-slate-500">
             {t('auth.login.terms')}{' '}
-            <a href="#" className="text-accent-400 hover:underline">
+            <Link to="/terms" className="text-accent-400 hover:underline">
               {t('auth.login.termsOfService')}
-            </a>{' '}
+            </Link>{' '}
             {t('auth.login.and')}{' '}
-            <a href="#" className="text-accent-400 hover:underline">
+            <Link to="/privacy" className="text-accent-400 hover:underline">
               {t('auth.login.privacyPolicy')}
-            </a>
+            </Link>
           </p>
         </div>
 
         {/* Info */}
         <p className="mt-8 text-center text-sm text-slate-500">
           {t('auth.login.newToWeb3')}{' '}
-          <a href="#" className="text-accent-400 hover:underline">
+          <Link to="/docs" className="text-accent-400 hover:underline">
             {t('auth.login.learnWallet')}
-          </a>
+          </Link>
         </p>
       </div>
     </div>

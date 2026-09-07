@@ -1,685 +1,350 @@
-import { useState } from 'react';
-import { useParams } from 'react-router-dom';
-import { useAccount } from 'wagmi';
-import { useTranslation } from 'react-i18next';
-import { useQuery, useMutation } from 'convex/react';
-import { api } from '../../convex/_generated/api';
-import { Id } from '../../convex/_generated/dataModel';
-import { AppLayout } from '@/components/layout/AppLayout';
-import { Button } from '@/components/ui/button';
-import { Users, Plus, Trash2, Loader2, AlertCircle, Edit, X } from 'lucide-react';
-
-type Role = 'admin' | 'approver' | 'initiator' | 'clerk' | 'viewer';
-
-interface EditingMember {
-  membershipId: string;
-  name: string;
-  email: string;
-  role: Role;
-  walletAddress: string;
-  isCurrentUser: boolean;
-}
+import { lazy, Suspense, useState } from "react";
+import { useParams, useSearchParams } from "react-router-dom";
+import { useAccount } from "wagmi";
+import { useMutation, useQuery } from "convex/react";
+import { Plus, Users, Pencil, UserMinus } from "lucide-react";
+import { api } from "../../convex/_generated/api";
+import type { Id } from "../../convex/_generated/dataModel";
+import { useSessionToken } from "@/lib/session";
+import { MemberEditor } from "@/features/team/MemberEditor";
+import { Invitations } from "@/features/team/Invitations";
+import { roles, type TeamMember } from "@/features/team/memberTypes";
+import { MemberSpendingLimits } from "@/components/payments/MemberSpendingLimits";
+const SafeSpendingPolicies = lazy(() =>
+  import("@/components/payments/SafeSpendingPolicies").then((module) => ({
+    default: module.SafeSpendingPolicies,
+  })),
+);
+const MemberAccess = lazy(() =>
+  import("@/features/team/MemberAccess").then((module) => ({
+    default: module.MemberAccess,
+  })),
+);
+import { Dialog } from "@/components/ui/Dialog";
+import {
+  EmptyState,
+  LoadingRows,
+  Notice,
+  PageHeader,
+  SearchField,
+  StatusBadge,
+} from "@/components/workspace/WorkspacePrimitives";
 
 export default function Team() {
-  const { orgId } = useParams<{ orgId: string }>();
+  const { orgId } = useParams();
   const { address } = useAccount();
-  const { t } = useTranslation();
-
-  const ROLES = [
-    { value: 'admin' as const, label: t('settings.team.roles.admin'), description: t('settings.team.roles.adminDesc') },
-    { value: 'approver' as const, label: t('settings.team.roles.approver'), description: t('settings.team.roles.approverDesc') },
-    { value: 'initiator' as const, label: t('settings.team.roles.initiator'), description: t('settings.team.roles.initiatorDesc') },
-    { value: 'clerk' as const, label: t('settings.team.roles.clerk'), description: t('settings.team.roles.clerkDesc') },
-    { value: 'viewer' as const, label: t('settings.team.roles.viewer'), description: t('settings.team.roles.viewerDesc') },
-  ] as const;
-
-  const [isAddingMember, setIsAddingMember] = useState(false);
-  const [newMemberAddress, setNewMemberAddress] = useState('');
-  const [newMemberName, setNewMemberName] = useState('');
-  const [newMemberEmail, setNewMemberEmail] = useState('');
-  const [newMemberRole, setNewMemberRole] = useState<Role>('viewer');
-  const [memberError, setMemberError] = useState<string | null>(null);
-  const [processingMemberId, setProcessingMemberId] = useState<string | null>(null);
-  const [editingMember, setEditingMember] = useState<EditingMember | null>(null);
-  const [editError, setEditError] = useState<string | null>(null);
-  const [memberToRemove, setMemberToRemove] = useState<{
-    membershipId: string;
-    name?: string;
-    walletAddress: string;
-  } | null>(null);
-
-  const members = useQuery(
-    api.orgs.listMembers,
-    orgId && address
-      ? { orgId: orgId as Id<'orgs'>, walletAddress: address }
-      : 'skip'
-  );
-
-  const currentUserRole = members?.find(
-    (m) => m?.walletAddress.toLowerCase() === address?.toLowerCase()
-  )?.role;
-  const isAdmin = currentUserRole === 'admin';
-
-  const inviteMember = useMutation(api.orgs.inviteMember);
-  const updateMemberRole = useMutation(api.orgs.updateMemberRole);
-  const updateMemberName = useMutation(api.orgs.updateMemberName);
-  const updateMemberEmail = useMutation(api.orgs.updateMemberEmail);
+  const sessionToken = useSessionToken();
+  const args =
+    orgId && sessionToken
+      ? { orgId: orgId as Id<"orgs">, sessionToken }
+      : "skip";
+  const members = useQuery(api.orgs.listMembers, args);
   const removeMember = useMutation(api.orgs.removeMember);
-
-  const handleInviteMember = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!orgId || !address || !newMemberAddress.trim()) return;
-
-    setMemberError(null);
-
-    try {
-      await inviteMember({
-        orgId: orgId as Id<'orgs'>,
-        walletAddress: address,
-        memberWalletAddress: newMemberAddress.trim(),
-        memberName: newMemberName.trim() || undefined,
-        memberEmail: newMemberEmail.trim() || undefined,
-        role: newMemberRole,
-      });
-      setNewMemberAddress('');
-      setNewMemberName('');
-      setNewMemberEmail('');
-      setNewMemberRole('viewer');
-      setIsAddingMember(false);
-    } catch (error) {
-      console.error('Failed to invite member:', error);
-      setMemberError(error instanceof Error ? error.message : 'Failed to invite member');
-    }
-  };
-
-  const handleOpenEditMember = (member: {
-    membershipId: string;
-    name?: string;
-    email?: string;
-    role: Role;
-    walletAddress: string;
-  }) => {
-    const isCurrentUser = member.walletAddress.toLowerCase() === address?.toLowerCase();
-    setEditingMember({
-      membershipId: member.membershipId,
-      name: member.name || '',
-      email: member.email || '',
-      role: member.role,
-      walletAddress: member.walletAddress,
-      isCurrentUser,
-    });
-    setEditError(null);
-  };
-
-  const handleCloseEditMember = () => {
-    setEditingMember(null);
-    setEditError(null);
-  };
-
-  const handleSaveEditMember = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!editingMember || !orgId || !address) return;
-
-    setEditError(null);
-    setProcessingMemberId(editingMember.membershipId);
-
-    try {
-      const originalMember = members?.find(m => m?.membershipId === editingMember.membershipId);
-
-      if (originalMember?.name !== editingMember.name) {
-        await updateMemberName({
-          orgId: orgId as Id<'orgs'>,
-          membershipId: editingMember.membershipId as Id<'orgMemberships'>,
-          walletAddress: address,
-          name: editingMember.name.trim() || undefined,
-        });
-      }
-
-      if (originalMember?.email !== editingMember.email) {
-        await updateMemberEmail({
-          orgId: orgId as Id<'orgs'>,
-          membershipId: editingMember.membershipId as Id<'orgMemberships'>,
-          walletAddress: address,
-          email: editingMember.email.trim() || undefined,
-        });
-      }
-
-      if (isAdmin && !editingMember.isCurrentUser && originalMember?.role !== editingMember.role) {
-        await updateMemberRole({
-          orgId: orgId as Id<'orgs'>,
-          membershipId: editingMember.membershipId as Id<'orgMemberships'>,
-          walletAddress: address,
-          newRole: editingMember.role,
-        });
-      }
-
-      setEditingMember(null);
-    } catch (error) {
-      console.error('Failed to update member:', error);
-      setEditError(error instanceof Error ? error.message : 'Failed to update member');
-    } finally {
-      setProcessingMemberId(null);
-    }
-  };
-
-  const handleOpenRemoveMember = (member: {
-    membershipId: string;
-    name?: string;
-    walletAddress: string;
-  }) => {
-    setMemberToRemove({
-      membershipId: member.membershipId,
-      name: member.name,
-      walletAddress: member.walletAddress,
-    });
-    setMemberError(null);
-  };
-
-  const handleCloseRemoveMember = () => {
-    setMemberToRemove(null);
-  };
-
-  const handleRemoveMember = async () => {
-    if (!memberToRemove || !orgId || !address) return;
-
-    setProcessingMemberId(memberToRemove.membershipId);
-    try {
-      await removeMember({
-        orgId: orgId as Id<'orgs'>,
-        membershipId: memberToRemove.membershipId as Id<'orgMemberships'>,
-        walletAddress: address,
-      });
-      handleCloseRemoveMember();
-    } catch (error) {
-      console.error('Failed to remove member:', error);
-      setMemberError(error instanceof Error ? error.message : 'Failed to remove member');
-    } finally {
-      setProcessingMemberId(null);
-    }
-  };
-
+  const isAdmin =
+    members?.some(
+      (m) =>
+        m &&
+        m.walletAddress.toLowerCase() === address?.toLowerCase() &&
+        m.role === "admin" &&
+        m.status === "active",
+    ) ?? false;
+  const [params, setParams] = useSearchParams();
+  const tab = params.get("tab") ?? "members";
+  const [search, setSearch] = useState("");
+  const [editor, setEditor] = useState<TeamMember | "new" | null>(null);
+  const [removing, setRemoving] = useState<TeamMember | null>(null);
+  const [accessId, setAccessId] = useState<Id<"orgMemberships"> | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const [removed, setRemoved] = useState(false);
+  const visible = members?.filter(
+    (m) =>
+      m &&
+      ["active", "invited"].includes(m.status) &&
+      `${m.name ?? ""} ${m.email ?? ""} ${m.walletAddress}`
+        .toLowerCase()
+        .includes(search.toLowerCase()),
+  );
   return (
-    <AppLayout>
-      <div className="space-y-4 sm:space-y-6 lg:space-y-8 w-full max-w-full overflow-x-hidden">
-        <div className="pt-4 lg:pt-6">
-          <h1 className="text-xl sm:text-2xl font-bold text-white">{t('settings.team.title')}</h1>
-          <p className="mt-1 text-sm sm:text-base text-slate-400">
-            {t('settings.team.subtitle')}
-          </p>
-        </div>
-
-        <div className="rounded-2xl border border-white/10 bg-navy-900/50 p-4 sm:p-6">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4 sm:mb-6">
-            <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-navy-800 text-slate-400 shrink-0">
-                <Users className="h-5 w-5" />
-              </div>
-              <div className="min-w-0">
-                <h2 className="text-base sm:text-lg font-semibold text-white">{t('settings.team.title')}</h2>
-                <p className="text-xs sm:text-sm text-slate-400">{t('settings.team.subtitle')}</p>
-              </div>
-            </div>
-            {isAdmin && (
-              <Button onClick={() => setIsAddingMember(true)} className="w-full sm:w-auto h-11 shrink-0">
-                <Plus className="h-4 w-4" />
-                {t('settings.team.addMember')}
-              </Button>
-            )}
-          </div>
-
-          {memberError && (
-            <div className="mb-4 flex items-center gap-2 rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-400">
-              <AlertCircle className="h-4 w-4 flex-shrink-0" />
-              {memberError}
-              <button
-                onClick={() => setMemberError(null)}
-                className="ml-auto text-red-300 hover:text-white"
-              >
-                Dismiss
-              </button>
-            </div>
-          )}
-
-          {isAddingMember && (
-            <form onSubmit={handleInviteMember} className="mb-6 rounded-xl border border-accent-500/30 bg-navy-800/50 p-4">
-              <h3 className="mb-4 font-medium text-white">{t('settings.team.addTeamMember')}</h3>
-              <div className="space-y-4 sm:space-y-6">
-                <div>
-                  <label className="mb-2 block text-sm font-medium text-slate-300">
-                    {t('common.walletAddress')}
-                  </label>
-                  <input
-                    type="text"
-                    value={newMemberAddress}
-                    onChange={(e) => setNewMemberAddress(e.target.value)}
-                    placeholder="0x..."
-                    className="w-full rounded-lg border border-white/10 bg-navy-800 px-4 py-3 font-mono text-base text-white placeholder-slate-500 focus:border-accent-500 focus:outline-none focus:ring-1 focus:ring-accent-500"
-                    required
-                  />
-                </div>
-                <div>
-                  <label className="mb-2 block text-sm font-medium text-slate-300">
-                    {t('settings.team.displayName')} <span className="text-slate-500">({t('common.optional')})</span>
-                  </label>
-                  <input
-                    type="text"
-                    value={newMemberName}
-                    onChange={(e) => setNewMemberName(e.target.value)}
-                    placeholder={t('settings.team.displayNamePlaceholder')}
-                    className="w-full rounded-lg border border-white/10 bg-navy-800 px-4 py-3 text-base text-white placeholder-slate-500 focus:border-accent-500 focus:outline-none focus:ring-1 focus:ring-accent-500"
-                  />
-                </div>
-                <div>
-                  <label className="mb-2 block text-sm font-medium text-slate-300">
-                    {t('common.email')} <span className="text-slate-500">({t('common.optional')})</span>
-                  </label>
-                  <input
-                    type="email"
-                    value={newMemberEmail}
-                    onChange={(e) => setNewMemberEmail(e.target.value)}
-                    placeholder={t('settings.team.emailPlaceholder')}
-                    className="w-full rounded-lg border border-white/10 bg-navy-800 px-4 py-3 text-base text-white placeholder-slate-500 focus:border-accent-500 focus:outline-none focus:ring-1 focus:ring-accent-500"
-                  />
-                </div>
-                <div>
-                  <label className="mb-2 block text-sm font-medium text-slate-300">
-                    {t('settings.team.role')}
-                  </label>
-                  <select
-                    value={newMemberRole}
-                    onChange={(e) => setNewMemberRole(e.target.value as Role)}
-                    className="w-full rounded-lg border border-white/10 bg-navy-800 px-4 py-3 text-base text-white focus:border-accent-500 focus:outline-none focus:ring-1 focus:ring-accent-500"
-                  >
-                    {ROLES.map((role) => (
-                      <option key={role.value} value={role.value}>
-                        {role.label} - {role.description}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div className="flex flex-col sm:flex-row gap-3">
-                  <Button type="submit" className="w-full sm:w-auto h-11">{t('settings.team.addMember')}</Button>
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    onClick={() => {
-                      setIsAddingMember(false);
-                      setNewMemberAddress('');
-                      setNewMemberName('');
-                      setNewMemberEmail('');
-                      setNewMemberRole('viewer');
-                    }}
-                    className="w-full sm:w-auto h-11"
-                  >
-                    {t('common.cancel')}
-                  </Button>
-                </div>
-              </div>
-            </form>
-          )}
-
-          {members?.length === 0 ? (
-            <div className="rounded-xl border border-dashed border-white/20 bg-navy-800/30 p-8 text-center">
-              <p className="text-slate-400">{t('settings.team.noMembers')}</p>
-            </div>
-          ) : (
-            <>
-              <div className="hidden lg:block rounded-xl border border-white/10 overflow-hidden">
-                <table className="w-full">
-                  <thead>
-                    <tr className="border-b border-white/10 bg-navy-800/50">
-                      <th className="px-4 py-3 text-left text-sm font-medium text-slate-400">
-                        {t('settings.team.member')}
-                      </th>
-                      <th className="px-4 py-3 text-left text-sm font-medium text-slate-400">
-                        {t('settings.team.role')}
-                      </th>
-                      <th className="px-4 py-3 text-left text-sm font-medium text-slate-400">
-                        {t('settings.team.status')}
-                      </th>
-                      <th className="px-4 py-3 text-right text-sm font-medium text-slate-400">
-                        {t('settings.team.actions')}
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-white/5">
-                    {members?.filter((m) => m?.status === 'active').map((member) => {
-                      if (!member) return null;
-                      const isCurrentUser = member.walletAddress.toLowerCase() === address?.toLowerCase();
-                      const isProcessing = processingMemberId === member.membershipId;
-                      const canEdit = isAdmin || isCurrentUser;
-
-                      return (
-                        <tr key={member.membershipId} className="hover:bg-navy-800/30">
-                          <td className="px-4 py-3">
-                            <div>
-                              {member.name ? (
-                                <p className="font-medium text-white">
-                                  {member.name}
-                                  {isCurrentUser && (
-                                    <span className="ml-2 text-xs text-accent-400">({t('settings.team.you')})</span>
-                                  )}
-                                </p>
-                              ) : (
-                                <p className="text-sm text-slate-500 italic">
-                                  {t('settings.team.noName')}
-                                  {isCurrentUser && (
-                                    <span className="ml-1 text-xs text-accent-400 not-italic">({t('settings.team.you')})</span>
-                                  )}
-                                </p>
-                              )}
-                              <p className="font-mono text-xs text-slate-500">
-                                {member.walletAddress.slice(0, 6)}...{member.walletAddress.slice(-4)}
-                              </p>
-                              {member.email && (
-                                <p className="text-sm text-slate-500">{member.email}</p>
-                              )}
-                            </div>
-                          </td>
-                          <td className="px-4 py-3">
-                            <span className="inline-flex rounded-full bg-navy-700 px-3 py-1 text-xs font-medium text-slate-300 capitalize">
-                              {member.role}
-                            </span>
-                          </td>
-                          <td className="px-4 py-3">
-                            <span className="inline-flex rounded-full bg-green-500/10 px-3 py-1 text-xs font-medium text-green-400 capitalize">
-                              {member.status}
-                            </span>
-                          </td>
-                          <td className="px-4 py-3 text-right">
-                            <div className="flex items-center justify-end gap-2">
-                              {canEdit && (
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  onClick={() => handleOpenEditMember(member)}
-                                  title="Edit member"
-                                >
-                                  <Edit className="h-4 w-4 text-slate-400" />
-                                </Button>
-                              )}
-                              {isAdmin && !isCurrentUser && (
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  onClick={() => handleOpenRemoveMember(member)}
-                                  disabled={isProcessing}
-                                  title="Remove member"
-                                >
-                                  {isProcessing ? (
-                                    <Loader2 className="h-4 w-4 animate-spin" />
-                                  ) : (
-                                    <Trash2 className="h-4 w-4 text-red-400" />
-                                  )}
-                                </Button>
-                              )}
-                            </div>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-
-              <div className="lg:hidden space-y-3">
-                {members?.filter((m) => m?.status === 'active').map((member) => {
-                  if (!member) return null;
-                  const isCurrentUser = member.walletAddress.toLowerCase() === address?.toLowerCase();
-                  const isProcessing = processingMemberId === member.membershipId;
-                  const canEdit = isAdmin || isCurrentUser;
-
-                  return (
-                    <div
-                      key={member.membershipId}
-                      className="rounded-lg border border-white/10 bg-navy-800/50 p-4 space-y-3"
-                    >
-                      <div className="flex items-start justify-between">
-                        <div className="flex-1 min-w-0">
-                          {member.name ? (
-                            <p className="font-medium text-white">
-                              {member.name}
-                              {isCurrentUser && (
-                                <span className="ml-2 text-xs text-accent-400">({t('settings.team.you')})</span>
-                              )}
-                            </p>
-                          ) : (
-                            <p className="text-sm text-slate-500 italic">
-                              {t('settings.team.noName')}
-                              {isCurrentUser && (
-                                <span className="ml-1 text-xs text-accent-400 not-italic">({t('settings.team.you')})</span>
-                              )}
-                            </p>
-                          )}
-                          <p className="font-mono text-xs text-slate-500 mt-1 break-all">
-                            {member.walletAddress}
-                          </p>
-                          {member.email && (
-                            <p className="text-sm text-slate-500 mt-1">{member.email}</p>
-                          )}
-                        </div>
-                      </div>
-
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span className="inline-flex rounded-full bg-navy-700 px-2.5 py-1 text-xs font-medium text-slate-300 capitalize">
-                          {member.role}
-                        </span>
-                        <span className="inline-flex rounded-full bg-green-500/10 px-2.5 py-1 text-xs font-medium text-green-400 capitalize">
-                          {member.status}
-                        </span>
-                      </div>
-
-                      {(canEdit || (isAdmin && !isCurrentUser)) && (
-                        <div className="flex items-center gap-2 pt-2 border-t border-white/5">
-                          {canEdit && (
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleOpenEditMember(member)}
-                              className="flex-1 h-11"
-                            >
-                              <Edit className="h-4 w-4 mr-2" />
-                              {t('settings.team.editMember')}
-                            </Button>
-                          )}
-                          {isAdmin && !isCurrentUser && (
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleOpenRemoveMember(member)}
-                              disabled={isProcessing}
-                              className="flex-1 h-11 text-red-400 hover:text-red-300"
-                            >
-                              {isProcessing ? (
-                                <>
-                                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                                  {t('common.removing')}
-                                </>
-                              ) : (
-                                <>
-                                  <Trash2 className="h-4 w-4 mr-2" />
-                                  {t('settings.team.remove')}
-                                </>
-                              )}
-                            </Button>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            </>
-          )}
-        </div>
+    <>
+      <PageHeader
+        title="Team & approvals"
+        description="Give each person the access and spending authority their work needs."
+        actions={
+          isAdmin && (
+            <button
+              className="workspace-button workspace-button-primary"
+              onClick={() => setEditor("new")}
+            >
+              <Plus size={14} />
+              Invite member
+            </button>
+          )
+        }
+      />
+      <div
+        className="workspace-tabs mb-6"
+        role="tablist"
+        aria-label="Team settings"
+      >
+        {Object.entries({
+          members: "Members",
+          invitations: "Invitations",
+          limits: "Payment limits",
+          delegation: "Delegated spending",
+        }).map(([key, label]) => (
+          <button
+            key={key}
+            role="tab"
+            aria-selected={tab === key}
+            onClick={() => setParams({ tab: key })}
+          >
+            {label}
+          </button>
+        ))}
       </div>
-
-      {editingMember && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 overflow-y-auto">
-          <div className="w-full max-w-md rounded-2xl border border-white/10 bg-navy-900 p-4 sm:p-6 my-auto">
-            <div className="flex items-center justify-between mb-4 sm:mb-6">
-              <h2 className="text-lg sm:text-xl font-bold text-white">{t('settings.team.editMember')}</h2>
-              <button
-                onClick={handleCloseEditMember}
-                className="text-slate-400 hover:text-white h-11 w-11 flex items-center justify-center"
-                aria-label="Close"
-              >
-                <X className="h-5 w-5" />
-              </button>
-            </div>
-
-            {editError && (
-              <div className="mb-4 flex items-center gap-2 rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-400">
-                <AlertCircle className="h-4 w-4 flex-shrink-0" />
-                {editError}
-              </div>
-            )}
-
-            <form onSubmit={handleSaveEditMember} className="space-y-4 sm:space-y-6">
-              <div>
-                <label className="mb-2 block text-sm font-medium text-slate-300">
-                  {t('common.walletAddress')}
-                </label>
-                <p className="font-mono text-sm text-slate-400 break-all">
-                  {editingMember.walletAddress}
-                </p>
-              </div>
-
-              <div>
-                <label className="mb-2 block text-sm font-medium text-slate-300">
-                  {t('settings.team.displayName')}
-                </label>
-                <input
-                  type="text"
-                  value={editingMember.name}
-                  onChange={(e) => setEditingMember({ ...editingMember, name: e.target.value })}
-                  placeholder={t('settings.team.displayNamePlaceholder')}
-                  className="w-full rounded-lg border border-white/10 bg-navy-800 px-4 py-3 text-base text-white placeholder-slate-500 focus:border-accent-500 focus:outline-none focus:ring-1 focus:ring-accent-500"
-                />
-              </div>
-
-              <div>
-                <label className="mb-2 block text-sm font-medium text-slate-300">
-                  {t('common.email')}
-                </label>
-                <input
-                  type="email"
-                  value={editingMember.email}
-                  onChange={(e) => setEditingMember({ ...editingMember, email: e.target.value })}
-                  placeholder={t('settings.team.emailPlaceholder')}
-                  className="w-full rounded-lg border border-white/10 bg-navy-800 px-4 py-3 text-base text-white placeholder-slate-500 focus:border-accent-500 focus:outline-none focus:ring-1 focus:ring-accent-500"
-                />
-              </div>
-
-              <div>
-                <label className="mb-2 block text-sm font-medium text-slate-300">
-                  {t('settings.team.role')}
-                </label>
-                {isAdmin && !editingMember.isCurrentUser ? (
-                  <select
-                    value={editingMember.role}
-                    onChange={(e) => setEditingMember({ ...editingMember, role: e.target.value as Role })}
-                    className="w-full rounded-lg border border-white/10 bg-navy-800 px-4 py-3 text-base text-white focus:border-accent-500 focus:outline-none focus:ring-1 focus:ring-accent-500"
-                  >
-                    {ROLES.map((role) => (
-                      <option key={role.value} value={role.value}>
-                        {role.label} - {role.description}
-                      </option>
-                    ))}
-                  </select>
-                ) : (
-                  <p className="text-sm text-slate-400 capitalize">
-                    {editingMember.role}
-                    {editingMember.isCurrentUser && (
-                      <span className="ml-2 text-xs text-slate-500">({t('settings.team.cannotChangeRole')})</span>
-                    )}
-                  </p>
-                )}
-              </div>
-
-              <div className="flex flex-col sm:flex-row gap-3 pt-2">
-                <Button
-                  type="submit"
-                  className="flex-1 h-11"
-                  disabled={processingMemberId === editingMember.membershipId}
-                >
-                  {processingMemberId === editingMember.membershipId ? (
-                    <>
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                      {t('common.saving')}
-                    </>
-                  ) : (
-                    t('beneficiaries.saveChanges')
-                  )}
-                </Button>
-                <Button type="button" variant="secondary" onClick={handleCloseEditMember} className="h-11">
-                  {t('common.cancel')}
-                </Button>
-              </div>
-            </form>
-          </div>
+      {removed && (
+        <div className="mb-5">
+          <Notice tone="info">
+            Workspace access was removed. Review this person's account ownership
+            and delegated spending grants; those remain active until account
+            owners revoke them.{" "}
+            <button
+              className="underline"
+              onClick={() => setParams({ tab: "delegation" })}
+            >
+              Review delegated spending
+            </button>
+          </Notice>
         </div>
       )}
-
-      {memberToRemove && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 overflow-y-auto">
-          <div className="w-full max-w-md rounded-2xl border border-white/10 bg-navy-900 p-4 sm:p-6 my-auto">
-            <div className="flex items-center justify-between mb-4 sm:mb-6">
-              <h2 className="text-lg sm:text-xl font-bold text-white">{t('settings.team.removeMemberTitle')}</h2>
-              <button
-                onClick={handleCloseRemoveMember}
-                className="text-slate-400 hover:text-white h-11 w-11 flex items-center justify-center"
-                aria-label="Close"
-                disabled={processingMemberId === memberToRemove.membershipId}
-              >
-                <X className="h-5 w-5" />
-              </button>
+      {tab === "invitations" ? (
+        <Invitations orgId={orgId as Id<"orgs">} isAdmin={isAdmin} />
+      ) : tab === "limits" ? (
+        <MemberSpendingLimits orgId={orgId as Id<"orgs">} isAdmin={isAdmin} />
+      ) : tab === "delegation" ? (
+        <SafeSpendingPolicies orgId={orgId as Id<"orgs">} isAdmin={isAdmin} />
+      ) : (
+        <section className="workspace-panel">
+          <div className="workspace-toolbar">
+            <div>
+              <h2 className="text-sm font-semibold">Workspace members</h2>
+              <p className="workspace-table-secondary">
+                Invited members receive access only after accepting.
+              </p>
             </div>
-
-            <p className="mb-4 text-sm text-slate-400">
-              {t('settings.team.removeConfirm')}
+            <SearchField
+              value={search}
+              onChange={setSearch}
+              placeholder="Search team"
+            />
+          </div>
+          {visible === undefined ? (
+            <LoadingRows />
+          ) : !visible.length ? (
+            <EmptyState
+              icon={Users}
+              title="No matching members"
+              description="Search by name, email, or sign-in wallet."
+            />
+          ) : (
+            <div className="workspace-table-wrap">
+              <table className="workspace-table">
+                <thead>
+                  <tr>
+                    <th>Member</th>
+                    <th>Workspace role</th>
+                    <th>Status</th>
+                    <th>
+                      <span className="sr-only">Actions</span>
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {visible.map((m) => {
+                    if (!m) return null;
+                    const self =
+                      m.walletAddress.toLowerCase() === address?.toLowerCase();
+                    return (
+                      <tr key={m.membershipId}>
+                        <td>
+                          <div className="workspace-person">
+                            <span className="workspace-avatar">
+                              {(m.name || "TM").slice(0, 2).toUpperCase()}
+                            </span>
+                            <span>
+                              <strong>
+                                {m.name ||
+                                  `${m.walletAddress.slice(0, 6)}…${m.walletAddress.slice(-4)}`}
+                                {self && (
+                                  <span className="ml-2 text-xs font-normal text-slate-400">
+                                    You
+                                  </span>
+                                )}
+                              </strong>
+                              <span className="workspace-table-secondary">
+                                {m.email ||
+                                  `${m.walletAddress.slice(0, 8)}…${m.walletAddress.slice(-6)}`}
+                                {m.emailVerifiedAt && (
+                                  <span className="block">Email verified</span>
+                                )}
+                              </span>
+                            </span>
+                          </div>
+                        </td>
+                        <td>{roles[m.role][0]}</td>
+                        <td>
+                          <StatusBadge
+                            status={m.status}
+                            label={
+                              m.status === "invited"
+                                ? m.invitationExpiresAt &&
+                                  m.invitationExpiresAt <= Date.now()
+                                  ? "Invitation expired"
+                                  : "Invitation pending"
+                                : undefined
+                            }
+                          />
+                        </td>
+                        <td>
+                          <div className="flex justify-end gap-2">
+                            <button
+                              className="workspace-button"
+                              aria-label={`View access for ${m.name || "member"}`}
+                              onClick={() => setAccessId(m.membershipId)}
+                            >
+                              View access
+                            </button>
+                            {(isAdmin || self) && (
+                              <button
+                                aria-label={`Edit ${m.name || "member"}`}
+                                className="workspace-button"
+                                onClick={() => setEditor(m)}
+                              >
+                                <Pencil size={13} />
+                                Edit
+                              </button>
+                            )}
+                            {isAdmin && !self && (
+                              <button
+                                aria-label={`Remove ${m.name || "member"}`}
+                                className="workspace-button"
+                                onClick={() => {
+                                  setError("");
+                                  setRemoving(m);
+                                }}
+                              >
+                                <UserMinus size={13} />
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+          <div className="workspace-table-footer">
+            <span>{visible?.length ?? 0} members</span>
+            <span>Account signatures require separate owner permissions</span>
+          </div>
+        </section>
+      )}
+      {editor && (
+        <MemberEditor
+          orgId={orgId as Id<"orgs">}
+          member={editor === "new" ? undefined : editor}
+          isAdmin={isAdmin}
+          onClose={(created) => {
+            setEditor(null);
+            if (created)
+              setParams({
+                tab: created === "email" ? "invitations" : "members",
+              });
+          }}
+        />
+      )}
+      {accessId && (
+        <Suspense
+          fallback={
+            <Dialog title="Member access" onClose={() => setAccessId(null)}>
+              <LoadingRows />
+            </Dialog>
+          }
+        >
+          <MemberAccess
+            orgId={orgId as Id<"orgs">}
+            membershipId={accessId}
+            onClose={() => setAccessId(null)}
+            onManage={
+              isAdmin
+                ? (tab) => {
+                    setAccessId(null);
+                    setParams({ tab });
+                  }
+                : undefined
+            }
+          />
+        </Suspense>
+      )}
+      {removing && (
+        <Dialog
+          title={`Remove ${removing.name || "team member"}?`}
+          onClose={() => {
+            if (!busy) setRemoving(null);
+          }}
+        >
+          <div className="space-y-5 p-6">
+            {error && <Notice>{error}</Notice>}
+            <p className="workspace-description">
+              This removes workspace access. Existing payment records remain
+              available to the team.
             </p>
-            <div className="rounded-lg border border-white/10 bg-navy-800/50 p-4 mb-6">
-              <p className="font-medium text-white">
-                {memberToRemove.name || t('settings.team.noName')}
-              </p>
-              <p className="font-mono text-xs text-slate-500 mt-1 break-all">
-                {memberToRemove.walletAddress}
-              </p>
-            </div>
-
-            <div className="flex flex-col-reverse sm:flex-row gap-3">
-              <Button
-                type="button"
-                variant="secondary"
-                onClick={handleCloseRemoveMember}
-                className="h-11"
-                disabled={processingMemberId === memberToRemove.membershipId}
+            <Notice tone="info">
+              Account ownership and contract spending grants are separate.
+              Account owners must revoke those permissions independently.
+            </Notice>
+            <div className="flex justify-end gap-2">
+              <button
+                className="workspace-button"
+                disabled={busy}
+                onClick={() => setRemoving(null)}
               >
-                {t('common.cancel')}
-              </Button>
-              <Button
-                type="button"
-                className="flex-1 h-11 bg-red-600 hover:bg-red-500 text-white"
-                onClick={handleRemoveMember}
-                disabled={processingMemberId === memberToRemove.membershipId}
+                Keep member
+              </button>
+              <button
+                className="workspace-button workspace-button-primary"
+                disabled={busy}
+                onClick={async () => {
+                  if (args === "skip" || busy) return;
+                  setBusy(true);
+                  setError("");
+                  try {
+                    await removeMember({
+                      ...args,
+                      membershipId: removing.membershipId,
+                    });
+                    setRemoving(null);
+                    setRemoved(true);
+                  } catch (e) {
+                    setError(
+                      e instanceof Error
+                        ? e.message
+                        : "Could not remove member",
+                    );
+                  } finally {
+                    setBusy(false);
+                  }
+                }}
               >
-                {processingMemberId === memberToRemove.membershipId ? (
-                  <>
-                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                    {t('common.removing')}
-                  </>
-                ) : (
-                  <>
-                    <Trash2 className="h-4 w-4 mr-2" />
-                    {t('settings.team.removeFromTeam')}
-                  </>
-                )}
-              </Button>
+                {busy ? "Removing…" : "Remove access"}
+              </button>
             </div>
           </div>
-        </div>
+        </Dialog>
       )}
-    </AppLayout>
+    </>
   );
 }

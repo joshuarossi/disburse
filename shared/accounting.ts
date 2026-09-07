@@ -1,0 +1,82 @@
+export const BOOK_CURRENCIES = { USD: 2, EUR: 2, GBP: 2, CAD: 2, AUD: 2, JPY: 0 } as const;
+export type BookCurrency = keyof typeof BOOK_CURRENCIES;
+export type AccountingTreatment = 'existing_payable' | 'existing_receivable' | 'expense' | 'customer_advance' | 'internal_transfer' | 'fee' | 'already_recorded';
+export const accountingTreatments: Record<AccountingTreatment, string> = {
+  existing_payable: 'Settle a bill already in the books',
+  existing_receivable: 'Collect an invoice already in the books',
+  expense: 'Record an expense not yet in the books',
+  customer_advance: 'Customer advance or unapplied receipt',
+  internal_transfer: 'Transfer between company accounts',
+  fee: 'Payment or provider fee',
+  already_recorded: 'Match a transaction already in the books',
+};
+export type AccountKind = 'asset' | 'payable' | 'receivable' | 'liability' | 'equity' | 'income' | 'expense';
+export type BookAccount = { id: string; externalId: string; name: string; kind: AccountKind; version: number };
+export type JournalLine = { account: BookAccount; debit: string; credit: string; name?: string };
+
+/** Quantities and book values use different scales. Never round user input. */
+export function bookUnits(value: string, currency: BookCurrency, allowZero = false) {
+  const precision = BOOK_CURRENCIES[currency];
+  if (precision === undefined || !/^\d{1,24}(\.\d+)?$/.test(value) || (value.split('.')[1]?.length ?? 0) > precision)
+    throw new Error(`Enter a book value with up to ${precision ?? 2} decimal places in ${currency}`);
+  const [whole, fraction = ''] = value.split('.');
+  const units = BigInt(whole) * 10n ** BigInt(precision) + BigInt(fraction.padEnd(precision, '0') || '0');
+  if (!allowZero && units <= 0n) throw new Error('Book values must be positive');
+  return units;
+}
+export function formatBookUnits(value: bigint, currency: BookCurrency) {
+  const precision = BOOK_CURRENCIES[currency], sign = value < 0n ? '-' : '';
+  const digits = (value < 0n ? -value : value).toString().padStart(precision + 1, '0');
+  return sign + (precision ? digits.slice(0, -precision) + '.' + digits.slice(-precision) : digits);
+}
+export function assertPostingDate(date: string, closedThrough?: string) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !Number.isFinite(Date.parse(date)) || new Date(date).toISOString().slice(0, 10) !== date)
+    throw new Error('Choose a valid accounting date');
+  if (closedThrough && date <= closedThrough) throw new Error(`The books are closed through ${closedThrough}. Use an open accounting date.`);
+}
+export function buildSettlementJournal(input: {
+  treatment: Exclude<AccountingTreatment, 'already_recorded'>; direction: 'inflow' | 'outflow'; currency: BookCurrency;
+  assetBookValue: string; obligationBookValue?: string;
+  assetAccount: BookAccount; counterAccount: BookAccount; differenceAccount?: BookAccount; externalName?: string;
+  companyTransfer: boolean;
+  receiptHasExcess?: boolean; advanceBookValue?: string; advanceAccount?: BookAccount;
+}): JournalLine[] {
+  const { treatment, direction, currency, assetAccount, counterAccount, differenceAccount } = input;
+  if (assetAccount.kind !== 'asset') throw new Error('Choose an asset account for the settled currency holding');
+  if (assetAccount.id === counterAccount.id) throw new Error('Choose different accounts for the two sides of the journal');
+  if (input.companyTransfer && treatment !== 'internal_transfer') throw new Error('A transfer between company accounts must not be posted as income, an expense or a customer collection');
+  if (treatment === 'internal_transfer' && !input.companyTransfer) throw new Error('The other address has not been identified as a company account');
+  const out = ['existing_payable', 'expense', 'fee'];
+  const incoming = ['existing_receivable', 'customer_advance'];
+  if ((out.includes(treatment) && direction !== 'outflow') || (incoming.includes(treatment) && direction !== 'inflow'))
+    throw new Error('The accounting treatment does not match the settled direction');
+  const kind: Record<Exclude<AccountingTreatment, 'already_recorded'>, AccountKind[]> = {
+    existing_payable: ['payable'], existing_receivable: ['receivable'], expense: ['expense'],
+    customer_advance: ['liability'], internal_transfer: ['asset'], fee: ['expense'],
+  };
+  if (!kind[treatment].includes(counterAccount.kind)) throw new Error('The selected offset account does not match this accounting treatment');
+  const obligation = treatment === 'existing_payable' || treatment === 'existing_receivable';
+  if (obligation && !input.externalName?.trim()) throw new Error('Enter the exact vendor or customer name used in the books');
+  const assetValue = bookUnits(input.assetBookValue, currency);
+  const settledValue = obligation ? bookUnits(input.obligationBookValue ?? '', currency) : assetValue;
+  const hasAdvance = treatment === 'existing_receivable' && input.receiptHasExcess;
+  const advanceValue = hasAdvance ? bookUnits(input.advanceBookValue ?? '', currency) : 0n;
+  if (hasAdvance && input.advanceAccount?.kind !== 'liability')
+    throw new Error('Choose a customer liability account for the excess receipt');
+  const line = (account: BookAccount, signedDebit: bigint, name?: string): JournalLine => ({
+    account, debit: signedDebit > 0n ? formatBookUnits(signedDebit, currency) : '',
+    credit: signedDebit < 0n ? formatBookUnits(-signedDebit, currency) : '', name,
+  });
+  const assetDebit = direction === 'inflow' ? assetValue : -assetValue;
+  const offsetDebit = direction === 'outflow' ? settledValue : -settledValue;
+  const lines = [line(assetAccount, assetDebit), line(counterAccount, offsetDebit, obligation ? input.externalName?.trim() : undefined)];
+  if (hasAdvance) lines.push(line(input.advanceAccount!, -advanceValue, input.externalName?.trim()));
+  const differenceDebit = -assetDebit - offsetDebit + advanceValue;
+  if (differenceDebit) {
+    if (!differenceAccount || differenceAccount.kind !== (differenceDebit > 0n ? 'expense' : 'income'))
+      throw new Error(`Choose a reviewed ${differenceDebit > 0n ? 'loss / expense' : 'gain / income'} account for the valuation difference`);
+    if ([assetAccount.id, counterAccount.id].includes(differenceAccount.id)) throw new Error('The valuation difference needs its own account');
+    lines.push(line(differenceAccount, differenceDebit));
+  }
+  return lines;
+}

@@ -62,8 +62,11 @@ describe('Button component', () => {
     it('renders icon size', () => {
       render(<Button size="icon">Icon</Button>);
       const button = screen.getByRole('button');
-      expect(button).toHaveClass('h-10');
-      expect(button).toHaveClass('w-10');
+      // Component uses responsive sizing: h-11 w-11 on mobile, h-10 w-10 on sm+
+      expect(button).toHaveClass('h-11');
+      expect(button).toHaveClass('w-11');
+      expect(button).toHaveClass('sm:h-10');
+      expect(button).toHaveClass('sm:w-10');
     });
   });
 

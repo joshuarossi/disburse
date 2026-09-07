@@ -1,2720 +1,391 @@
-import { useState, useMemo, useRef, useEffect } from 'react';
-import { useParams, useSearchParams } from 'react-router-dom';
-import { useAccount, useReadContracts, useChainId } from 'wagmi';
-import { useTranslation } from 'react-i18next';
-import { useQuery, useMutation } from 'convex/react';
-import { api } from '../../convex/_generated/api';
-import { convex } from '@/lib/convex';
-import { Id } from '../../convex/_generated/dataModel';
-import { AppLayout } from '@/components/layout/AppLayout';
-import { Button } from '@/components/ui/button';
-import { BatchDetailModal } from '@/components/disbursements/BatchDetailModal';
-import { TagInput } from '@/components/beneficiaries/TagInput';
-import { cn } from '@/lib/utils';
+import { useActivityEnvironment } from "@/features/workspace/ActivityEnvironment";
+import { chainEnvironment } from "../../shared/assets";
+import { paymentDebits } from "../../shared/executionFee";
+import { useState } from "react";
+import { useParams, useSearchParams } from "react-router-dom";
+import { useQuery } from "convex/react";
+import { ArrowUpRight, Download, ListChecks, Plus } from "lucide-react";
+import { api } from "../../convex/_generated/api";
+import type { Id } from "../../convex/_generated/dataModel";
+import { useSessionToken } from "@/lib/session";
+import { formatDate, formatMoney } from "@/lib/formatMoney";
+import { exportToCsv, generateFilename } from "@/lib/csv";
+import { getChainName } from "@/lib/chains";
+import { PaymentBatchForm } from "@/components/payments/PaymentBatchForm";
+import { PaymentReview } from "@/features/payments/PaymentReview";
 import {
-  Plus, Send, ArrowUpRight, Loader2, Play, CheckCircle, X, Rocket,
-  Search, Filter, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Calendar, RefreshCw
-} from 'lucide-react';
-import {
-  createTransferTx,
-  createBatchTransferTxs,
-  proposeTransaction,
-  executeTransaction,
-} from '@/lib/safe';
-import { executeTransactionViaGelato, proposeTransactionViaGelato } from '@/lib/safeRelay';
-import { selectRelayFeeToken } from '@/lib/relayFee';
-import { RELAY_FEATURE_ENABLED, resolveRelaySettings, type RelayFeeMode } from '@/lib/relayConfig';
-import {
-  CHAINS_LIST,
-  getChainName,
-  getTokenSymbolsForChain,
-  getTokensForChain,
-  getBlockExplorerTxUrl,
-} from '@/lib/chains';
-import { useSwitchChain } from 'wagmi';
-
-// ERC20 ABI for balanceOf
-const erc20Abi = [
-  {
-    name: 'balanceOf',
-    type: 'function',
-    stateMutability: 'view',
-    inputs: [{ name: 'account', type: 'address' }],
-    outputs: [{ name: '', type: 'uint256' }],
+  EmptyState,
+  LoadingRows,
+  PageHeader,
+  SearchField,
+  StatusBadge,
+} from "@/components/workspace/WorkspacePrimitives";
+const views: Record<string, { label: string; status?: string[] }> = {
+  all: { label: "All payments" },
+  approvals: { label: "Awaiting approval", status: ["pending", "proposed"] },
+  drafts: { label: "Drafts", status: ["draft"] },
+  review: {
+    label: "Needs review",
+    status: ["draft", "pending", "proposed", "failed"],
   },
-] as const;
-
-const PAGE_SIZE = 10;
-const normalizeTag = (tag: string) => tag.trim().toLowerCase();
-const toLocalDateTimeInputValue = (date: Date) => {
-  const pad = (value: number) => String(value).padStart(2, '0');
-  const year = date.getFullYear();
-  const month = pad(date.getMonth() + 1);
-  const day = pad(date.getDate());
-  const hours = pad(date.getHours());
-  const minutes = pad(date.getMinutes());
-  return `${year}-${month}-${day}T${hours}:${minutes}`;
+  attention: { label: "Needs attention", status: ["failed"] },
+  upcoming: {
+    label: "Upcoming",
+    status: ["draft", "pending", "proposed", "scheduled"],
+  },
+  paid: { label: "Paid", status: ["executed"] },
+  processing: { label: "Processing", status: ["relaying"] },
+  cancelled: { label: "Cancelled", status: ["cancelled"] },
 };
-const MIN_SCHEDULE_OFFSET_MS = 60_000;
-
-type DisbursementSummary = {
-  _id: Id<'disbursements'>;
-  chainId?: number;
-  beneficiary?: { walletAddress: string } | null;
-  token: string;
-  amount?: string;
-  type?: 'single' | 'batch';
-  totalAmount?: string;
-};
-
-type DisbursementExecuteRef = {
-  _id: Id<'disbursements'>;
-  chainId?: number;
-  safeTxHash?: string;
-};
-
-type ScreeningWarningState =
-  | {
-      flagged: Array<{ beneficiaryId: string; beneficiaryName: string; status: string }>;
-      action: 'create';
-      data: { isBatch: boolean };
-    }
-  | {
-      flagged: Array<{ beneficiaryId: string; beneficiaryName: string; status: string }>;
-      action: 'propose';
-      data: { disbursement: DisbursementSummary };
-    }
-  | {
-      flagged: Array<{ beneficiaryId: string; beneficiaryName: string; status: string }>;
-      action: 'execute';
-      data: { disbursement: DisbursementExecuteRef };
-    };
-
 export default function Disbursements() {
-  const { orgId } = useParams<{ orgId: string }>();
-  const [searchParams, setSearchParams] = useSearchParams();
-  const { address } = useAccount();
-  const { t } = useTranslation();
-  const [isCreating, setIsCreating] = useState(false);
-  
-  const STATUS_OPTIONS = [
-    { value: 'draft', label: t('status.draft') },
-    { value: 'pending', label: t('status.pending') },
-    { value: 'proposed', label: t('status.proposed') },
-    { value: 'scheduled', label: t('status.scheduled') },
-    { value: 'relaying', label: t('status.relaying') },
-    { value: 'executed', label: t('status.executed') },
-    { value: 'failed', label: t('status.failed') },
-    { value: 'cancelled', label: t('status.cancelled') },
-  ];
-
-  const [chainFilter, setChainFilter] = useState<number | ''>('');
-  const [createChainId, setCreateChainId] = useState<number>(11155111); // Sepolia default
-  const filterTokenOptions = useMemo(
-    () => [
-      { value: '', label: t('disbursements.filters.allTokens') },
-      ...Array.from(
-        new Set(CHAINS_LIST.flatMap((c) => getTokenSymbolsForChain(c.chainId)))
-      ).map((symbol) => ({ value: symbol, label: symbol })),
-    ],
-    [t]
+  const { environment } = useActivityEnvironment();
+  const { orgId } = useParams();
+  const sessionToken = useSessionToken();
+  const args =
+    orgId && sessionToken
+      ? { orgId: orgId as Id<"orgs">, sessionToken }
+      : "skip";
+  const [params, setParams] = useSearchParams();
+  const view = views[params.get("view") ?? ""] ? params.get("view")! : "all";
+  const [search, setSearch] = useState("");
+  const [cursorHistory, setCursorHistory] = useState<Array<string | undefined>>(
+    [undefined],
   );
-  const [selectedBeneficiary, setSelectedBeneficiary] = useState('');
-  const [amount, setAmount] = useState('');
-  const [token, setToken] = useState('USDC');
-  const [memo, setMemo] = useState('');
-  const [scheduledAt, setScheduledAt] = useState<string>('');
-  const [scheduledAtError, setScheduledAtError] = useState<string | null>(null);
-  const [beneficiarySearch, setBeneficiarySearch] = useState('');
-  const [beneficiaryTypeFilter, setBeneficiaryTypeFilter] = useState<'all' | 'individual' | 'business'>('all');
-  const [isBeneficiaryDropdownOpen, setIsBeneficiaryDropdownOpen] = useState(false);
-  const beneficiaryDropdownRef = useRef<HTMLDivElement | null>(null);
-  const [manualPaymentOverride, setManualPaymentOverride] = useState(false);
-  const [preferredAppliedFor, setPreferredAppliedFor] = useState<string | null>(null);
-  const [processingId, setProcessingId] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [selectedDisbursementId, setSelectedDisbursementId] = useState<Id<'disbursements'> | null>(null);
-  const [cancelDisbursementId, setCancelDisbursementId] = useState<Id<'disbursements'> | null>(null);
-  const [rescheduleDisbursementId, setRescheduleDisbursementId] = useState<Id<'disbursements'> | null>(null);
-  const [newScheduledAt, setNewScheduledAt] = useState<string>('');
-  const [newScheduledAtError, setNewScheduledAtError] = useState<string | null>(null);
-
-  // Batch disbursement state
-  const [recipients, setRecipients] = useState<Array<{ beneficiaryId: string; amount: string }>>([]);
-  const [selectedTags, setSelectedTags] = useState<string[]>([]);
-  const [addMode, setAddMode] = useState<'beneficiary' | 'tag'>('beneficiary');
-
-  // Screening warning state
-  const [screeningWarning, setScreeningWarning] = useState<ScreeningWarningState | null>(null);
-
-  // Screening block state
-  const [screeningBlock, setScreeningBlock] = useState<{
-    flagged: Array<{ beneficiaryId: string; beneficiaryName: string; status: string }>;
-    action: 'create' | 'propose' | 'execute';
-  } | null>(null);
-
-  // Filter & search state
-  const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState<string[]>([]);
-  const [tokenFilter, setTokenFilter] = useState('');
-  const [dateFrom, setDateFrom] = useState('');
-  const [dateTo, setDateTo] = useState('');
-  const [showFilters, setShowFilters] = useState(false);
-
-  const focusedDisbursementId = searchParams.get('focus') as Id<'disbursements'> | null;
-  const prefillBeneficiaryId = searchParams.get('beneficiary') as Id<'beneficiaries'> | null;
-  const prefillToken = searchParams.get('token');
-  const prefillChainId = searchParams.get('chainId');
-  const prefillCreate = searchParams.get('create');
-  const [prefillApplied, setPrefillApplied] = useState(false);
-
-  useEffect(() => {
-    if (focusedDisbursementId) {
-      setSelectedDisbursementId(focusedDisbursementId);
-    }
-  }, [focusedDisbursementId]);
-
-  useEffect(() => {
-    if (!isBeneficiaryDropdownOpen) return;
-
-    const handleClickOutside = (event: MouseEvent) => {
-      if (!beneficiaryDropdownRef.current?.contains(event.target as Node)) {
-        setIsBeneficiaryDropdownOpen(false);
-        if (selectedBeneficiary && beneficiarySearch) {
-          setBeneficiarySearch('');
-        }
-      }
-    };
-
-    const handleEscape = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        setIsBeneficiaryDropdownOpen(false);
-        if (selectedBeneficiary && beneficiarySearch) {
-          setBeneficiarySearch('');
-        }
-      }
-    };
-
-    document.addEventListener('mousedown', handleClickOutside);
-    document.addEventListener('keydown', handleEscape);
-
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-      document.removeEventListener('keydown', handleEscape);
-    };
-  }, [beneficiarySearch, isBeneficiaryDropdownOpen, selectedBeneficiary]);
-
-  // Sorting state
-  const [sortBy, setSortBy] = useState<'createdAt' | 'amount' | 'status' | 'scheduledAt'>('createdAt');
-  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
-
-  // Pagination state
-  const [cursors, setCursors] = useState<(string | null)[]>([null]); // Stack of cursors for each page
-  const [currentPage, setCurrentPage] = useState(0);
-
-  // Build query args
-  const queryArgs = useMemo(() => {
-    if (!orgId || !address) return null;
-    
-    return {
-      orgId: orgId as Id<'orgs'>,
-      walletAddress: address,
-      search: search.trim() || undefined,
-      status: statusFilter.length > 0 ? statusFilter : undefined,
-      token: tokenFilter || undefined,
-      chainId: chainFilter !== '' ? chainFilter : undefined,
-      dateFrom: dateFrom ? new Date(dateFrom).getTime() : undefined,
-      dateTo: dateTo ? new Date(dateTo).getTime() : undefined,
-      sortBy,
-      sortOrder,
-      cursor: cursors[currentPage] ?? undefined,
-      limit: PAGE_SIZE,
-    };
-  }, [orgId, address, search, statusFilter, tokenFilter, chainFilter, dateFrom, dateTo, sortBy, sortOrder, cursors, currentPage]);
-
-  const disbursementsResult = useQuery(
+  const [currency, setCurrency] = useState("");
+  const result = useQuery(
     api.disbursements.list,
-    queryArgs ?? 'skip'
+    args === "skip"
+      ? args
+      : {
+          ...args,
+          environment,
+          recurringPaymentId: (params.get("schedule") || undefined) as
+            Id<"recurringPayments"> | undefined,
+          search: search || undefined,
+          token: currency || undefined,
+          status: views[view].status,
+          includeRelayExceptions: view === "review" || view === "attention",
+          includeOverdueScheduled: view === "review" || view === "attention",
+          upcomingOnly: view === "upcoming",
+          cursor: cursorHistory[cursorHistory.length - 1],
+          limit: 20,
+        },
   );
-
-  // Keep previous data while loading to prevent flicker during sort/filter changes
-  const lastValidResultRef = useRef(disbursementsResult);
-  if (disbursementsResult !== undefined) {
-    lastValidResultRef.current = disbursementsResult;
-  }
-  const displayedResult = disbursementsResult ?? lastValidResultRef.current;
-  const isRefreshing = disbursementsResult === undefined && lastValidResultRef.current !== undefined;
-
-  const beneficiaries = useQuery(
-    api.beneficiaries.list,
-    orgId && address
-      ? { orgId: orgId as Id<'orgs'>, walletAddress: address, activeOnly: true, includeTags: true }
-      : 'skip'
+  const allSafes = useQuery(api.safes.getForOrg, args);
+  const safes = allSafes?.filter(
+    (safe) => chainEnvironment(safe.chainId) === environment,
   );
-
-  const availableTags = useQuery(
-    api.tags.list,
-    orgId && address
-      ? { orgId: orgId as Id<'orgs'>, walletAddress: address }
-      : 'skip'
+  const org = useQuery(api.orgs.get, args);
+  const members = useQuery(api.orgs.listMembers, args);
+  const session = useQuery(
+    api.auth.validateSession,
+    sessionToken ? { token: sessionToken } : "skip",
   );
-
-  const safes = useQuery(
-    api.safes.getForOrg,
-    orgId && address
-      ? { orgId: orgId as Id<'orgs'>, walletAddress: address }
-      : 'skip'
-  );
-  const org = useQuery(
-    api.orgs.get,
-    orgId ? { orgId: orgId as Id<'orgs'> } : 'skip'
-  );
-  const switchChain = useSwitchChain();
-  const currentChainId = useChainId();
-  const relaySettings = resolveRelaySettings(org ?? undefined);
-
-  useEffect(() => {
-    if (prefillApplied) return;
-    if (!prefillBeneficiaryId && !prefillCreate) return;
-    if (!beneficiaries) return;
-
-    setIsCreating(true);
-
-    if (prefillBeneficiaryId && beneficiaries.some((b) => b._id === prefillBeneficiaryId)) {
-      setSelectedBeneficiary(prefillBeneficiaryId);
-    }
-
-    if (prefillChainId) {
-      const chainIdNum = Number(prefillChainId);
-      if (!Number.isNaN(chainIdNum) && safes?.some((s) => s.chainId === chainIdNum)) {
-        setCreateChainId(chainIdNum);
-        const availableTokens = getTokenSymbolsForChain(chainIdNum);
-        if (prefillToken && availableTokens.includes(prefillToken)) {
-          setToken(prefillToken);
-        } else if (!availableTokens.includes(token)) {
-          setToken(availableTokens[0] ?? 'USDC');
-        }
-      }
-    } else if (prefillToken) {
-      const availableTokens = getTokenSymbolsForChain(createChainId);
-      if (availableTokens.includes(prefillToken)) {
-        setToken(prefillToken);
-      }
-    }
-
-    setPrefillApplied(true);
-  }, [
-    beneficiaries,
-    createChainId,
-    prefillApplied,
-    prefillBeneficiaryId,
-    prefillChainId,
-    prefillCreate,
-    prefillToken,
-    safes,
-    token,
-  ]);
-
-  // Fetch token balances for the selected chain
-  const balanceContracts = useMemo(() => {
-    if (!safes?.length || !createChainId) return undefined;
-    const safe = safes.find((s) => s.chainId === createChainId);
-    if (!safe) return undefined;
-
-    const tokens = getTokensForChain(createChainId);
-    const contracts: Array<{
-      address: `0x${string}`;
-      abi: typeof erc20Abi;
-      functionName: 'balanceOf';
-      args: [`0x${string}`];
-      chainId: number;
-      symbol: string;
-      decimals: number;
-    }> = [];
-
-    for (const [symbol, config] of Object.entries(tokens)) {
-      contracts.push({
-        address: config.address,
-        abi: erc20Abi,
-        functionName: 'balanceOf',
-        args: [safe.safeAddress as `0x${string}`],
-        chainId: createChainId,
-        symbol,
-        decimals: config.decimals,
-      });
-    }
-
-    return contracts.length ? contracts : undefined;
-  }, [safes, createChainId]);
-
-  const { data: balanceResults } = useReadContracts({
-    contracts: balanceContracts,
-    query: {
-      enabled: !!balanceContracts?.length,
-    },
-  });
-
-  // Calculate available balance for selected token
-  const availableBalance = useMemo(() => {
-    if (!balanceContracts || !balanceResults) return null;
-
-    const tokenIndex = balanceContracts.findIndex((c) => c.symbol === token);
-    if (tokenIndex === -1) return null;
-
-    const result = balanceResults[tokenIndex]?.result;
-    if (result == null) return null;
-
-    const decimals = balanceContracts[tokenIndex].decimals;
-    const balance = Number(result) / Math.pow(10, decimals);
-    return balance;
-  }, [balanceContracts, balanceResults, token]);
-
-  const createDisbursement = useMutation(api.disbursements.create);
-  const createBatchDisbursement = useMutation(api.disbursements.createBatch);
-  const updateStatus = useMutation(api.disbursements.updateStatus);
-  const scheduleDisbursement = useMutation(api.disbursements.schedule);
-  const rescheduleDisbursement = useMutation(api.disbursements.reschedule);
-
-  const relayingDisbursements = useMemo(() => {
-    if (!displayedResult?.items) return [];
-    return displayedResult.items.filter(
-      (d) => d.status === 'relaying' && d.relayTaskId
+  const role = members?.find(
+    (m) => m?.userId === session?.userId && m?.status === "active",
+  )?.role;
+  const canManage = !!role && ["admin", "approver", "initiator"].includes(role);
+  const title = (p: NonNullable<typeof result>["items"][number]) =>
+    p.name ||
+    p.memo ||
+    p.recipientName ||
+    p.beneficiary?.name ||
+    "Payment batch";
+  const setParam = (key: string, value?: string) => {
+    const next = new URLSearchParams(params);
+    if (value) next.set(key, value);
+    else next.delete(key);
+    setParams(next);
+  };
+  const exportPage = () =>
+    exportToCsv(
+      generateFilename(`payments_page_${environment}`),
+      (result?.items ?? []).map((p) => ({
+        name: title(p),
+        environment,
+        network: getChainName(p.chainId ?? 0),
+        chain_id: p.chainId ?? "",
+        account_id: p.safeId,
+        account_name: p.account?.name ?? "",
+        account_address: p.account?.address ?? "",
+        token_contract: p.tokenAddress ?? "",
+        amount: p.totalAmount ?? p.amount,
+        currency: p.token,
+        fee_amount: p.executionFee?.amount ?? "",
+        fee_currency: p.executionFee?.token ?? "",
+        account_debits: paymentDebits(
+          p.token,
+          p.totalAmount ?? p.amount ?? "0",
+          p.executionFee,
+        )
+          .map((v) => `${v.amount} ${v.token}`)
+          .join(" + "),
+        status: p.status,
+        pay_date: p.scheduledAt ? new Date(p.scheduledAt).toISOString() : "",
+        transaction_hash: p.txHash ?? "",
+      })),
+      [
+        "name",
+        "environment",
+        "network",
+        "chain_id",
+        "account_id",
+        "account_name",
+        "account_address",
+        "token_contract",
+        "amount",
+        "currency",
+        "fee_amount",
+        "fee_currency",
+        "account_debits",
+        "status",
+        "pay_date",
+        "transaction_hash",
+      ].map((key) => ({ key, label: key })),
     );
-  }, [displayedResult]);
-
-  useEffect(() => {
-    if (!RELAY_FEATURE_ENABLED || !address || relayingDisbursements.length === 0) {
-      return;
-    }
-
-    let cancelled = false;
-
-    const pollRelayStatuses = async () => {
-      for (const disbursement of relayingDisbursements) {
-        if (!disbursement.relayTaskId) continue;
-        try {
-          const status = await convex.action(api.relay.getTaskStatus, {
-            taskId: disbursement.relayTaskId,
-          });
-
-          if (cancelled) return;
-
-          const taskState = status?.taskState;
-          const txHash = status?.transactionHash;
-
-          if (txHash) {
-            await updateStatus({
-              disbursementId: disbursement._id,
-              walletAddress: address,
-              status: 'executed',
-              txHash,
-              relayStatus: taskState,
-            });
-            continue;
-          }
-
-          if (taskState === 'Cancelled' || taskState === 'ExecReverted') {
-            await updateStatus({
-              disbursementId: disbursement._id,
-              walletAddress: address,
-              status: 'failed',
-              relayStatus: taskState,
-              relayError: taskState,
-            });
-            continue;
-          }
-
-          if (taskState && taskState !== disbursement.relayStatus) {
-            await updateStatus({
-              disbursementId: disbursement._id,
-              walletAddress: address,
-              status: 'relaying',
-              relayStatus: taskState,
-            });
-          }
-        } catch (err) {
-          console.error('Failed to poll relay status:', err);
-        }
-      }
-    };
-
-    pollRelayStatuses();
-    const interval = setInterval(pollRelayStatuses, 15000);
-
-    return () => {
-      cancelled = true;
-      clearInterval(interval);
-    };
-  }, [address, relayingDisbursements, updateStatus]);
-
-  // Helper to reset pagination when filters change
-  const resetPagination = () => {
-    setCursors([null]);
-    setCurrentPage(0);
-  };
-
-  // Handler for search input
-  const handleSearchChange = (value: string) => {
-    setSearch(value);
-    resetPagination();
-  };
-
-  // Handler for status toggle
-  const toggleStatus = (status: string) => {
-    setStatusFilter(prev => 
-      prev.includes(status) 
-        ? prev.filter(s => s !== status)
-        : [...prev, status]
-    );
-    resetPagination();
-  };
-
-  // Handler for token filter
-  const handleTokenFilterChange = (value: string) => {
-    setTokenFilter(value);
-    resetPagination();
-  };
-
-  // Handler for chain filter
-  const handleChainFilterChange = (value: number | '') => {
-    setChainFilter(value);
-    resetPagination();
-  };
-
-  // Handler for date changes
-  const handleDateFromChange = (value: string) => {
-    setDateFrom(value);
-    resetPagination();
-  };
-
-  const handleDateToChange = (value: string) => {
-    setDateTo(value);
-    resetPagination();
-  };
-
-  const validateScheduledAt = (value: string) => {
-    if (!value) return null;
-    const ts = new Date(value).getTime();
-    if (Number.isNaN(ts)) return t('disbursements.form.scheduleInvalid');
-    if (ts < Date.now() + MIN_SCHEDULE_OFFSET_MS) {
-      return t('disbursements.form.scheduleTooSoon');
-    }
-    return null;
-  };
-
-  // Handler for sort
-  const handleSort = (field: typeof sortBy) => {
-    if (sortBy === field) {
-      setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc');
-    } else {
-      setSortBy(field);
-      setSortOrder('desc');
-    }
-    resetPagination();
-  };
-
-  // Pagination handlers
-  const goToNextPage = () => {
-    if (displayedResult?.nextCursor) {
-      setCursors(prev => [...prev.slice(0, currentPage + 1), displayedResult.nextCursor]);
-      setCurrentPage(prev => prev + 1);
-    }
-  };
-
-  const goToPrevPage = () => {
-    if (currentPage > 0) {
-      setCurrentPage(prev => prev - 1);
-    }
-  };
-
-  // Clear all filters
-  const clearFilters = () => {
-    setSearch('');
-    setStatusFilter([]);
-    setTokenFilter('');
-    setChainFilter('');
-    setDateFrom('');
-    setDateTo('');
-    resetPagination();
-  };
-
-  const hasActiveFilters = search || statusFilter.length > 0 || tokenFilter || chainFilter !== '' || dateFrom || dateTo;
-
-  // Calculate total for batch disbursements
-  const batchTotal = useMemo(() => {
-    let total = 0;
-    
-    // Include first recipient if filled
-    if (selectedBeneficiary && amount) {
-      const amt = parseFloat(amount || '0');
-      total += isNaN(amt) ? 0 : amt;
-    }
-    
-    // Add recipients
-    recipients.forEach(r => {
-      const amt = parseFloat(r.amount || '0');
-      total += isNaN(amt) ? 0 : amt;
-    });
-    
-    return total;
-  }, [recipients, selectedBeneficiary, amount]);
-
-  const hasDraftRecipient = Boolean(selectedBeneficiary && amount && parseFloat(amount) > 0);
-  const recipientCount = recipients.length + (hasDraftRecipient ? 1 : 0);
-  // Check if in batch mode (once we have at least one recipient)
-  const isBatchMode = recipients.length > 0;
-
-  // Get available beneficiaries (exclude already selected ones, but include currently selected one)
-  const availableBeneficiaries = useMemo(() => {
-    if (!beneficiaries) return [];
-    const selectedIds = new Set([
-      ...recipients.map(r => r.beneficiaryId)
-      // Don't exclude selectedBeneficiary so it shows in the dropdown
-    ]);
-    return beneficiaries.filter(b => !selectedIds.has(b._id));
-  }, [beneficiaries, recipients]);
-
-  const selectedBeneficiaryData = useMemo(
-    () => beneficiaries?.find((b) => b._id === selectedBeneficiary) ?? null,
-    [beneficiaries, selectedBeneficiary]
-  );
-
-  useEffect(() => {
-    if (!selectedBeneficiary) {
-      setManualPaymentOverride(false);
-      setPreferredAppliedFor(null);
-      return;
-    }
-
-    setManualPaymentOverride(false);
-    setPreferredAppliedFor(null);
-  }, [selectedBeneficiary]);
-
-  const beneficiaryOptions = useMemo(() => {
-    const baseOptions = (() => {
-      if (isBatchMode) {
-        const selectedBen = selectedBeneficiary
-          ? beneficiaries?.find((b) => b._id === selectedBeneficiary)
-          : null;
-        const allOptions =
-          selectedBen && !availableBeneficiaries?.some((b) => b._id === selectedBeneficiary)
-            ? [selectedBen, ...(availableBeneficiaries || [])]
-            : (availableBeneficiaries || []);
-        return allOptions;
-      }
-      return beneficiaries ?? [];
-    })();
-
-    const searchLower = beneficiarySearch.trim().toLowerCase();
-    const filtered = baseOptions.filter((b) => {
-      const type = b.type ?? 'individual';
-      if (beneficiaryTypeFilter !== 'all' && type !== beneficiaryTypeFilter) {
-        return false;
-      }
-      if (!searchLower) return true;
-      return (
-        b.name.toLowerCase().includes(searchLower) ||
-        b.walletAddress.toLowerCase().includes(searchLower)
-      );
-    });
-    if (selectedBeneficiary && !filtered.some((b) => b._id === selectedBeneficiary)) {
-      const selected = baseOptions.find((b) => b._id === selectedBeneficiary);
-      if (selected) {
-        return [selected, ...filtered];
-      }
-    }
-    return filtered;
-  }, [
-    availableBeneficiaries,
-    beneficiarySearch,
-    beneficiaryTypeFilter,
-    beneficiaries,
-    isBatchMode,
-    selectedBeneficiary,
-  ]);
-  const beneficiaryInputValue = isBeneficiaryDropdownOpen
-    ? beneficiarySearch
-    : (beneficiarySearch || selectedBeneficiaryData?.name || '');
-
-  useEffect(() => {
-    if (!selectedBeneficiaryData) return;
-    if (recipients.length > 0) return;
-    if (manualPaymentOverride) return;
-    if (preferredAppliedFor === selectedBeneficiaryData._id) return;
-
-    const preferredChainId = selectedBeneficiaryData.preferredChainId;
-    const preferredToken = selectedBeneficiaryData.preferredToken;
-
-    if (preferredChainId && safes?.some((s) => s.chainId === preferredChainId)) {
-      if (preferredChainId !== createChainId) {
-        setCreateChainId(preferredChainId);
-      }
-      const availableTokens = getTokenSymbolsForChain(preferredChainId);
-      if (preferredToken && availableTokens.includes(preferredToken)) {
-        if (preferredToken !== token) {
-          setToken(preferredToken);
-        }
-      } else if (!availableTokens.includes(token)) {
-        setToken(availableTokens[0] ?? 'USDC');
-      }
-      setPreferredAppliedFor(selectedBeneficiaryData._id);
-      return;
-    }
-
-    if (preferredToken) {
-      const availableTokens = getTokenSymbolsForChain(createChainId);
-      if (availableTokens.includes(preferredToken) && preferredToken !== token) {
-        setToken(preferredToken);
-      }
-    }
-    setPreferredAppliedFor(selectedBeneficiaryData._id);
-  }, [
-    createChainId,
-    manualPaymentOverride,
-    preferredAppliedFor,
-    recipients.length,
-    safes,
-    selectedBeneficiaryData,
-    token,
-  ]);
-
-  const beneficiariesByTag = useMemo(() => {
-    if (!beneficiaries || selectedTags.length === 0) return [];
-    const selected = new Set(selectedTags.map(normalizeTag));
-    return beneficiaries.filter((b) =>
-      b.tags?.some((tag: string) => selected.has(normalizeTag(tag)))
-    );
-  }, [beneficiaries, selectedTags]);
-
-  // Add recipient row (adds current first row to recipients, keeps first row for next entry)
-  const addRecipient = () => {
-    if (!selectedBeneficiary || !amount) return;
-    
-    // Check for duplicate
-    if (recipients.some(r => r.beneficiaryId === selectedBeneficiary)) {
-      setError(t('disbursements.form.duplicateBeneficiary'));
-      return;
-    }
-    
-    // Validate amount
-    const amt = parseFloat(amount);
-    if (isNaN(amt) || amt <= 0) {
-      setError(t('disbursements.form.invalidAmount'));
-      return;
-    }
-    
-    setError(null);
-    setRecipients(prev => [...prev, { beneficiaryId: selectedBeneficiary, amount }]);
-    // Clear first row for next entry
-    setSelectedBeneficiary('');
-    setAmount('');
-  };
-
-  const handleSelectBeneficiary = (beneficiaryId: string) => {
-    setSelectedBeneficiary(beneficiaryId);
-    setBeneficiarySearch('');
-    setIsBeneficiaryDropdownOpen(false);
-    setError(null);
-  };
-
-  const addRecipientsByTag = () => {
-    if (selectedTags.length === 0) return;
-    if (!beneficiariesByTag.length) {
-      setError(t('disbursements.form.noTaggedBeneficiaries'));
-      return;
-    }
-
-    setError(null);
-    setRecipients((prev) => {
-      const existing = new Set(prev.map((r) => r.beneficiaryId));
-      const updated = [...prev];
-      for (const beneficiary of beneficiariesByTag) {
-        if (existing.has(beneficiary._id) || beneficiary._id === selectedBeneficiary) {
-          continue;
-        }
-        updated.push({ beneficiaryId: beneficiary._id, amount: '' });
-      }
-      return updated;
-    });
-  };
-
-  // Remove recipient row
-  const removeRecipient = (index: number) => {
-    setRecipients(prev => prev.filter((_, i) => i !== index));
-  };
-
-  // Update recipient amount
-  const updateRecipientAmount = (index: number, newAmount: string) => {
-    setRecipients(prev => prev.map((r, i) => i === index ? { ...r, amount: newAmount } : r));
-  };
-
-  // Update recipient beneficiary (reserved for future UI)
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars -- may be wired to UI later
-  const updateRecipientBeneficiary = (index: number, beneficiaryId: string) => {
-    setRecipients(prev => prev.map((r, i) => i === index ? { ...r, beneficiaryId } : r));
-  };
-
-  // Reset form
-  const resetForm = () => {
-    setSelectedBeneficiary('');
-    setAmount('');
-    setToken('USDC');
-    setMemo('');
-    setScheduledAt('');
-    setScheduledAtError(null);
-    setRecipients([]);
-    setSelectedTags([]);
-    setAddMode('beneficiary');
-    setCreateChainId(11155111);
-    setBeneficiarySearch('');
-    setBeneficiaryTypeFilter('all');
-    setIsCreating(false);
-  };
-
-  const handleCreate = async (e: React.FormEvent, skipScreening = false) => {
-    e.preventDefault();
-    if (!orgId || !address) return;
-
-    const scheduleError = validateScheduledAt(scheduledAt);
-    if (scheduleError) {
-      setScheduledAtError(scheduleError);
-      return;
-    }
-
-    // Validate batch mode
-    if (isBatchMode || (selectedBeneficiary && amount)) {
-      // Include first recipient if it's filled but not yet added to recipients
-      const allRecipients = selectedBeneficiary && amount && !recipients.some(r => r.beneficiaryId === selectedBeneficiary)
-        ? [...recipients, { beneficiaryId: selectedBeneficiary, amount }]
-        : recipients;
-
-      if (allRecipients.length === 0) {
-        setError('At least one recipient is required');
-        return;
-      }
-
-      // Validate all recipients have beneficiary and amount
-      for (const recipient of allRecipients) {
-        if (!recipient.beneficiaryId || !recipient.amount) {
-          setError('All recipients must have a beneficiary and amount');
-          return;
-        }
-        const amt = parseFloat(recipient.amount);
-        if (isNaN(amt) || amt <= 0) {
-          setError('All amounts must be greater than 0');
-          return;
-        }
-      }
-
-      // Check screening before creating (unless skipping)
-      if (!skipScreening) {
-        const beneficiaryIds = allRecipients.map(r => r.beneficiaryId as Id<'beneficiaries'>);
-        const screeningCheck = await convex.query(api.screeningQueries.checkBeneficiaries, {
-          orgId: orgId as Id<'orgs'>,
-          walletAddress: address,
-          beneficiaryIds,
-        });
-
-        if (screeningCheck.enforcement === 'block' && screeningCheck.flagged.length > 0) {
-          setScreeningBlock({
-            flagged: screeningCheck.flagged,
-            action: 'create',
-          });
-          return;
-        }
-
-        if (screeningCheck.enforcement === 'warn' && screeningCheck.flagged.length > 0) {
-          setScreeningWarning({
-            flagged: screeningCheck.flagged,
-            action: 'create',
-            data: { isBatch: true },
-          });
-          return;
-        }
-      }
-
-      try {
-        await createBatchDisbursement({
-          orgId: orgId as Id<'orgs'>,
-          walletAddress: address,
-          chainId: createChainId,
-          token,
-          recipients: allRecipients.map(r => ({
-            beneficiaryId: r.beneficiaryId as Id<'beneficiaries'>,
-            amount: r.amount,
-          })),
-          memo: memo.trim() || undefined,
-          scheduledAt: scheduledAt ? new Date(scheduledAt).getTime() : undefined,
-        });
-        resetForm();
-      } catch (error) {
-        console.error('Failed to create batch disbursement:', error);
-        setError(error instanceof Error ? error.message : 'Failed to create batch disbursement');
-      }
-    } else {
-      // Single disbursement
-      if (!selectedBeneficiary || !amount) return;
-
-      // Check screening before creating (unless skipping)
-      if (!skipScreening) {
-        const screeningCheck = await convex.query(api.screeningQueries.checkBeneficiaries, {
-          orgId: orgId as Id<'orgs'>,
-          walletAddress: address,
-          beneficiaryIds: [selectedBeneficiary as Id<'beneficiaries'>],
-        });
-
-        if (screeningCheck.enforcement === 'block' && screeningCheck.flagged.length > 0) {
-          setScreeningBlock({
-            flagged: screeningCheck.flagged,
-            action: 'create',
-          });
-          return;
-        }
-
-        if (screeningCheck.enforcement === 'warn' && screeningCheck.flagged.length > 0) {
-          setScreeningWarning({
-            flagged: screeningCheck.flagged,
-            action: 'create',
-            data: { isBatch: false },
-          });
-          return;
-        }
-      }
-
-      try {
-        await createDisbursement({
-          orgId: orgId as Id<'orgs'>,
-          walletAddress: address,
-          chainId: createChainId,
-          beneficiaryId: selectedBeneficiary as Id<'beneficiaries'>,
-          token,
-          amount,
-          memo: memo.trim() || undefined,
-          scheduledAt: scheduledAt ? new Date(scheduledAt).getTime() : undefined,
-        });
-        resetForm();
-      } catch (error) {
-        console.error('Failed to create disbursement:', error);
-        setError(error instanceof Error ? error.message : 'Failed to create disbursement');
-      }
-    }
-  };
-
-  const handlePropose = async (
-    disbursement: {
-      _id: Id<'disbursements'>;
-      chainId?: number;
-      beneficiary?: { walletAddress: string } | null;
-      token: string;
-      amount?: string;
-      type?: 'single' | 'batch';
-      totalAmount?: string;
-    },
-    skipScreening = false
-  ) => {
-    const chainId = disbursement.chainId;
-    if (chainId == null || !safes?.length || !address) return;
-    const safe = safes.find((s) => s.chainId === chainId);
-    if (!safe) {
-      setError('No Safe linked for this chain. Link the Safe for this chain in Settings.');
-      return;
-    }
-
-    setProcessingId(disbursement._id);
-    setError(null);
-
-    try {
-      // Check screening before proposing (unless skipping)
-      if (!skipScreening) {
-        const screeningCheck = await convex.query(api.screeningQueries.checkDisbursementRecipients, {
-          disbursementId: disbursement._id,
-          walletAddress: address,
-        });
-
-        if (screeningCheck.enforcement === 'block' && screeningCheck.flagged.length > 0) {
-          setScreeningBlock({
-            flagged: screeningCheck.flagged,
-            action: 'propose',
-          });
-          setProcessingId(null);
-          return;
-        }
-
-        if (screeningCheck.enforcement === 'warn' && screeningCheck.flagged.length > 0) {
-          setScreeningWarning({
-            flagged: screeningCheck.flagged,
-            action: 'propose',
-            data: { disbursement },
-          });
-          setProcessingId(null);
-          return;
-        }
-      }
-
-      if (switchChain && switchChain.switchChainAsync && currentChainId !== chainId) {
-        await switchChain.switchChainAsync({ chainId });
-      }
-
-      let relayFeeToken: string | undefined;
-      let relayFeeTokenSymbol: string | undefined;
-      let relayFeeMode: RelayFeeMode | undefined;
-
-      if (RELAY_FEATURE_ENABLED) {
-        const feeSelection = await selectRelayFeeToken({
-          chainId,
-          safeAddress: safe.safeAddress,
-          feeTokenSymbol: relaySettings.relayFeeTokenSymbol,
-          feeMode: relaySettings.relayFeeMode,
-        });
-        relayFeeToken = feeSelection.feeTokenAddress;
-        relayFeeTokenSymbol = feeSelection.feeTokenSymbol;
-        relayFeeMode = relaySettings.relayFeeMode;
-      }
-
-      await updateStatus({
-        disbursementId: disbursement._id,
-        walletAddress: address,
-        status: 'pending',
-      });
-
-      let transactions: Array<{ to: string; value: string; data: string; operation?: number }>;
-
-      if (disbursement.type === 'batch') {
-        const batchData = await convex.query(api.disbursements.getWithRecipients, {
-          disbursementId: disbursement._id,
-          walletAddress: address,
-        });
-        if (!batchData || !batchData.recipients || batchData.recipients.length === 0) {
-          throw new Error('No recipients found for batch disbursement');
-        }
-        transactions = createBatchTransferTxs(
-          chainId,
-          disbursement.token,
-          batchData.recipients.map((r: { recipientAddress: string; amount: string }) => ({ to: r.recipientAddress, amount: r.amount }))
-        );
-      } else {
-        const singleAmount = disbursement.amount;
-        if (!disbursement.beneficiary || !singleAmount) {
-          throw new Error('Beneficiary or amount not found');
-        }
-        const transferTx = createTransferTx(
-          chainId,
-          disbursement.token,
-          disbursement.beneficiary.walletAddress,
-          singleAmount
-        );
-        transactions = [transferTx];
-      }
-
-      const safeTxHash = RELAY_FEATURE_ENABLED
-        ? await proposeTransactionViaGelato({
-            safeAddress: safe.safeAddress,
-            signerAddress: address,
-            chainId,
-            transactions,
-            gasToken: relayFeeToken as `0x${string}` | undefined,
-          })
-        : await proposeTransaction(
-            safe.safeAddress,
-            address,
-            chainId,
-            transactions
-          );
-
-      const currentDisb = await convex.query(api.disbursements.get, {
-        disbursementId: disbursement._id,
-        walletAddress: address,
-      });
-
-      if (currentDisb?.scheduledAt && currentDisb.scheduledAt > Date.now()) {
-        await scheduleDisbursement({
-          disbursementId: disbursement._id,
-          walletAddress: address,
-          scheduledAt: currentDisb.scheduledAt,
-          safeTxHash,
-          relayFeeToken,
-          relayFeeTokenSymbol,
-          relayFeeMode,
-        });
-      } else {
-        await updateStatus({
-          disbursementId: disbursement._id,
-          walletAddress: address,
-          status: 'proposed',
-          safeTxHash,
-          relayFeeToken,
-          relayFeeTokenSymbol,
-          relayFeeMode,
-        });
-      }
-    } catch (err) {
-      console.error('Failed to propose transaction:', err);
-      setError(err instanceof Error ? err.message : 'Failed to propose transaction');
-      await updateStatus({
-        disbursementId: disbursement._id,
-        walletAddress: address,
-        status: 'draft',
-      });
-    } finally {
-      setProcessingId(null);
-    }
-  };
-
-  const handleExecute = async (
-    disbursement: {
-      _id: Id<'disbursements'>;
-      chainId?: number;
-      safeTxHash?: string;
-    },
-    skipScreening = false
-  ) => {
-    const chainId = disbursement.chainId;
-    if (chainId == null || !safes?.length || !address || !disbursement.safeTxHash) return;
-    const safe = safes.find((s) => s.chainId === chainId);
-    if (!safe) {
-      setError('No Safe linked for this chain.');
-      return;
-    }
-
-    setProcessingId(disbursement._id);
-    setError(null);
-
-    try {
-      // Check screening before executing (unless skipping)
-      if (!skipScreening) {
-        const screeningCheck = await convex.query(api.screeningQueries.checkDisbursementRecipients, {
-          disbursementId: disbursement._id,
-          walletAddress: address,
-        });
-
-        if (screeningCheck.enforcement === 'block' && screeningCheck.flagged.length > 0) {
-          setScreeningBlock({
-            flagged: screeningCheck.flagged,
-            action: 'execute',
-          });
-          setProcessingId(null);
-          return;
-        }
-
-        if (screeningCheck.enforcement === 'warn' && screeningCheck.flagged.length > 0) {
-          setScreeningWarning({
-            flagged: screeningCheck.flagged,
-            action: 'execute',
-            data: { disbursement },
-          });
-          setProcessingId(null);
-          return;
-        }
-      }
-
-      if (switchChain && switchChain.switchChainAsync && currentChainId !== chainId) {
-        await switchChain.switchChainAsync({ chainId });
-      }
-
-      if (RELAY_FEATURE_ENABLED) {
-        const relayResult = await executeTransactionViaGelato({
-          safeAddress: safe.safeAddress,
-          signerAddress: address,
-          chainId,
-          safeTxHash: disbursement.safeTxHash,
-        });
-
-        await updateStatus({
-          disbursementId: disbursement._id,
-          walletAddress: address,
-          status: 'relaying',
-          relayTaskId: relayResult.taskId,
-          relayStatus: 'submitted',
-        });
-      } else {
-        const txHash = await executeTransaction(
-          safe.safeAddress,
-          address,
-          chainId,
-          disbursement.safeTxHash
-        );
-
-        await updateStatus({
-          disbursementId: disbursement._id,
-          walletAddress: address,
-          status: 'executed',
-          txHash,
-        });
-      }
-    } catch (err) {
-      console.error('Failed to execute transaction:', err);
-      setError(err instanceof Error ? err.message : 'Failed to execute transaction');
-      await updateStatus({
-        disbursementId: disbursement._id,
-        walletAddress: address,
-        status: 'failed',
-      });
-    } finally {
-      setProcessingId(null);
-    }
-  };
-
-  const handleRetryRelay = async (
-    disbursement: {
-      _id: Id<'disbursements'>;
-      chainId?: number;
-      safeTxHash?: string;
-    }
-  ) => {
-    if (!address) return;
-    setProcessingId(disbursement._id);
-    setError(null);
-
-    try {
-      const retryResult = await convex.action(api.relay.retryDisbursement, {
-        disbursementId: disbursement._id,
-        walletAddress: address,
-      });
-
-      if (retryResult?.status === 'executed') {
-        setProcessingId(null);
-        return;
-      }
-
-      if (retryResult?.status === 'needs_confirmations') {
-        const remaining = Math.max(
-          0,
-          (retryResult.confirmationsRequired ?? 0) -
-            (retryResult.confirmations ?? 0)
-        );
-        setError(
-          remaining > 0
-            ? `Needs ${remaining} more confirmation(s) before relay.`
-            : 'Needs more confirmations before relay.'
-        );
-        setProcessingId(null);
-        return;
-      }
-
-      if (retryResult?.status === 'not_found') {
-        setError('Safe transaction not found. Please re-propose the disbursement.');
-        setProcessingId(null);
-        return;
-      }
-
-      setProcessingId(null);
-      await handleExecute(disbursement);
-    } catch (err) {
-      console.error('Failed to retry relay:', err);
-      setError(err instanceof Error ? err.message : 'Failed to retry relay');
-      setProcessingId(null);
-    }
-  };
-
-  const handleCancel = async (disbursementId: Id<'disbursements'>) => {
-    if (!address) return;
-    
-    setCancelDisbursementId(disbursementId);
-  };
-
-  const confirmCancel = async () => {
-    if (!address || !cancelDisbursementId) return;
-
-    try {
-      await updateStatus({
-        disbursementId: cancelDisbursementId,
-        walletAddress: address,
-        status: 'cancelled',
-      });
-      setCancelDisbursementId(null);
-    } catch (err) {
-      console.error('Failed to cancel disbursement:', err);
-      setError(err instanceof Error ? err.message : 'Failed to cancel disbursement');
-      setCancelDisbursementId(null);
-    }
-  };
-
-  const handleReschedule = async () => {
-    if (!rescheduleDisbursementId || !newScheduledAt || !address) return;
-    const scheduleError = validateScheduledAt(newScheduledAt);
-    if (scheduleError) {
-      setNewScheduledAtError(scheduleError);
-      return;
-    }
-    try {
-      await rescheduleDisbursement({
-        disbursementId: rescheduleDisbursementId,
-        walletAddress: address,
-        newScheduledAt: new Date(newScheduledAt).getTime(),
-      });
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to reschedule');
-    }
-    setRescheduleDisbursementId(null);
-    setNewScheduledAt('');
-    setNewScheduledAtError(null);
-  };
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'executed':
-        return 'bg-green-500/10 text-green-400';
-      case 'failed':
-      case 'cancelled':
-        return 'bg-red-500/10 text-red-400';
-      case 'pending':
-      case 'proposed':
-      case 'scheduled':
-      case 'relaying':
-        return 'bg-yellow-500/10 text-yellow-400';
-      default:
-        return 'bg-slate-500/10 text-slate-400';
-    }
-  };
-
-  const renderActionButton = (disbursement: NonNullable<typeof disbursementsResult>['items'][number]) => {
-    const isProcessing = processingId === disbursement._id;
-
-    if (isProcessing) {
-      return (
-        <div className="flex items-center justify-center gap-2 h-8">
-          <Loader2 className="h-4 w-4 animate-spin text-slate-400" />
-        </div>
-      );
-    }
-
-    switch (disbursement.status) {
-      case 'draft':
-        return (
-          <div className="flex items-center justify-center gap-2 h-8">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => handlePropose(disbursement)}
-              title={t('disbursements.actions.propose')}
-              className="h-8 w-8 p-0"
-            >
-              <Play className="h-4 w-4 text-accent-400" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => handleCancel(disbursement._id)}
-              title="Cancel"
-              className="h-8 w-8 p-0"
-            >
-              <X className="h-4 w-4 text-slate-400 hover:text-red-400" />
-            </Button>
-          </div>
-        );
-      case 'pending':
-        return (
-          <div className="flex items-center justify-center gap-2 h-8">
-            <Loader2 className="h-4 w-4 animate-spin text-yellow-400" />
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => handleCancel(disbursement._id)}
-              title="Cancel"
-              className="h-8 w-8 p-0"
-            >
-              <X className="h-4 w-4 text-slate-400 hover:text-red-400" />
-            </Button>
-          </div>
-        );
-      case 'proposed':
-        return (
-          <div className="flex items-center justify-center gap-2 h-8">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => handleExecute(disbursement)}
-              title={t('disbursements.actions.execute')}
-              className="h-8 w-8 p-0"
-            >
-              <Rocket className="h-4 w-4 text-yellow-400" />
-            </Button>
-          </div>
-        );
-      case 'scheduled':
-        return (
-          <div className="flex items-center justify-center gap-2 h-8">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => {
-                setRescheduleDisbursementId(disbursement._id);
-                setNewScheduledAt(
-                  disbursement.scheduledAt
-                    ? toLocalDateTimeInputValue(new Date(disbursement.scheduledAt))
-                    : ''
-                );
-                setNewScheduledAtError(null);
-              }}
-              title={t('disbursements.actions.reschedule')}
-              className="h-8 w-8 p-0"
-            >
-              <Calendar className="h-4 w-4 text-yellow-400" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => handleCancel(disbursement._id)}
-              title="Cancel"
-              className="h-8 w-8 p-0"
-            >
-              <X className="h-4 w-4 text-slate-400 hover:text-red-400" />
-            </Button>
-          </div>
-        );
-      case 'relaying':
-        return (
-          <div className="flex items-center justify-center gap-2 h-8">
-            <Loader2 className="h-4 w-4 animate-spin text-yellow-400" />
-          </div>
-        );
-      case 'executed':
-        return (
-          <div className="flex items-center justify-center gap-2 h-8">
-            <CheckCircle className="h-4 w-4 text-green-400" />
-            {disbursement.txHash && (
-              <a
-                href={disbursement.chainId != null ? getBlockExplorerTxUrl(disbursement.chainId, disbursement.txHash) : `https://etherscan.io/tx/${disbursement.txHash}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center justify-center h-8 w-8 text-accent-400 hover:text-accent-300 transition-colors"
-                title="View transaction"
-              >
-                <ArrowUpRight className="h-4 w-4" />
-              </a>
-            )}
-          </div>
-        );
-      case 'failed':
-        return (
-          <div className="flex items-center justify-center gap-2 h-8">
-            {disbursement.safeTxHash ? (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() =>
-                  handleRetryRelay({
-                    _id: disbursement._id,
-                    chainId: disbursement.chainId,
-                    safeTxHash: disbursement.safeTxHash,
-                  })
-                }
-                title="Retry relay"
-                className="h-8 w-8 p-0"
-              >
-                <RefreshCw className="h-4 w-4 text-slate-400 hover:text-accent-300" />
-              </Button>
-            ) : null}
-          </div>
-        );
-      case 'cancelled':
-        return (
-          <div className="flex items-center justify-center gap-2 h-8">
-            {/* Empty div to maintain consistent height */}
-          </div>
-        );
-      default:
-        return (
-          <div className="flex items-center justify-center gap-2 h-8">
-            {/* Empty div to maintain consistent height */}
-          </div>
-        );
-    }
-  };
-
-  const closeDetailModal = () => {
-    setSelectedDisbursementId(null);
-    if (searchParams.has('focus')) {
-      const nextParams = new URLSearchParams(searchParams);
-      nextParams.delete('focus');
-      setSearchParams(nextParams, { replace: true });
-    }
-  };
-
-  const renderActionButtonsDetailed = (disbursement: {
-    _id: Id<'disbursements'>;
-    status: string;
-    chainId?: number;
-    safeTxHash?: string;
-    txHash?: string;
-    token: string;
-    amount?: string;
-    totalAmount?: string;
-    type?: 'single' | 'batch';
-    beneficiary?: { walletAddress: string } | null;
-    scheduledAt?: number;
-  }) => {
-    const isProcessing = processingId === disbursement._id;
-
-    if (isProcessing) {
-      return (
-        <div className="flex items-center gap-2 text-sm text-slate-400">
-          <Loader2 className="h-4 w-4 animate-spin" />
-          {t('common.loading')}
-        </div>
-      );
-    }
-
-    switch (disbursement.status) {
-      case 'draft':
-        return (
-          <>
-            <Button
-              onClick={() => handlePropose(disbursement)}
-              className="w-full sm:w-auto"
-            >
-              {t('disbursements.actions.propose')}
-            </Button>
-            <Button
-              variant="secondary"
-              onClick={() => {
-                closeDetailModal();
-                handleCancel(disbursement._id);
-              }}
-              className="w-full sm:w-auto border border-red-500/30 text-red-400 hover:text-red-300 hover:border-red-400/50"
-            >
-              {t('common.cancel')}
-            </Button>
-          </>
-        );
-      case 'pending':
-        return (
-          <Button
-            variant="secondary"
-            onClick={() => {
-              closeDetailModal();
-              handleCancel(disbursement._id);
-            }}
-            className="w-full sm:w-auto border border-red-500/30 text-red-400 hover:text-red-300 hover:border-red-400/50"
-          >
-            {t('common.cancel')}
-          </Button>
-        );
-      case 'proposed':
-        return (
-          <Button
-            onClick={() => handleExecute(disbursement)}
-            className="w-full sm:w-auto"
-          >
-            {t('disbursements.actions.execute')}
-          </Button>
-        );
-      case 'scheduled':
-        return (
-          <>
-            <Button
-              variant="secondary"
-              onClick={() => {
-                closeDetailModal();
-                setRescheduleDisbursementId(disbursement._id);
-                setNewScheduledAt(
-                  disbursement.scheduledAt
-                    ? toLocalDateTimeInputValue(new Date(disbursement.scheduledAt))
-                    : ''
-                );
-                setNewScheduledAtError(null);
-              }}
-              className="w-full sm:w-auto"
-            >
-              {t('disbursements.actions.reschedule')}
-            </Button>
-            <Button
-              variant="secondary"
-              onClick={() => {
-                closeDetailModal();
-                handleCancel(disbursement._id);
-              }}
-              className="w-full sm:w-auto border border-red-500/30 text-red-400 hover:text-red-300 hover:border-red-400/50"
-            >
-              {t('common.cancel')}
-            </Button>
-          </>
-        );
-      case 'failed':
-        return disbursement.safeTxHash ? (
-          <Button
-            variant="secondary"
-            onClick={() =>
-              handleRetryRelay({
-                _id: disbursement._id,
-                chainId: disbursement.chainId,
-                safeTxHash: disbursement.safeTxHash,
-              })
-            }
-            className="w-full sm:w-auto"
-          >
-            {t('disbursements.actions.retry', { defaultValue: 'Retry' })}
-          </Button>
-        ) : null;
-      case 'executed':
-        return disbursement.txHash ? (
-          <a
-            href={disbursement.chainId != null ? getBlockExplorerTxUrl(disbursement.chainId, disbursement.txHash) : `https://etherscan.io/tx/${disbursement.txHash}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex w-full sm:w-auto"
-          >
-            <Button variant="secondary" className="w-full sm:w-auto">
-              {t('common.view')}
-            </Button>
-          </a>
-        ) : null;
-      case 'relaying':
-        return (
-          <div className="flex items-center gap-2 text-sm text-slate-400">
-            <Loader2 className="h-4 w-4 animate-spin" />
-            {t('status.relaying')}
-          </div>
-        );
-      default:
-        return null;
-    }
-  };
-
   return (
-    <AppLayout>
-      <div className="space-y-8">
-        {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pt-4 lg:pt-6">
-          <div>
-            <h1 className="text-xl sm:text-2xl font-bold text-white">{t('disbursements.title')}</h1>
-            <p className="mt-1 text-sm sm:text-base text-slate-400">
-              {t('disbursements.subtitle')}
-              {displayedResult && (
-                <span className="ml-2 text-slate-500">
-                  ({t('disbursements.total', { count: displayedResult.totalCount })})
-                  {isRefreshing && (
-                    <RefreshCw className="ml-2 inline h-3 w-3 animate-spin" />
-                  )}
-                </span>
-              )}
-            </p>
-          </div>
-          <Button onClick={() => setIsCreating(true)} disabled={!safes?.length} className="w-full sm:w-auto h-11">
-            <Plus className="h-4 w-4" />
-            {t('disbursements.newDisbursement')}
-          </Button>
-        </div>
-
-        {/* Search & Filter Bar */}
-        <div className="space-y-4">
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
-            {/* Search Input */}
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-              <input
-                type="text"
-                value={search}
-                onChange={(e) => handleSearchChange(e.target.value)}
-                placeholder={t('disbursements.searchPlaceholder')}
-                className="w-full rounded-lg border border-white/10 bg-navy-800 pl-10 pr-4 py-2.5 text-sm text-white placeholder-slate-500 focus:border-accent-500 focus:outline-none focus:ring-1 focus:ring-accent-500"
-              />
-            </div>
-
-            <div className="flex items-center gap-2">
-              {/* Filter Toggle */}
-              <Button
-                variant="secondary"
-                onClick={() => setShowFilters(!showFilters)}
-                className={cn("h-11", hasActiveFilters ? 'border-accent-500' : '')}
+    <>
+      <PageHeader
+        title="Payments"
+        description="Prepare, approve, and track every payment in one place."
+        actions={
+          <>
+            <button
+              className="workspace-button"
+              disabled={!result?.items.length}
+              onClick={exportPage}
+            >
+              <Download size={14} />
+              Export this page
+            </button>
+            {canManage && (
+              <button
+                className="workspace-button workspace-button-primary"
+                onClick={() => setParam("new", "1")}
               >
-                <Filter className="h-4 w-4" />
-                <span className="hidden sm:inline">{t('common.filters')}</span>
-                {hasActiveFilters && (
-                  <span className="ml-1 rounded-full bg-accent-500 px-1.5 py-0.5 text-xs text-white">
-                    {(statusFilter.length > 0 ? 1 : 0) + (tokenFilter ? 1 : 0) + (chainFilter !== '' ? 1 : 0) + (dateFrom || dateTo ? 1 : 0)}
-                  </span>
-                )}
-              </Button>
-
-              {/* Clear Filters */}
-              {hasActiveFilters && (
-                <Button variant="ghost" onClick={clearFilters} className="h-11 text-slate-400 hover:text-white">
-                  {t('common.clearAll')}
-                </Button>
-              )}
-            </div>
-          </div>
-
-          {/* Expanded Filters */}
-          {showFilters && (
-            <div className="rounded-xl border border-white/10 bg-navy-900/50 p-4 space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                {/* Status Filter */}
-                <div>
-                  <label className="mb-2 block text-sm font-medium text-slate-300">
-                    {t('disbursements.filters.status')}
-                  </label>
-                  <div className="flex flex-wrap gap-2">
-                    {STATUS_OPTIONS.map((option) => (
-                      <button
-                        key={option.value}
-                        onClick={() => toggleStatus(option.value)}
-                        className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
-                          statusFilter.includes(option.value)
-                            ? 'bg-accent-500 text-white'
-                            : 'bg-navy-800 text-slate-400 hover:bg-navy-700 hover:text-white'
-                        }`}
-                      >
-                        {option.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Token Filter */}
-                <div>
-                  <label className="mb-2 block text-sm font-medium text-slate-300">
-                    Token
-                  </label>
-                  <select
-                    value={tokenFilter}
-                    onChange={(e) => handleTokenFilterChange(e.target.value)}
-                    className="w-full rounded-lg border border-white/10 bg-navy-800 px-4 py-2 text-white focus:border-accent-500 focus:outline-none focus:ring-1 focus:ring-accent-500"
-                  >
-                    {filterTokenOptions.map((option) => (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                {/* Chain Filter */}
-                <div>
-                  <label className="mb-2 block text-sm font-medium text-slate-300">
-                    {t('disbursements.filters.chain', { defaultValue: 'Chain' })}
-                  </label>
-                  <select
-                    value={chainFilter}
-                    onChange={(e) => handleChainFilterChange(e.target.value === '' ? '' : Number(e.target.value))}
-                    className="w-full rounded-lg border border-white/10 bg-navy-800 px-4 py-2 text-white focus:border-accent-500 focus:outline-none focus:ring-1 focus:ring-accent-500"
-                  >
-                    <option value="">{t('common.all')}</option>
-                    {CHAINS_LIST.map((c) => (
-                      <option key={c.chainId} value={c.chainId}>
-                        {c.chainName}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                {/* Date Range */}
-                <div>
-                  <label className="mb-2 block text-sm font-medium text-slate-300">
-                    <Calendar className="inline h-4 w-4 mr-1" />
-                    {t('disbursements.filters.dateRange')}
-                  </label>
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="date"
-                      value={dateFrom}
-                      onChange={(e) => handleDateFromChange(e.target.value)}
-                      className="flex-1 rounded-lg border border-white/10 bg-navy-800 px-3 py-2 text-white focus:border-accent-500 focus:outline-none focus:ring-1 focus:ring-accent-500"
-                    />
-                    <span className="text-slate-500">{t('disbursements.filters.to')}</span>
-                    <input
-                      type="date"
-                      value={dateTo}
-                      onChange={(e) => handleDateToChange(e.target.value)}
-                      className="flex-1 rounded-lg border border-white/10 bg-navy-800 px-3 py-2 text-white focus:border-accent-500 focus:outline-none focus:ring-1 focus:ring-accent-500"
-                    />
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
+                <Plus size={14} />
+                New payment
+              </button>
+            )}
+          </>
+        }
+      />
+      {params.get("schedule") && (
+        <div className="mb-4 flex flex-wrap items-center gap-3 text-sm">
+          <span>Showing payments generated by this schedule.</span>
+          <button
+            className="workspace-action-link"
+            onClick={() => {
+              setParam("schedule");
+              setCursorHistory([undefined]);
+            }}
+          >
+            Show all payments
+          </button>
         </div>
-
-        {safes && safes.length === 0 && (
-          <div className="rounded-lg border border-yellow-500/30 bg-yellow-500/10 p-4 text-yellow-400">
-            {t('disbursements.noSafeWarning')}
+      )}
+      <section className="workspace-panel">
+        <div className="workspace-toolbar">
+          <div
+            className="workspace-tabs"
+            role="tablist"
+            aria-label="Payment views"
+          >
+            {Object.entries(views).map(([key, item]) => (
+              <button
+                role="tab"
+                key={key}
+                aria-selected={key === view}
+                onClick={() => {
+                  setParam("view", key);
+                  setCursorHistory([undefined]);
+                }}
+              >
+                {item.label}
+              </button>
+            ))}
+          </div>
+        </div>
+        <div className="workspace-toolbar">
+          <SearchField
+            placeholder="Search payment or recipient"
+            value={search}
+            onChange={(v) => {
+              setSearch(v);
+              setCursorHistory([undefined]);
+            }}
+          />
+          <select
+            className="finance-field !w-auto"
+            aria-label="Filter by currency"
+            value={currency}
+            onChange={(e) => {
+              setCurrency(e.target.value);
+              setCursorHistory([undefined]);
+            }}
+          >
+            <option value="">All currencies</option>
+            {["USDC", "USDT", "PYUSD", "EURC"].map((t) => (
+              <option key={t}>{t}</option>
+            ))}
+          </select>
+        </div>
+        {result === undefined ? (
+          <LoadingRows />
+        ) : result.items.length === 0 ? (
+          <EmptyState
+            icon={ListChecks}
+            title={
+              search || view !== "all"
+                ? "No payments in this view"
+                : "Your first payment starts here"
+            }
+            description={
+              search || view !== "all"
+                ? "Try another filter or search term."
+                : "Pay one person or a whole team using saved recipients. Review the amounts and choose when to pay."
+            }
+            action={
+              canManage && (
+                <button
+                  className="workspace-button workspace-button-primary"
+                  onClick={() => setParam("new", "1")}
+                >
+                  <Plus size={14} />
+                  Prepare a payment
+                </button>
+              )
+            }
+          />
+        ) : (
+          <div className="workspace-table-wrap">
+            <table className="workspace-table">
+              <thead>
+                <tr>
+                  <th>Payment</th>
+                  <th>Pay date</th>
+                  <th>Account</th>
+                  <th className="numeric">Amount</th>
+                  <th>Status</th>
+                  <th>
+                    <span className="sr-only">Review payment</span>
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {result.items.map((p) => (
+                  <tr key={p._id}>
+                    <td>
+                      <button
+                        className="workspace-table-primary text-left"
+                        onClick={() => setParam("focus", p._id)}
+                      >
+                        {title(p)}
+                      </button>
+                      <span className="workspace-table-secondary">
+                        {p.purpose === "payroll"
+                          ? "Payroll"
+                          : p.purpose === "invoice"
+                            ? "Vendor bills"
+                            : p.type === "batch"
+                              ? "Payment batch"
+                              : "Individual payment"}
+                        {p.recurringPaymentId ? " · Recurring" : ""}
+                      </span>
+                    </td>
+                    <td>
+                      {formatDate(p.scheduledAt, {
+                        month: "short",
+                        day: "numeric",
+                        year: "numeric",
+                        timeZone: "UTC",
+                      })}
+                    </td>
+                    <td>
+                      {p.account?.name ?? (p.chainId ? getChainName(p.chainId) + " account" : "Original account")}
+                      <span className="workspace-table-secondary">
+                        {getChainName(p.chainId ?? 0)}{p.account?.archived ? " · Archived" : ""}
+                      </span>
+                    </td>
+                    <td className="numeric">
+                      <strong>
+                        {formatMoney(
+                          p.totalAmount ?? p.amount ?? "0",
+                          p.token,
+                          true,
+                        )}
+                      </strong>
+                      <span className="workspace-table-secondary">
+                        {p.token}
+                      </span>
+                    </td>
+                    <td>
+                      <StatusBadge {...paymentStatus(p)} />
+                    </td>
+                    <td>
+                      <button
+                        className="workspace-action-link"
+                        aria-label={`Review ${title(p)}`}
+                        onClick={() => setParam("focus", p._id)}
+                      >
+                        Review
+                        <ArrowUpRight size={14} />
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         )}
-
-        {/* Error Message */}
-        {error && (
-          <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-4 text-red-400">
-            {error}
+        <div className="workspace-table-footer">
+          <span>
+            {result?.totalCount ?? 0} payments · Page {cursorHistory.length}
+          </span>
+          <div className="flex gap-2">
             <button
-              onClick={() => setError(null)}
-              className="ml-4 text-red-300 hover:text-white"
+              className="workspace-button"
+              disabled={cursorHistory.length < 2}
+              onClick={() => setCursorHistory((h) => h.slice(0, -1))}
             >
-              Dismiss
+              Previous
+            </button>
+            <button
+              className="workspace-button"
+              disabled={!result?.nextCursor}
+              onClick={() => {
+                if (result?.nextCursor)
+                  setCursorHistory((h) => [...h, result.nextCursor!]);
+              }}
+            >
+              Next
             </button>
           </div>
-        )}
-
-        {/* Create Form */}
-        {isCreating && (
-          <div className="rounded-2xl border border-accent-500/30 bg-navy-900/50 p-4 sm:p-6">
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-              <div>
-                <h2 className="text-base sm:text-lg font-semibold text-white">
-                  {t('disbursements.createDisbursement')}
-                </h2>
-              </div>
-            </div>
-
-            <form onSubmit={handleCreate} className="mt-4 space-y-6">
-              <div className="grid gap-6 lg:grid-cols-[1.3fr_0.7fr]">
-                <div className="space-y-4">
-                  <div className="rounded-xl border border-white/10 bg-navy-900/40 p-4 space-y-4">
-                    <div className="flex items-center justify-between">
-                      <h3 className="text-sm font-semibold text-white">
-                        {t('disbursements.form.recipients', { defaultValue: 'Recipients' })}
-                      </h3>
-                      <span className="text-xs text-slate-400">
-                        {recipientCount} {recipientCount === 1 ? t('disbursements.form.recipient', { defaultValue: 'recipient' }) : t('disbursements.form.recipientsCount', { defaultValue: 'recipients' })}
-                      </span>
-                    </div>
-
-                    <div className="inline-flex rounded-lg border border-white/10 bg-navy-800/70 p-1 text-xs">
-                      <button
-                        type="button"
-                        onClick={() => setAddMode('beneficiary')}
-                        className={cn(
-                          'rounded-md px-3 py-1.5 transition-colors',
-                          addMode === 'beneficiary'
-                            ? 'bg-accent-500/20 text-accent-200'
-                            : 'text-slate-400 hover:text-white'
-                        )}
-                      >
-                        {t('disbursements.form.byBeneficiary', { defaultValue: 'By beneficiary' })}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setAddMode('tag')}
-                        className={cn(
-                          'rounded-md px-3 py-1.5 transition-colors',
-                          addMode === 'tag'
-                            ? 'bg-accent-500/20 text-accent-200'
-                            : 'text-slate-400 hover:text-white'
-                        )}
-                      >
-                        {t('disbursements.form.byTag', { defaultValue: 'By tag' })}
-                      </button>
-                    </div>
-
-                    {addMode === 'beneficiary' ? (
-                      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-[1.6fr_0.7fr_auto]">
-                        <div ref={beneficiaryDropdownRef} className="relative">
-                          <label className="mb-2 block text-sm font-medium text-slate-300">
-                            {t('disbursements.form.beneficiary')}
-                          </label>
-                          <div className="relative">
-                            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
-                            <input
-                              type="text"
-                              value={beneficiaryInputValue}
-                              onChange={(e) => {
-                                setBeneficiarySearch(e.target.value);
-                                setIsBeneficiaryDropdownOpen(true);
-                              }}
-                              onFocus={() => {
-                                setIsBeneficiaryDropdownOpen(true);
-                                if (selectedBeneficiaryData) {
-                                  setBeneficiarySearch('');
-                                }
-                              }}
-                              onClick={() => setIsBeneficiaryDropdownOpen(true)}
-                              placeholder={t('beneficiaries.searchPlaceholder')}
-                              className="h-11 w-full rounded-lg border border-white/10 bg-navy-800 pl-10 pr-3 text-base text-white placeholder-slate-500 focus:border-accent-500 focus:outline-none focus:ring-1 focus:ring-accent-500"
-                            />
-                            {isBeneficiaryDropdownOpen && (
-                              <div className="absolute left-0 right-0 z-50 mt-2 overflow-hidden rounded-lg border border-white/10 bg-navy-900 shadow-xl">
-                                <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/10 bg-navy-800/70 px-3 py-2 text-[11px] text-slate-400">
-                                  <span>{t('disbursements.form.filterBy', { defaultValue: 'Filter' })}</span>
-                                  <div className="flex rounded-lg border border-white/10 bg-navy-800/70 p-1">
-                                    {(['all', 'individual', 'business'] as const).map((type) => (
-                                      <button
-                                        key={type}
-                                        type="button"
-                                        onClick={() => setBeneficiaryTypeFilter(type)}
-                                        className={cn(
-                                          'rounded-md px-2.5 py-1 text-[11px] transition-colors',
-                                          beneficiaryTypeFilter === type
-                                            ? 'bg-accent-500/20 text-accent-200'
-                                            : 'text-slate-400 hover:text-white'
-                                        )}
-                                      >
-                                        {type === 'all'
-                                          ? t('common.all')
-                                          : type === 'individual'
-                                            ? t('beneficiaries.individual')
-                                            : t('beneficiaries.business')}
-                                      </button>
-                                    ))}
-                                  </div>
-                                </div>
-                                <div className="max-h-64 overflow-auto">
-                                  {beneficiaryOptions.length === 0 ? (
-                                    <div className="px-4 py-3 text-sm text-slate-500">
-                                      {t('common.noResults')}
-                                    </div>
-                                  ) : (
-                                    beneficiaryOptions.map((b) => {
-                                      const preferredChainLabel = b.preferredChainId
-                                        ? getChainName(b.preferredChainId)
-                                        : null;
-                                      const preferredLabel = [preferredChainLabel, b.preferredToken]
-                                        .filter(Boolean)
-                                        .join(' • ');
-                                      const isSelected = selectedBeneficiary === b._id;
-
-                                      return (
-                                        <button
-                                          key={b._id}
-                                          type="button"
-                                          onClick={() => handleSelectBeneficiary(b._id)}
-                                          className={cn(
-                                            'flex w-full items-center justify-between gap-3 px-4 py-3 text-left transition-colors',
-                                            isSelected
-                                              ? 'bg-accent-500/15 text-white'
-                                              : 'text-slate-300 hover:bg-navy-700/60'
-                                          )}
-                                        >
-                                          <div>
-                                            <p className="text-sm font-medium text-white">{b.name}</p>
-                                            <p className="text-xs text-slate-500 font-mono">
-                                              {b.walletAddress.slice(0, 6)}...{b.walletAddress.slice(-4)}
-                                            </p>
-                                            {preferredLabel ? (
-                                              <p className="mt-1 text-[11px] text-slate-400">
-                                                {t('disbursements.form.preferred', { defaultValue: 'Preferred' })}: {preferredLabel}
-                                              </p>
-                                            ) : null}
-                                          </div>
-                                          <span
-                                            className={cn(
-                                              'inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-medium',
-                                              (b.type ?? 'individual') === 'individual'
-                                                ? 'bg-blue-500/10 text-blue-400'
-                                                : 'bg-purple-500/10 text-purple-400'
-                                            )}
-                                          >
-                                            {(b.type ?? 'individual') === 'individual'
-                                              ? t('beneficiaries.individual')
-                                              : t('beneficiaries.business')}
-                                          </span>
-                                        </button>
-                                      );
-                                    })
-                                  )}
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                        <div>
-                          <label className="mb-2 block text-sm font-medium text-slate-300">
-                            {t('disbursements.form.amount')}
-                          </label>
-                          <input
-                            type="number"
-                            step="0.01"
-                            min="0"
-                            max={availableBalance ?? undefined}
-                            value={amount}
-                            onChange={(e) => setAmount(e.target.value)}
-                            placeholder="0.00"
-                            className="h-11 w-full rounded-lg border border-white/10 bg-navy-800 px-4 text-base text-white placeholder-slate-500 focus:border-accent-500 focus:outline-none focus:ring-1 focus:ring-accent-500"
-                            required={!isBatchMode}
-                          />
-                          <p className={cn(
-                            'mt-1 text-xs',
-                            availableBalance != null && parseFloat(amount || '0') > availableBalance
-                              ? 'text-red-400'
-                              : 'text-transparent'
-                          )}>
-                            {availableBalance != null && parseFloat(amount || '0') > availableBalance
-                              ? 'Insufficient balance'
-                              : ' '}
-                          </p>
-                        </div>
-                        <div className="flex flex-col">
-                          <span className="mb-2 h-5" aria-hidden="true" />
-                          <Button
-                            type="button"
-                            variant="secondary"
-                            onClick={addRecipient}
-                            disabled={!selectedBeneficiary || !amount || parseFloat(amount) <= 0}
-                            className="h-11"
-                          >
-                            <Plus className="mr-2 h-4 w-4" />
-                            {recipients.length > 0
-                              ? t('disbursements.batch.addAnother', { defaultValue: 'Add another beneficiary' })
-                              : t('disbursements.batch.startBatch', { defaultValue: 'Add to batch' })}
-                          </Button>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="space-y-3">
-                        <TagInput
-                          availableTags={availableTags ?? []}
-                          value={selectedTags}
-                          onChange={setSelectedTags}
-                          placeholder={t('disbursements.form.selectTagsPlaceholder')}
-                          allowCreate={false}
-                        />
-                        <div className="flex items-center justify-between text-xs text-slate-400">
-                          <span>
-                            {t('disbursements.form.tagMatches', { count: beneficiariesByTag.length })}
-                          </span>
-                          <Button
-                            type="button"
-                            variant="secondary"
-                            size="sm"
-                            onClick={addRecipientsByTag}
-                            disabled={selectedTags.length === 0}
-                            className="h-9"
-                          >
-                            {t('disbursements.form.addTaggedBeneficiaries')}
-                          </Button>
-                        </div>
-                      </div>
-                    )}
-
-                    <div className="rounded-lg border border-white/10 bg-navy-900/40 p-3">
-                      <div className="flex flex-wrap items-center justify-between gap-2">
-                        <h4 className="text-xs font-semibold uppercase tracking-wide text-slate-400">
-                          {t('disbursements.form.paymentSettings', { defaultValue: 'Payment settings' })}
-                        </h4>
-                        {availableBalance != null && (
-                          <span className="text-xs text-slate-400">
-                            {t('disbursements.form.availableBalance', { defaultValue: 'Available' })}:{' '}
-                            <span className="font-mono text-slate-300">
-                              {availableBalance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {token}
-                            </span>
-                          </span>
-                        )}
-                      </div>
-                      <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                        <div>
-                          <label className="mb-2 block text-sm font-medium text-slate-300">
-                            {t('disbursements.filters.chain', { defaultValue: 'Chain' })}
-                          </label>
-                          <select
-                            value={createChainId}
-                            onChange={(e) => {
-                              const newChainId = Number(e.target.value);
-                              const symbols = getTokenSymbolsForChain(newChainId);
-                              setManualPaymentOverride(true);
-                              setPreferredAppliedFor(selectedBeneficiaryData?._id ?? null);
-                              setCreateChainId(newChainId);
-                              setToken(symbols.includes(token) ? token : symbols[0] ?? 'USDC');
-                            }}
-                            disabled={recipients.length > 0}
-                            className={cn(
-                              'w-full rounded-lg border border-white/10 bg-navy-800 px-4 py-3 text-base text-white focus:border-accent-500 focus:outline-none focus:ring-1 focus:ring-accent-500',
-                              recipients.length > 0 && 'cursor-not-allowed opacity-60'
-                            )}
-                          >
-                            {CHAINS_LIST.filter((c) => safes?.some((s) => s.chainId === c.chainId)).map((c) => (
-                              <option key={c.chainId} value={c.chainId}>
-                                {c.chainName}
-                              </option>
-                            ))}
-                          </select>
-                        </div>
-                        <div>
-                          <label className="mb-2 block text-sm font-medium text-slate-300">
-                            Token
-                          </label>
-                          <select
-                            value={token}
-                            onChange={(e) => {
-                              setManualPaymentOverride(true);
-                              setPreferredAppliedFor(selectedBeneficiaryData?._id ?? null);
-                              setToken(e.target.value);
-                            }}
-                            disabled={recipients.length > 0}
-                            className={cn(
-                              'w-full rounded-lg border border-white/10 bg-navy-800 px-4 py-3 text-base text-white focus:border-accent-500 focus:outline-none focus:ring-1 focus:ring-accent-500',
-                              recipients.length > 0 && 'cursor-not-allowed opacity-60'
-                            )}
-                          >
-                            {Object.keys(getTokensForChain(createChainId)).map((sym) => (
-                              <option key={sym} value={sym}>{sym}</option>
-                            ))}
-                          </select>
-                        </div>
-                      </div>
-                      {recipients.length > 0 && (
-                        <p className="mt-2 text-xs text-slate-500">
-                          {t('disbursements.form.paymentLocked', { defaultValue: 'Chain and token are locked to the first recipient in the batch.' })}
-                        </p>
-                      )}
-                    </div>
-
-                    <p className="text-xs text-slate-500">
-                      {t('disbursements.form.batchHint', { defaultValue: 'Optional: add more beneficiaries to create a batch.' })}
-                    </p>
-                  </div>
-
-                  <div className="rounded-xl border border-white/10 bg-navy-900/40 p-4">
-                    <h3 className="mb-3 text-sm font-semibold text-white">
-                      {t('disbursements.form.details', { defaultValue: 'Details' })}
-                    </h3>
-                    <div className="grid gap-3 sm:grid-cols-2">
-                      <div>
-                        <label className="mb-2 block text-sm font-medium text-slate-300">
-                          {t('disbursements.form.memo')} ({t('common.optional')})
-                        </label>
-                        <input
-                          type="text"
-                          value={memo}
-                          onChange={(e) => setMemo(e.target.value)}
-                          placeholder={t('disbursements.form.memoPlaceholder')}
-                          className="w-full rounded-lg border border-white/10 bg-navy-800 px-4 py-3 text-base text-white placeholder-slate-500 focus:border-accent-500 focus:outline-none focus:ring-1 focus:ring-accent-500"
-                        />
-                      </div>
-                      <div>
-                        <label className="mb-2 block text-sm font-medium text-slate-300">
-                          {t('disbursements.form.scheduleFor')} ({t('common.optional')})
-                        </label>
-                        <input
-                          type="datetime-local"
-                          value={scheduledAt}
-                          onChange={(e) => {
-                            const nextValue = e.target.value;
-                            setScheduledAt(nextValue);
-                            setScheduledAtError(validateScheduledAt(nextValue));
-                          }}
-                          className="w-full rounded-lg border border-white/10 bg-navy-800 px-4 py-3 text-base text-white placeholder-slate-500 focus:border-accent-500 focus:outline-none focus:ring-1 focus:ring-accent-500"
-                        />
-                        {scheduledAtError ? (
-                          <p className="mt-1 text-xs text-red-400">
-                            {scheduledAtError}
-                          </p>
-                        ) : scheduledAt ? (
-                          <p className="mt-1 text-xs text-slate-400">
-                            {t('disbursements.form.scheduleNote')}
-                          </p>
-                        ) : null}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="space-y-4">
-                  <div className="rounded-xl border border-white/10 bg-navy-900/40 p-4 space-y-3">
-                    <div className="flex items-center justify-between">
-                      <h3 className="text-sm font-semibold text-white">
-                        {t('disbursements.form.currentBatch', { defaultValue: 'Current batch' })}
-                      </h3>
-                      <span className="text-xs text-slate-400">
-                        {recipientCount} {recipientCount === 1 ? t('disbursements.form.recipient', { defaultValue: 'recipient' }) : t('disbursements.form.recipientsCount', { defaultValue: 'recipients' })}
-                      </span>
-                    </div>
-
-                    <div className="rounded-lg border border-accent-500/30 bg-accent-500/10 p-3">
-                      <div className="flex items-center justify-between text-xs text-slate-300">
-                        <span>{t('disbursements.form.totalAmount', { defaultValue: 'Total amount' })}</span>
-                        <span className="font-mono text-white">{batchTotal.toFixed(2)} {token}</span>
-                      </div>
-                      <div className="mt-1 flex items-center justify-between text-[11px] text-slate-400">
-                        <span>{t('disbursements.form.recipientCount', { defaultValue: 'Recipients' })}: {recipientCount}</span>
-                        {availableBalance != null && (
-                          <span>
-                            {t('disbursements.form.availableBalance', { defaultValue: 'Available' })}:{' '}
-                            <span className="font-mono text-slate-300">
-                              {availableBalance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {token}
-                            </span>
-                          </span>
-                        )}
-                      </div>
-                    </div>
-
-                    {recipients.length === 0 && !hasDraftRecipient && (
-                      <div className="rounded-lg border border-dashed border-white/10 bg-navy-900/40 p-3 text-center text-xs text-slate-500">
-                        {t('disbursements.form.noRecipients', { defaultValue: 'No recipients added yet.' })}
-                      </div>
-                    )}
-
-                    {(recipients.length > 0 || hasDraftRecipient) && (
-                      <div className="space-y-2 max-h-[360px] overflow-auto pr-1">
-                        {recipients.map((recipient, index) => {
-                          const recipientBeneficiary = beneficiaries?.find(b => b._id === recipient.beneficiaryId);
-                          return (
-                            <div
-                              key={`recipient-${index}-${recipient.beneficiaryId}`}
-                              className="flex items-center gap-3 rounded-lg border border-white/10 bg-navy-800/60 p-3"
-                            >
-                              <div className="min-w-0 flex-1">
-                                <p className="truncate text-sm font-medium text-white">
-                                  {recipientBeneficiary?.name || 'Unknown'}
-                                </p>
-                                {recipientBeneficiary && (
-                                  <p className="text-xs text-slate-500 font-mono">
-                                    {recipientBeneficiary.walletAddress.slice(0, 6)}...{recipientBeneficiary.walletAddress.slice(-4)}
-                                  </p>
-                                )}
-                              </div>
-                              <div className="w-24">
-                                <input
-                                  type="number"
-                                  step="0.01"
-                                  min="0"
-                                  max={availableBalance ?? undefined}
-                                  value={recipient.amount}
-                                  onChange={(e) => updateRecipientAmount(index, e.target.value)}
-                                  placeholder="0.00"
-                                  className="h-9 w-full rounded-lg border border-white/10 bg-navy-800 px-2 text-sm text-white placeholder-slate-500 focus:border-accent-500 focus:outline-none focus:ring-1 focus:ring-accent-500"
-                                />
-                              </div>
-                              <button
-                                type="button"
-                                onClick={() => removeRecipient(index)}
-                                className="text-slate-400 hover:text-red-400 transition-colors"
-                                title={t('disbursements.batch.remove')}
-                              >
-                                <X className="h-4 w-4" />
-                              </button>
-                            </div>
-                          );
-                        })}
-                        {hasDraftRecipient && (
-                          <div className="flex items-center gap-3 rounded-lg border border-dashed border-white/10 bg-navy-900/40 p-3">
-                            <div className="min-w-0 flex-1">
-                              <p className="text-xs text-slate-500">
-                                {t('disbursements.form.draft', { defaultValue: 'Draft' })}
-                              </p>
-                              <p className="truncate text-sm font-medium text-white">
-                                {beneficiaries?.find(b => b._id === selectedBeneficiary)?.name || 'Unknown'}
-                              </p>
-                            </div>
-                            <span className="text-xs font-mono text-slate-300">
-                              {amount} {token}
-                            </span>
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex flex-col sm:flex-row gap-3">
-                <Button type="submit" className="w-full sm:w-auto h-11">{t('disbursements.createDisbursement')}</Button>
-                <Button
-                  type="button"
-                  variant="secondary"
-                  onClick={resetForm}
-                  className="w-full sm:w-auto h-11"
-                >
-                  {t('common.cancel')}
-                </Button>
-              </div>
-            </form>
-          </div>
-        )}
-
-        {/* Disbursements List */}
-        {displayedResult?.items.length === 0 && !hasActiveFilters ? (
-          <div className="rounded-2xl border border-dashed border-white/20 bg-navy-900/30 p-8 text-center">
-            <Send className="mx-auto h-12 w-12 text-slate-500" />
-            <h3 className="mt-4 text-lg font-medium text-white">
-              {t('disbursements.noDisbursements.title')}
-            </h3>
-            <p className="mt-2 text-slate-400">
-              {t('disbursements.noDisbursements.description')}
-            </p>
-          </div>
-        ) : displayedResult?.items.length === 0 && hasActiveFilters ? (
-          <div className="rounded-2xl border border-dashed border-white/20 bg-navy-900/30 p-8 text-center">
-            <Search className="mx-auto h-12 w-12 text-slate-500" />
-            <h3 className="mt-4 text-lg font-medium text-white">
-              {t('disbursements.noResults.title')}
-            </h3>
-            <p className="mt-2 text-slate-400">
-              {t('disbursements.noResults.description')}
-            </p>
-            <Button variant="secondary" onClick={clearFilters} className="mt-4">
-              {t('common.clearFilters')}
-            </Button>
-          </div>
-        ) : (
-          <div className={`rounded-2xl border border-white/10 bg-navy-900/50 overflow-hidden transition-opacity ${isRefreshing ? 'opacity-70' : ''}`}>
-            {/* Desktop Table */}
-            <div className="hidden lg:block overflow-x-auto">
-              <table className="w-full">
-                <thead>
-                  <tr className="border-b border-white/10 bg-navy-800/50">
-                    <th className="px-6 py-4 text-left text-sm font-medium text-slate-400">
-                      {t('disbursements.table.beneficiary')}
-                    </th>
-                    <th 
-                      className="px-6 py-4 text-left text-sm font-medium text-slate-400 cursor-pointer hover:text-white transition-colors"
-                      onClick={() => handleSort('amount')}
-                    >
-                      <span className="flex items-center gap-1">
-                        {t('disbursements.table.amount')}
-                        {sortBy === 'amount' && (
-                          sortOrder === 'desc' ? <ChevronDown className="h-4 w-4" /> : <ChevronUp className="h-4 w-4" />
-                        )}
-                      </span>
-                    </th>
-                    <th className="px-6 py-4 text-left text-sm font-medium text-slate-400">
-                      {t('disbursements.table.chain', { defaultValue: 'Chain' })}
-                    </th>
-                    <th className="px-6 py-4 text-left text-sm font-medium text-slate-400">
-                      {t('disbursements.table.memo')}
-                    </th>
-                    <th 
-                      className="px-6 py-4 text-left text-sm font-medium text-slate-400 cursor-pointer hover:text-white transition-colors"
-                      onClick={() => handleSort('status')}
-                    >
-                      <span className="flex items-center gap-1">
-                        {t('disbursements.table.status')}
-                        {sortBy === 'status' && (
-                          sortOrder === 'desc' ? <ChevronDown className="h-4 w-4" /> : <ChevronUp className="h-4 w-4" />
-                        )}
-                      </span>
-                    </th>
-                    <th
-                      className="px-6 py-4 text-left text-sm font-medium text-slate-400 cursor-pointer hover:text-white transition-colors"
-                      onClick={() => handleSort('scheduledAt')}
-                    >
-                      <span className="flex items-center gap-1">
-                        {t('disbursements.table.scheduledFor')}
-                        {sortBy === 'scheduledAt' && (
-                          sortOrder === 'desc' ? <ChevronDown className="h-4 w-4" /> : <ChevronUp className="h-4 w-4" />
-                        )}
-                      </span>
-                    </th>
-                    <th 
-                      className="px-6 py-4 text-left text-sm font-medium text-slate-400 cursor-pointer hover:text-white transition-colors"
-                      onClick={() => handleSort('createdAt')}
-                    >
-                      <span className="flex items-center gap-1">
-                        {t('disbursements.table.date')}
-                        {sortBy === 'createdAt' && (
-                          sortOrder === 'desc' ? <ChevronDown className="h-4 w-4" /> : <ChevronUp className="h-4 w-4" />
-                        )}
-                      </span>
-                    </th>
-                    <th className="px-6 py-4 text-center text-sm font-medium text-slate-400">
-                      {t('disbursements.table.actions')}
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-white/5">
-                  {displayedResult?.items.map((disbursement) => {
-                    const isBatch = disbursement.type === 'batch';
-                    const displayAmount = isBatch ? (disbursement.totalAmount || disbursement.amount || '0') : (disbursement.amount || '0');
-                    return (
-                      <tr key={disbursement._id} className="hover:bg-navy-800/30">
-                      <td className="px-6 py-4">
-                        <button
-                          onClick={() => setSelectedDisbursementId(disbursement._id)}
-                          className="font-medium text-white hover:text-accent-400 transition-colors text-left"
-                        >
-                          {disbursement.beneficiary?.name || 'Unknown'}
-                        </button>
-                      </td>
-                        <td className="px-6 py-4">
-                          <span className="font-mono text-white">
-                            {displayAmount} {disbursement.token}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4">
-                          {disbursement.chainId != null ? (
-                            <span className="rounded-full bg-navy-700 px-2 py-0.5 text-xs text-slate-400">
-                              {getChainName(disbursement.chainId)}
-                            </span>
-                          ) : (
-                            <span className="text-slate-500">—</span>
-                          )}
-                        </td>
-                        <td className="px-6 py-4 text-slate-400 max-w-xs truncate" title={disbursement.memo || undefined}>
-                          {disbursement.memo || '-'}
-                        </td>
-                        <td className="px-6 py-4">
-                          <span
-                            className={`inline-flex rounded-full px-3 py-1 text-xs font-medium capitalize ${getStatusColor(
-                              disbursement.status
-                            )}`}
-                          >
-                            {t(`status.${disbursement.status}`)}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4 text-slate-400 text-xs whitespace-nowrap">
-                          {disbursement.scheduledAt
-                            ? new Date(disbursement.scheduledAt).toLocaleString()
-                            : <span className="text-slate-600">—</span>}
-                        </td>
-                        <td className="px-6 py-4 text-slate-400">
-                          {new Date(disbursement.createdAt).toLocaleDateString()}
-                        </td>
-                      <td className="px-6 py-4">
-                        {renderActionButton(disbursement)}
-                      </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-
-            {/* Mobile Cards */}
-            <div className="lg:hidden divide-y divide-white/5">
-              {displayedResult?.items.map((disbursement) => {
-                const isBatch = disbursement.type === 'batch';
-                const displayAmount = isBatch ? (disbursement.totalAmount || disbursement.amount || '0') : (disbursement.amount || '0');
-                return (
-                  <div key={disbursement._id} className="p-4 space-y-3">
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1 min-w-0">
-                        <button
-                          onClick={() => setSelectedDisbursementId(disbursement._id)}
-                          className="font-medium text-white hover:text-accent-400 transition-colors text-left"
-                        >
-                          {disbursement.beneficiary?.name || 'Unknown'}
-                        </button>
-                        <span className="font-mono text-sm text-slate-400 mt-1 block">
-                          {displayAmount} {disbursement.token}
-                          {disbursement.chainId != null && (
-                            <span className="ml-2 rounded-full bg-navy-700 px-2 py-0.5 text-xs text-slate-500">
-                              {getChainName(disbursement.chainId)}
-                            </span>
-                          )}
-                        </span>
-                      </div>
-                      <span
-                        className={`ml-2 inline-flex rounded-full px-2.5 py-1 text-xs font-medium capitalize shrink-0 ${getStatusColor(
-                          disbursement.status
-                        )}`}
-                      >
-                        {t(`status.${disbursement.status}`)}
-                      </span>
-                      {disbursement.status === 'scheduled' && disbursement.scheduledAt && (
-                        <span className="ml-2 text-xs text-slate-500">
-                          {new Date(disbursement.scheduledAt).toLocaleString()}
-                        </span>
-                      )}
-                    </div>
-                    
-                    {disbursement.memo && (
-                      <div>
-                        <p className="text-xs text-slate-500 mb-1">{t('disbursements.table.memo')}</p>
-                        <p className="text-sm text-slate-400">{disbursement.memo}</p>
-                      </div>
-                    )}
-
-                    {disbursement.scheduledAt && (
-                      <div>
-                        <p className="text-xs text-slate-500 mb-0.5">
-                          {t('disbursements.table.scheduledFor')}
-                        </p>
-                        <p className="text-sm text-yellow-400">
-                          {new Date(disbursement.scheduledAt).toLocaleString()}
-                        </p>
-                      </div>
-                    )}
-                    
-                    <div className="flex items-center justify-between pt-2 border-t border-white/5">
-                      <div className="text-sm text-slate-400">
-                        {new Date(disbursement.createdAt).toLocaleDateString()}
-                      </div>
-                      <div>
-                        {renderActionButton(disbursement)}
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-
-            {/* Pagination */}
-            {displayedResult && displayedResult.totalCount > PAGE_SIZE && (
-              <div className="flex flex-col sm:flex-row items-center justify-between gap-4 border-t border-white/10 bg-navy-800/30 px-4 sm:px-6 py-4">
-                <div className="text-sm text-slate-400 text-center sm:text-left">
-                  {t('disbursements.pagination.showing', {
-                    from: currentPage * PAGE_SIZE + 1,
-                    to: Math.min((currentPage + 1) * PAGE_SIZE, displayedResult.totalCount),
-                    total: displayedResult.totalCount
-                  })}
-                </div>
-                <div className="flex items-center gap-2">
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    onClick={goToPrevPage}
-                    disabled={currentPage === 0}
-                    className="h-11"
-                  >
-                    <ChevronLeft className="h-4 w-4" />
-                    <span className="hidden sm:inline">{t('common.previous')}</span>
-                  </Button>
-                  <span className="px-3 py-1 text-sm text-slate-400">
-                    {t('disbursements.pagination.page', {
-                      current: currentPage + 1,
-                      total: Math.ceil(displayedResult.totalCount / PAGE_SIZE)
-                    })}
-                  </span>
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    onClick={goToNextPage}
-                    disabled={!displayedResult.hasMore}
-                    className="h-11"
-                  >
-                    <span className="hidden sm:inline">{t('common.next')}</span>
-                    <ChevronRight className="h-4 w-4" />
-                  </Button>
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Batch Detail Modal */}
-        {selectedDisbursementId && (
-          <BatchDetailModal
-            disbursementId={selectedDisbursementId}
-            onClose={closeDetailModal}
-            renderActions={renderActionButtonsDetailed}
-          />
-        )}
-
-        {/* Cancel Confirmation Modal */}
-        {cancelDisbursementId && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={() => setCancelDisbursementId(null)}>
-            <div
-              className="rounded-2xl border border-white/10 bg-navy-900 p-6 max-w-md w-full"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-lg font-semibold text-white">
-                  {t('disbursements.actions.cancel')} Disbursement
-                </h2>
-                <button
-                  onClick={() => setCancelDisbursementId(null)}
-                  className="text-slate-400 hover:text-white transition-colors"
-                >
-                  <X className="h-5 w-5" />
-                </button>
-              </div>
-
-              <p className="text-sm text-slate-300 mb-6">
-                {t('disbursements.actions.cancelConfirm')}
-              </p>
-
-              <div className="flex flex-col sm:flex-row gap-3 sm:justify-end">
-                <Button
-                  variant="secondary"
-                  onClick={() => setCancelDisbursementId(null)}
-                  className="w-full sm:w-auto"
-                >
-                  {t('common.cancel')}
-                </Button>
-                <Button
-                  onClick={confirmCancel}
-                  className="w-full sm:w-auto bg-red-500 hover:bg-red-600 text-white"
-                >
-                  Yes, Cancel Disbursement
-                </Button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Reschedule Modal */}
-        {rescheduleDisbursementId && (
-          <div
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
-            onClick={() => {
-              setRescheduleDisbursementId(null);
-              setNewScheduledAt('');
-              setNewScheduledAtError(null);
-            }}
-          >
-            <div
-              className="rounded-2xl border border-white/10 bg-navy-900 p-6 max-w-md w-full"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-lg font-semibold text-white">
-                  {t('disbursements.actions.rescheduleTitle')}
-                </h2>
-                <button
-                  onClick={() => {
-                    setRescheduleDisbursementId(null);
-                    setNewScheduledAt('');
-                    setNewScheduledAtError(null);
-                  }}
-                  className="text-slate-400 hover:text-white transition-colors"
-                >
-                  <X className="h-5 w-5" />
-                </button>
-              </div>
-
-              <p className="text-sm text-slate-300 mb-4">
-                {t('disbursements.actions.rescheduleConfirm')}
-              </p>
-
-              <div className="mb-6">
-                <label className="mb-2 block text-sm font-medium text-slate-300">
-                  {t('disbursements.form.scheduleFor')}
-                </label>
-                <input
-                  type="datetime-local"
-                  value={newScheduledAt}
-                  onChange={(e) => {
-                    const nextValue = e.target.value;
-                    setNewScheduledAt(nextValue);
-                    setNewScheduledAtError(validateScheduledAt(nextValue));
-                  }}
-                  className="w-full rounded-lg border border-white/10 bg-navy-800 px-4 py-3 text-base text-white placeholder-slate-500 focus:border-accent-500 focus:outline-none focus:ring-1 focus:ring-accent-500"
-                />
-                {newScheduledAtError && (
-                  <p className="mt-1 text-xs text-red-400">
-                    {newScheduledAtError}
-                  </p>
-                )}
-              </div>
-
-              <div className="flex flex-col sm:flex-row gap-3 sm:justify-end">
-                <Button
-                  variant="secondary"
-                  onClick={() => {
-                    setRescheduleDisbursementId(null);
-                    setNewScheduledAt('');
-                  }}
-                  className="w-full sm:w-auto"
-                >
-                  {t('common.cancel')}
-                </Button>
-                <Button
-                  onClick={handleReschedule}
-                  className="w-full sm:w-auto"
-                >
-                  {t('disbursements.actions.reschedule')}
-                </Button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Screening Warning Modal */}
-        {screeningWarning && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={() => setScreeningWarning(null)}>
-            <div
-              className="rounded-2xl border border-yellow-500/30 bg-navy-900 p-6 max-w-md w-full"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-lg font-semibold text-yellow-400">
-                  SDN Screening Warning
-                </h2>
-                <button
-                  onClick={() => setScreeningWarning(null)}
-                  className="text-slate-400 hover:text-white transition-colors"
-                >
-                  <X className="h-5 w-5" />
-                </button>
-              </div>
-
-              <div className="mb-6 space-y-3">
-                <p className="text-sm text-slate-300">
-                  The following beneficiary(ies) have potential or confirmed SDN matches:
-                </p>
-                <ul className="space-y-2">
-                  {screeningWarning.flagged.map((f) => (
-                    <li key={f.beneficiaryId} className="rounded-lg bg-yellow-500/10 border border-yellow-500/30 p-3">
-                      <p className="text-sm font-medium text-white">{f.beneficiaryName}</p>
-                      <p className="text-xs text-yellow-400 capitalize">{f.status.replace('_', ' ')}</p>
-                    </li>
-                  ))}
-                </ul>
-                <p className="text-sm text-slate-400">
-                  Proceeding with this transaction may violate sanctions regulations. Please review the screening results before continuing.
-                </p>
-              </div>
-
-              <div className="flex flex-col sm:flex-row gap-3 sm:justify-end">
-                <Button
-                  variant="secondary"
-                  onClick={() => setScreeningWarning(null)}
-                  className="w-full sm:w-auto"
-                >
-                  Cancel
-                </Button>
-                <Button
-                  onClick={async () => {
-                    const warning = screeningWarning;
-                    setScreeningWarning(null);
-                    if (!warning) return;
-
-                    if (warning.action === 'create') {
-                      // Re-create the form event and call handleCreate with skipScreening=true
-                      const fakeEvent = { preventDefault: () => {} } as React.FormEvent;
-                      await handleCreate(fakeEvent, true);
-                    } else if (warning.action === 'propose') {
-                      await handlePropose(warning.data.disbursement, true);
-                    } else if (warning.action === 'execute') {
-                      await handleExecute(warning.data.disbursement, true);
-                    }
-                  }}
-                  className="w-full sm:w-auto bg-yellow-500 hover:bg-yellow-600 text-navy-900 font-medium"
-                >
-                  Proceed Anyway
-                </Button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Screening Block Modal */}
-        {screeningBlock && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={() => setScreeningBlock(null)}>
-            <div
-              className="rounded-2xl border border-red-500/30 bg-navy-900 p-6 max-w-md w-full"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-lg font-semibold text-red-400">
-                  SDN Screening Block
-                </h2>
-                <button
-                  onClick={() => setScreeningBlock(null)}
-                  className="text-slate-400 hover:text-white transition-colors"
-                >
-                  <X className="h-5 w-5" />
-                </button>
-              </div>
-
-              <div className="mb-6 space-y-3">
-                <p className="text-sm text-slate-300">
-                  The following beneficiary(ies) have unresolved SDN matches and cannot be processed:
-                </p>
-                <ul className="space-y-2">
-                  {screeningBlock.flagged.map((f) => (
-                    <li key={f.beneficiaryId} className="rounded-lg bg-red-500/10 border border-red-500/30 p-3">
-                      <p className="text-sm font-medium text-white">{f.beneficiaryName}</p>
-                      <p className="text-xs text-red-400 capitalize">{f.status.replace('_', ' ')}</p>
-                    </li>
-                  ))}
-                </ul>
-                <p className="text-sm text-slate-400">
-                  An admin must review and resolve the screening results before this {screeningBlock.action === 'create' ? 'disbursement can be created' : screeningBlock.action === 'propose' ? 'transaction can be proposed' : 'transaction can be executed'}.
-                </p>
-              </div>
-
-              <div className="flex justify-end">
-                <Button
-                  variant="secondary"
-                  onClick={() => setScreeningBlock(null)}
-                  className="w-full sm:w-auto"
-                >
-                  Close
-                </Button>
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
-    </AppLayout>
+        </div>
+      </section>
+      {params.get("new") === "1" && canManage && (
+        <PaymentBatchForm
+          orgId={orgId as Id<"orgs">}
+          initialPurpose="other"
+          initialSafeId={params.get("account") as Id<"safes"> | undefined}
+          initialChainId={
+            params.has("chain") ? Number(params.get("chain")) : undefined
+          }
+          onClose={() => setParam("new")}
+        />
+      )}
+      {params.get("focus") && (
+        <PaymentReview
+          key={params.get("focus")}
+          id={params.get("focus") as Id<"disbursements">}
+          orgId={orgId as Id<"orgs">}
+          safes={safes}
+          org={org}
+          canManage={canManage}
+          onClose={() => setParam("focus")}
+        />
+      )}
+    </>
   );
 }
+import { paymentStatus } from '../../shared/paymentQueue';

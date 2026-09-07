@@ -61,128 +61,128 @@
       "tryForFree": "Try For Free"
     },
     "hero": {
-      "badge": "Non-custodial & Safe-powered",
-      "title": "Treasury Management for",
-      "titleHighlight": "Web3 Teams",
-      "subtitle": "Streamline stablecoin disbursements with enterprise-grade security. Schedule payments, run gasless transactions, and maintain complete audit trails—all without ever giving up control of your keys.",
+      "badge": "Business payments, under your control",
+      "title": "Pay your people.",
+      "titleHighlight": "Stay in control.",
+      "subtitle": "Import your recipients, prepare payroll and vendor payments, and keep approvals and records in one place. Stablecoins handle settlement. Your team keeps control of the funds.",
       "tryForFree": "Try For Free",
       "learnMore": "Learn More",
-      "trustIndicators": "Powered by industry-leading security"
+      "trustIndicators": "Settlement powered by Safe and stablecoins"
     },
     "features": {
       "title": "Features",
       "subtitle": "Everything you need to manage treasury operations",
-      "description": "Built for finance teams who need compliance, automation, and control over their treasury.",
+      "description": "A familiar place to prepare, approve and reconcile business payments.",
       "nonCustodial": {
-        "title": "Non-Custodial",
-        "description": "Your keys, your funds. We never have access to your private keys or assets."
+        "title": "Your funds stay yours",
+        "description": "Your organization controls its account and signing keys. Disburse does not take custody of your funds."
       },
       "safePowered": {
-        "title": "Safe-Powered",
-        "description": "Built on Gnosis Safe, the most trusted smart contract wallet in Web3."
+        "title": "Shared approvals",
+        "description": "Account owners review and sign payments in Disburse. Set the number of signatures your account requires."
       },
       "sanctionsScreening": {
-        "title": "Sanctions Screening",
-        "description": "OFAC/SDN screening protects against sanctioned entities. Configurable enforcement levels ensure compliance while maintaining workflow flexibility."
+        "title": "Recipient screening",
+        "description": "Review potential sanctions matches before approval. Choose whether matches warn or block payments; screening does not replace your compliance process."
       },
       "auditTrail": {
-        "title": "Audit Trail",
-        "description": "Complete transaction history with immutable on-chain records for compliance."
+        "title": "Payment history",
+        "description": "Track preparation, approvals and verified settlement, with records your team can export."
       },
       "scheduledPayments": {
-        "title": "Scheduled Payments",
-        "description": "Schedule, reschedule, and cancel disbursements ahead of time with clear approvals and visibility."
+        "title": "Pay on your schedule",
+        "description": "Set a pay date and collect approvals in advance. Recurring instructions prepare a fresh draft for each cycle."
       },
       "gaslessTransactions": {
-        "title": "Gasless Transactions",
-        "description": "Pay network fees using stablecoins so operators never need to hold native tokens."
+        "title": "Fees in the same workflow",
+        "description": "Review a separate stablecoin payment fee before signing. Managed execution is available on supported networks."
       },
       "batchTransactions": {
-        "title": "Batch Transactions",
-        "description": "Send payments to multiple recipients in a single transaction. Reduce gas costs and streamline payroll-style disbursements."
+        "title": "One person or a whole team",
+        "description": "Select saved recipients once. Compatible payouts travel together, while different currencies and networks stay in separate batches."
       },
       "bulkImport": {
-        "title": "Bulk Import",
-        "description": "Upload beneficiaries via CSV with validation, required fields, and duplicate checks."
+        "title": "Bring your recipient list",
+        "description": "Import a CSV or spreadsheet export, map its columns, and review duplicates and missing payout details before saving."
       },
       "beneficiaryTags": {
-        "title": "Beneficiary Tags",
-        "description": "Create tagged cohorts and launch repeat disbursement runs in seconds."
+        "title": "Reusable recipient groups",
+        "description": "Group employees, contractors and vendors so the next payment starts with the right people."
       },
       "reporting": {
-        "title": "Reporting & Exports",
-        "description": "Generate finance-ready reports and export records for reconciliation."
+        "title": "Reconcile and export",
+        "description": "Review incoming funds, outgoing payments and fees by currency. Export exact amounts and transaction references."
       },
       "stablecoinNative": {
-        "title": "Stablecoin Native",
-        "description": "First-class support for USDC and USDT with more tokens coming soon."
+        "title": "Saved payout instructions",
+        "description": "Keep each recipient’s requested currency, network and address attached to their record. No repeated copying and pasting."
       },
       "roleBasedAccess": {
-        "title": "Role-Based Access",
-        "description": "Granular permissions for your team. Admins, approvers, initiators, and more."
+        "title": "Team roles and spending limits",
+        "description": "Separate preparation from approval. Grant eligible members an account allowance for delegated payments."
       },
       "simpleBilling": {
         "title": "Simple Billing",
         "description": "Pay for the platform in stablecoins. No credit cards or bank accounts needed."
       },
       "section1": {
-        "badge": "Security & Compliance",
-        "title": "Enterprise-grade security,",
-        "titleHighlight": "built-in"
+        "badge": "Team controls",
+        "title": "Clear responsibilities.",
+        "titleHighlight": "Shared control."
       },
       "section2": {
-        "title": "Powerful operations,",
-        "titleHighlight": "simplified",
-        "description": "Automate payouts, reduce gas overhead, and run high-volume disbursements with confidence."
+        "title": "A payment workflow",
+        "titleHighlight": "your team can follow",
+        "description": "Prepare contractor payroll and vendor payments, review the details, then follow each payment through settlement."
       },
       "section3": {
-        "title": "Everything you need",
-        "description": "Built for finance teams who demand clarity and control"
+        "title": "Less preparation. Clearer records.",
+        "description": "Keep recipient instructions, payment history and exports together."
       },
       "badges": {
-        "compliance": "Compliance",
+        "compliance": "Screening",
         "efficient": "Efficient",
         "automation": "Automation",
-        "gasless": "Gasless"
+        "gasless": "Stablecoin fees"
       }
     },
     "howItWorks": {
       "title": "How It Works",
-      "subtitle": "Get started in minutes",
-      "description": "Three simple steps to streamline your treasury operations.",
+      "subtitle": "From recipient list to payment",
+      "description": "Prepare payments in Disburse and approve them with your organization’s account.",
       "step1": {
         "number": "01",
-        "title": "Connect Your Safe",
-        "description": "Link your existing Gnosis Safe or create a new one. Your keys stay with you."
+        "title": "Connect your funding account",
+        "description": "Link an existing Safe account. Its owners and approval threshold remain in control."
       },
       "step2": {
         "number": "02",
-        "title": "Add Beneficiaries",
-        "description": "Set up your payment recipients with wallet addresses and optional metadata."
+        "title": "Import your recipients",
+        "description": "Bring your employee or vendor export, map the columns and complete any missing payout instructions."
       },
       "step3": {
         "number": "03",
-        "title": "Send or Schedule",
-        "description": "Execute or schedule stablecoin disbursements with gasless options and full audit trails."
+        "title": "Review, approve and pay",
+        "description": "Prepare one payment or a batch, review recipients and fees, then collect the required signatures. Schedule approved payments for later."
       }
     },
     "pricing": {
       "badge": "Pricing",
       "title": "Transparent pricing that scales",
       "subtitle": "Pick a plan that fits your team and pay in stablecoins.",
-      "popular": "Most popular",
+      "popular": "For small teams",
       "cta": "Start free trial",
-      "note": "All plans include core treasury tools, audit trails, and compliance workflows."
+      "note": "Core payments remain available without a subscription. You pay all network and provider fees. No automatic subscription charges."
     },
     "cta": {
       "badge": "30-day free trial",
-      "title": "Ready to streamline your treasury?",
-      "description": "Join teams already using Disburse to manage their stablecoin operations with confidence and control.",
+      "title": "Make your next pay run easier",
+      "description": "Start with your existing recipient list. Review the workflow with your team before moving funds.",
       "tryForFree": "Try For Free",
-      "noCreditCard": "No credit card required • Cancel anytime"
+      "noCreditCard": "30-day trial · No automatic renewal"
     },
     "footer": {
-      "tagline": "Non-custodial treasury management for Web3 teams.",
+      "tagline": "Business payments and treasury, with stablecoin settlement.",
       "product": "Product",
       "company": "Company",
       "legal": "Legal",
@@ -200,15 +200,47 @@
   "marketingPages": {
     "docs": {
       "title": "Documentation",
-      "subtitle": "Setup guides, wallet connections, and payout workflows.",
+      "subtitle": "A practical guide to recipients, payments, approvals and recovery.",
       "sections": {
         "gettingStarted": {
-          "title": "Getting started",
-          "body": "Connect your Safe, add beneficiaries, and run a test disbursement in minutes."
+          "title": "Connect your account",
+          "body": "Sign in with a wallet used by your organization. Your wallet asks you to sign a login message; signing in does not send a payment. In Settings, link your existing Safe funding account. The account owners and signature threshold control payments. Never share a recovery phrase or private key with your team or support."
+        },
+        "recipients": {
+          "title": "Import recipients and payout instructions",
+          "body": "Open Recipients and choose Import. Paste or upload a CSV export, then map name, email, wallet address, currency and network. Review duplicates and incomplete rows before saving. Records can be imported without an address, but every recipient needs complete payout details before a payment can be prepared. Payroll exports usually need these payout details added separately."
         },
         "workflows": {
-          "title": "Payments & reporting",
-          "body": "Schedule, batch, and approve disbursements with audit-ready exports for finance teams."
+          "title": "Prepare one payment or a batch",
+          "body": "Choose New payment and select saved recipients. Enter the exact amount each person should receive. Saved payout instructions determine their currency, network and address. Different currencies or networks produce separate batches, each with its own approval and settlement. Saving a draft does not move funds."
+        },
+        "bills": {
+          "title": "Pay a vendor bill",
+          "body": "Record the vendor, invoice number, amount and due date in Bills. Prepare its payment from the bill so the records stay linked. A bill becomes paid only after its linked payment has verified settlement."
+        },
+        "approvals": {
+          "title": "Review and approve",
+          "body": "Open the payment to review recipients, amounts, funding account and the separate fee. Account owners sign in their wallets. Disburse shows the required approvals and checks them before submitting. An eligible member can use a granted spending allowance instead; a delegated batch requests a signature for each recipient and one for the fee."
+        },
+        "schedules": {
+          "title": "Schedule and repeat payments",
+          "body": "Choose a future pay date and complete approvals beforehand. The payment service submits eligible scheduled payments when due. Recurring instructions prepare a new draft for each cycle; each draft needs fresh review and authorization. Review paused instructions when recipient details or permissions change. Cancelling an instruction does not invalidate a proposal already signed in Safe."
+        },
+        "fees": {
+          "title": "Understand amounts and fees",
+          "body": "Recipients receive the amounts you entered. The reviewed payment fee is added separately to the account debit and counts toward spending limits. A fee in another currency requires a balance and, for delegated payments, an allowance in that currency. Supported managed payment flows do not require the member to broadcast a native-gas transaction."
+        },
+        "recovery": {
+          "title": "Resolve a payment needing attention",
+          "body": "Open Payments and choose Needs attention. Check settlement verifies the original submission without sending it again. Resume payment is available only when no submission was attempted. Avoid preparing a replacement while the original outcome is uncertain. Receipt linking can reconcile an existing delegated payment even when new payments are blocked."
+        },
+        "billing": {
+          "title": "Trial, renewal and access",
+          "body": "The trial lasts 30 days. Paid subscriptions cover 30 days at a time and do not renew automatically. After expiry, you can view and export records, prepare drafts and cancel instructions; new payment submissions require renewal. Renew in Settings, under Plan & billing. If checkout was interrupted, verify the saved receipt before paying again."
+        },
+        "reports": {
+          "title": "Reconcile your records",
+          "body": "Reports shows incoming funds, outgoing payments, fees and net change separately for each currency. Filter before exporting and check the stated export scope. Payments exports include recipient totals and fees; transaction references let your team match records to settlement."
         }
       }
     },
@@ -278,7 +310,7 @@
         },
         "billing": {
           "title": "Billing and payments",
-          "body": "Subscriptions renew monthly unless canceled. You are responsible for payment authorizations and fees."
+          "body": "Subscriptions cover 30 days per verified payment and do not renew automatically. Payment and network fees are separate. You are responsible for reviewing payment authorizations and fees."
         }
       }
     }
@@ -309,9 +341,9 @@
     }
   },
   "navigation": {
-    "dashboard": "Dashboard",
-    "beneficiaries": "Beneficiaries",
-    "disbursements": "Disbursements",
+    "dashboard": "Overview",
+    "beneficiaries": "Recipients",
+    "disbursements": "Payment activity",
     "reports": "Reports",
     "team": "Team",
     "settings": "Settings",
@@ -320,9 +352,9 @@
     "theme": "Theme"
   },
   "dashboard": {
-    "title": "Dashboard",
-    "subtitle": "Overview of your treasury operations",
-    "totalTreasuryValue": "Total Treasury Value",
+    "title": "Overview",
+    "subtitle": "Your balances, upcoming payments, and daily finance work.",
+    "totalTreasuryValue": "Total balance",
     "available": "Total Available",
     "byToken": "By Token",
     "byChain": "By Chain",
@@ -365,10 +397,10 @@
     }
   },
   "beneficiaries": {
-    "title": "Beneficiaries",
-    "subtitle": "Manage your payment recipients",
+    "title": "Recipients",
+    "subtitle": "Save your people and vendors once. Pay them by name.",
     "total": "{{count}} total",
-    "addBeneficiary": "Add Beneficiary",
+    "addBeneficiary": "Add recipient",
     "newBeneficiary": "New Beneficiary",
     "noBeneficiaries": {
       "title": "No Beneficiaries Yet",
@@ -428,7 +460,7 @@
       "noSearchResults": "No results match your search"
     },
     "bulkImport": {
-      "button": "Bulk Import",
+      "button": "Import recipients",
       "title": "Bulk Import Beneficiaries",
       "template": {
         "title": "CSV Template",
@@ -469,10 +501,10 @@
     }
   },
   "disbursements": {
-    "title": "Disbursements",
-    "subtitle": "Manage and track stablecoin payments",
+    "title": "Payment activity",
+    "subtitle": "Review, approve, and track your payments.",
     "total": "{{count}} total",
-    "newDisbursement": "New Disbursement",
+    "newDisbursement": "One-time payment",
     "createDisbursement": "Create Disbursement",
     "noDisbursements": {
       "title": "No Disbursements Yet",
@@ -611,6 +643,8 @@
     },
     "summary": {
       "showing": "Showing {{count}} transaction",
+      "showing_one": "Showing {{count}} transaction",
+      "showing_other": "Showing {{count}} transactions",
       "total": "Total",
       "beneficiaries": "{{count}} beneficiaries",
       "events": "{{count}} events"
@@ -648,8 +682,8 @@
       "adminOnly": "Only admins can edit the organization name"
     },
     "safe": {
-      "title": "Safe Wallet",
-      "subtitle": "Connect your Gnosis Safe (one address, multiple chains)",
+      "title": "Funding accounts",
+      "subtitle": "Connect an account on each payment network. Addresses can differ between networks.",
       "connected": "Connected Safe",
       "openSafe": "View on Safe",
       "unlinkSafe": "Unlink",
@@ -657,28 +691,28 @@
       "noSafe": "No Safe connected yet",
       "linkExisting": "Link Safe",
       "linkAnotherChain": "Add another chain",
-      "addChain": "Add another chain",
+      "addChain": "Connect another account",
       "createSafe": "Don't have a Safe?",
       "createSafeLink": "Create one here",
       "chain": "Chain",
       "depositAddress": "Deposit address (same on all chains)",
-      "linkedChains": "Linked chains",
+      "linkedChains": "Linked accounts",
       "safeAddress": "Safe Address",
       "safeAddressPlaceholder": "0x...",
-      "safeAddressDescription": "Enter your Safe address. The same address will be used on each chain you link.",
+      "safeAddressDescription": "Enter the deployed Safe address for the selected network. We verify that your wallet is an owner before linking it.",
       "linkSafe": "Link Safe",
       "validating": "Validating...",
       "network": "Sepolia"
     },
     "relay": {
-      "title": "Gasless Execution",
-      "subtitle": "Configure how relay fees are paid by your Safe",
-      "feeTokenLabel": "Fee token",
-      "feeTokenDescription": "Supported fee tokens: USDC, USDT.",
-      "feeModeLabel": "Fee mode",
+      "title": "Network fees",
+      "subtitle": "Choose how your funding account pays transaction fees",
+      "feeTokenLabel": "Fee currency",
+      "feeTokenDescription": "USDC and USDT can be used where supported by the network and payment provider.",
+      "feeModeLabel": "Fee payment rule",
       "feeModePreferred": "Stablecoin preferred (fallback to native)",
       "feeModeOnly": "Stablecoin only (block if insufficient)",
-      "feeModeDescription": "If USDC is unavailable, fallback to native only in preferred mode.",
+      "feeModeDescription": "The preferred option may use the network's native currency if your selected fee currency is unavailable. Stablecoin-only payments stop instead.",
       "save": "Save",
       "adminOnly": "Only admins can change gasless settings",
       "disabled": "Gasless relay is disabled by environment settings."
@@ -734,11 +768,11 @@
       "description": "Your theme preference will be saved and applied across all pages."
     },
     "billing": {
-      "title": "Billing & Subscription",
+      "title": "Plan & billing",
       "subtitle": "Manage your subscription and payment",
       "currentPlan": "Current Plan",
-      "users": "Users",
-      "beneficiaries": "Beneficiaries",
+      "users": "Member limit",
+      "beneficiaries": "Recipient limit",
       "unlimited": "Unlimited",
       "trialDaysLeft": "{{days}} days left in trial",
       "activeDaysRemaining": "Active - {{days}} days remaining",
@@ -748,46 +782,26 @@
       "subscribe": "Subscribe",
       "upgrade": "Upgrade",
       "downgradeNA": "Downgrade N/A",
-      "currentPlan": "Current Plan",
       "plans": {
         "starter": {
           "name": "Starter",
           "description": "For individuals",
-          "price": "${{price}}/mo",
-          "features": {
-            "users": "1 user",
-            "safe": "1 Safe per chain",
-            "beneficiaries": "25 beneficiaries",
-            "disbursements": "One-time disbursements",
-            "audit": "Audit logs",
-            "export": "CSV export"
-          }
+          "price": "${{price}} / 30 days"
         },
         "team": {
           "name": "Team",
           "description": "For small teams",
-          "price": "${{price}}/mo",
-          "features": {
-            "users": "5 users",
-            "safe": "1 Safe per chain",
-            "beneficiaries": "100 beneficiaries",
-            "roles": "All 5 roles",
-            "multisig": "Multi-sig approval",
-            "everything": "Everything in Starter"
-          }
+          "price": "${{price}} / 30 days"
         },
         "pro": {
           "name": "Pro",
           "description": "For growing teams",
-          "price": "${{price}}/mo",
-          "features": {
-            "users": "Unlimited users",
-            "safe": "1 Safe per chain",
-            "beneficiaries": "Unlimited beneficiaries",
-            "reports": "Professional reports",
-            "support": "Priority support",
-            "everything": "Everything in Team"
-          }
+          "price": "${{price}} / 30 days"
+        },
+        "free": {
+          "name": "Free",
+          "description": "For a single operator",
+          "price": "$0 / forever"
         }
       },
       "payment": {
@@ -813,20 +827,55 @@
         "viewTransaction": "View Transaction",
         "done": "Done"
       },
-      "info": "Pay with stablecoins (USDC, USDT) on Ethereum Sepolia. All plans include a 30-day money-back guarantee."
+      "info": "Pay with stablecoins (USDC, USDT) on Ethereum Sepolia. All plans include a 30-day money-back guarantee.",
+      "usageTitle": "Workspace usage",
+      "memberSeats": "Team seats",
+      "savedRecipients": "Saved recipients",
+      "connectedAccounts": "Connected accounts",
+      "usedOf": "{{used}} of {{limit}} used",
+      "noPlanLimit": "{{used}} · no plan limit",
+      "seatBreakdown": "{{active}} active · {{pending}} pending invitations",
+      "archivedCount": "Includes {{count}} archived records",
+      "accountsIncluded": "Business and test accounts included",
+      "usageUnavailable": "Usage could not be counted. Refresh to try again; your plan and renewal remain available.",
+      "trialEnd": "Trial access ends {{date}}. Choose a plan to continue sending payments.",
+      "paidEnd": "Paid access ends {{date}}. This date includes any unused paid time.",
+      "expiryPolicy": "Core money management and payments remain available when a trial or paid term ends. Tier limits apply to seats and saved recipients. Your accounts and funds stay under your control.",
+      "included": "All tiers currently include individual and batch payments, scheduling, approvals and accounting exports. Network and provider fees are shown separately before approval and paid by you.",
+      "trialTerms": "Choose a plan for 30 days of paid access. No automatic renewal or charges. Unused trial days do not become paid credit.",
+      "paidTerms": "Pay for 30 days at a time. No automatic renewal or charges. Renewing early preserves unused paid time; changing plans converts that time into credit at the new rate. Network and provider fees are separate.",
+      "features": {
+        "members_one": "{{count}} team member",
+        "members_other": "{{count}} team members",
+        "membersUnlimited": "No plan limit on members",
+        "recipients": "{{count}} saved recipients",
+        "recipientsUnlimited": "No plan limit on recipients",
+        "accounts": "Separate business accounts",
+        "payments": "Individual and batch payments",
+        "schedules": "Scheduled and recurring payments",
+        "controls": "Approvals and payment limits",
+        "records": "Audit records and accounting exports"
+      },
+      "noSubscriptionCharge": "No subscription charge",
+      "freePolicy": "Core money management and payments remain available on Free access. Your accounts and funds stay under your control.",
+      "fallbackPolicy": "After this period, {{tier}} access continues automatically. Core money management and payments remain available.",
+      "complimentaryEnd": "Complimentary access ends {{date}}.",
+      "includedFree": "Included at no charge",
+      "freeTerms": "No subscription payment is needed for your current access. You pay all network and provider fees. Disburse does not hold your funds or cover these fees.",
+      "overLimitPolicy": "Your saved usage exceeds this tier’s limits. Existing members and recipients remain available. Adding recipients or accepting invitations requires room within the tier’s limits."
     },
     "screening": {
       "title": "Sanctions Screening",
       "subtitle": "Configure SDN screening enforcement",
       "enforcement": "Enforcement Level",
-      "enforcementDescription": "Control how sanctions screening affects disbursements",
+      "enforcementDescription": "Control how matches, missing checks, outdated results and unavailable screening affect payments.",
       "options": {
         "off": "Off",
-        "offDescription": "Screening is disabled. No checks are performed.",
+        "offDescription": "No payment holds or acknowledgements. Screening checks and history remain available.",
         "warn": "Warn",
-        "warnDescription": "Show warnings for matches but allow disbursements to proceed.",
+        "warnDescription": "Show screening warnings and require acknowledgement before continuing.",
         "block": "Block",
-        "blockDescription": "Block disbursements with unresolved SDN matches. Admin review required."
+        "blockDescription": "Block payments until screening is current and unresolved matches are reviewed."
       },
       "adminOnly": "Only admins can change screening enforcement settings",
       "saving": "Saving...",
@@ -886,7 +935,8 @@
     "title": "Screening",
     "checking": "Checking...",
     "pending": "Pending",
-    "clear": "Clear",
+    "clear": "No listed matches",
+    "scope": "OFAC SDN names and published digital-currency identifiers. This check does not verify address ownership or assess transaction exposure.",
     "potentialMatch": "Potential Match",
     "confirmedMatch": "Confirmed Match",
     "falsePositive": "False Positive",

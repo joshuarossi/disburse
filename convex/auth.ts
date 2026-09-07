@@ -1,58 +1,143 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
+import { verifyMessage } from "./lib/signatures";
+import { assertValidAddress } from "./lib/validation";
+import { hashSessionToken } from "./lib/rbac";
+import { getOrCreateUser } from "./lib/users";
 
-// Generate a nonce for SIWE authentication
+const NONCE_TTL_MS = 10 * 60 * 1000; // pending sign-in nonces
+const SESSION_TTL_MS = 7 * 24 * 60 * 60 * 1000; // authenticated sessions
+
+// Domains allowed inside the signed SIWE message. Comma-separated env var;
+// Defaults to the domain the server uses to build challenges; never skips verification.
+function getAllowedDomains(): string[] {
+  const raw = process.env.SIWE_ALLOWED_DOMAINS ?? "";
+  const domains = raw
+    .split(",")
+    .map((d) => d.trim().toLowerCase())
+    .filter(Boolean);
+  return domains.length > 0 ? domains : [(process.env.SIWE_DOMAIN ?? "app.disburse.xyz").toLowerCase()];
+}
+
+function buildSiweMessage(opts: {
+  domain: string;
+  walletAddress: string;
+  nonce: string;
+  issuedAt: string;
+  expirationTime: string;
+}): string {
+  const { domain, walletAddress, nonce, issuedAt, expirationTime } = opts;
+  // EIP-4361 (Sign-In With Ethereum) formatted message.
+  return [
+    `${domain} wants you to sign in with your Ethereum account:`,
+    walletAddress,
+    "",
+    "Sign in to Disburse. This signature does not trigger a blockchain transaction or cost any gas.",
+    "",
+    `URI: https://${domain}`,
+    "Version: 1",
+    "Chain ID: 1",
+    `Nonce: ${nonce}`,
+    `Issued At: ${issuedAt}`,
+    `Expiration Time: ${expirationTime}`,
+  ].join("\n");
+}
+
+/**
+ * Minimal EIP-4361 parser for messages we generated ourselves.
+ * Returns null if required fields are missing or malformed.
+ */
+function parseSiweMessage(message: string): {
+  domain: string;
+  address: string;
+  nonce: string;
+  expirationTime: number;
+} | null {
+  const lines = message.split("\n");
+  const header = lines[0] ?? "";
+  const domainMatch = header.match(/^(.+)\s+wants you to sign in/);
+  if (!domainMatch) return null;
+
+  const addressLine = lines[1];
+  if (
+    !addressLine ||
+    !/^0x[0-9a-fA-F]{40}$/.test(addressLine.trim())
+  ) {
+    return null;
+  }
+
+  let nonce: string | null = null;
+  let expirationTime: number | null = null;
+  for (const line of lines) {
+    const nonceMatch = line.match(/^Nonce:\s+(\S+)$/);
+    if (nonceMatch) nonce = nonceMatch[1];
+    const expMatch = line.match(/^Expiration Time:\s+(.+)$/);
+    if (expMatch) {
+      const parsed = Date.parse(expMatch[1]);
+      if (!Number.isNaN(parsed)) expirationTime = parsed;
+    }
+  }
+
+  if (!nonce || !expirationTime) return null;
+
+  return {
+    domain: domainMatch[1].trim().toLowerCase(),
+    address: addressLine.trim(),
+    nonce,
+    expirationTime,
+  };
+}
+
+// Generate a single-use nonce + server-built SIWE message for signing.
 export const generateNonce = mutation({
   args: { walletAddress: v.string() },
   handler: async (ctx, args) => {
+    assertValidAddress(args.walletAddress, "wallet address");
     const walletAddress = args.walletAddress.toLowerCase();
-    const nonce = crypto.randomUUID();
     const now = Date.now();
-    const expiresAt = now + 10 * 60 * 1000; // 10 minutes
 
-    // Check if user exists
-    let user = await ctx.db
-      .query("users")
-      .withIndex("by_wallet", (q) => q.eq("walletAddress", walletAddress))
-      .first();
+    // M-03: race-safe lookup-or-create (heals duplicate rows from races)
+    const user = await getOrCreateUser(ctx, walletAddress);
 
-    // Create user if they don't exist
-    if (!user) {
-      const userId = await ctx.db.insert("users", {
-        walletAddress,
-        createdAt: now,
-      });
-      user = await ctx.db.get(userId);
-    }
-
-    if (!user) {
-      throw new Error("Failed to create user");
-    }
-
-    // Delete any existing sessions for this wallet
-    const existingSessions = await ctx.db
+    // Clean up this wallet's stale pending nonces (keep live sessions intact)
+    const stalePending = await ctx.db
       .query("sessions")
       .withIndex("by_wallet", (q) => q.eq("walletAddress", walletAddress))
       .collect();
-
-    for (const session of existingSessions) {
-      await ctx.db.delete(session._id);
+    for (const row of stalePending) {
+      if (row.nonce && !row.tokenHash) {
+        await ctx.db.delete(row._id);
+      }
     }
 
-    // Create new session with nonce
+    // High-entropy nonce (256-bit)
+    const nonce =
+      crypto.randomUUID().replace(/-/g, "") +
+      crypto.randomUUID().replace(/-/g, "");
     await ctx.db.insert("sessions", {
       userId: user._id,
       walletAddress,
       nonce,
-      expiresAt,
+      expiresAt: now + NONCE_TTL_MS,
       createdAt: now,
     });
 
-    return { nonce };
+    const host = process.env.SIWE_DOMAIN ?? "app.disburse.xyz";
+
+    return {
+      nonce,
+      message: buildSiweMessage({
+        domain: host,
+        walletAddress,
+        nonce,
+        issuedAt: new Date(now).toISOString(),
+        expirationTime: new Date(now + NONCE_TTL_MS).toISOString(),
+      }),
+    };
   },
 });
 
-// Verify signature and create authenticated session
+// Verify signature server-side and issue an opaque session token.
 export const verifySignature = mutation({
   args: {
     walletAddress: v.string(),
@@ -60,44 +145,86 @@ export const verifySignature = mutation({
     message: v.string(),
   },
   handler: async (ctx, args) => {
+    assertValidAddress(args.walletAddress, "wallet address");
     const walletAddress = args.walletAddress.toLowerCase();
+    const now = Date.now();
 
-    // Find the session with matching nonce
-    const session = await ctx.db
+    // Parse and structurally validate the SIWE message
+    const parsed = parseSiweMessage(args.message);
+    if (!parsed) {
+      throw new Error("Malformed sign-in message");
+    }
+
+    // The signed message must claim the same wallet that is authenticating
+    if (parsed.address.toLowerCase() !== walletAddress) {
+      throw new Error("Message address does not match requesting wallet");
+    }
+
+    // Nonce must be single-use and bound to this wallet
+    const pending = await ctx.db
       .query("sessions")
-      .withIndex("by_wallet", (q) => q.eq("walletAddress", walletAddress))
+      .withIndex("by_nonce", (q) => q.eq("nonce", parsed.nonce))
       .first();
 
-    if (!session) {
-      throw new Error("No pending session found");
+    if (!pending || !pending.nonce || pending.tokenHash) {
+      throw new Error("Invalid or already-used nonce");
+    }
+    if (pending.walletAddress !== walletAddress) {
+      throw new Error("Nonce is not bound to this wallet");
+    }
+    if (now > pending.expiresAt) {
+      await ctx.db.delete(pending._id);
+      throw new Error("Sign-in expired. Please try again.");
     }
 
-    if (Date.now() > session.expiresAt) {
-      await ctx.db.delete(session._id);
-      throw new Error("Session expired");
+    // Domain allowlist (enforced in production via SIWE_ALLOWED_DOMAINS)
+    const allowedDomains = getAllowedDomains();
+    if (!allowedDomains.includes(parsed.domain)) {
+      throw new Error(`Untrusted domain in sign-in message: ${parsed.domain}`);
     }
 
-    // Verify the nonce is in the message
-    if (!args.message.includes(session.nonce)) {
-      throw new Error("Invalid nonce in message");
+    // Message must not already be expired per its own Expiration Time
+    if (now > parsed.expirationTime) {
+      throw new Error("Signed message has expired");
     }
 
-    // Note: In production, you would verify the signature here using viem
-    // For now, we trust the frontend verification
-    // The signature verification happens client-side with wagmi/viem
+    // CRYPTOGRAPHIC VERIFICATION: recover the signer and compare against the
+    // claimed identity. This is the line that makes web3 auth real.
+    const signatureOk = await verifyMessage({
+      address: parsed.address as `0x${string}`,
+      message: args.message,
+      signature: args.signature as `0x${string}`,
+    });
+    if (!signatureOk) {
+      throw new Error("Signature verification failed");
+    }
 
-    // Extend session expiry (7 days)
-    const newExpiresAt = Date.now() + 7 * 24 * 60 * 60 * 1000;
-    await ctx.db.patch(session._id, { expiresAt: newExpiresAt });
+    // Consume the nonce exactly once
+    await ctx.db.delete(pending._id);
 
-    // Get user
-    const user = await ctx.db.get(session.userId);
+    // Issue opaque session token; persist only its SHA-256 digest
+    const token =
+      crypto.randomUUID().replace(/-/g, "") +
+      crypto.randomUUID().replace(/-/g, "");
+    const tokenHash = await hashSessionToken(token);
+    const expiresAt = now + SESSION_TTL_MS;
+
+    await ctx.db.insert("sessions", {
+      userId: pending.userId,
+      walletAddress,
+      tokenHash,
+      expiresAt,
+      createdAt: now,
+    });
+
+    const user = await ctx.db.get(pending.userId);
     if (!user) {
       throw new Error("User not found");
     }
 
     return {
-      sessionId: session._id,
+      token,
+      expiresAt,
       userId: user._id,
       walletAddress: user.walletAddress,
       preferredLanguage: user.preferredLanguage,
@@ -106,22 +233,26 @@ export const verifySignature = mutation({
   },
 });
 
-// Get current session
-export const getSession = query({
-  args: { walletAddress: v.string() },
+// Validate a session token. Used by the frontend guard on every app load.
+export const validateSession = query({
+  args: { token: v.string() },
   handler: async (ctx, args) => {
-    const walletAddress = args.walletAddress.toLowerCase();
+    if (typeof args.token !== "string" || args.token.length < 32) {
+      return null;
+    }
 
+    const tokenHash = await hashSessionToken(args.token);
     const session = await ctx.db
       .query("sessions")
-      .withIndex("by_wallet", (q) => q.eq("walletAddress", walletAddress))
+      .withIndex("by_tokenHash", (q) => q.eq("tokenHash", tokenHash))
       .first();
 
-    if (!session) {
+    if (!session || !session.tokenHash) {
       return null;
     }
 
     if (Date.now() > session.expiresAt) {
+      // Queries are read-only; expired rows are cleaned up by mutation flows
       return null;
     }
 
@@ -141,18 +272,21 @@ export const getSession = query({
   },
 });
 
-// Logout - delete session
+// Logout - delete session by token
 export const logout = mutation({
-  args: { walletAddress: v.string() },
+  args: { token: v.string() },
   handler: async (ctx, args) => {
-    const walletAddress = args.walletAddress.toLowerCase();
+    if (typeof args.token !== "string" || args.token.length < 32) {
+      return { success: true };
+    }
 
-    const sessions = await ctx.db
+    const tokenHash = await hashSessionToken(args.token);
+    const session = await ctx.db
       .query("sessions")
-      .withIndex("by_wallet", (q) => q.eq("walletAddress", walletAddress))
-      .collect();
+      .withIndex("by_tokenHash", (q) => q.eq("tokenHash", tokenHash))
+      .first();
 
-    for (const session of sessions) {
+    if (session) {
       await ctx.db.delete(session._id);
     }
 

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useAccount } from 'wagmi';
+import { useSessionToken } from '@/lib/session';
 import { useTranslation } from 'react-i18next';
 import { useMutation } from 'convex/react';
 import { api } from '../../../convex/_generated/api';
@@ -17,7 +17,7 @@ type SwitcherProps = { variant?: ButtonProps['variant']; size?: ButtonProps['siz
 
 export function LanguageSwitcher({ variant = 'ghost', size = 'sm' }: SwitcherProps) {
   const { i18n } = useTranslation();
-  const { address } = useAccount();
+  const sessionToken = useSessionToken();
   const [isOpen, setIsOpen] = useState(false);
   const updatePreferredLanguage = useMutation(api.users.updatePreferredLanguage);
 
@@ -27,10 +27,10 @@ export function LanguageSwitcher({ variant = 'ghost', size = 'sm' }: SwitcherPro
     i18n.changeLanguage(langCode);
     setIsOpen(false);
     
-    if (address) {
+    if (sessionToken) {
       try {
         await updatePreferredLanguage({
-          walletAddress: address,
+          sessionToken,
           preferredLanguage: langCode as 'en' | 'es' | 'pt-BR',
         });
       } catch (error) {

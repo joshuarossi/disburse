@@ -1,79 +1,23 @@
-import { Building2, User, Users } from 'lucide-react'
+import { PLAN_LIMITS } from '../../shared/billing';
+import { Building2, User, Users } from 'lucide-react';
 
 export const PLANS = {
-  starter: {
-    name: 'Starter',
-    price: 25,
-    description: 'For individuals',
-    icon: User,
-    popular: false,
-    features: [
-      '1 user',
-      '1 Safe per chain',
-      '25 beneficiaries',
-      'One-time disbursements',
-      'Audit logs',
-      'CSV export',
-    ],
-    limits: {
-      users: 1,
-      beneficiaries: 25,
-    },
-  },
-  team: {
-    name: 'Team',
-    price: 50,
-    description: 'For small teams',
-    icon: Users,
-    popular: true,
-    features: [
-      '5 users',
-      '1 Safe per chain',
-      '100 beneficiaries',
-      'All 5 roles',
-      'Multi-sig approval',
-      'Everything in Starter',
-    ],
-    limits: {
-      users: 5,
-      beneficiaries: 100,
-    },
-  },
-  pro: {
-    name: 'Pro',
-    price: 99,
-    description: 'For growing teams',
-    icon: Building2,
-    popular: false,
-    features: [
-      'Unlimited users',
-      '1 Safe per chain',
-      'Unlimited beneficiaries',
-      'Professional reports',
-      'Priority support',
-      'Everything in Team',
-    ],
-    limits: {
-      users: Infinity,
-      beneficiaries: Infinity,
-    },
-  },
-} as const
+  starter: { name: 'Starter', price: PLAN_LIMITS.starter.price, description: 'For a single operator', icon: User, popular: false },
+  team: { name: 'Team', price: PLAN_LIMITS.team.price, description: 'For small teams', icon: Users, popular: true },
+  pro: { name: 'Pro', price: PLAN_LIMITS.pro.price, description: 'For growing teams', icon: Building2, popular: false },
+} as const;
+export type PlanKey = keyof typeof PLANS;
 
-export type PlanKey = keyof typeof PLANS
-
-const PLAN_FEATURE_KEYS = [
-  'users',
-  'safe',
-  'beneficiaries',
-  'disbursements',
-  'audit',
-  'export',
-  'roles',
-  'multisig',
-  'everything',
-  'reports',
-  'support',
-] as const
-
-export const getPlanFeatureKey = (index: number) => PLAN_FEATURE_KEYS[index] ?? `feature${index}`
+/** Feature identities stay consistent across plans, translations and list order. */
+export function getPlanFeatures(plan: PlanKey) {
+  const { maxUsers, maxBeneficiaries } = PLAN_LIMITS[plan];
+  return [
+    { key: Number.isFinite(maxUsers) ? 'members' : 'membersUnlimited', count: Number.isFinite(maxUsers) ? maxUsers : undefined, text: Number.isFinite(maxUsers) ? `${maxUsers} team member${maxUsers === 1 ? '' : 's'}` : 'No plan limit on members' },
+    { key: Number.isFinite(maxBeneficiaries) ? 'recipients' : 'recipientsUnlimited', count: Number.isFinite(maxBeneficiaries) ? maxBeneficiaries : undefined, text: Number.isFinite(maxBeneficiaries) ? `${maxBeneficiaries} saved recipients` : 'No plan limit on recipients' },
+    { key: 'accounts', text: 'Separate business accounts' },
+    { key: 'payments', text: 'Individual and batch payments' },
+    { key: 'schedules', text: 'Scheduled and recurring payments' },
+    { key: 'controls', text: 'Approvals and payment limits' },
+    { key: 'records', text: 'Audit records and accounting exports' },
+  ];
+}

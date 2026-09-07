@@ -2,7 +2,7 @@ import { Header, Hero, Features, Pricing, HowItWorks, CTA, Footer } from '@/comp
 
 export default function Landing() {
   return (
-    <div className="min-h-screen" style={{ backgroundColor: 'var(--color-bg-primary)' }}>
+    <div className="marketing-site min-h-screen" style={{ backgroundColor: 'var(--color-bg-primary)' }}>
       <Header />
       <main>
         <Hero />

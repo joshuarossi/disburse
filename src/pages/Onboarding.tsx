@@ -1,12 +1,15 @@
-import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { useAccount, useSendTransaction, useWaitForTransactionReceipt } from 'wagmi';
-import { useMutation } from 'convex/react';
-import { api } from '../../convex/_generated/api';
-import { Id } from '../../convex/_generated/dataModel';
-import { Button } from '@/components/ui/button';
-import { createSafe, validateSafeAddress, isOwner } from '@/lib/safe';
-import { CHAINS_LIST } from '@/lib/chains';
+import { getPublicClient } from "wagmi/actions";
+import { config } from "@/lib/wagmi";
+import type { SupportedChainId } from "@/lib/chains";
+import { useRef, useState } from "react";
+import { getSessionToken } from "@/lib/session";
+import { useNavigate } from "react-router-dom";
+import { useAccount, useSendTransaction, useSwitchChain } from "wagmi";
+import { useMutation, useAction } from "convex/react";
+import { api } from "../../convex/_generated/api";
+import { Id } from "../../convex/_generated/dataModel";
+import { Button } from "@/components/ui/button";
+import { CHAINS_LIST } from "@/lib/chains";
 import {
   ArrowLeft,
   ArrowRight,
@@ -19,15 +22,15 @@ import {
   Users,
   Building2,
   User,
-} from 'lucide-react';
+} from "lucide-react";
 
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
-type Role = 'admin' | 'approver' | 'initiator' | 'clerk' | 'viewer';
-type Step = 'profile' | 'create-org' | 'team' | 'safe';
+type Role = "admin" | "approver" | "initiator" | "clerk" | "viewer";
+type Step = "profile" | "create-org" | "team" | "safe";
 
-const STEPS: Step[] = ['profile', 'create-org', 'team', 'safe'];
+const STEPS: Step[] = ["profile", "create-org", "team", "safe"];
 
 interface TeamMember {
   walletAddress: string;
@@ -42,32 +45,40 @@ interface TeamMember {
 export default function Onboarding() {
   const navigate = useNavigate();
   const { address, chain } = useAccount();
+  const { switchChainAsync } = useSwitchChain();
+  const setupLock = useRef(false);
+  const invitedWallets = useRef(new Set<string>());
+  const [ownerWallets, setOwnerWallets] = useState<string[]>([]);
 
   // ---- profile state ----
-  const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
 
   // ---- org state ----
-  const [orgName, setOrgName] = useState('');
+  const [orgName, setOrgName] = useState("");
   const [orgId, setOrgId] = useState<string | null>(null);
 
   // ---- team state ----
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
-  const [newMember, setNewMember] = useState<TeamMember>({ walletAddress: '', name: '', email: '', role: 'approver' });
+  const [newMember, setNewMember] = useState<TeamMember>({
+    walletAddress: "",
+    name: "",
+    email: "",
+    role: "approver",
+  });
   const [isAddingMember, setIsAddingMember] = useState(false);
 
   // ---- safe state ----
   const [hasSafe, setHasSafe] = useState<boolean | null>(null); // null = not yet chosen
-  const [existingSafeAddress, setExistingSafeAddress] = useState('');
+  const [existingSafeAddress, setExistingSafeAddress] = useState("");
   const [selectedChainId, setSelectedChainId] = useState(chain?.id ?? 1);
   const [safeThreshold, setSafeThreshold] = useState(1);
   const [deploying, setDeploying] = useState(false);
-  const [deployedTxHash, setDeployedTxHash] = useState<`0x${string}` | undefined>(undefined);
   const [safeError, setSafeError] = useState<string | null>(null);
   const [linkingExisting, setLinkingExisting] = useState(false);
 
   // ---- nav state ----
-  const [step, setStep] = useState<Step>('profile');
+  const [step, setStep] = useState<Step>("profile");
   const [orgError, setOrgError] = useState<string | null>(null);
   const [teamError, setTeamError] = useState<string | null>(null);
 
@@ -75,13 +86,10 @@ export default function Onboarding() {
   const createOrg = useMutation(api.orgs.create);
   const updateOwnProfile = useMutation(api.orgs.updateOwnProfile);
   const inviteMember = useMutation(api.orgs.inviteMember);
-  const linkSafe = useMutation(api.safes.link);
+  const linkSafe = useAction(api.safes.link);
 
   // ---- wagmi tx helpers ----
   const { sendTransactionAsync } = useSendTransaction();
-  useWaitForTransactionReceipt({
-    hash: deployedTxHash,
-  });
 
   // ---------------------------------------------------------------------------
   // Handlers
@@ -96,29 +104,36 @@ export default function Onboarding() {
 
   // --- Org → next (creates org, persists profile name/email, advances) ---
   const handleCreateOrg = async () => {
-    if (!address || !orgName.trim()) return;
+    if (!address || !orgName.trim() || setupLock.current) return;
+    setupLock.current = true;
     setOrgError(null);
 
     try {
-      const { orgId: newOrgId } = await createOrg({
-        name: orgName.trim(),
-        walletAddress: address,
-      });
+      const { orgId: newOrgId } = orgId
+        ? { orgId: orgId as Id<"orgs"> }
+        : await createOrg({
+            name: orgName.trim(),
+            sessionToken: getSessionToken() ?? "",
+          });
       setOrgId(newOrgId);
 
       // Persist the profile name/email collected in step 1 onto the creator's membership
       if (name.trim() || email.trim()) {
         await updateOwnProfile({
           orgId: newOrgId,
-          walletAddress: address,
+          sessionToken: getSessionToken() ?? "",
           name: name.trim() || undefined,
           email: email.trim() || undefined,
         });
       }
 
-      setStep('team');
+      setStep("team");
     } catch (err) {
-      setOrgError(err instanceof Error ? err.message : 'Failed to create organization');
+      setOrgError(
+        err instanceof Error ? err.message : "Failed to create organization",
+      );
+    } finally {
+      setupLock.current = false;
     }
   };
 
@@ -131,13 +146,22 @@ export default function Onboarding() {
       setTeamError("You're already a member of this organization.");
       return;
     }
-    if (teamMembers.some((m) => m.walletAddress.toLowerCase() === newMember.walletAddress.toLowerCase())) {
-      setTeamError('This wallet is already in the list.');
+    if (
+      teamMembers.some(
+        (m) =>
+          m.walletAddress.toLowerCase() ===
+          newMember.walletAddress.toLowerCase(),
+      )
+    ) {
+      setTeamError("This wallet is already in the list.");
       return;
     }
 
-    setTeamMembers((prev) => [...prev, { ...newMember, walletAddress: newMember.walletAddress.trim() }]);
-    setNewMember({ walletAddress: '', name: '', email: '', role: 'approver' });
+    setTeamMembers((prev) => [
+      ...prev,
+      { ...newMember, walletAddress: newMember.walletAddress.trim() },
+    ]);
+    setNewMember({ walletAddress: "", name: "", email: "", role: "approver" });
     setIsAddingMember(false);
   };
 
@@ -147,24 +171,32 @@ export default function Onboarding() {
 
   // --- Team → next (persists members, advances) ---
   const handleTeamNext = async () => {
-    if (!orgId || !address) return;
+    if (!orgId || !address || setupLock.current) return;
+    setupLock.current = true;
     setTeamError(null);
 
     try {
       // Persist all team members
       for (const member of teamMembers) {
+        if (invitedWallets.current.has(member.walletAddress.toLowerCase()))
+          continue;
         await inviteMember({
-          orgId: orgId as Id<'orgs'>,
-          walletAddress: address,
+          orgId: orgId as Id<"orgs">,
+          sessionToken: getSessionToken() ?? "",
           memberWalletAddress: member.walletAddress,
           memberName: member.name || undefined,
           memberEmail: member.email || undefined,
           role: member.role,
         });
+        invitedWallets.current.add(member.walletAddress.toLowerCase());
       }
-      setStep('safe');
+      setStep("safe");
     } catch (err) {
-      setTeamError(err instanceof Error ? err.message : 'Failed to add team members');
+      setTeamError(
+        err instanceof Error ? err.message : "Failed to add team members",
+      );
+    } finally {
+      setupLock.current = false;
     }
   };
 
@@ -175,20 +207,9 @@ export default function Onboarding() {
     setLinkingExisting(true);
 
     try {
-      const valid = await validateSafeAddress(existingSafeAddress.trim(), selectedChainId);
-      if (!valid) {
-        setSafeError('No Safe found at that address on the selected chain.');
-        return;
-      }
-      const isOwnerResult = await isOwner(existingSafeAddress.trim(), address, selectedChainId);
-      if (!isOwnerResult) {
-        setSafeError('Your connected wallet is not an owner of that Safe.');
-        return;
-      }
-
       await linkSafe({
-        orgId: orgId as Id<'orgs'>,
-        walletAddress: address,
+        orgId: orgId as Id<"orgs">,
+        sessionToken: getSessionToken() ?? "",
         safeAddress: existingSafeAddress.trim(),
         chainId: selectedChainId,
       });
@@ -196,7 +217,7 @@ export default function Onboarding() {
       // Done — go to dashboard
       navigate(`/org/${orgId}/dashboard`);
     } catch (err) {
-      setSafeError(err instanceof Error ? err.message : 'Failed to link Safe');
+      setSafeError(err instanceof Error ? err.message : "Failed to link Safe");
     } finally {
       setLinkingExisting(false);
     }
@@ -204,16 +225,31 @@ export default function Onboarding() {
 
   // --- Safe: deploy a new safe ---
   const handleCreateNewSafe = async () => {
-    if (!orgId || !address) return;
+    if (!orgId || !address || setupLock.current) return;
+    setupLock.current = true;
+    const deploymentChainId = selectedChainId;
+    let broadcast = false;
     setSafeError(null);
     setDeploying(true);
 
     try {
-      // Owners = connected wallet + any team members added (wallet addresses)
-      const owners = [address, ...teamMembers.map((m) => m.walletAddress)];
+      // App membership does not grant ownership of funds.
+      const owners = [
+        address,
+        ...teamMembers
+          .filter((member) => ownerWallets.includes(member.walletAddress))
+          .map((member) => member.walletAddress),
+      ];
+      if (chain?.id !== deploymentChainId)
+        await switchChainAsync({ chainId: deploymentChainId });
       const threshold = Math.min(safeThreshold, owners.length);
 
-      const { predictedAddress, deployTx } = await createSafe(owners, threshold);
+      const { predictedAddress, deployTx } = await (await import('@/lib/safeCreation')).createSafe(
+        owners,
+        threshold,
+        "0",
+        deploymentChainId,
+      );
 
       // Send the deploy transaction — MetaMask will prompt
       const txHash = await sendTransactionAsync({
@@ -222,60 +258,91 @@ export default function Onboarding() {
         value: deployTx.value,
       });
 
-      setDeployedTxHash(txHash);
+      broadcast = true;
+      setExistingSafeAddress(predictedAddress);
+      const client = getPublicClient(config, {
+        chainId: deploymentChainId as SupportedChainId,
+      });
+      if (!client)
+        throw new Error("Could not connect to the deployment network");
+      const receipt = await client.waitForTransactionReceipt({ hash: txHash });
+      if (receipt.status !== "success")
+        throw new Error("Account deployment reverted");
 
-      // Link immediately — address is deterministic via CREATE2
+      // Link only after the server can verify deployed ownership.
       await linkSafe({
-        orgId: orgId as Id<'orgs'>,
-        walletAddress: address,
+        orgId: orgId as Id<"orgs">,
+        sessionToken: getSessionToken() ?? "",
         safeAddress: predictedAddress,
-        chainId: selectedChainId,
+        chainId: deploymentChainId,
       });
 
       // Navigate to dashboard
       navigate(`/org/${orgId}/dashboard`);
     } catch (err) {
-      setSafeError(err instanceof Error ? err.message : 'Failed to deploy Safe');
+      if (broadcast) setHasSafe(true);
+      setSafeError(
+        broadcast
+          ? `The deployment was submitted. Check the account below and link it once confirmed. ${err instanceof Error ? err.message : ""}`
+          : err instanceof Error
+            ? err.message
+            : "Failed to deploy Safe",
+      );
     } finally {
+      setupLock.current = false;
       setDeploying(false);
     }
   };
 
   const handleProfileAndAdvance = () => {
-    setStep('create-org');
+    setStep("create-org");
   };
 
   // ---------------------------------------------------------------------------
   // Render helpers
   // ---------------------------------------------------------------------------
 
-  const StepBadge = ({ s, label, icon: Icon }: { s: Step; label: string; icon: typeof User }) => {
+  const StepBadge = ({
+    s,
+    label,
+    icon: Icon,
+  }: {
+    s: Step;
+    label: string;
+    icon: typeof User;
+  }) => {
     const idx = STEPS.indexOf(s);
     const currentIdx = STEPS.indexOf(step);
     const done = idx < currentIdx;
     const active = idx === currentIdx;
 
     return (
-      <div className={`flex items-center gap-2 ${idx > 0 ? 'ml-auto' : ''}`}>
+      <div className={`flex items-center gap-2 ${idx > 0 ? "ml-auto" : ""}`}>
         {idx > 0 && (
-          <div className={`h-px w-6 ${done ? 'bg-accent-500' : 'bg-white/10'}`} />
+          <div
+            className={`h-px w-6 ${done ? "bg-accent-500" : "bg-white/10"}`}
+          />
         )}
         <div
           className={`flex h-8 w-8 items-center justify-center rounded-full border transition-colors ${
             done
-              ? 'border-accent-500 bg-accent-500'
+              ? "border-accent-500 bg-accent-500"
               : active
-              ? 'border-accent-500 bg-navy-800'
-              : 'border-white/10 bg-navy-800'
+                ? "border-accent-500 bg-navy-800"
+                : "border-white/10 bg-navy-800"
           }`}
         >
           {done ? (
             <Check className="h-4 w-4 text-navy-950" />
           ) : (
-            <Icon className={`h-4 w-4 ${active ? 'text-accent-400' : 'text-slate-500'}`} />
+            <Icon
+              className={`h-4 w-4 ${active ? "text-accent-400" : "text-slate-500"}`}
+            />
           )}
         </div>
-        <span className={`text-xs font-medium ${active ? 'text-white' : done ? 'text-accent-400' : 'text-slate-500'}`}>
+        <span
+          className={`text-xs font-medium ${active ? "text-white" : done ? "text-accent-400" : "text-slate-500"}`}
+        >
           {label}
         </span>
       </div>
@@ -284,23 +351,23 @@ export default function Onboarding() {
 
   const stepIcons: Record<Step, typeof User> = {
     profile: User,
-    'create-org': Building2,
+    "create-org": Building2,
     team: Users,
     safe: Shield,
   };
 
   const stepLabels: Record<Step, string> = {
-    profile: 'Profile',
-    'create-org': 'Organization',
-    team: 'Team',
-    safe: 'Safe Wallet',
+    profile: "Profile",
+    "create-org": "Organization",
+    team: "Team",
+    safe: "Funding",
   };
 
   // ---------------------------------------------------------------------------
   // Render
   // ---------------------------------------------------------------------------
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center bg-navy-950 px-6">
+    <div className="workspace workspace-entry flex min-h-screen flex-col items-center justify-center bg-navy-950 px-6 py-12">
       {/* Background glow */}
       <div className="absolute inset-0 -z-10">
         <div className="absolute left-1/2 top-1/2 h-[500px] w-[500px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-accent-500/10 blur-[120px]" />
@@ -310,29 +377,42 @@ export default function Onboarding() {
         {/* Progress bar */}
         <div className="mb-8 flex items-center justify-between">
           {STEPS.map((s) => (
-            <StepBadge key={s} s={s} label={stepLabels[s]} icon={stepIcons[s]} />
+            <StepBadge
+              key={s}
+              s={s}
+              label={stepLabels[s]}
+              icon={stepIcons[s]}
+            />
           ))}
         </div>
 
         {/* Card */}
         <div className="rounded-2xl border border-white/10 bg-navy-900/50 p-8">
-
           {/* ================================================================
               STEP: PROFILE
               ============================================================== */}
-          {step === 'profile' && (
+          {step === "profile" && (
             <div className="space-y-6">
               <div className="text-center">
-                <h1 className="text-2xl font-bold text-white">Welcome to Disburse</h1>
+                <h1 className="text-2xl font-bold text-white">
+                  Welcome to Disburse
+                </h1>
                 <p className="mt-2 text-slate-400">
-                  Tell us a bit about yourself. Both fields are optional — you can always update later.
+                  Tell us a bit about yourself. Both fields are optional — you
+                  can always update later.
                 </p>
               </div>
 
               <div className="space-y-4">
                 <div>
-                  <label className="mb-1.5 block text-sm font-medium text-slate-300">Name</label>
+                  <label
+                    htmlFor="onboarding-name"
+                    className="mb-1.5 block text-sm font-medium text-slate-300"
+                  >
+                    Name
+                  </label>
                   <input
+                    id="onboarding-name"
                     type="text"
                     value={name}
                     onChange={(e) => setName(e.target.value)}
@@ -341,8 +421,14 @@ export default function Onboarding() {
                   />
                 </div>
                 <div>
-                  <label className="mb-1.5 block text-sm font-medium text-slate-300">Email</label>
+                  <label
+                    htmlFor="onboarding-email"
+                    className="mb-1.5 block text-sm font-medium text-slate-300"
+                  >
+                    Email
+                  </label>
                   <input
+                    id="onboarding-email"
                     type="email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
@@ -364,18 +450,27 @@ export default function Onboarding() {
           {/* ================================================================
               STEP: CREATE ORG
               ============================================================== */}
-          {step === 'create-org' && (
+          {step === "create-org" && (
             <div className="space-y-6">
               <div className="text-center">
-                <h1 className="text-2xl font-bold text-white">Create your organization</h1>
+                <h1 className="text-2xl font-bold text-white">
+                  Create your organization
+                </h1>
                 <p className="mt-2 text-slate-400">
-                  Your organization is the workspace where you manage disbursements and team members.
+                  Your organization is the workspace where you manage
+                  disbursements and team members.
                 </p>
               </div>
 
               <div>
-                <label className="mb-1.5 block text-sm font-medium text-slate-300">Organization name</label>
+                <label
+                  htmlFor="onboarding-orgName"
+                  className="mb-1.5 block text-sm font-medium text-slate-300"
+                >
+                  Organization name
+                </label>
                 <input
+                  id="onboarding-orgName"
                   type="text"
                   value={orgName}
                   onChange={(e) => setOrgName(e.target.value)}
@@ -386,17 +481,28 @@ export default function Onboarding() {
               </div>
 
               {orgError && (
-                <div className="flex items-start gap-2 rounded-lg border border-red-500/30 bg-red-500/5 p-3">
+                <div
+                  role="alert"
+                  className="flex items-start gap-2 rounded-lg border border-red-500/30 bg-red-500/5 p-3"
+                >
                   <AlertCircle className="h-4 w-4 text-red-400 shrink-0 mt-0.5" />
                   <p className="text-sm text-red-400">{orgError}</p>
                 </div>
               )}
 
               <div className="flex gap-3 pt-2">
-                <Button variant="secondary" onClick={goBack} className="w-12 shrink-0">
+                <Button
+                  variant="secondary"
+                  onClick={goBack}
+                  className="w-12 shrink-0"
+                >
                   <ArrowLeft className="h-4 w-4" />
                 </Button>
-                <Button onClick={handleCreateOrg} disabled={!orgName.trim()} className="flex-1">
+                <Button
+                  onClick={handleCreateOrg}
+                  disabled={!orgName.trim()}
+                  className="flex-1"
+                >
                   Create organization
                   <ArrowRight className="h-4 w-4" />
                 </Button>
@@ -407,12 +513,15 @@ export default function Onboarding() {
           {/* ================================================================
               STEP: TEAM
               ============================================================== */}
-          {step === 'team' && (
+          {step === "team" && (
             <div className="space-y-6">
               <div className="text-center">
-                <h1 className="text-2xl font-bold text-white">Add team members</h1>
+                <h1 className="text-2xl font-bold text-white">
+                  Add team members
+                </h1>
                 <p className="mt-2 text-slate-400">
-                  Invite people to your organization. You can always add more later. This step is optional.
+                  Invite people to your organization. You can always add more
+                  later. This step is optional.
                 </p>
               </div>
 
@@ -426,13 +535,17 @@ export default function Onboarding() {
                     >
                       <div className="min-w-0">
                         <p className="truncate text-sm font-medium text-white font-mono">
-                          {m.walletAddress.slice(0, 8)}...{m.walletAddress.slice(-4)}
+                          {m.walletAddress.slice(0, 8)}...
+                          {m.walletAddress.slice(-4)}
                         </p>
                         <p className="text-xs text-slate-500 capitalize">
-                          {m.name || 'No name'} · {m.role}
+                          {m.name || "No name"} · {m.role}
                         </p>
                       </div>
-                      <button onClick={() => handleRemoveMember(idx)} className="text-slate-500 hover:text-red-400 transition-colors">
+                      <button
+                        onClick={() => handleRemoveMember(idx)}
+                        className="text-slate-500 hover:text-red-400 transition-colors"
+                      >
                         <Trash2 className="h-4 w-4" />
                       </button>
                     </div>
@@ -444,11 +557,22 @@ export default function Onboarding() {
               {isAddingMember ? (
                 <div className="rounded-lg border border-accent-500/30 bg-navy-800/50 p-4 space-y-3">
                   <div>
-                    <label className="mb-1 block text-xs font-medium text-slate-400">Wallet address *</label>
+                    <label
+                      htmlFor="onboarding-newMember-walletAddress"
+                      className="mb-1 block text-xs font-medium text-slate-400"
+                    >
+                      Wallet address *
+                    </label>
                     <input
+                      id="onboarding-newMember-walletAddress"
                       type="text"
                       value={newMember.walletAddress}
-                      onChange={(e) => setNewMember((prev) => ({ ...prev, walletAddress: e.target.value }))}
+                      onChange={(e) =>
+                        setNewMember((prev) => ({
+                          ...prev,
+                          walletAddress: e.target.value,
+                        }))
+                      }
                       placeholder="0x..."
                       autoFocus
                       className="w-full rounded-lg border border-white/10 bg-navy-800 px-3 py-2 font-mono text-sm text-white placeholder-slate-500 focus:border-accent-500 focus:outline-none focus:ring-1 focus:ring-accent-500"
@@ -456,31 +580,64 @@ export default function Onboarding() {
                   </div>
                   <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <label className="mb-1 block text-xs font-medium text-slate-400">Name</label>
+                      <label
+                        htmlFor="onboarding-newMember-name"
+                        className="mb-1 block text-xs font-medium text-slate-400"
+                      >
+                        Name
+                      </label>
                       <input
+                        id="onboarding-newMember-name"
                         type="text"
                         value={newMember.name}
-                        onChange={(e) => setNewMember((prev) => ({ ...prev, name: e.target.value }))}
+                        onChange={(e) =>
+                          setNewMember((prev) => ({
+                            ...prev,
+                            name: e.target.value,
+                          }))
+                        }
                         placeholder="Name"
                         className="w-full rounded-lg border border-white/10 bg-navy-800 px-3 py-2 text-sm text-white placeholder-slate-500 focus:border-accent-500 focus:outline-none focus:ring-1 focus:ring-accent-500"
                       />
                     </div>
                     <div>
-                      <label className="mb-1 block text-xs font-medium text-slate-400">Email</label>
+                      <label
+                        htmlFor="onboarding-newMember-email"
+                        className="mb-1 block text-xs font-medium text-slate-400"
+                      >
+                        Email
+                      </label>
                       <input
+                        id="onboarding-newMember-email"
                         type="email"
                         value={newMember.email}
-                        onChange={(e) => setNewMember((prev) => ({ ...prev, email: e.target.value }))}
+                        onChange={(e) =>
+                          setNewMember((prev) => ({
+                            ...prev,
+                            email: e.target.value,
+                          }))
+                        }
                         placeholder="Email"
                         className="w-full rounded-lg border border-white/10 bg-navy-800 px-3 py-2 text-sm text-white placeholder-slate-500 focus:border-accent-500 focus:outline-none focus:ring-1 focus:ring-accent-500"
                       />
                     </div>
                   </div>
                   <div>
-                    <label className="mb-1 block text-xs font-medium text-slate-400">Role</label>
+                    <label
+                      htmlFor="onboarding-newMember-role"
+                      className="mb-1 block text-xs font-medium text-slate-400"
+                    >
+                      Role
+                    </label>
                     <select
+                      id="onboarding-newMember-role"
                       value={newMember.role}
-                      onChange={(e) => setNewMember((prev) => ({ ...prev, role: e.target.value as Role }))}
+                      onChange={(e) =>
+                        setNewMember((prev) => ({
+                          ...prev,
+                          role: e.target.value as Role,
+                        }))
+                      }
                       className="w-full rounded-lg border border-white/10 bg-navy-800 px-3 py-2 text-sm text-white focus:border-accent-500 focus:outline-none focus:ring-1 focus:ring-accent-500"
                     >
                       <option value="approver">Approver</option>
@@ -490,34 +647,54 @@ export default function Onboarding() {
                     </select>
                   </div>
                   <div className="flex gap-2 pt-1">
-                    <Button size="sm" onClick={handleAddMember} disabled={!newMember.walletAddress.trim()} className="flex-1">
+                    <Button
+                      size="sm"
+                      onClick={handleAddMember}
+                      disabled={!newMember.walletAddress.trim()}
+                      className="flex-1"
+                    >
                       Add
                     </Button>
-                    <Button size="sm" variant="secondary" onClick={() => setIsAddingMember(false)}>
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      onClick={() => setIsAddingMember(false)}
+                    >
                       Cancel
                     </Button>
                   </div>
                 </div>
               ) : (
-                <Button variant="secondary" onClick={() => setIsAddingMember(true)} className="w-full">
+                <Button
+                  variant="secondary"
+                  onClick={() => setIsAddingMember(true)}
+                  className="w-full"
+                >
                   <Plus className="h-4 w-4" />
                   Add a team member
                 </Button>
               )}
 
               {teamError && (
-                <div className="flex items-start gap-2 rounded-lg border border-red-500/30 bg-red-500/5 p-3">
+                <div
+                  role="alert"
+                  className="flex items-start gap-2 rounded-lg border border-red-500/30 bg-red-500/5 p-3"
+                >
                   <AlertCircle className="h-4 w-4 text-red-400 shrink-0 mt-0.5" />
                   <p className="text-sm text-red-400">{teamError}</p>
                 </div>
               )}
 
               <div className="flex gap-3 pt-2">
-                <Button variant="secondary" onClick={goBack} className="w-12 shrink-0">
+                <Button
+                  variant="secondary"
+                  onClick={goBack}
+                  className="w-12 shrink-0"
+                >
                   <ArrowLeft className="h-4 w-4" />
                 </Button>
                 <Button onClick={handleTeamNext} className="flex-1">
-                  {teamMembers.length === 0 ? 'Skip for now' : 'Continue'}
+                  {teamMembers.length === 0 ? "Skip for now" : "Continue"}
                   <ArrowRight className="h-4 w-4" />
                 </Button>
               </div>
@@ -527,12 +704,15 @@ export default function Onboarding() {
           {/* ================================================================
               STEP: SAFE
               ============================================================== */}
-          {step === 'safe' && (
+          {step === "safe" && (
             <div className="space-y-6">
               <div className="text-center">
-                <h1 className="text-2xl font-bold text-white">Set up your Safe wallet</h1>
+                <h1 className="text-2xl font-bold text-white">
+                  Set up your Safe wallet
+                </h1>
                 <p className="mt-2 text-slate-400">
-                  A Safe multisig wallet holds your organization's funds. Do you already have one?
+                  A Safe multisig wallet holds your organization's funds. Do you
+                  already have one?
                 </p>
               </div>
 
@@ -544,14 +724,18 @@ export default function Onboarding() {
                     className="rounded-xl border border-white/10 bg-navy-800 p-4 text-left transition-all hover:border-accent-500/40 hover:bg-navy-800/80"
                   >
                     <p className="font-semibold text-white">Yes, I have one</p>
-                    <p className="mt-1 text-xs text-slate-400">Link an existing Safe wallet</p>
+                    <p className="mt-1 text-xs text-slate-400">
+                      Link an existing Safe wallet
+                    </p>
                   </button>
                   <button
                     onClick={() => setHasSafe(false)}
                     className="rounded-xl border border-white/10 bg-navy-800 p-4 text-left transition-all hover:border-accent-500/40 hover:bg-navy-800/80"
                   >
                     <p className="font-semibold text-white">No, create one</p>
-                    <p className="mt-1 text-xs text-slate-400">We'll set it up for you</p>
+                    <p className="mt-1 text-xs text-slate-400">
+                      We'll set it up for you
+                    </p>
                   </button>
                 </div>
               )}
@@ -560,38 +744,65 @@ export default function Onboarding() {
               {hasSafe === true && (
                 <div className="space-y-4">
                   <div>
-                    <label className="mb-1.5 block text-sm font-medium text-slate-300">Safe address</label>
+                    <label
+                      htmlFor="onboarding-existingSafeAddress"
+                      className="mb-1.5 block text-sm font-medium text-slate-300"
+                    >
+                      Safe address
+                    </label>
                     <input
+                      id="onboarding-existingSafeAddress"
                       type="text"
                       value={existingSafeAddress}
-                      onChange={(e) => { setExistingSafeAddress(e.target.value); setSafeError(null); }}
+                      onChange={(e) => {
+                        setExistingSafeAddress(e.target.value);
+                        setSafeError(null);
+                      }}
                       placeholder="0x..."
                       autoFocus
                       className="w-full rounded-lg border border-white/10 bg-navy-800 px-4 py-2.5 font-mono text-sm text-white placeholder-slate-500 focus:border-accent-500 focus:outline-none focus:ring-1 focus:ring-accent-500"
                     />
                   </div>
                   <div>
-                    <label className="mb-1.5 block text-sm font-medium text-slate-300">Chain</label>
+                    <label
+                      htmlFor="onboarding-selectedChainId"
+                      className="mb-1.5 block text-sm font-medium text-slate-300"
+                    >
+                      Chain
+                    </label>
                     <select
+                      id="onboarding-selectedChainId"
                       value={selectedChainId}
-                      onChange={(e) => setSelectedChainId(Number(e.target.value))}
+                      disabled={deploying || linkingExisting}
+                      onChange={(e) =>
+                        setSelectedChainId(Number(e.target.value))
+                      }
                       className="w-full rounded-lg border border-white/10 bg-navy-800 px-4 py-2.5 text-base text-white focus:border-accent-500 focus:outline-none focus:ring-1 focus:ring-accent-500"
                     >
                       {CHAINS_LIST.map((c) => (
-                        <option key={c.chainId} value={c.chainId}>{c.chainName}</option>
+                        <option key={c.chainId} value={c.chainId}>
+                          {c.chainName}
+                        </option>
                       ))}
                     </select>
                   </div>
 
                   {safeError && (
-                    <div className="flex items-start gap-2 rounded-lg border border-red-500/30 bg-red-500/5 p-3">
+                    <div
+                      role="alert"
+                      className="flex items-start gap-2 rounded-lg border border-red-500/30 bg-red-500/5 p-3"
+                    >
                       <AlertCircle className="h-4 w-4 text-red-400 shrink-0 mt-0.5" />
                       <p className="text-sm text-red-400">{safeError}</p>
                     </div>
                   )}
 
                   <div className="flex gap-3 pt-2">
-                    <Button variant="secondary" onClick={() => setHasSafe(null)} className="w-12 shrink-0">
+                    <Button
+                      variant="secondary"
+                      onClick={() => setHasSafe(null)}
+                      className="w-12 shrink-0"
+                    >
                       <ArrowLeft className="h-4 w-4" />
                     </Button>
                     <Button
@@ -605,7 +816,7 @@ export default function Onboarding() {
                           Validating...
                         </>
                       ) : (
-                        'Link Safe'
+                        "Link Safe"
                       )}
                     </Button>
                   </div>
@@ -616,7 +827,14 @@ export default function Onboarding() {
               {hasSafe === false && (
                 <div className="space-y-4">
                   <div className="rounded-lg border border-white/10 bg-navy-800 p-4">
-                    <p className="text-sm font-medium text-slate-300">Owners</p>
+                    <p className="text-sm font-medium text-slate-300">
+                      Account owners
+                    </p>
+                    <p className="mt-2 text-xs leading-5 text-slate-400">
+                      Owners can authorize transfers and change account
+                      permissions outside Disburse. Choose them separately from
+                      application roles.
+                    </p>
                     <div className="mt-2 space-y-1.5">
                       <div className="flex items-center gap-2">
                         <span className="rounded bg-accent-500/15 px-2 py-0.5 text-xs font-mono text-accent-400">
@@ -625,18 +843,42 @@ export default function Onboarding() {
                         <span className="text-xs text-slate-500">(you)</span>
                       </div>
                       {teamMembers.map((m, idx) => (
-                        <div key={idx} className="flex items-center gap-2">
+                        <label key={idx} className="flex items-center gap-2">
+                          <input
+                            type="checkbox"
+                            disabled={deploying}
+                            checked={ownerWallets.includes(m.walletAddress)}
+                            onChange={(e) => {
+                              const next = e.target.checked
+                                ? [...ownerWallets, m.walletAddress]
+                                : ownerWallets.filter(
+                                    (a) => a !== m.walletAddress,
+                                  );
+                              setOwnerWallets(next);
+                              setSafeThreshold((t) =>
+                                Math.min(t, next.length + 1),
+                              );
+                            }}
+                          />
                           <span className="rounded bg-white/5 px-2 py-0.5 text-xs font-mono text-slate-300">
-                            {m.walletAddress.slice(0, 8)}...{m.walletAddress.slice(-4)}
+                            {m.walletAddress.slice(0, 8)}...
+                            {m.walletAddress.slice(-4)}
                           </span>
-                          {m.name && <span className="text-xs text-slate-500">{m.name}</span>}
-                        </div>
+                          {m.name && (
+                            <span className="text-xs text-slate-500">
+                              {m.name}
+                            </span>
+                          )}
+                        </label>
                       ))}
                     </div>
                   </div>
 
                   <div>
-                    <label className="mb-1.5 block text-sm font-medium text-slate-300">
+                    <label
+                      htmlFor="onboarding-safeThreshold"
+                      className="mb-1.5 block text-sm font-medium text-slate-300"
+                    >
                       Approval threshold
                     </label>
                     <p className="mb-2 text-xs text-slate-500">
@@ -644,50 +886,83 @@ export default function Onboarding() {
                     </p>
                     <div className="flex items-center gap-3">
                       <select
+                        id="onboarding-safeThreshold"
                         value={safeThreshold}
-                        onChange={(e) => setSafeThreshold(Number(e.target.value))}
+                        disabled={deploying}
+                        onChange={(e) =>
+                          setSafeThreshold(Number(e.target.value))
+                        }
                         className="w-24 rounded-lg border border-white/10 bg-navy-800 px-3 py-2 text-white focus:border-accent-500 focus:outline-none focus:ring-1 focus:ring-accent-500"
                       >
-                        {Array.from({ length: 1 + teamMembers.length }, (_, i) => i + 1).map((n) => (
-                          <option key={n} value={n}>{n}</option>
+                        {Array.from(
+                          { length: 1 + ownerWallets.length },
+                          (_, i) => i + 1,
+                        ).map((n) => (
+                          <option key={n} value={n}>
+                            {n}
+                          </option>
                         ))}
                       </select>
                       <span className="text-sm text-slate-400">
-                        of {1 + teamMembers.length} {1 + teamMembers.length === 1 ? 'owner' : 'owners'}
+                        of {1 + ownerWallets.length}{" "}
+                        {1 + ownerWallets.length === 1 ? "owner" : "owners"}
                       </span>
                     </div>
                   </div>
 
                   <div>
-                    <label className="mb-1.5 block text-sm font-medium text-slate-300">Chain</label>
+                    <label
+                      htmlFor="onboarding-selectedChainId"
+                      className="mb-1.5 block text-sm font-medium text-slate-300"
+                    >
+                      Chain
+                    </label>
                     <select
+                      id="onboarding-selectedChainId"
                       value={selectedChainId}
-                      onChange={(e) => setSelectedChainId(Number(e.target.value))}
+                      disabled={deploying || linkingExisting}
+                      onChange={(e) =>
+                        setSelectedChainId(Number(e.target.value))
+                      }
                       className="w-full rounded-lg border border-white/10 bg-navy-800 px-4 py-2.5 text-base text-white focus:border-accent-500 focus:outline-none focus:ring-1 focus:ring-accent-500"
                     >
                       {CHAINS_LIST.map((c) => (
-                        <option key={c.chainId} value={c.chainId}>{c.chainName}</option>
+                        <option key={c.chainId} value={c.chainId}>
+                          {c.chainName}
+                        </option>
                       ))}
                     </select>
                   </div>
 
                   <p className="text-xs text-slate-500">
-                    Clicking "Create Safe" will open a transaction approval in your wallet (e.g. MetaMask).
-                    This deploys the Safe contract — a small gas fee applies.
+                    Clicking "Create Safe" will open a transaction approval in
+                    your wallet (e.g. MetaMask). This deploys the Safe contract
+                    — a small gas fee applies.
                   </p>
 
                   {safeError && (
-                    <div className="flex items-start gap-2 rounded-lg border border-red-500/30 bg-red-500/5 p-3">
+                    <div
+                      role="alert"
+                      className="flex items-start gap-2 rounded-lg border border-red-500/30 bg-red-500/5 p-3"
+                    >
                       <AlertCircle className="h-4 w-4 text-red-400 shrink-0 mt-0.5" />
                       <p className="text-sm text-red-400">{safeError}</p>
                     </div>
                   )}
 
                   <div className="flex gap-3 pt-2">
-                    <Button variant="secondary" onClick={() => setHasSafe(null)} className="w-12 shrink-0">
+                    <Button
+                      variant="secondary"
+                      onClick={() => setHasSafe(null)}
+                      className="w-12 shrink-0"
+                    >
                       <ArrowLeft className="h-4 w-4" />
                     </Button>
-                    <Button onClick={handleCreateNewSafe} disabled={deploying} className="flex-1">
+                    <Button
+                      onClick={handleCreateNewSafe}
+                      disabled={deploying}
+                      className="flex-1"
+                    >
                       {deploying ? (
                         <>
                           <Loader2 className="h-4 w-4 animate-spin" />
@@ -710,8 +985,9 @@ export default function Onboarding() {
         </div>
 
         {/* Footer hint */}
-        <p className="mt-6 text-center text-xs text-slate-600">
-          You can always configure these settings later in your organization's Settings page.
+        <p className="mt-6 text-center text-xs text-slate-400">
+          You can always configure these settings later in your organization's
+          Settings page.
         </p>
       </div>
     </div>

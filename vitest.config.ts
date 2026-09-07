@@ -12,8 +12,16 @@ export default defineConfig({
   test: {
     // Global test configuration
     globals: true,
-    
-    // Project configuration for different test types (Vitest 4.x syntax)
+
+    // C-05 fix: convex-test relies on Vite transforms (import.meta.glob) inside
+    // its own bundle; without inlining, every backend suite fails at startup.
+    server: {
+      deps: {
+        inline: ['convex-test'],
+      },
+    },
+
+    // Project configuration for different test types (Vitest 3.x syntax)
     projects: [
       // Frontend tests
       {
