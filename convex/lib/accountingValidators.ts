@@ -13,6 +13,7 @@ export const accountingFact = v.object({
   safeId: v.id('safes'), accountAddress: v.string(), accountName: v.string(), counterpartyAddress: v.string(),
   direction: v.union(v.literal('inflow'), v.literal('outflow')), companyTransfer: v.boolean(), companyAccountName: v.optional(v.string()),
   invoiceAppliedRaw: v.optional(v.string()), invoiceExcessRaw: v.optional(v.string()),
+  treasuryTransferId: v.optional(v.id('treasuryTransfers')), deliveryFeeRaw: v.optional(v.string()),
   references: v.array(v.object({ kind: v.union(v.literal('bill'), v.literal('invoice')), id: v.string(), number: v.string() })),
 });
 export const reviewInput = {
@@ -20,6 +21,7 @@ export const reviewInput = {
   assetAccountId: v.optional(v.id('accountingAccounts')), counterAccountId: v.optional(v.id('accountingAccounts')),
   differenceAccountId: v.optional(v.id('accountingAccounts')),
   advanceAccountId: v.optional(v.id('accountingAccounts')), advanceBookValue: v.optional(v.string()),
+  deliveryFeeAccountId: v.optional(v.id('accountingAccounts')), deliveryFeeBookValue: v.optional(v.string()),
   assetBookValue: v.string(), obligationBookValue: v.optional(v.string()), bookReference: v.string(),
   externalName: v.optional(v.string()), valuationEvidence: v.string(), memo: v.string(),
 };

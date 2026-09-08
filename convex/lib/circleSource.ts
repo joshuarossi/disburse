@@ -1,4 +1,5 @@
 import { readCircleCancellation } from "./circleCancellation";
+import { readTreasuryTransfer } from "./treasuryTransfer";
 import { readDelegatedSource } from "./circleDelegation";
 import { v } from "convex/values";
 import type { ActionCtx, QueryCtx } from "../_generated/server";
@@ -21,6 +22,7 @@ import { decodeCircleRequest } from "../../shared/circleRequest";
 import { readScheduledSource } from "./scheduledPayment";
 
 export const circleSourceArgs = {
+  treasuryTransferId: v.optional(v.id("treasuryTransfers")),
   cancelExecutionId: v.optional(v.id("circleExecutions")),
   delegatedDisbursementId: v.optional(v.id("disbursements")),
   paymentScheduleId: v.optional(v.id("paymentSchedules")),
@@ -34,6 +36,7 @@ export const circleSourceArgs = {
   accountSetupId: v.optional(v.id("accountSetups")),
 };
 export type CircleSource = {
+  treasuryTransferId?: Id<"treasuryTransfers">;
   cancelExecutionId?: Id<"circleExecutions">;
   delegatedDisbursementId?: Id<"disbursements">;
   paymentScheduleId?: Id<"paymentSchedules">;
@@ -49,6 +52,7 @@ export type CircleSource = {
 export function circleSourceIdentity(s: CircleSource) {
   if (
     [
+      s.treasuryTransferId,
       s.cancelExecutionId,
       s.delegatedDisbursementId,
       s.paymentScheduleId,
@@ -63,6 +67,7 @@ export function circleSourceIdentity(s: CircleSource) {
     ].filter(Boolean).length !== 1
   )
     throw new Error("Choose one account instruction");
+  if (s.treasuryTransferId) return { treasuryTransferId: s.treasuryTransferId };
   if (s.cancelExecutionId) return { cancelExecutionId: s.cancelExecutionId };
   if (s.delegatedDisbursementId)
     return { delegatedDisbursementId: s.delegatedDisbursementId };
@@ -87,6 +92,8 @@ export async function readCircleSource(
   write = false,
 ) {
   const identity = circleSourceIdentity(source);
+  if (identity.treasuryTransferId)
+    return readTreasuryTransfer(ctx, identity.treasuryTransferId, sessionToken, write);
   if (identity.cancelExecutionId)
     return readCircleCancellation(
       ctx,
@@ -207,6 +214,8 @@ export async function verifyCircleSource(
   sessionToken: string,
 ): Promise<{ to: string; data: string; operation?: 0 | 1 }> {
   const identity = circleSourceIdentity(source);
+  if (identity.treasuryTransferId)
+    return ctx.runAction(internal.treasuryActions.verify, { treasuryTransferId: identity.treasuryTransferId, sessionToken });
   if (identity.cancelExecutionId)
     return (
       await ctx.runQuery(internal.delegatedCircle.cancellationContext, {

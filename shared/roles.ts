@@ -30,3 +30,7 @@ export const ACCOUNTING_EDITOR_ROLES: readonly OrgRole[] = [
   "clerk",
 ];
 export const SCREENING_REVIEWER_ROLES: readonly OrgRole[] = ["admin"];
+export const TREASURY_OPERATOR_ROLES: readonly OrgRole[] = [
+  "admin",
+  "approver",
+];

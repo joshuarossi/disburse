@@ -183,7 +183,48 @@ export default defineSchema({
     .index("by_org_open", ["orgId", "open"])
     .index("by_request", ["orgId", "requestId"])
     .index("by_due", ["recoveryAt"]),
+  treasuryTransfers: defineTable({
+    orgId: v.id("orgs"),
+    environment: v.union(v.literal("production"), v.literal("test")),
+    safeId: v.id("safes"),
+    destinationSafeId: v.id("safes"),
+    chainId: v.number(),
+    destinationChainId: v.number(),
+    createdBy: v.id("users"),
+    requestId: v.string(),
+    quote: v.string(),
+    hash: v.string(),
+    status: v.union(v.literal("quoted"), v.literal("approving"), v.literal("processing"), v.literal("delivering"), v.literal("completed"), v.literal("cancelled"), v.literal("failed"), v.literal("expired")),
+    open: v.boolean(),
+    circleExecutionId: v.optional(v.id("circleExecutions")),
+    cancellationRequestedAt: v.optional(v.number()),
+    sourceTxHash: v.optional(v.string()),
+    sourceTransferId: v.optional(v.string()),
+    sourceSettlement: v.optional(settlementBlockValidator),
+    destinationTxHash: v.optional(v.string()),
+    destinationTransferId: v.optional(v.string()),
+    destinationScanBlock: v.optional(v.string()),
+    deliveryHint: v.optional(v.string()),
+    destinationSettlement: v.optional(settlementBlockValidator),
+    deliveredAmount: v.optional(v.string()),
+    deliveryFee: v.optional(v.string()),
+    deliveryNonce: v.optional(v.string()),
+    error: v.optional(v.string()),
+    recoveryAt: v.optional(v.number()),
+    checks: v.number(),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_org", ["orgId"])
+    .index("by_request", ["orgId", "requestId"])
+    .index("by_safe_status", ["safeId", "status"])
+    .index("by_org_environment", ["orgId", "environment"])
+    .index("by_source_receipt", ["chainId", "sourceTxHash"])
+    .index("by_destination_receipt", ["destinationChainId", "destinationTxHash"])
+    .index("by_hash", ["hash"])
+    .index("by_due", ["recoveryAt"]),
   circleExecutions: defineTable({
+    treasuryTransferId: v.optional(v.id("treasuryTransfers")),
     cancelExecutionId: v.optional(v.id("circleExecutions")),
     delegatedDisbursementId: v.optional(v.id("disbursements")),
     paymentScheduleId: v.optional(v.id("paymentSchedules")),
@@ -226,6 +267,7 @@ export default defineSchema({
     feeProof: v.optional(circleFeeProofValidator),
     error: v.optional(v.string()),
   })
+    .index("by_treasury_transfer", ["treasuryTransferId"])
     .index("by_payment", ["disbursementId"])
     .index("by_delegated_payment", ["delegatedDisbursementId"])
     .index("by_cancel_execution", ["cancelExecutionId"])
@@ -328,6 +370,7 @@ export default defineSchema({
     assetBookValue: v.string(),
     obligationBookValue: v.optional(v.string()),
     advanceBookValue: v.optional(v.string()),
+    deliveryFeeBookValue: v.optional(v.string()),
     bookReference: v.string(),
     externalName: v.optional(v.string()),
     valuationEvidence: v.string(),
@@ -449,6 +492,7 @@ export default defineSchema({
       v.literal("deposits"),
       v.literal("outgoing"),
       v.literal("fees"),
+      v.literal("treasury"),
       v.literal("done"),
     ),
     cursor: v.optional(v.string()),
@@ -466,12 +510,14 @@ export default defineSchema({
       v.id("deposits"),
       v.id("outgoingTransfers"),
       v.id("circleExecutions"),
+      v.id("treasuryTransfers"),
     ),
     kind: v.union(
       v.literal("payment"),
       v.literal("deposit"),
       v.literal("outgoing"),
       v.literal("fee"),
+      v.literal("treasury"),
     ),
     nextAt: v.number(),
     attempts: v.number(),

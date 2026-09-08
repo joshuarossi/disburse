@@ -40,11 +40,12 @@ export function AccountingExport({ exportId, canReview, onClose }: { exportId: I
             transaction_hash: entry.fact.txHash, transfer_id: entry.fact.transferId, settled_utc: new Date(entry.fact.settledAt).toISOString(),
             settlement_block: entry.fact.blockNumber, block_hash: entry.fact.blockHash ?? '', date_evidence: entry.fact.dateSource,
             valuation_evidence: entry.valuationEvidence, source_documents: entry.fact.references.map(ref => `${ref.kind}:${ref.id}:${ref.number}`).join(' | '),
+            company_transfer_id: entry.fact.treasuryTransferId ?? '', delivery_fee_raw_usdc: entry.fact.deliveryFeeRaw ?? '', delivery_fee_book_value: entry.deliveryFeeBookValue ?? '',
           })));
           exportToCsv(`disburse_reconciliation_${exportId}`, rows, Object.keys(rows[0] ?? {}).map(key => ({ key, label: key })));
         }}>Download reconciliation evidence</button>
       </div>
-      <p className="text-xs text-slate-400">The journal CSV uses the fields supported by QuickBooks journal import. Map the date format and existing accounts in the importer. Reconciliation evidence repeats the movement reference on each journal line; asset quantities are not additive across lines or corrections.</p>
+      <p className="text-xs text-slate-400">The journal CSV uses the fields supported by QuickBooks journal import. Map the date format and existing accounts in the importer. Reconciliation evidence repeats the movement reference on each journal line; asset quantities and delivery-fee evidence are not additive across lines or corrections.</p>
       {data.entries.map(entry => <details key={entry._id} className="space-y-3 rounded-xl border border-white/10 p-4">
         <summary className="cursor-pointer text-sm font-medium">{entry.journalNumber} · {entry.postingDate} · {entry.memo}</summary>
         <JournalPreview lines={entry.lines} currency={entry.currency} />

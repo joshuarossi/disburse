@@ -12,19 +12,23 @@ export function accountingFixture(name: string, args: any, scenario: string | nu
     ['expense', '6100', 'Professional services', 'expense'],
     ['loss', '7100', 'Realized losses', 'expense'],
     ['gain', '4100', 'Realized gains', 'income'],
+    ['clearing', '0015', 'Transfers in transit', 'asset'],
+    ['delivery', '6110', 'Transfer delivery fees', 'expense'],
   ].map(([_id, externalId, label, kind]) => ({ _id, externalId, name: label, kind, orgId: 'demo', active: true, version: 1, updatedAt: 1 }));
   const snapshot = (id: string) => { const { _id, ...account } = accounts.find(a => a._id === id)!; return { ...account, id: _id }; };
   const profile = { _id: 'profile', orgId: 'demo', currency: 'USD', bookName: 'Northstar · QuickBooks', version: 2, nextJournal: 3, updatedAt: 1 };
   const excess = scenario === 'accounting-excess';
+  const treasury = scenario === 'accounting-treasury';
   const fact = { key: `8453:e${'ab'.repeat(32)}4`, fingerprint: 'verified-settlement-identity',
     source: { kind: excess ? 'receipt' : 'activity', id: excess ? 'receipt1' : 'activity1' }, label: excess ? 'Invoice INV-1042 · Acme Studio' : 'Studio North · INV-1042',
     chainId: 8453, token: 'USDC', tokenAddress: configuredTokenAddress(8453, 'USDC'), decimals: 6,
     amount: excess ? '1250.000001' : '100.000001', amountRaw: excess ? '1250000001' : '100000001', transferId: `e${'ab'.repeat(32)}4`, txHash: `0x${'ab'.repeat(32)}`,
     blockNumber: '123', blockHash: `0x${'cd'.repeat(32)}`, settledAt: Date.UTC(2026, 7, 31, 23, 59, 59), dateSource: 'settlement', environment: 'production',
     safeId: 'safe1', accountAddress: safes[0].safeAddress, accountName: excess ? 'Invoice INV-1042 receiving account' : 'Operations',
-    counterpartyAddress: wallet, direction: excess ? 'inflow' : 'outflow', companyTransfer: false,
+    counterpartyAddress: wallet, direction: excess || treasury ? 'inflow' : 'outflow', companyTransfer: treasury,
     references: [{ kind: excess ? 'invoice' : 'bill', id: 'bill1', number: 'INV-1042' }],
     ...(excess ? { invoiceAppliedRaw: '1000000000', invoiceExcessRaw: '250000001' } : {}),
+    ...(treasury ? { treasuryTransferId: 'treasury1', deliveryFeeRaw: '200000', amount: '100.05', amountRaw: '100050000', label: 'Transfer from Operations', companyAccountName: 'Operations' } : {}),
   };
   const entry = { _id: 'journal1', _creationTime: 1, orgId: 'demo', journalNumber: 'DSB-1', fact, currency: 'USD', treatment: 'existing_payable',
     postingDate: '2026-08-31', assetBookValue: '99.80', obligationBookValue: '100.00', bookReference: 'QBO-BILL-1042', externalName: 'Studio North',
@@ -50,8 +54,8 @@ export function accountingFixture(name: string, args: any, scenario: string | nu
     case 'accounting:listExports': return page(args.environment === 'test' ? [] : [batch]);
     case 'accounting:exportDetails': return { batch, entries: [{ ...entry, state: 'exported', exportId: 'export1' }] };
     case 'reports:getTransactionReport': return { items: [{ ...identifyAsset(8453, fact.tokenAddress, 'USDC'),
-      rowId: 'activity1', sourceId: 'payment1', createdAt: fact.settledAt, kind: 'payment', status: 'executed', direction: 'outflow',
-      safeId: 'safe1', accountAddress: fact.accountAddress, beneficiaryName: fact.label, beneficiaryWallet: wallet, amount: '100.000001',
+      rowId: 'activity1', sourceId: 'payment1', createdAt: fact.settledAt, kind: treasury ? 'deposit' : 'payment', status: 'executed', direction: fact.direction,
+      safeId: 'safe1', accountAddress: fact.accountAddress, beneficiaryName: fact.label, beneficiaryWallet: wallet, amount: fact.amount,
       includedInTotals: true }], totals: [], assets: [], isDone: true, continueCursor: '', indexVersion: 1, indexing: false, indexErrors: [], rangeError: '' };
   }
 }

@@ -9,6 +9,36 @@ async function openAccounting(page: Page, scenario = 'accounting') {
   await page.getByRole('button', { name: 'Reconciliation', exact: true }).click();
 }
 
+for (const [theme, width] of [['light', 1440], ['dark', 390]] as const) test(`${theme}: reconcile net company transfer and retained delivery fee through clearing`, async ({ page }, info) => {
+  await page.setViewportSize({ width, height: 1000 });
+  await page.addInitScript(value => localStorage.setItem('theme', value), theme);
+  await openAccounting(page, 'accounting-treasury');
+  await page.getByRole('button', { name: 'Review with books', exact: true }).click();
+  const dialog = page.getByRole('dialog');
+  await expect(dialog).toContainText('100.05 USDC');
+  await expect(dialog).toContainText('same transfer clearing account');
+  const treatment = dialog.getByLabel('How is this recorded in your books?');
+  await expect(treatment.locator('option')).toHaveCount(3);
+  await treatment.selectOption('internal_transfer');
+  await dialog.getByLabel('Offset account in your books').selectOption('clearing');
+  await dialog.getByLabel('Book / obligation reference').fill('CCTP-TRANSFER-1');
+  await dialog.getByLabel('Asset book value · USD', { exact: true }).fill('100.05');
+  await expect(dialog.getByRole('button', { name: 'Prepare journal' })).toBeDisabled();
+  await dialog.getByLabel('Delivery fee book value · USD', { exact: true }).fill('0.20');
+  await dialog.getByLabel('Delivery fee expense account').selectOption('delivery');
+  await dialog.getByLabel('Book value evidence').fill('Reviewed USDC carrying value and Circle delivery receipt');
+  const journal = width < 640 ? dialog.getByRole('list', { name: 'Journal preview in USD' }) : dialog.getByRole('table', { name: 'Journal preview in USD' });
+  await expect(journal).toContainText('100.25');
+  await expect(journal).toContainText('Transfer delivery fees');
+  await expect(journal).toContainText('0.20');
+  await dialog.getByRole('checkbox', { name: 'I reviewed the book values' }).check();
+  await dialog.getByRole('button', { name: 'Prepare journal', exact: true }).click();
+  expect(await page.evaluate(() => JSON.parse(sessionStorage.getItem('qa:lastMutation')!).args)).toMatchObject({ treatment: 'internal_transfer', assetBookValue: '100.05', deliveryFeeBookValue: '0.20', deliveryFeeAccountId: 'delivery', counterAccountId: 'clearing' });
+  expect((await new AxeBuilder({ page }).include('dialog').analyze()).violations).toEqual([]);
+  await journal.scrollIntoViewIfNeeded();
+  await page.screenshot({ path: info.outputPath(`treasury-journal-${theme}.png`) });
+});
+
 for (const [theme, width] of [['light', 1440], ['dark', 390]] as const) {
   test(`an accountant settles an existing bill without recording a second expense in ${theme}`, async ({ page }) => {
     await page.setViewportSize({ width, height: 1000 });

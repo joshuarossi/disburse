@@ -100,11 +100,11 @@ Build details and research: [receivables design](docs/ACCOUNTS_RECEIVABLE.md).
 - [ ] Y02 Build provider adapters for position discovery, deposit/withdraw quotes, approvals, transaction tracking, earnings and accounting. Disburse must not operate the strategy or take custody.
 - [ ] Y03 Add an Earn flow showing provider, underlying activity, variable rate, fees, withdrawal delay and funds available for payments. Require reviewed limits and team authorization.
 - [ ] Y04 Test rejected/stale quotes, withdrawal delays, provider outages, depegs and position reconciliation. Do not treat invested balances as immediately spendable payroll funds.
-- [ ] C01 Research swap/bridge providers and select adapters by asset/network coverage, route availability, fees and noncustodial execution.
-- [ ] C02 Build conversion quotes with source/destination accounts, minimum received, expiry, slippage, allowance limits and complete costs.
-- [ ] C03 Add reviewed swap/bridge execution, durable transaction tracking, partial-route/recovery handling and accounting for fees and asset movements.
-- [ ] C04 Keep conversion separate from recipient instructions: convert funding with explicit approval, then pay the exact requested currency/network.
-- [ ] C05 Validate mainnet/testnet separation, provider failures, delayed bridges, refunds and stale quotes before enabling each integration.
+- [ ] C01 Circle CCTP Forwarding Service is selected and integrated for USDC account bridging, with no operator-paid API or relay. Base/Arbitrum production contracts and Base Sepolia/Sepolia test contracts are verified and pinned. Token-swap selection remains. See [account transfers](docs/ACCOUNT_TRANSFERS.md).
+- [ ] C02 USDC bridge quotes bind connected source/destination accounts, minimum received, expiry, exact allowance, delivery cap and separate USDC execution costs. Same-network token-swap quotes remain.
+- [ ] C03 Account bridging now has current owner approvals, one saved submission, unsigned discard, signed cancellation before submission, background delivery checks and canonical receipt matching. Gross debit, net receipt and retained fees reconcile through a reviewed clearing account without duplicate history rows. Live Base Sepolia → Sepolia forwarding passed with the source and delivery fees paid in USDC, zero source ETH, exact receiving balance and both canonical receipts. Direct on-chain receipt recovery also passed. Token-swap execution remains.
+- [x] C04 Account transfers use separate company-account instructions and explicit owner approval. They do not change beneficiary records or the currency/network requested on a payment.
+- [ ] C05 Bridge tests cover environment separation, malformed quotes, account changes, rejected approvals, lost responses, quote expiry, failed execution, delayed delivery, signed cancellation and accounting exports. Actual Base Sepolia → Sepolia forwarding acceptance passed. A sandbox composable-hook incompatibility was fixed by using the verified single-hook format; the experimental transfer was recovered and documented separately. Other provider adapters remain disabled until their own verification.
 
 ## Follow-on integrations
 

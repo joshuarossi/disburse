@@ -9,6 +9,7 @@ import {
 } from "../../../shared/circleRequest";
 import { safes, wallet } from "./fixtures";
 import type { Address } from "viem";
+import { cctpCall, decodeCctpQuote } from "../../../shared/cctp";
 export function readCircleFixture() {
   return JSON.parse(sessionStorage.getItem("qa:circle") ?? "null");
 }
@@ -67,6 +68,17 @@ export function createCircleFixture() {
       request.validUntil,
       `0x${"11".repeat(32)}${"22".repeat(32)}1b`,
     );
+  }
+  const transfer = JSON.parse(sessionStorage.getItem("qa:treasury") ?? "null");
+  if (sessionStorage.getItem("qa:scenario")?.startsWith("circle-treasury-") && transfer) {
+    const quote = decodeCctpQuote(transfer.quote), call = transfer.cancellationRequestedAt ? { to: safe, data: "0x" as const, operation: 0 as const } : cctpCall(quote);
+    request.transaction = call;
+    request.directCall = true;
+    request.originalHash = transfer.hash;
+    request.validUntil = Math.floor(quote.expiresAt / 1000);
+    request.operation.nonce = 3n << 64n;
+    request.operation.callData = circleAccountCall(call.to, call.data, call.operation);
+    request.operation.signature = circleSignature(0, request.validUntil, `0x${"11".repeat(32)}${"22".repeat(32)}1b`);
   }
   const result = {
     _id: "circle1",

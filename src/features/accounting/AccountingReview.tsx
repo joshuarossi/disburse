@@ -91,6 +91,8 @@ function ReviewForm({ orgId, details, config, onSaved }: { orgId: Id<'orgs'>; de
   const [differenceId, setDifferenceId] = useState(previous?.lines.slice(2).find(line => ['income', 'expense'].includes(line.account.kind))?.account.id ?? '');
   const [advanceId, setAdvanceId] = useState(previous?.lines.slice(2).find(line => line.account.kind === 'liability')?.account.id ?? '');
   const [advanceValue, setAdvanceValue] = useState(previous?.advanceBookValue ?? '');
+  const [deliveryFeeValue, setDeliveryFeeValue] = useState(previous?.deliveryFeeBookValue ?? '');
+  const [deliveryFeeId, setDeliveryFeeId] = useState(previous?.deliveryFeeBookValue !== undefined ? previous.lines.slice(2).find(line => line.account.kind === 'expense')?.account.id ?? '' : '');
   const [assetValue, setAssetValue] = useState(previous?.assetBookValue ?? '');
   const [obligationValue, setObligationValue] = useState(previous?.obligationBookValue ?? '');
   const [postingDate, setPostingDate] = useState(previous ? new Date().toISOString().slice(0, 10) : new Date(fact.settledAt).toISOString().slice(0, 10));
@@ -110,6 +112,8 @@ function ReviewForm({ orgId, details, config, onSaved }: { orgId: Id<'orgs'>; de
   const obligation = treatment === 'existing_payable' || treatment === 'existing_receivable';
   const receiptHasExcess = !!fact.invoiceExcessRaw && BigInt(fact.invoiceExcessRaw) > 0n;
   const needsAdvance = treatment === 'existing_receivable' && receiptHasExcess;
+  const deliveryFeeRequired = !!fact.deliveryFeeRaw && BigInt(fact.deliveryFeeRaw) > 0n;
+  const needsDeliveryFee = treatment === 'internal_transfer' && deliveryFeeRequired;
   let lines: JournalLine[] = [], previewError = '';
   try {
     if (!treatment) throw new Error('Choose how this movement should be reconciled');
@@ -117,7 +121,8 @@ function ReviewForm({ orgId, details, config, onSaved }: { orgId: Id<'orgs'>; de
     else lines = buildSettlementJournal({ treatment, direction: fact.direction, currency: profile.currency,
       assetBookValue: assetValue, obligationBookValue: obligationValue, assetAccount: account(assetId), counterAccount: account(counterId),
       differenceAccount: differenceId ? account(differenceId) : undefined, externalName, companyTransfer: fact.companyTransfer,
-      receiptHasExcess, advanceBookValue: advanceValue, advanceAccount: advanceId ? account(advanceId) : undefined });
+      receiptHasExcess, advanceBookValue: advanceValue, advanceAccount: advanceId ? account(advanceId) : undefined,
+      deliveryFeeRequired, deliveryFeeBookValue: deliveryFeeValue, deliveryFeeAccount: deliveryFeeId ? account(deliveryFeeId) : undefined });
   } catch (e) { previewError = userErrorMessage(e, 'Review the journal values'); }
   const options = (Object.keys(accountingTreatments) as AccountingTreatment[]).filter(value => value === 'already_recorded'
     || (fact.companyTransfer ? value === 'internal_transfer'
@@ -138,6 +143,8 @@ function ReviewForm({ orgId, details, config, onSaved }: { orgId: Id<'orgs'>; de
         differenceAccountId: differenceId ? differenceId as Id<'accountingAccounts'> : undefined,
         advanceAccountId: needsAdvance && advanceId ? advanceId as Id<'accountingAccounts'> : undefined,
         advanceBookValue: needsAdvance ? advanceValue : undefined,
+        deliveryFeeBookValue: needsDeliveryFee ? deliveryFeeValue : undefined,
+        deliveryFeeAccountId: needsDeliveryFee && deliveryFeeId ? deliveryFeeId as Id<'accountingAccounts'> : undefined,
         bookReference: reference, externalName: externalName || undefined, valuationEvidence: evidence, memo,
         replaces: previous?._id, correctionReason: previous ? reason : undefined });
       onSaved();
@@ -147,6 +154,7 @@ function ReviewForm({ orgId, details, config, onSaved }: { orgId: Id<'orgs'>; de
     <p className="text-sm text-slate-400">Book values are in {profile.currency}. Use the carrying value and obligation balance from {profile.bookName}. The settled quantity remains {fact.amount} {fact.token}.</p>
     {previous && <Notice tone="info">{previous.state === 'reconciled' ? 'This correction creates a reversal and a replacement for export together. The original journal is retained.' : 'The unexported review will be retained as voided and replaced with this journal.'}</Notice>}
     {error && <Notice>{error}</Notice>}
+    {fact.treasuryTransferId && <Notice tone="info">Reconcile both sides through the same transfer clearing account. The sending account records the full debit; the receiving account records its net receipt and the provider's retained delivery fee. Keep the separate execution fee in its own review.</Notice>}
     <label className="block"><span className="finance-label">How is this recorded in your books?</span>
       <select className="finance-field" value={treatment} onChange={e => { setTreatment(e.target.value as AccountingTreatment); setCounterId(''); setDifferenceId(''); setReviewed(false); }} required>
         <option value="">Choose accounting treatment</option>{options.map(value => <option key={value} value={value}>{accountingTreatments[value]}</option>)}
@@ -164,6 +172,10 @@ function ReviewForm({ orgId, details, config, onSaved }: { orgId: Id<'orgs'>; de
       <label><span className="finance-label">Asset book value · {profile.currency}</span><input className="finance-field" inputMode="decimal" value={assetValue} onChange={e => { setAssetValue(e.target.value); setReviewed(false); }} placeholder="Enter the reviewed book value" required /></label>
       {obligation && <label><span className="finance-label">Obligation settled · {profile.currency}</span><input className="finance-field" inputMode="decimal" value={obligationValue} onChange={e => { setObligationValue(e.target.value); setReviewed(false); }} placeholder="Value of this settlement in the books" required /></label>}
     </div>
+    {needsDeliveryFee && <div className="grid gap-4 sm:grid-cols-2">
+      <label><span className="finance-label">Delivery fee book value · {profile.currency}</span><input className="finance-field" inputMode="decimal" value={deliveryFeeValue} onChange={e => { setDeliveryFeeValue(e.target.value); setReviewed(false); }} required placeholder="Reviewed value of the retained fee" /></label>
+      {selectAccount('Delivery fee expense account', deliveryFeeId, setDeliveryFeeId, ['expense'])}
+    </div>}
     {obligation && <>
       <label className="block"><span className="finance-label">Vendor or customer name in the books</span><input className="finance-field" value={externalName} onChange={e => { setExternalName(e.target.value); setReviewed(false); }} maxLength={200} required /></label>
       {needsAdvance && <div className="grid gap-4 sm:grid-cols-2">

@@ -10,6 +10,7 @@ import { generatePrivateKey, privateKeyToAccount } from "viem/accounts";
 import {
   circleFeeSigningData,
   circleRootSigningData,
+  circleValidityWindow,
   decodeCircleRequest,
   encodeCircleRequest,
   type CircleRequest,
@@ -25,6 +26,20 @@ import {
   safeMessageTypes,
 } from "../../../shared/safeSignatures";
 import fixture from "./fixtures/circleRecoveryOperation.json";
+
+it("accepts a short immediate provider quote without treating zero as its start date", () => {
+  const now = 1_783_000_000, quote = { validAfter: 0, validUntil: now + 600 };
+  expect(circleValidityWindow(quote, now, true)).toEqual(quote);
+  expect(() => circleValidityWindow({ ...quote, validUntil: now + 60 }, now, true)).toThrow("fresh quote");
+  expect(() => circleValidityWindow({ ...quote, validUntil: now + 86401 }, now, true)).toThrow();
+  expect(() => circleValidityWindow(quote, now, false)).toThrow();
+});
+it("preserves scheduled authorization boundaries when accepting immediate quotes", () => {
+  const now = 1_783_000_000, validAfter = now + 89 * 86400;
+  expect(circleValidityWindow({ validAfter, validUntil: validAfter + 86400 }, now, true).validAfter).toBe(validAfter);
+  for (const window of [{ validAfter, validUntil: validAfter + 86401 }, { validAfter: now + 91 * 86400, validUntil: now + 92 * 86400 }, { validAfter, validUntil: validAfter }, { validAfter: NaN, validUntil: now + 600 }])
+    expect(() => circleValidityWindow(window, now, true)).toThrow();
+});
 
 const uintFields = [
   "nonce",

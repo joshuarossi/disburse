@@ -29,7 +29,8 @@ function finish(fact: Omit<AccountingFact, 'key' | 'fingerprint'>): AccountingFa
   const to = fact.direction === 'inflow' ? fact.accountAddress : fact.counterpartyAddress;
   const key = `${fact.chainId}:${fact.transferId.toLowerCase()}`;
   return { ...fact, key, fingerprint: [key, fact.tokenAddress.toLowerCase(), fact.amountRaw, from.toLowerCase(), to.toLowerCase(),
-    fact.blockNumber, fact.blockHash ?? '', fact.settledAt, fact.companyTransfer, fact.invoiceAppliedRaw ?? '', fact.invoiceExcessRaw ?? ''].join('|') };
+    fact.blockNumber, fact.blockHash ?? '', fact.settledAt, fact.companyTransfer, fact.invoiceAppliedRaw ?? '', fact.invoiceExcessRaw ?? '',
+    ...(fact.treasuryTransferId ? [fact.treasuryTransferId, fact.deliveryFeeRaw ?? ''] : [])].join('|') };
 }
 
 /** Read the underlying records again, not just an asynchronously built report.
@@ -76,7 +77,8 @@ export async function loadAccountingFact(ctx: QueryCtx, orgId: Id<'orgs'>, sourc
   const indexed = await ctx.db.query('reportEntries').withIndex('by_org_row', q => q.eq('orgId', orgId).eq('rowId', source.id)).unique();
   if (!indexed) throw new Error('Activity not found. Refresh account history before reconciling.');
   let rows: ReportRow[];
-  if (indexed.kind === 'deposit') rows = await depositReportRows(ctx, indexed.sourceId as Id<'deposits'>);
+  if (indexed.treasuryTransferId) rows = await treasuryReportRows(ctx, indexed.treasuryTransferId);
+  else if (indexed.kind === 'deposit') rows = await depositReportRows(ctx, indexed.sourceId as Id<'deposits'>);
   else if (indexed.kind === 'account_transfer') rows = await outgoingReportRows(ctx, indexed.sourceId as Id<'outgoingTransfers'>);
   else if (indexed.kind === 'fee' && ctx.db.normalizeId('circleExecutions', indexed.sourceId)) rows = await circleFeeReportRows(ctx, indexed.sourceId as Id<'circleExecutions'>);
   else rows = await paymentReportRows(ctx, indexed.sourceId as Id<'disbursements'>);
@@ -94,7 +96,10 @@ export async function loadAccountingFact(ctx: QueryCtx, orgId: Id<'orgs'>, sourc
   if (!/^\d{1,100}$/.test(raw) || BigInt(raw) <= 0n) throw new Error('This movement has no positive settled quantity');
   const account = await ctx.db.get(row.safeId);
   if (account?.orgId !== orgId) throw new Error('Account not found in this workspace');
-  const companyAccountName = await companyLocation(ctx, orgId, row.chainId, row.beneficiaryWallet);
+  const transfer = row.treasuryTransferId ? await ctx.db.get(row.treasuryTransferId) : null;
+  if (row.treasuryTransferId && transfer?.orgId !== orgId) throw new Error('The company transfer could not be verified');
+  const other = transfer ? await ctx.db.get(row.direction === 'outflow' ? transfer.destinationSafeId : transfer.safeId) : null;
+  const companyAccountName = transfer ? other?.name ?? 'Company account' : await companyLocation(ctx, orgId, row.chainId, row.beneficiaryWallet);
   const bills = row.kind === 'payment' ? await ctx.db.query('invoices').withIndex('by_payment', q => q.eq('disbursementId', row.sourceId as Id<'disbursements'>)).take(101) : [];
   if (bills.length > 100) throw new Error('This payment exceeds the bill-reference review limit');
   return finish({ source, label: row.memo ? `${row.beneficiaryName} · ${row.memo}` : row.beneficiaryName,
@@ -104,6 +109,8 @@ export async function loadAccountingFact(ctx: QueryCtx, orgId: Id<'orgs'>, sourc
     environment: row.environment, safeId: row.safeId, accountAddress: row.accountAddress.toLowerCase(),
     accountName: account.name ?? 'Company account', counterpartyAddress: row.beneficiaryWallet.toLowerCase(),
     direction: row.direction, companyTransfer: !!companyAccountName, companyAccountName,
+    treasuryTransferId: transfer?._id, deliveryFeeRaw: transfer && row.direction === 'inflow' ? transfer.deliveryFee : undefined,
     references: bills.filter(bill => bill.orgId === orgId && bill.beneficiaryId === row.beneficiaryId).map(bill => ({ kind: 'bill', id: bill._id, number: bill.invoiceNumber })),
   });
 }
+import { treasuryReportRows } from './treasuryReports';

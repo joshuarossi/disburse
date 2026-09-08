@@ -20,6 +20,7 @@ export function CustomerPaidExecution({
   onBusyChange,
   compact = false,
   armed = false,
+  principalUSDC,
 }: {
   source: CircleSource;
   ready: boolean;
@@ -28,37 +29,42 @@ export function CustomerPaidExecution({
   onBusyChange: (busy: boolean) => void;
   compact?: boolean;
   armed?: boolean;
+  principalUSDC?: string;
 }) {
-  const subject = source.accountSetupId
-    ? "account setup"
-    : source.billingCheckoutId
-      ? "subscription"
-      : source.disbursementId ||
-          source.paymentScheduleId ||
-          source.delegatedDisbursementId
-        ? "payment"
-        : source.policyChangeId
-          ? "policy"
-          : source.receivableId
-            ? "collection"
-            : source.receivingSetupSafeId
-              ? "receiving setup"
-              : "cancellation";
+  const subject = source.treasuryTransferId
+    ? "account transfer"
+    : source.accountSetupId
+      ? "account setup"
+      : source.billingCheckoutId
+        ? "subscription"
+        : source.disbursementId ||
+            source.paymentScheduleId ||
+            source.delegatedDisbursementId
+          ? "payment"
+          : source.policyChangeId
+            ? "policy"
+            : source.receivableId
+              ? "collection"
+              : source.receivingSetupSafeId
+                ? "receiving setup"
+                : "cancellation";
   const submitLabel = source.paymentScheduleId
     ? "Schedule payment"
-    : subject === "account setup"
-      ? "Create company account"
-      : subject === "subscription"
-        ? "Pay subscription"
-        : subject === "payment"
-          ? "Send payment"
-          : subject === "policy"
-            ? "Apply policy"
-            : subject === "collection"
-              ? "Collect invoice funds"
-              : subject === "receiving setup"
-                ? "Set up receiving"
-                : "Confirm cancellation";
+    : subject === "account transfer"
+      ? "Start transfer"
+      : subject === "account setup"
+        ? "Create company account"
+        : subject === "subscription"
+          ? "Pay subscription"
+          : subject === "payment"
+            ? "Send payment"
+            : subject === "policy"
+              ? "Apply policy"
+              : subject === "collection"
+                ? "Collect invoice funds"
+                : subject === "receiving setup"
+                  ? "Set up receiving"
+                  : "Confirm cancellation";
   const sessionToken = useSessionToken(),
     { address } = useAccount();
   const execution = useQuery(
@@ -156,9 +162,11 @@ export function CustomerPaidExecution({
     >
       <div>
         <h3 className="font-semibold text-[var(--ws-text)]">
-          {source.paymentScheduleId
-            ? "Fee and approvals"
-            : `${submitLabel} with fees in USDC`}
+          {execution && !execution.open
+            ? "Execution receipt"
+            : source.paymentScheduleId
+              ? "Fee and approvals"
+              : `${submitLabel} with fees in USDC`}
         </h3>
         <p className="mt-1 text-sm text-[var(--ws-muted)]">
           Your company account pays the execution service directly.
@@ -191,6 +199,20 @@ export function CustomerPaidExecution({
             <dd className="text-right tabular-nums font-medium">
               {formatUnits(BigInt(request.permit.amount), 6)} USDC
             </dd>
+            {principalUSDC !== undefined && (
+              <>
+                <dt className="text-[var(--ws-muted)]">
+                  Maximum total account debit
+                </dt>
+                <dd className="text-right tabular-nums font-medium">
+                  {formatUnits(
+                    BigInt(principalUSDC) + BigInt(request.permit.amount),
+                    6,
+                  )}{" "}
+                  USDC
+                </dd>
+              </>
+            )}
             {execution.fee !== undefined && (
               <>
                 <dt className="text-[var(--ws-muted)]">Actual fee charged</dt>
@@ -203,12 +225,7 @@ export function CustomerPaidExecution({
               <>
                 <dt className="text-[var(--ws-muted)]">Approval expires</dt>
                 <dd className="text-right">
-                  {source.paymentScheduleId
-                    ? scheduleDateTime(request.validUntil * 1000)
-                    : new Date(request.validUntil * 1000).toLocaleString([], {
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      })}
+                  {scheduleDateTime(request.validUntil * 1000)}
                 </dd>
               </>
             )}
@@ -243,8 +260,8 @@ export function CustomerPaidExecution({
           )}
           {execution.stage === "confirmed" && (
             <Notice tone="info">
-              The execution service completed its request. The account receipt
-              determines whether the {subject} completed.
+              The execution is confirmed. Its verified service fee is shown
+              above.
             </Notice>
           )}
           {execution.stage === "cancelled" && (
@@ -413,7 +430,7 @@ export function CustomerPaidExecution({
           {busy ? "Getting fee…" : "Review execution fee"}
         </button>
       )}
-      {!execution && !ready && (
+      {execution === null && !ready && (
         <p className="text-sm text-[var(--ws-muted)]">
           Complete the {subject} approvals to review its execution fee.
         </p>

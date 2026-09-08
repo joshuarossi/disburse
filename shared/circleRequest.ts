@@ -186,3 +186,29 @@ export function decodeCircleRequest(encoded: string): CircleRequest {
     );
   }
 }
+/** Immediate provider quotes start now; a zero validAfter is not Unix epoch
+ * authorization duration. Scheduled requests retain a maximum one-day window. */
+export function circleValidityWindow(
+  window: { validAfter: number; validUntil: number } | undefined,
+  blockTime: number,
+  directCall = false,
+) {
+  if (!window) return { validAfter: 0, validUntil: blockTime + 1800 };
+  const { validAfter, validUntil } = window;
+  if (
+    !directCall ||
+    !Number.isSafeInteger(validAfter) ||
+    !Number.isSafeInteger(validUntil) ||
+    validAfter < 0 ||
+    validUntil <= blockTime + 60 ||
+    validUntil <= validAfter ||
+    validUntil - (validAfter || blockTime) > 86400 ||
+    validAfter > blockTime + 90 * 86400
+  )
+    throw new Error(
+      validAfter === 0
+        ? "This quote is no longer ready for approval. Review a fresh quote."
+        : "Choose a payment date within the next 90 days.",
+    );
+  return { validAfter, validUntil };
+}

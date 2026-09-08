@@ -2,6 +2,7 @@ import { settleCircleCancellation } from "./lib/circleCancellation";
 import { settleDelegatedCircle } from "./lib/circleDelegation";
 import { assertDelegatedCircleReceipt } from "../shared/delegatedSettlement";
 import { v } from "convex/values";
+import { assertCctpBurn, decodeCctpQuote } from "../shared/cctp";
 import {
   action,
   internalAction,
@@ -88,6 +89,8 @@ export const get = query({
       args,
       args.sessionToken,
     );
+    if (source.treasuryTransferId)
+      return ctx.db.query("circleExecutions").withIndex("by_treasury_transfer", q => q.eq("treasuryTransferId", source.treasuryTransferId)).order("desc").first();
     if (source.paymentScheduleId || source.scheduleCancellationId) {
       const schedule = await ctx.db.get(
         (source.paymentScheduleId ?? source.scheduleCancellationId)!,
@@ -417,6 +420,8 @@ export const persist = internalMutation({
       await ctx.db.patch(source.identity.delegatedDisbursementId, {
         allowanceCircleExecutionId: id,
       });
+    if (source.identity.treasuryTransferId)
+      await ctx.db.patch(source.identity.treasuryTransferId, { circleExecutionId: id, status: "approving", recoveryAt: request.validUntil * 1000 + 5000, updatedAt: Date.now() });
     await appendAudit(ctx, {
       orgId: source.target.orgId,
       actorUserId: source.user._id,
@@ -827,6 +832,8 @@ export const claim = internalMutation({
         checks: 0,
         updatedAt: Date.now(),
       });
+    if (execution.treasuryTransferId)
+      await ctx.db.patch(execution.treasuryTransferId, { status: "processing", recoveryAt: Date.now(), updatedAt: Date.now() });
     await ctx.db.patch(execution._id, {
       stage: "submitting",
       userOpHash: args.userOpHash,
@@ -973,6 +980,13 @@ export const reconcile = internalAction({
         );
         if (execution.paymentScheduleId && result.status === "confirmed")
           assertScheduledTransfers(request, receipt.logs, result);
+        let treasuryDebitIndex: number | undefined;
+        if (execution.treasuryTransferId && result.status === "confirmed") {
+          const data = await ctx.runQuery(internal.treasury.internalGet, { treasuryTransferId: execution.treasuryTransferId });
+          if (!data || data.transfer.circleExecutionId !== execution._id || data.transfer.hash !== request.originalHash)
+            throw new Error("The original account transfer changed.");
+          treasuryDebitIndex = assertCctpBurn(decodeCctpQuote(data.transfer.quote), receipt.logs, result).logIndex;
+        }
         if (
           execution.delegatedDisbursementId &&
           result.status === "confirmed"
@@ -1013,10 +1027,12 @@ export const reconcile = internalAction({
           originalNonceAvailable: nonce === BigInt(request.safeNonce),
           principalVerified:
             (execution.paymentScheduleId ||
+              execution.treasuryTransferId ||
               execution.delegatedDisbursementId) &&
             result.status === "confirmed"
               ? true
               : undefined,
+          treasuryDebitIndex,
         });
         if (execution.stage === "submitting") {
           if (execution.disbursementId)
@@ -1083,6 +1099,7 @@ export const reconcile = internalAction({
 });
 export const checkpoint = internalMutation({
   args: {
+    treasuryDebitIndex: v.optional(v.number()),
     executionId: v.id("circleExecutions"),
     revision: v.number(),
     scanFrom: v.string(),
@@ -1143,10 +1160,13 @@ export const checkpoint = internalMutation({
       throw new Error("Fee transfer evidence is inconsistent");
     if (
       args.state === "confirmed" &&
-      (execution.paymentScheduleId || execution.delegatedDisbursementId) &&
+      (execution.paymentScheduleId || execution.delegatedDisbursementId || execution.treasuryTransferId) &&
       !args.principalVerified
     )
       throw new Error("The principal transfers have not been verified.");
+    if (execution.treasuryTransferId && args.state === "confirmed" &&
+      (!Number.isSafeInteger(args.treasuryDebitIndex) || args.treasuryDebitIndex! < 0))
+      throw new Error("The transfer's account debit has not been verified.");
     await ctx.db.patch(execution._id, {
       stage: args.state ?? execution.stage,
       open: !args.state,
@@ -1165,6 +1185,16 @@ export const checkpoint = internalMutation({
     });
     if (args.feeProof)
       await queueReportSource(ctx, execution.orgId, "fee", execution._id);
+    if (execution.treasuryTransferId && args.state) {
+      const transfer = await ctx.db.get(execution.treasuryTransferId);
+      if (!transfer || transfer.circleExecutionId !== execution._id || transfer.hash !== decodeCircleRequest(execution.record).originalHash)
+        throw new Error("The original transfer fee request changed.");
+      await ctx.db.patch(transfer._id, args.state === "confirmed" ? {
+        open: false, status: "delivering", sourceTxHash: args.txHash, sourceSettlement: args.settlement,
+        sourceTransferId: `e${args.txHash!.slice(2)}${args.treasuryDebitIndex}`, recoveryAt: Date.now(), checks: 0, error: undefined, updatedAt: Date.now(),
+      } : { open: false, status: args.state, recoveryAt: undefined, error: undefined, updatedAt: Date.now() });
+      if (args.state === "confirmed") await queueReportSource(ctx, transfer.orgId, "treasury", transfer._id);
+    }
     if (args.state && execution.delegatedDisbursementId)
       await settleDelegatedCircle(ctx, (await ctx.db.get(execution._id))!);
     if (args.state && execution.cancelExecutionId)

@@ -13,7 +13,7 @@ export async function ensureReportIndex(ctx: MutationCtx, orgId: Id<'orgs'>) {
   return (await ctx.db.get(id))!;
 }
 
-export async function queueReportSource(ctx: MutationCtx, orgId: Id<'orgs'>, kind: 'payment' | 'deposit' | 'outgoing' | 'fee', sourceId: Id<'disbursements'> | Id<'deposits'> | Id<'outgoingTransfers'> | Id<'circleExecutions'>) {
+export async function queueReportSource(ctx: MutationCtx, orgId: Id<'orgs'>, kind: 'payment' | 'deposit' | 'outgoing' | 'fee' | 'treasury', sourceId: Id<'disbursements'> | Id<'deposits'> | Id<'outgoingTransfers'> | Id<'circleExecutions'> | Id<'treasuryTransfers'>) {
   const state = await ensureReportIndex(ctx, orgId);
   const sourceKey = `${kind}:${sourceId}`;
   const existing = await ctx.db.query('reportIndexJobs').withIndex('by_source', q => q.eq('sourceKey', sourceKey)).unique();

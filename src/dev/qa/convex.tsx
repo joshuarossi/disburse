@@ -39,6 +39,7 @@ import {
   saveCircleFixture,
 } from "./circle";
 import { accountFeeSetupFixture, readAccountFeeSetup } from "./accountFeeSetup";
+import { readTreasuryFixture, treasuryAccounts, treasuryCircleStep, treasuryFixtureAction } from "./treasury";
 const cache = new Map<string, any>();
 let fixtureRevision = 0;
 const fixtureListeners = new Set<() => void>();
@@ -65,6 +66,12 @@ export function readQueryFixture(reference: any, args: any) {
   if (cache.has(key)) return cache.get(key);
   let value: any;
   switch (name) {
+    case "treasury:list":
+      value = { page: readTreasuryFixture() ? [readTreasuryFixture()] : [], isDone: true, continueCursor: "" };
+      break;
+    case "treasury:get":
+      value = readTreasuryFixture();
+      break;
     case "accountFeeSetups:current":
       value = readAccountFeeSetup();
       if (value && value.safeId !== args.safeId) value = null;
@@ -95,6 +102,7 @@ export function readQueryFixture(reference: any, args: any) {
         : [];
     case "circlePayments:get":
       value = readCircleFixture();
+      if (scenario?.startsWith("circle-treasury-") && args.treasuryTransferId && sessionStorage.getItem("qa:treasury-originalCircle")) value = JSON.parse(sessionStorage.getItem("qa:treasury-originalCircle")!);
       break;
     case "paymentSchedules:get":
       value = JSON.parse(sessionStorage.getItem("qa:schedule") ?? "null");
@@ -388,7 +396,7 @@ export function readQueryFixture(reference: any, args: any) {
       break;
     case "orgs:listMembers":
       value =
-        scenario === "ar-viewer"
+        scenario === "ar-viewer" || scenario === "circle-treasury-viewer"
           ? members.map((m) => ({ ...m, role: "viewer" }))
           : scenario === "access-viewer"
             ? members.map((m, i) => (i ? { ...m, role: "viewer" } : m))
@@ -414,6 +422,7 @@ export function readQueryFixture(reference: any, args: any) {
               },
             ]
           : safes;
+      if (scenario?.startsWith("circle-treasury-") && !scenario.endsWith("no-route")) value = treasuryAccounts();
       if (scenario === "policy-assigned")
         value = [
           ...safes,
@@ -1444,6 +1453,10 @@ const disabled = async () => {
   );
 };
 export function useMutation(reference?: any) {
+  if (getFunctionName(reference).startsWith("treasury:")) return async (args: any) => {
+    try { return await treasuryFixtureAction(getFunctionName(reference), args); }
+    finally { cache.clear(); fixtureRevision++; fixtureListeners.forEach(listener => listener()); }
+  };
   if (getFunctionName(reference) === "circlePayments:beginApproval")
     return async () => {
       saveCircleFixture({
@@ -1715,6 +1728,10 @@ export function useConvex() {
   };
 }
 export function useAction(reference: any) {
+  if (getFunctionName(reference).startsWith("treasuryActions:")) return async (args: any) => {
+    try { return await treasuryFixtureAction(getFunctionName(reference), args); }
+    finally { cache.clear(); fixtureRevision++; fixtureListeners.forEach(listener => listener()); }
+  };
   if (
     getFunctionName(reference) === "delegatedPayments:prepare" &&
     sessionStorage.getItem("qa:scenario")?.startsWith("circle-delegated-")
@@ -1935,7 +1952,7 @@ export function useAction(reference: any) {
           });
         if (scenario.endsWith("expired"))
           saveCircleFixture({ ...current, stage: "expired", open: false });
-        if (scenario.endsWith("success")) {
+        if (scenario.endsWith("success") || scenario === "circle-treasury-delivery-outage") {
           saveCircleFixture({
             ...current,
             stage: "confirmed",
@@ -1995,6 +2012,10 @@ export function useAction(reference: any) {
       cache.clear();
       fixtureRevision++;
       fixtureListeners.forEach((listener) => listener());
+      if (scenario.startsWith("circle-treasury-")) {
+        treasuryCircleStep(name);
+        cache.clear(); fixtureRevision++; fixtureListeners.forEach(listener => listener());
+      }
       if (name === "circlePayments:submit" && scenario.endsWith("unknown"))
         throw new Error(
           "Your original execution request is saved. Check its status before trying another payment.",
@@ -2315,6 +2336,11 @@ export function useAction(reference: any) {
   return disabled;
 }
 
+export function usePaginatedQuery(reference: any, args: any, _options: any) {
+  void _options;
+  const result = useQuery(reference, args);
+  return { results: result?.page ?? [], status: args === "skip" || result ? "Exhausted" : "LoadingFirstPage", isLoading: !result && args !== "skip", loadMore: () => {} };
+}
 export function useQuery(reference: any, args: any) {
   useSyncExternalStore(subscribeToFixtures, () => fixtureRevision);
   return readQueryFixture(reference, args);

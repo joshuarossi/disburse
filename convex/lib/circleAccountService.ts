@@ -18,6 +18,7 @@ import {
 import {
   circleFeeSigningData,
   circleRootSigningData,
+  circleValidityWindow,
   type CircleRequest,
 } from "../../shared/circleRequest";
 import { circleRpc } from "../../shared/circleTransport";
@@ -192,18 +193,7 @@ export async function prepareCircleRequest(input: {
     );
   const to = getAddress(input.transaction.to);
   await assertCircleBatch(input.chainId, input.transaction);
-  if (
-    input.window &&
-    (!input.directCall ||
-      input.window.validAfter < 0 ||
-      input.window.validUntil <= Number(state.block.timestamp) + 60 ||
-      input.window.validUntil - input.window.validAfter > 86400 ||
-      input.window.validAfter > Number(state.block.timestamp) + 90 * 86400)
-  )
-    throw new Error("Choose a payment date within the next 90 days.");
-  const validAfter = input.window?.validAfter ?? 0;
-  const validUntil =
-    input.window?.validUntil ?? Number(state.block.timestamp) + 1800;
+  const { validAfter, validUntil } = circleValidityWindow(input.window, Number(state.block.timestamp), input.directCall);
   const request: CircleRequest = {
     chainId: input.chainId,
     safe,

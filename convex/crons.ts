@@ -1,6 +1,7 @@
 import { cronJobs } from "convex/server";
 import { internal } from "./_generated/api";
 const crons = cronJobs();
+crons.interval("Reconcile transfers between company accounts", { minutes: 1 }, internal.treasury.recover, {});
 crons.interval(
   "Continue finance report indexing",
   { minutes: 1 },

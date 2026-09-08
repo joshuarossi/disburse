@@ -139,6 +139,7 @@ export const review = mutation({
     const memo = text(args.memo, 'Journal description', 500);
     const value = formatBookUnits(bookUnits(args.assetBookValue, profile.currency, args.treatment === 'already_recorded'), profile.currency);
     const receiptHasExcess = !!fact.invoiceExcessRaw && BigInt(fact.invoiceExcessRaw) > 0n;
+    const deliveryFeeRequired = !!fact.deliveryFeeRaw && BigInt(fact.deliveryFeeRaw) > 0n;
     if (args.treatment === 'existing_receivable' && fact.invoiceAppliedRaw === '0')
       throw new Error('The invoice was already fully funded. Record this receipt as a customer advance or match its existing book entry.');
     const lines: JournalLine[] = args.treatment === 'already_recorded' ? [] : buildSettlementJournal({
@@ -148,6 +149,8 @@ export const review = mutation({
       differenceAccount: args.differenceAccountId ? await bookAccount(ctx, args.orgId, args.differenceAccountId) : undefined,
       receiptHasExcess, advanceBookValue: args.advanceBookValue,
       advanceAccount: args.advanceAccountId ? await bookAccount(ctx, args.orgId, args.advanceAccountId) : undefined,
+      deliveryFeeRequired, deliveryFeeBookValue: args.deliveryFeeBookValue,
+      deliveryFeeAccount: args.deliveryFeeAccountId ? await bookAccount(ctx, args.orgId, args.deliveryFeeAccountId) : undefined,
     });
     const movement = await ctx.db.query('accountingMovements').withIndex('by_movement', q => q.eq('orgId', args.orgId).eq('key', fact.key)).unique();
     const previous = movement ? await ctx.db.get(movement.entryId) : null;
@@ -155,6 +158,7 @@ export const review = mutation({
       obligationBookValue: ['existing_payable', 'existing_receivable'].includes(args.treatment) && args.obligationBookValue
         ? formatBookUnits(bookUnits(args.obligationBookValue, profile.currency), profile.currency) : undefined,
       advanceBookValue: receiptHasExcess && args.treatment === 'existing_receivable' ? formatBookUnits(bookUnits(args.advanceBookValue ?? '', profile.currency), profile.currency) : undefined,
+      deliveryFeeBookValue: deliveryFeeRequired && args.treatment === 'internal_transfer' ? formatBookUnits(bookUnits(args.deliveryFeeBookValue ?? '', profile.currency, true), profile.currency) : undefined,
       bookReference, externalName: args.externalName?.trim() || undefined, valuationEvidence, memo, lines, profileVersion: profile.version };
     if (previous && (!args.replaces || previous.replaces === args.replaces)) {
       // An interrupted response can be retried without another journal number.

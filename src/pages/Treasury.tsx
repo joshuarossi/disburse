@@ -26,6 +26,7 @@ import {
 } from "@/components/workspace/WorkspacePrimitives";
 import { Dialog } from "@/components/ui/Dialog";
 import { getChainName, getSafeAppUrl, getTokensForChain } from "@/lib/chains";
+import { AccountTransfers } from "@/features/treasury/AccountTransfers";
 
 export default function Treasury() {
   const { environment } = useActivityEnvironment();
@@ -154,6 +155,7 @@ export default function Treasury() {
           ))}
         </div>
       )}
+      {orgId && allSafes && <AccountTransfers orgId={orgId as Id<"orgs">} accounts={allSafes} />}
       <section className="workspace-panel mt-6">
         <div className="workspace-panel-heading">
           <div>

@@ -40,6 +40,7 @@ export function buildSettlementJournal(input: {
   assetAccount: BookAccount; counterAccount: BookAccount; differenceAccount?: BookAccount; externalName?: string;
   companyTransfer: boolean;
   receiptHasExcess?: boolean; advanceBookValue?: string; advanceAccount?: BookAccount;
+  deliveryFeeRequired?: boolean; deliveryFeeBookValue?: string; deliveryFeeAccount?: BookAccount;
 }): JournalLine[] {
   const { treatment, direction, currency, assetAccount, counterAccount, differenceAccount } = input;
   if (assetAccount.kind !== 'asset') throw new Error('Choose an asset account for the settled currency holding');
@@ -60,6 +61,9 @@ export function buildSettlementJournal(input: {
   const assetValue = bookUnits(input.assetBookValue, currency);
   const settledValue = obligation ? bookUnits(input.obligationBookValue ?? '', currency) : assetValue;
   const hasAdvance = treatment === 'existing_receivable' && input.receiptHasExcess;
+  const hasDeliveryFee = treatment === 'internal_transfer' && direction === 'inflow' && input.deliveryFeeRequired;
+  const deliveryFee = hasDeliveryFee ? bookUnits(input.deliveryFeeBookValue ?? '', currency, true) : 0n;
+  if (hasDeliveryFee && input.deliveryFeeAccount?.kind !== 'expense') throw new Error('Choose an expense account for the delivery fee retained by the transfer provider');
   const advanceValue = hasAdvance ? bookUnits(input.advanceBookValue ?? '', currency) : 0n;
   if (hasAdvance && input.advanceAccount?.kind !== 'liability')
     throw new Error('Choose a customer liability account for the excess receipt');
@@ -68,10 +72,11 @@ export function buildSettlementJournal(input: {
     credit: signedDebit < 0n ? formatBookUnits(-signedDebit, currency) : '', name,
   });
   const assetDebit = direction === 'inflow' ? assetValue : -assetValue;
-  const offsetDebit = direction === 'outflow' ? settledValue : -settledValue;
+  const offsetDebit = direction === 'outflow' ? settledValue : -settledValue - deliveryFee;
   const lines = [line(assetAccount, assetDebit), line(counterAccount, offsetDebit, obligation ? input.externalName?.trim() : undefined)];
   if (hasAdvance) lines.push(line(input.advanceAccount!, -advanceValue, input.externalName?.trim()));
-  const differenceDebit = -assetDebit - offsetDebit + advanceValue;
+  if (deliveryFee) lines.push(line(input.deliveryFeeAccount!, deliveryFee));
+  const differenceDebit = -assetDebit - offsetDebit + advanceValue - deliveryFee;
   if (differenceDebit) {
     if (!differenceAccount || differenceAccount.kind !== (differenceDebit > 0n ? 'expense' : 'income'))
       throw new Error(`Choose a reviewed ${differenceDebit > 0n ? 'loss / expense' : 'gain / income'} account for the valuation difference`);
