@@ -11,6 +11,11 @@ import { assertCurrent } from "../accountCancellationData";
 import { readReceivingSource } from "./circleReceivables";
 import { readBillingSource } from "./circleBilling";
 import { readAccountSetupSource } from "./circleAccountSetup";
+import {
+  assertCircleQueueCompatible,
+  MAX_OPEN_CIRCLE_REQUESTS,
+} from "../../shared/circleQueue";
+import { decodeCircleRequest } from "../../shared/circleRequest";
 
 export const circleSourceArgs = {
   disbursementId: v.optional(v.id("disbursements")),
@@ -206,6 +211,26 @@ export async function assertCircleReservation(
   const safe = await ctx.db.get(safeId);
   if (!safe) throw new Error("Company account not found");
   const key = `${safe.chainId}:${safe.safeAddress.toLowerCase()}`;
+  if (executionId) {
+    const execution = await ctx.db.get(executionId);
+    if (!execution || execution.accountKey !== key || !execution.open)
+      throw new Error(
+        "The saved fee request belongs to another account or is closed.",
+      );
+    if (execution.concurrentFees) {
+      const open = await openCircleRequests(ctx, key);
+      assertCircleQueueCompatible(
+        decodeCircleRequest(execution.record),
+        open
+          .filter((e) => e._id !== executionId)
+          .map((e) => ({
+            concurrentFees: e.concurrentFees,
+            request: decodeCircleRequest(e.record),
+          })),
+      );
+      return;
+    }
+  }
   const open = await ctx.db
     .query("circleExecutions")
     .withIndex("by_account_open", (q) =>
@@ -216,4 +241,13 @@ export async function assertCircleReservation(
     throw new Error(
       "This account has a saved USDC fee request. Complete or check that request first.",
     );
+}
+
+export async function openCircleRequests(ctx: QueryCtx, accountKey: string) {
+  return ctx.db
+    .query("circleExecutions")
+    .withIndex("by_account_open", (q) =>
+      q.eq("accountKey", accountKey).eq("open", true),
+    )
+    .take(MAX_OPEN_CIRCLE_REQUESTS + 1);
 }

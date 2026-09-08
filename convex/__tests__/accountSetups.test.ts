@@ -68,7 +68,7 @@ async function setup() {
     permit: { name: "USDC", version: "2", nonce: "0", amount: "500000" },
     operation: {
       sender: safe,
-      nonce: 0n,
+      nonce: 1n << 64n,
       callData: circleAccountCall(data.call.to, data.call.data),
       callGasLimit: 200000n,
       verificationGasLimit: 900000n,

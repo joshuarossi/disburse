@@ -428,7 +428,7 @@ export function PaymentReview({
               )}
             </Notice>
           )}
-          {RELAY_FEATURE_ENABLED && !usingAllowance && ["draft", "pending"].includes(payment.status) && !payment.safeTxHash && (
+          {RELAY_FEATURE_ENABLED && !customerPaid && !usingAllowance && ["draft", "pending"].includes(payment.status) && !payment.safeTxHash && (
             <section className="workspace-card p-4 space-y-3">
               <h3 className="font-semibold">Payment fee</h3>
               {!feeQuote ? <p>Loading payment fee…</p> : feeQuote.error ? <Notice>{feeQuote.error}</Notice> : feeQuote.fee && (

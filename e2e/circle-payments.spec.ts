@@ -39,6 +39,14 @@ async function approveBoth(page: Page) {
   await fees.getByRole("checkbox").check();
   return fees;
 }
+test('a new payment uses the current fee flow without a retired-provider loading panel', async ({ page }) => {
+  await page.addInitScript(() => sessionStorage.setItem('qa:scenario', 'circle-draft'));
+  await page.goto('/org/demo/disbursements?focus=p1');
+  const payment = page.getByRole('dialog', { name: 'Payment details' });
+  await expect(payment.getByRole('button', { name: 'Review in wallet', exact: true })).toBeEnabled();
+  await expect(payment.getByText('Loading payment fee…', { exact: true })).toHaveCount(0);
+  await expect(payment.getByRole('heading', { name: 'Payment fee', exact: true })).toHaveCount(0);
+});
 for (const theme of ["light", "dark"]) {
   test(`${theme}: cancelled fee approval preserves the payment and shows a neutral message`, async ({
     page,

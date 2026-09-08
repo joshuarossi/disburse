@@ -157,6 +157,7 @@ export function readQueryFixture(reference: any, args: any) {
             ...p,
             ...(scenario?.startsWith('circle-') ? { status: readCircleFixture()?.stage === 'submitting' ? 'relaying' : readCircleFixture()?.stage === 'confirmed' ? 'executed' : 'proposed', chainId: 8453, approvalMethod: 'workspace', safeTxHash: `0x${'ab'.repeat(32)}`, scheduledAt: undefined, executionFee: undefined,
               nativeExecution: ['submitting', 'confirmed'].includes(readCircleFixture()?.stage) ? { service: 'circle', attemptId: 'circle1', startedAt: Date.now(), checks: 0 } : undefined } : {}),
+            ...(scenario === 'circle-draft' ? { status: 'draft', safeTxHash: undefined, approvalMethod: undefined } : {}),
             ...(scenario?.startsWith('cancel-') ? { status: scenario === 'cancel-confirmed' ? 'cancelled' : 'proposed', cancellationId: scenario !== 'cancel-request' ? 'cancellation1' : undefined, cancellationConfirmedAt: scenario === 'cancel-confirmed' ? Date.now() : undefined, safeTxHash: `0x${'ab'.repeat(32)}`, approvalMethod: 'workspace', scheduledAt: undefined } : {}),
             ...(scenario?.startsWith('nested-') ? { status: 'proposed', approvalMethod: 'workspace', safeTxHash: `0x${'ab'.repeat(32)}`, scheduledAt: undefined } : {}),
             ...(scenario === 'payout-review-payment' ? { payoutReviewError: 'Maya Chen: payout details were reviewed or changed after this payment was prepared. Its prior approvals cannot be used in Disburse. Cancel this payment and prepare a new one with the reviewed details.' } : {}),

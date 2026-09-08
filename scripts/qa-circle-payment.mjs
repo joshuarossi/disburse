@@ -18,6 +18,11 @@ import {
 import { circleConfiguration } from "../shared/circleExecution.ts";
 import { userErrorMessage } from "../src/lib/userErrors.ts";
 const run = process.argv.find((a) => a.startsWith("--run="))?.slice(6);
+const feeLimitArg =
+  process.argv.find((a) => a.startsWith("--max-fee-raw="))?.slice(14) ??
+  "600000";
+if (!/^[1-9][0-9]{0,6}$/.test(feeLimitArg) || BigInt(feeLimitArg) > 2_000_000n)
+  throw new Error("The QA execution fee limit must be at most 2 USDC.");
 if (!run || !/^[a-z0-9][a-z0-9-]{0,40}$/.test(run))
   throw new Error("Choose --run=name.");
 const cancel = process.argv.includes("--cancel");
@@ -134,6 +139,7 @@ try {
           safe,
           owner: owner.address,
           kind: cancel ? "cancellation" : "payment",
+          feeLimit: feeLimitArg,
         }),
         { flag: "wx", mode: 0o600 },
       );
@@ -280,8 +286,8 @@ try {
         sessionToken,
       }),
       request = decodeCircleRequest(execution.record);
-    if (BigInt(request.permit.amount) > 600000n)
-      throw new Error("This test permits at most 0.60 USDC in execution fees.");
+    if (BigInt(request.permit.amount) > BigInt(saved.feeLimit ?? "600000"))
+      throw new Error("The execution fee exceeds this test's saved limit.");
     await save({
       stage: "prepared",
       executionId,
@@ -321,7 +327,7 @@ try {
       if (
         request.safe.toLowerCase() !== safe.toLowerCase() ||
         request.originalHash !== saved.safeTxHash ||
-        BigInt(request.permit.amount) > 600000n
+        BigInt(request.permit.amount) > BigInt(saved.feeLimit ?? "600000")
       )
         throw new Error("The saved payment or fee changed.");
       const approvals = await client.action(

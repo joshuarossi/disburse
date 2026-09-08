@@ -93,7 +93,7 @@ async function setup(t = convexTest(schema)) {
     permit: { name: "USDC", version: "2", nonce: "0", amount: "500000" },
     operation: {
       sender: safe,
-      nonce: 0n,
+      nonce: 1n << 64n,
       callData: circleAccountCall(data.call.to, data.call.data),
       callGasLimit: 200000n,
       verificationGasLimit: 900000n,
@@ -314,7 +314,7 @@ function receiptFor(
         { type: "uint256" },
         { type: "uint256" },
       ],
-      [0n, variant !== "failed", 100000n, 1000n],
+      [s.request.operation.nonce, variant !== "failed", 100000n, 1000n],
     ),
   ];
   return {

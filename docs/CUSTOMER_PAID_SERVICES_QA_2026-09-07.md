@@ -112,3 +112,14 @@ The runner saves the original signed operation before its one submission request
 3. A full multi-approver finance cycle, actual external-ledger import and accountant-led close.
 4. Production capacity, restore/incident acceptance and independent contract review.
 5. Broader optional yield/conversion integrations and remaining receivable follow-ons listed in [TODOS.md](../TODOS.md).
+
+
+## September 8 continuation
+
+A second real Team checkout paid 50 USDC and 0.014584 USDC in gas, extending the existing paid-through date by exactly 30 days. Rechecking produced one billing payment and one extension. Both the owner and company account held zero ETH. Temporary development billing-recipient overrides were removed afterwards. [Renewal receipt](https://sepolia.basescan.org/tx/0xcde31709670b8df22309070d830139d349ac687722d622bb53e82ce737eea778). Pro upgrade credit still needs live acceptance at the actual plan price.
+
+New execution requests have independent EntryPoint nonce sequences. Simultaneous requests retain one common approved fee ceiling, so a later request cannot increase an earlier authorization. Existing unresolved requests retain their original sequence and remain exclusive. The queue is bounded at 50 requests; cross-workspace account reservations remain exclusive.
+
+After explicitly pushing the updated development backend, an app payment sent 0.10 USDC and paid 0.015708 USDC from its Safe using a nonzero nonce key. Both wallets held zero ETH. [Independent-sequence receipt](https://sepolia.basescan.org/tx/0x00c8c16adc3365e58de7cbd317152a53c6ac57a72c1b7274c5bbce62e71ec9e0). An earlier successful payment ran against old deployed code and is excluded from this queue acceptance evidence. Code generation alone did not update the running development backend.
+
+The code check passed 1019 tests across 102 files, typecheck and lint. All 13 targeted Circle payment browser stories passed, including a draft that no longer waits on the retired fee provider. The previously completed full browser suite had 327 stories; the expanded full suite has not yet been rerun. Commit 95f8e5c passed both GitHub CI and Cloudflare Pages. Its immutable preview rendered sign-in in Chromium without page errors, and the light-theme page was visually inspected. Scheduling and delegated fee execution remain unfinished.

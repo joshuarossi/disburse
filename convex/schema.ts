@@ -35,7 +35,7 @@ export default defineSchema({
     orgId: v.id('orgs'), safeId: v.id('safes'), accountKey: v.string(), disbursementId: v.optional(v.id('disbursements')),
     policyChangeId: v.optional(v.id('spendingPolicyChanges')), cancellationId: v.optional(v.id('accountCancellations')),
     receivableId: v.optional(v.id('receivables')), receivingSetupSafeId: v.optional(v.id('safes')), billingCheckoutId: v.optional(v.id('billingCheckouts')), accountSetupId: v.optional(v.id('accountSetups')),
-    createdBy: v.id('users'), record: v.string(), revision: v.number(), open: v.boolean(),
+    createdBy: v.id('users'), record: v.string(), revision: v.number(), open: v.boolean(), concurrentFees: v.optional(v.boolean()),
     stage: v.union(v.literal('fee'), v.literal('operation'), v.literal('ready'), v.literal('submitting'), v.literal('confirmed'), v.literal('failed'), v.literal('expired')),
     createdAt: v.number(), updatedAt: v.number(), scanFrom: v.string(), recoveryAt: v.optional(v.number()),
     userOpHash: v.optional(v.string()), txHash: v.optional(v.string()), fee: v.optional(v.string()),

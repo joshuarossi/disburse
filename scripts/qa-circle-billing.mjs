@@ -13,6 +13,7 @@ import {
 import { nestedSigningData } from "../shared/safeSignatures.ts";
 import { circleConfiguration } from "../shared/circleExecution.ts";
 import { userErrorMessage } from "../src/lib/userErrors.ts";
+import { PLAN_LIMITS, renewalEnd } from "../shared/billing.ts";
 const option = (name) =>
   process.argv
     .find((v) => v.startsWith(`--${name}=`))
@@ -25,6 +26,9 @@ const run = option("run"),
   );
 if (!run || !/^[a-z0-9-]{1,40}$/.test(run) || action.length !== 1)
   throw new Error("Choose a unique --run and one action.");
+const plan = option("plan") ?? "team";
+if (!["team", "pro"].includes(plan)) throw new Error("Choose Team or Pro.");
+const amountRaw = String(BigInt(PLAN_LIMITS[plan].price) * 1_000_000n);
 if (
   !process.env.CONVEX_DEPLOYMENT?.startsWith("dev:") ||
   process.env.VITE_CONVEX_URL !== "https://fortunate-cat-122.convex.cloud"
@@ -105,10 +109,21 @@ try {
     })
   ).token;
   if (fresh) {
+    const billing = await client.query(api.billing.get, {
+      orgId: previous.orgId,
+      sessionToken,
+    });
     saved = {
       stage: "preparing",
       requestId: crypto.randomUUID(),
-      name: `QA Team subscription ${run}`,
+      name: `QA ${plan} subscription ${run}`,
+      plan,
+      amountRaw,
+      previousLicense: {
+        plan: billing.plan,
+        status: billing.billingStatus ?? billing.status,
+        paidThroughAt: billing.paidThroughAt,
+      },
     };
     await writeFile(path, json(saved), { flag: "wx", mode: 0o600 });
     await save({ initial: await balances() });
@@ -119,11 +134,11 @@ try {
       {
         orgId: previous.orgId,
         safeId: previous.safeId,
-        plan: "team",
+        plan: saved.plan,
         chainId: 84532,
         treasury: owner.address,
         tokenAddress: config.token,
-        amountRaw: "50000000",
+        amountRaw: saved.amountRaw,
         requestId: saved.requestId,
         sessionToken,
       },
@@ -228,10 +243,32 @@ try {
       orgId: previous.orgId,
       sessionToken,
     });
-    const payments = billing.payments.filter(payment => payment.checkoutId === checkout._id);
-    if (checkout.status === "applied" &&
-      (billing.plan !== "team" || payments.length !== 1 || !payments[0].redeemedAt || billing.paidThroughAt <= Date.now()))
-      throw new Error("The license payment did not activate exactly one paid term.");
+    const payments = billing.payments.filter(
+      (payment) => payment.checkoutId === checkout._id,
+    );
+    const expectedPlan = saved.plan ?? "team";
+    if (checkout.status === "applied") {
+      if (
+        billing.plan !== expectedPlan ||
+        payments.length !== 1 ||
+        !payments[0].redeemedAt ||
+        billing.paidThroughAt <= Date.now()
+      )
+        throw new Error(
+          "The license payment did not activate exactly one paid term.",
+        );
+      if (
+        saved.previousLicense &&
+        renewalEnd(
+          saved.previousLicense,
+          expectedPlan,
+          payments[0].redeemedAt,
+        ) !== billing.paidThroughAt
+      )
+        throw new Error(
+          "The remaining paid term was not preserved at the correct plan rate.",
+        );
+    }
     const result = {
       execution: e.stage,
       txHash: e.txHash,
@@ -244,7 +281,11 @@ try {
         payer: checkout.payer,
         treasury: checkout.treasury,
       },
-      license: { plan: billing.plan, paidThroughAt: billing.paidThroughAt, verifiedPayments: payments.length },
+      license: {
+        plan: billing.plan,
+        paidThroughAt: billing.paidThroughAt,
+        verifiedPayments: payments.length,
+      },
       after: await balances(),
     };
     await save({ result });

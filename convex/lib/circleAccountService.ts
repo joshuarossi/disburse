@@ -29,6 +29,7 @@ import {
   type SavedAccountSignature,
 } from "./accountApproval";
 import type { AccountAuthority } from "./accountAuthority";
+import { DEFAULT_CIRCLE_FEE_LIMIT } from "../../shared/circleQueue";
 
 const paymasterAbi = parseAbi([
   "function token() view returns(address)",
@@ -46,7 +47,11 @@ const permitAbi = parseAbi([
 const nonceAbi = parseAbi([
   "function getNonce(address sender,uint192 key) view returns(uint256)",
 ]);
-export async function circleAccountState(chainId: number, safe: Address) {
+export async function circleAccountState(
+  chainId: number,
+  safe: Address,
+  nonceKey = 0n,
+) {
   const client = getChainClient(chainId),
     config = circleConfiguration(chainId);
   const block = await client.getBlock();
@@ -118,7 +123,7 @@ export async function circleAccountState(chainId: number, safe: Address) {
       address: config.entryPoint,
       abi: nonceAbi,
       functionName: "getNonce",
-      args: [safe, 0n],
+      args: [safe, nonceKey],
       blockNumber: block.number,
     }),
     client.estimateFeesPerGas(),
@@ -171,9 +176,11 @@ export async function prepareCircleRequest(input: {
   principalUSDC: bigint;
   directCall?: boolean;
   previousPermit?: { nonce: string; amount: string };
+  nonceKey?: bigint;
+  queueFeeLimit?: bigint;
 }): Promise<CircleRequest> {
   const safe = getAddress(input.safe),
-    state = await circleAccountState(input.chainId, safe);
+    state = await circleAccountState(input.chainId, safe, input.nonceKey);
   if (
     !input.directCall &&
     input.transaction.to.toLowerCase() !== safe.toLowerCase()
@@ -226,13 +233,25 @@ export async function prepareCircleRequest(input: {
   );
   // An unused permit has no token-level expiry. Reuse its exact cap until its
   // nonce advances, so a previously signed permit cannot raise a newer cap.
-  const estimatedCap = (estimate * 125n + 99n) / 100n;
+  const estimateWithMargin = (estimate * 125n + 99n) / 100n;
+  const estimatedCap =
+    input.nonceKey && estimateWithMargin < DEFAULT_CIRCLE_FEE_LIMIT
+      ? DEFAULT_CIRCLE_FEE_LIMIT
+      : estimateWithMargin;
   const amount =
-    input.previousPermit?.nonce === String(state.permitNonce)
+    input.queueFeeLimit ??
+    (input.previousPermit?.nonce === String(state.permitNonce)
       ? BigInt(input.previousPermit.amount)
       : state.allowance > estimatedCap
         ? state.allowance
-        : estimatedCap;
+        : estimatedCap);
+  if (
+    input.previousPermit?.nonce === String(state.permitNonce) &&
+    BigInt(input.previousPermit.amount) !== amount
+  )
+    throw new Error(
+      "The earlier fee permit must keep its approved limit. Check that execution before preparing another.",
+    );
   if (amount < estimate)
     throw new Error(
       "The current fee authorization is too small for this operation. Complete or revoke the original fee authorization first.",
@@ -298,7 +317,11 @@ export async function finishCircleFeeApproval(
     [next.operation, circleConfiguration(request.chainId).entryPoint],
   );
   next.operation = applyCircleGasEstimate(next.operation, estimate);
-  const state = await circleAccountState(request.chainId, request.safe);
+  const state = await circleAccountState(
+    request.chainId,
+    request.safe,
+    request.operation.nonce >> 64n,
+  );
   // A third party can submit the public permit ahead of the UserOp. Circle
   // deliberately accepts this; the remaining bounded allowance must cover gas.
   if (

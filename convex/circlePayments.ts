@@ -52,7 +52,13 @@ import {
   circleSourceIdentity,
   readCircleSource,
   verifyCircleSource,
+  openCircleRequests,
 } from "./lib/circleSource";
+import {
+  assertCircleQueueCompatible,
+  circleNonceKey,
+  circleQueueLimit,
+} from "../shared/circleQueue";
 import { reservePolicyExecution } from "./spendingPolicyData";
 import { reserveCancellationExecution } from "./accountCancellationData";
 import { circleFeeProofValidator } from "./lib/circleFeeProof";
@@ -161,32 +167,37 @@ export const previous = internalQuery({
   handler: async (ctx, args) => {
     const source = await readCircleSource(ctx, args, args.sessionToken, true);
     const accountKey = `${source.safe.chainId}:${source.safe.safeAddress.toLowerCase()}`;
-    const open = await ctx.db
-      .query("circleExecutions")
-      .withIndex("by_account_open", (q) =>
-        q.eq("accountKey", accountKey).eq("open", true),
-      )
-      .first();
-    if (
-      open &&
-      JSON.stringify(circleSourceIdentity(open)) !==
-        JSON.stringify(source.identity)
-    )
+    const queue = await openCircleRequests(ctx, accountKey);
+    if (queue.some((e) => e.orgId !== source.target.orgId))
       throw new Error(
-        "Another request has an open fee authorization for this account. Complete or check that request first.",
+        "Another workspace has an open fee authorization for this account. Complete or check that original request first.",
       );
+    const open =
+      queue.find(
+        (e) =>
+          JSON.stringify(circleSourceIdentity(e)) ===
+          JSON.stringify(source.identity),
+      ) ?? null;
+    const queueFeeLimit = open
+      ? undefined
+      : circleQueueLimit(
+          queue.map((e) => ({
+            concurrentFees: e.concurrentFees,
+            request: decodeCircleRequest(e.record),
+          })),
+        );
     const previous = await ctx.db
       .query("circleExecutions")
       .withIndex("by_account_created", (q) => q.eq("accountKey", accountKey))
       .order("desc")
       .first();
-    return { open, previous, source };
+    return { open, previous, source, queueFeeLimit: queueFeeLimit?.toString() };
   },
 });
 export const prepare = action({
   args: identity,
   handler: async (ctx, args): Promise<Id<"circleExecutions">> => {
-    const { open, previous, source } = await ctx.runQuery(
+    const { open, previous, source, queueFeeLimit } = await ctx.runQuery(
       internal.circlePayments.previous,
       args,
     );
@@ -205,6 +216,12 @@ export const prepare = action({
       transaction,
       originalHash: source.target.safeTxHash!,
       directCall: source.directCall,
+      nonceKey: circleNonceKey(
+        source.target.safeTxHash! as Hex,
+        crypto.randomUUID(),
+      ),
+      queueFeeLimit:
+        queueFeeLimit === undefined ? undefined : BigInt(queueFeeLimit),
       principalUSDC:
         source.identity.billingCheckoutId && "checkout" in source
           ? BigInt(source.checkout.amountRaw)
@@ -252,22 +269,24 @@ export const persist = internalMutation({
       throw new Error(
         "The execution does not match the reviewed account instruction",
       );
-    const open = await ctx.db
-      .query("circleExecutions")
-      .withIndex("by_account_open", (q) =>
-        q.eq("accountKey", accountKey).eq("open", true),
-      )
-      .first();
-    if (open) {
-      if (
-        JSON.stringify(circleSourceIdentity(open)) ===
-        JSON.stringify(source.identity)
-      )
-        return open._id;
+    const queue = await openCircleRequests(ctx, accountKey);
+    if (queue.some((e) => e.orgId !== source.target.orgId))
       throw new Error(
-        "Another request reserved this account fee authorization",
+        "Another workspace has an open fee authorization for this account. Complete or check that original request first.",
       );
-    }
+    const open = queue.find(
+      (e) =>
+        JSON.stringify(circleSourceIdentity(e)) ===
+        JSON.stringify(source.identity),
+    );
+    if (open) return open._id;
+    assertCircleQueueCompatible(
+      request,
+      queue.map((e) => ({
+        concurrentFees: e.concurrentFees,
+        request: decodeCircleRequest(e.record),
+      })),
+    );
     const previous = await ctx.db
       .query("circleExecutions")
       .withIndex("by_account_created", (q) => q.eq("accountKey", accountKey))
@@ -292,6 +311,7 @@ export const persist = internalMutation({
       record: args.record,
       revision: 0,
       open: true,
+      concurrentFees: true,
       stage: "fee",
       createdAt: Date.now(),
       updatedAt: Date.now(),
@@ -589,7 +609,11 @@ export const submit = action({
     );
     if (collected.confirmations.length < authority.nodes[0].threshold)
       throw new Error("The current account owners must approve this execution");
-    const state = await circleAccountState(request.chainId, request.safe);
+    const state = await circleAccountState(
+      request.chainId,
+      request.safe,
+      request.operation.nonce >> 64n,
+    );
     if (
       state.nonce !== request.operation.nonce ||
       Number(state.block.timestamp) >= request.validUntil - 30 ||

@@ -82,7 +82,7 @@ async function setup(factory = false) {
     permit: { name: "USDC", version: "2", nonce: "0", amount: "500000" },
     operation: {
       sender: safe,
-      nonce: 0n,
+      nonce: 1n << 64n,
       callData: circleAccountCall(data.call.to, data.call.data),
       callGasLimit: 200000n,
       verificationGasLimit: 900000n,
@@ -147,7 +147,7 @@ it("rejects a changed collection target even if its operation calldata is intern
   );
   await expect(s.persist()).rejects.toThrow("reviewed account instruction");
 });
-it("blocks a second invoice while the first account fee request is open", async () => {
+it("shares the reviewed fee ceiling with another receiving instruction", async () => {
   const s = await setup();
   await s.persist();
   await expect(
@@ -155,7 +155,7 @@ it("blocks a second invoice while the first account fee request is open", async 
       receivingSetupSafeId: s.org.safeId,
       sessionToken: s.args.sessionToken,
     }),
-  ).rejects.toThrow("open fee authorization");
+  ).resolves.toMatchObject({ open: null, queueFeeLimit: "500000" });
 });
 it.each(["draft", "changed account", "old service", "viewer"] as const)(
   "stops collection when %s invalidates its authorization",
