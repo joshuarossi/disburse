@@ -562,7 +562,8 @@ export default defineSchema({
   })
     .index("by_source", ["sourceKey"])
     .index("by_due", ["nextAt"])
-    .index("by_org_error", ["orgId", "hasError"]),
+    .index("by_org_error", ["orgId", "hasError"])
+    .index("by_error", ["hasError"]),
   reportMaintenance: defineTable({
     key: v.string(),
     cursor: v.optional(v.string()),
@@ -1241,6 +1242,7 @@ export default defineSchema({
   })
     .index("by_org", ["orgId"])
     .index("by_org_status", ["orgId", "status"])
+    .index("by_org_status_chain", ["orgId", "status", "chainId"])
     .index("by_native_recovery", ["nativeRecoveryAt"])
     .index("by_refund_invoice", ["refundInvoiceId"])
     .index("by_refund_request", ["refundInvoiceId", "refundRequestId"])

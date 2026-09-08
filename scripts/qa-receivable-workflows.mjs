@@ -402,7 +402,7 @@ try {
       page.getByRole("region", { name: "Credit notes" }),
     ).toContainText(saved.creditNumber);
     await expect(
-      page.getByText("Refunded 0.01 USDC", { exact: true }),
+      page.getByText("Refunded $0.01 USDC", { exact: true }),
     ).toBeVisible();
     await page.screenshot({
       path: ".local/review/ar-refund-public.png",

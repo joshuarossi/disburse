@@ -88,7 +88,7 @@ test("S02 saved USDC instructions cannot be replaced by changing a payment defau
   ).toBeEnabled();
 });
 
-test("S03 mixed payment review checks the combined principal and both fees against one account", async ({
+test("S03 mixed payment review checks principal and explains separate USDC fees for one account", async ({
   page,
 }) => {
   await page.goto("/org/demo/disbursements?new=1");
@@ -102,8 +102,14 @@ test("S03 mixed payment review checks the combined principal and both fees again
   }
   const funding = dialog.getByRole("region", { name: "Base funding check" });
   await expect(funding).toHaveCount(1);
-  await expect(funding).toContainText("1.100001 USDC");
+  await expect(funding).toContainText("1.000001 USDC");
   await expect(funding).toContainText("2.000002 USDT");
+  await expect(funding).toContainText(
+    "Execution fees are paid from this account in USDC.",
+  );
+  await expect(funding).toContainText(
+    "review and approve the separate fee limit before sending",
+  );
   await expect(funding).toContainText("2 of 2 owners required");
   await expect(funding).toContainText("Alex Morgan · Jordan Lee");
 });

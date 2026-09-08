@@ -2230,15 +2230,12 @@ export function useAction(reference: any) {
         threshold: 2,
         canPrepare: true,
         isOwner: true,
-        native: { symbol: "ETH", payerAddress: wallet, balance: "0.01" },
+        native: { symbol: "ETH", payerAddress: wallet, balance: "0" },
         managed: {
-          fee: {
-            token: "USDC",
-            tokenAddress: configuredTokenAddress(8453, "USDC"),
-            collector: wallet,
-            amount: "0.05",
-          },
-          error: null,
+          service: 'circle',
+          ready: scenario !== 'funding-setup-unavailable',
+          fee: null,
+          error: scenario === 'funding-setup-unavailable' ? 'The account’s USDC fee setup could not be verified. Open Accounts to check its setup, then refresh.' : null,
         },
       };
     };

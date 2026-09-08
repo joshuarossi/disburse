@@ -38,3 +38,7 @@ code-review-report.html
 # Browser test artifacts
 /test-results/
 /playwright-report/
+
+# Local Python verification artifacts
+__pycache__/
+*.pyc

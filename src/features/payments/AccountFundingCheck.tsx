@@ -93,7 +93,9 @@ export function AccountFundingCheck({
                   ? "You can prepare payments"
                   : "Your role has view access"}
                 {account.isOwner ? " · Your wallet is an owner" : ""}
-                {!account.isOwner && account.approvalPaths?.length ? ' · You can approve through an owning account' : ''}
+                {!account.isOwner && account.approvalPaths?.length
+                  ? " · You can approve through an owning account"
+                  : ""}
               </dd>
               <dd className="mt-2 text-xs text-slate-400">
                 {account.owners
@@ -126,11 +128,13 @@ export function AccountFundingCheck({
             </div>
           )}
           <p className="mt-3 text-xs leading-5 text-slate-400">
-            {RELAY_FEATURE_ENABLED
-              ? account.managed.fee
-                ? `Payment service fee: ${formatAssetAmount(account.managed.fee.amount, account.managed.fee.token)} ${account.managed.fee.token} per batch. Confirm the current fee when approving.`
-                : "Stablecoin payment fees are currently unavailable on this account."
-              : `${account.environment === "test" ? "Test network · " : ""}The sending wallet pays network fees in ${account.environment === "test" ? "test " : ""}${account.native.symbol}. Wallet balance: ${account.native.balance ?? "unavailable"} ${account.native.symbol}. The exact fee is checked when sending.`}
+            {account.managed.service === "circle"
+              ? "Execution fees are paid from this account in USDC. The amounts above cover recipients; review and approve the separate fee limit before sending."
+              : RELAY_FEATURE_ENABLED
+                ? account.managed.fee
+                  ? `Payment service fee: ${formatAssetAmount(account.managed.fee.amount, account.managed.fee.token)} ${account.managed.fee.token} per batch. Confirm the current fee when approving.`
+                  : "Stablecoin payment fees are currently unavailable on this account."
+                : `${account.environment === "test" ? "Test network · " : ""}The sending wallet pays network fees in ${account.environment === "test" ? "test " : ""}${account.native.symbol}. Wallet balance: ${account.native.balance ?? "unavailable"} ${account.native.symbol}. The exact fee is checked when sending.`}
           </p>
           {!!assessment?.issues.length && (
             <ul

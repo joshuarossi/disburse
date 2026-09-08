@@ -798,27 +798,32 @@ export function PaymentReview({
               </button>
             </div>
           )}
-          {payment.safeTxHash && safe && (
-            <a
-              className="workspace-action-link"
-              href={getSafeAppUrl(safe.chainId, safe.safeAddress)}
-              target="_blank"
-              rel="noreferrer"
-            >
-              Advanced account details in Safe
-              <ExternalLink size={13} />
-            </a>
-          )}
-          {payment.txHash && payment.chainId && (
-            <a
-              className="workspace-action-link"
-              href={getBlockExplorerTxUrl(payment.chainId, payment.txHash)}
-              target="_blank"
-              rel="noreferrer"
-            >
-              View settlement receipt
-              <ExternalLink size={13} />
-            </a>
+          {((payment.safeTxHash && safe) ||
+            (payment.txHash && payment.chainId)) && (
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+              {payment.safeTxHash && safe && (
+                <a
+                  className="workspace-action-link"
+                  href={getSafeAppUrl(safe.chainId, safe.safeAddress)}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  Advanced account details in Safe
+                  <ExternalLink size={13} />
+                </a>
+              )}
+              {payment.txHash && payment.chainId && (
+                <a
+                  className="workspace-action-link"
+                  href={getBlockExplorerTxUrl(payment.chainId, payment.txHash)}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  View settlement receipt
+                  <ExternalLink size={13} />
+                </a>
+              )}
+            </div>
           )}
           {canManage &&
             !payment.executionFailure &&

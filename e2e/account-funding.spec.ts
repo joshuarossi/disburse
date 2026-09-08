@@ -32,7 +32,10 @@ for (const [theme, width] of [
       .getByLabel("Amount for Maya Chen", { exact: true })
       .fill("1.000001");
     const funding = dialog.getByRole("region", { name: "Base funding check" });
-    await expect(funding).toContainText("Add 1.050001 USDC");
+    await expect(funding).toContainText("Add 1.000001 USDC");
+    await expect(funding).toContainText(
+      "Keep additional USDC in this account for execution fees",
+    );
     await expect(funding).toContainText("2 of 2 owners required");
     expect(
       (
@@ -55,7 +58,7 @@ for (const [theme, width] of [
     await dialog
       .getByRole("button", { name: "Review payment", exact: true })
       .click();
-    await expect(funding).toContainText("Add 1.050001 USDC");
+    await expect(funding).toContainText("Add 1.000001 USDC");
     await expect(
       dialog.getByRole("button", { name: "Save payment draft" }),
     ).toBeEnabled();

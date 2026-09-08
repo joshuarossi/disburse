@@ -1,0 +1,62 @@
+{
+  "scope": "Local execution gas. Excludes Safe/ERC-4337/paymaster overhead, L1 data charges and live provider prices.",
+  "networks": [
+    {
+      "chainId": 8453,
+      "name": "Base",
+      "blockNumber": "51041783",
+      "timestamp": "1788872913",
+      "gasPriceWei": "6000000",
+      "models": [
+        {
+          "name": "immutable",
+          "firstCollectionExecutionWei": "2054418000000",
+          "repeatCollectionExecutionWei": "281700000000"
+        },
+        {
+          "name": "clone prototype",
+          "firstCollectionExecutionWei": "700764000000",
+          "repeatCollectionExecutionWei": "279216000000"
+        }
+      ]
+    },
+    {
+      "chainId": 42161,
+      "name": "Arbitrum One",
+      "blockNumber": "503031288",
+      "timestamp": "1788872913",
+      "gasPriceWei": "20000000",
+      "models": [
+        {
+          "name": "immutable",
+          "firstCollectionExecutionWei": "6848060000000",
+          "repeatCollectionExecutionWei": "939000000000"
+        },
+        {
+          "name": "clone prototype",
+          "firstCollectionExecutionWei": "2335880000000",
+          "repeatCollectionExecutionWei": "930720000000"
+        }
+      ]
+    },
+    {
+      "chainId": 1,
+      "name": "Ethereum",
+      "blockNumber": "25932845",
+      "timestamp": "1788872903",
+      "gasPriceWei": "111326505",
+      "models": [
+        {
+          "name": "immutable",
+          "firstCollectionExecutionWei": "38118529291515",
+          "repeatCollectionExecutionWei": "5226779409750"
+        },
+        {
+          "name": "clone prototype",
+          "firstCollectionExecutionWei": "13002267824970",
+          "repeatCollectionExecutionWei": "5180690236680"
+        }
+      ]
+    }
+  ]
+}

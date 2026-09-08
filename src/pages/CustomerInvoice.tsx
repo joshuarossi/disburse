@@ -115,7 +115,8 @@ export default function CustomerInvoice() {
                 <div className="flex flex-wrap justify-between gap-2">
                   <strong>{c.number}</strong>
                   <span>
-                    −{formatMoney(c.amount,invoice.token,true)} {invoice.token}
+                    −{formatMoney(c.amount, invoice.token, true)}{" "}
+                    {invoice.token}
                   </span>
                 </div>
                 <p className="workspace-description">
@@ -127,7 +128,12 @@ export default function CustomerInvoice() {
             <div className="flex flex-wrap justify-between gap-2 font-semibold">
               <span>Adjusted total</span>
               <span>
-                {formatMoney(invoice.amounts.adjustedTotal,invoice.token,true)} {invoice.token}
+                {formatMoney(
+                  invoice.amounts.adjustedTotal,
+                  invoice.token,
+                  true,
+                )}{" "}
+                {invoice.token}
               </span>
             </div>
           </section>
@@ -217,7 +223,8 @@ export default function CustomerInvoice() {
             <p>
               Refunded{" "}
               <strong>
-                {invoice.amounts.refunded} {invoice.token}
+                {formatMoney(invoice.amounts.refunded, invoice.token, true)}{" "}
+                {invoice.token}
               </strong>
             </p>
           )}

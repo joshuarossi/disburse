@@ -132,6 +132,7 @@ import type * as nativePayments from "../nativePayments.js";
 import type * as ofac from "../ofac.js";
 import type * as ofacData from "../ofacData.js";
 import type * as ofacRetention from "../ofacRetention.js";
+import type * as operationsHealth from "../operationsHealth.js";
 import type * as orgs from "../orgs.js";
 import type * as paymentExecution from "../paymentExecution.js";
 import type * as paymentFollowupChecks from "../paymentFollowupChecks.js";
@@ -303,6 +304,7 @@ declare const fullApi: ApiFromModules<{
   ofac: typeof ofac;
   ofacData: typeof ofacData;
   ofacRetention: typeof ofacRetention;
+  operationsHealth: typeof operationsHealth;
   orgs: typeof orgs;
   paymentExecution: typeof paymentExecution;
   paymentFollowupChecks: typeof paymentFollowupChecks;
