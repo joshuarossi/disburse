@@ -60,10 +60,10 @@ export default function SelectOrg() {
   }
 
   return (
-    <div className="workspace workspace-entry flex min-h-screen flex-col items-center justify-center bg-navy-950 px-6 py-12">
+    <div className="workspace workspace-entry flex min-h-screen flex-col items-center justify-center bg-[var(--ws-bg)] px-6 py-12">
       {/* Background */}
       <div className="absolute inset-0 -z-10">
-        <div className="absolute left-1/2 top-1/2 h-[500px] w-[500px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-accent-500/10 blur-[120px]" />
+        <div className="absolute left-1/2 top-1/2 h-[500px] w-[500px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-[var(--ws-accent-soft)] blur-[120px]" />
       </div>
 
       <div className="w-full max-w-md">
@@ -74,10 +74,10 @@ export default function SelectOrg() {
               <Building2 className="h-6 w-6 text-navy-950" />
             </div>
           </div>
-          <h1 className="text-2xl font-bold text-white">
+          <h1 className="text-2xl font-bold text-[var(--ws-text)]">
             {t('auth.selectOrg.title')}
           </h1>
-          <p className="mt-2 text-slate-400">{t('auth.selectOrg.subtitle')}</p>
+          <p className="mt-2 text-[var(--ws-muted)]">{t('auth.selectOrg.subtitle')}</p>
         </div>
 
         {error && <Notice>{error}</Notice>}
@@ -90,18 +90,18 @@ export default function SelectOrg() {
                 // Pending invite — must be accepted before access is granted
                 <div
                   key={org._id}
-                  className="flex w-full items-center justify-between rounded-xl border border-accent-500/20 bg-navy-900/50 p-4"
+                  className="flex w-full items-center justify-between rounded-xl border border-[var(--ws-accent)]/20 bg-[var(--ws-surface)] p-4"
                 >
                   <div className="flex items-center gap-3">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-navy-800 text-slate-400">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[var(--ws-subtle)] text-[var(--ws-muted)]">
                       <Mail className="h-5 w-5" />
                     </div>
                     <div>
-                      <p className="font-medium text-white">{org.name}</p>
-                      <p className="text-sm text-accent-400">
+                      <p className="font-medium text-[var(--ws-text)]">{org.name}</p>
+                      <p className="text-sm text-[var(--ws-accent)]">
                         {org.invitationAvailable === false ? 'Invitation unavailable' : 'Invitation pending'} · {teamRoles[org.role][0]}
                       </p>
-                      {org.invitationAvailable === false ? <p className="text-xs text-slate-400">Ask an administrator for a new invitation.</p> : org.invitationExpiresAt && <p className="text-xs text-slate-400">Expires {formatDate(org.invitationExpiresAt)}</p>}
+                      {org.invitationAvailable === false ? <p className="text-xs text-[var(--ws-muted)]">Ask an administrator for a new invitation.</p> : org.invitationExpiresAt && <p className="text-xs text-[var(--ws-muted)]">Expires {formatDate(org.invitationExpiresAt)}</p>}
                     </div>
                   </div>
                   <Button
@@ -116,26 +116,26 @@ export default function SelectOrg() {
                 <button
                   key={org._id}
                   onClick={() => handleSelectOrg(org._id)}
-                  className="group flex w-full items-center justify-between rounded-xl border border-white/10 bg-navy-900/50 p-4 text-left transition-all hover:border-accent-500/30 hover:bg-navy-800/50"
+                  className="group flex w-full items-center justify-between rounded-xl border border-[var(--ws-border)] bg-[var(--ws-surface)] p-4 text-left transition-all hover:border-[var(--ws-accent)]/30 hover:bg-[var(--ws-subtle)]"
                 >
                   <div className="flex items-center gap-3">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-navy-800 text-slate-400 group-hover:bg-accent-500/20 group-hover:text-accent-400">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[var(--ws-subtle)] text-[var(--ws-muted)] group-hover:bg-accent-500/20 group-hover:text-[var(--ws-accent)]">
                       <Building2 className="h-5 w-5" />
                     </div>
                     <div>
-                      <p className="font-medium text-white">{org.name}</p>
-                      <p className="text-sm text-slate-500 capitalize">
+                      <p className="font-medium text-[var(--ws-text)]">{org.name}</p>
+                      <p className="text-sm text-[var(--ws-muted)] capitalize">
                         {teamRoles[org.role][0]}
                       </p>
                     </div>
                   </div>
-                  <ChevronRight className="h-5 w-5 text-slate-500 transition-transform group-hover:translate-x-1 group-hover:text-accent-400" />
+                  <ChevronRight className="h-5 w-5 text-[var(--ws-muted)] transition-transform group-hover:translate-x-1 group-hover:text-[var(--ws-accent)]" />
                 </button>
               ),
             )}
 
           {orgs?.length === 0 && (
-            <p className="text-center text-slate-500 py-4">
+            <p className="text-center text-[var(--ws-muted)] py-4">
               {t('auth.selectOrg.noOrgs')}
             </p>
           )}

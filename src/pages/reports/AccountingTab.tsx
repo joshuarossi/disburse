@@ -113,7 +113,7 @@ function AccountingWorkspace({
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <h2 className="text-lg font-semibold">Reconciliation</h2>
-          <p className="mt-1 text-sm text-slate-400">
+          <p className="mt-1 text-sm text-[var(--ws-muted)]">
             {config?.profile
               ? `${config.profile.bookName} · Functional currency ${config.profile.currency}`
               : "Match settled movements to your existing accounting books."}
@@ -129,7 +129,7 @@ function AccountingWorkspace({
         )}
       </div>
       {view !== "balances" && (
-        <p className="text-sm leading-6 text-slate-400">
+        <p className="text-sm leading-6 text-[var(--ws-muted)]">
           Review each movement, connect its book reference, and prepare a
           balanced journal only when an entry is needed. Customer collections
           and transfers between company accounts keep their own treatment.
@@ -214,14 +214,14 @@ function AccountingWorkspace({
                               {row.amount} {row.token}
                             </span>
                           </div>
-                          <p className="text-xs text-slate-400">
+                          <p className="text-xs text-[var(--ws-muted)]">
                             {new Date(row.createdAt).toISOString().slice(0, 10)}{" "}
                             · {row.network} ·{" "}
                             {row.direction === "inflow" ? "Received" : "Sent"}
                           </p>
                           <p className="text-sm">
                             {row.accountName}
-                            <span className="mt-1 block font-mono text-xs text-slate-400">
+                            <span className="mt-1 block font-mono text-xs text-[var(--ws-muted)]">
                               {row.accountAddress.slice(0, 8)}…
                               {row.accountAddress.slice(-6)}
                             </span>
@@ -304,7 +304,7 @@ function AccountingWorkspace({
             )}
             {view === "receipts" && (
               <section className="workspace-panel">
-                <p className="p-4 text-sm text-slate-400">
+                <p className="p-4 text-sm text-[var(--ws-muted)]">
                   Original customer receipts and forwarding transfers are shown
                   separately. A receiving address and your main account can
                   reference the same forwarding movement; it is reconciled once.
@@ -337,7 +337,7 @@ function AccountingWorkspace({
                               {row.amount || "Check evidence"} {row.token}
                             </span>
                           </div>
-                          <p className="text-xs text-slate-400">
+                          <p className="text-xs text-[var(--ws-muted)]">
                             {row.companyTransfer
                               ? "Internal transfer"
                               : "Customer receipt"}
@@ -416,7 +416,7 @@ function AccountingWorkspace({
             {view === "journals" && (
               <>
                 <div className="flex flex-wrap items-center justify-between gap-3">
-                  <p className="text-sm text-slate-400">
+                  <p className="text-sm text-[var(--ws-muted)]">
                     Choose reviewed journals to export. Include both parts of a
                     correction.
                   </p>
@@ -452,7 +452,7 @@ function AccountingWorkspace({
                                 <strong className="break-words text-sm">
                                   {entry.journalNumber}
                                 </strong>
-                                <p className="mt-1 text-xs text-slate-400">
+                                <p className="mt-1 text-xs text-[var(--ws-muted)]">
                                   {entry.postingDate}
                                 </p>
                               </div>
@@ -474,7 +474,7 @@ function AccountingWorkspace({
                             <p className="text-sm font-semibold tabular-nums">
                               {entry.assetBookValue} {entry.currency}
                             </p>
-                            <p className="text-xs text-slate-400">
+                            <p className="text-xs text-[var(--ws-muted)]">
                               {entry.reversalOf
                                 ? "Reversal"
                                 : accountingTreatments[entry.treatment]}
@@ -612,7 +612,7 @@ function AccountingWorkspace({
                             {batch.entryIds.length === 1 ? "" : "s"} ·{" "}
                             {batch.currency}
                           </p>
-                          <p className="text-sm text-slate-400">
+                          <p className="text-sm text-[var(--ws-muted)]">
                             {new Date(batch.createdAt).toLocaleString()} ·{" "}
                             {batch.importedAt
                               ? "Import confirmed"

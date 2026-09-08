@@ -62,6 +62,7 @@ export function StatusBadge({
     scheduled: 'Scheduled',
     relaying: 'Processing',
     executed: 'Paid',
+    received: 'Received',
     failed: 'Needs attention',
     cancelled: 'Cancelled',
     active: 'Active',

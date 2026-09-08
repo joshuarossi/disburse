@@ -17,7 +17,7 @@ export async function checkRecipientScreening(
     throw new Error("Review payment groups of at most 1,000 recipients.");
   const org = await ctx.db.get(orgId),
     source = await sourceRecord(ctx),
-    enforcement = org?.screeningEnforcement ?? "off";
+    enforcement = org?.screeningEnforcement ?? "warn";
   const flagged: Array<{
     beneficiaryId: Id<"beneficiaries">;
     beneficiaryName: string;

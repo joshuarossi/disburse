@@ -11,6 +11,26 @@ import {
 } from "./factories";
 
 describe("OFAC name-screening boundaries", () => {
+  it("warns on missing screening evidence by default and preserves explicit policies", async () => {
+    const t = convexTest(schema);
+    const ids = await t.run(ctx => createFullOrgSetup(ctx, { walletAddress: TEST_WALLETS.admin }));
+    const admin = await signIn(t, "admin");
+    const beneficiaryId = await t.run(ctx => createTestBeneficiary(ctx, ids.orgId));
+    const args = { orgId: ids.orgId, sessionToken: admin.sessionToken };
+    const { checkRecipientScreening } = await import("../lib/screeningPolicy");
+    expect(await t.query(api.screeningQueries.getScreeningEnforcement, args)).toBe("warn");
+    const warning = await t.run(ctx => checkRecipientScreening(ctx, ids.orgId, [beneficiaryId]));
+    expect(warning.enforcement).toBe("warn");
+    expect(warning.clear).toBe(false);
+    expect(warning.flagged).toHaveLength(1);
+    for (const enforcement of ["off", "block"] as const) {
+      await t.mutation(api.screeningMutations.updateScreeningEnforcement, { ...args, enforcement });
+      expect(await t.query(api.screeningQueries.getScreeningEnforcement, args)).toBe(enforcement);
+      const check = await t.run(ctx => checkRecipientScreening(ctx, ids.orgId, [beneficiaryId]));
+      expect(check.clear).toBe(enforcement === "off");
+    }
+  });
+
   it("does not allow an outsider or read-only member to trigger an organization scan", async () => {
     const t = convexTest(schema);
     const ids = await t.run((ctx) =>

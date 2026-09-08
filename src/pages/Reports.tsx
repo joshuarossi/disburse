@@ -41,7 +41,7 @@ export default function Reports() {
         />
 
         {/* Tab Navigation */}
-        <div className="border-b border-white/10">
+        <div className="border-b border-[var(--ws-border)]">
           <nav className="workspace-tabs" aria-label="Report sections">
             {tabs.map((tab) => {
               const Icon = tab.icon;

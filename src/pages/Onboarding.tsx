@@ -260,22 +260,22 @@ export default function Onboarding() {
         <div
           className={`flex h-8 w-8 items-center justify-center rounded-full border transition-colors ${
             done
-              ? "border-accent-500 bg-accent-500"
+              ? "border-[var(--ws-accent)] bg-[var(--ws-accent)]"
               : active
-                ? "border-accent-500 bg-navy-800"
-                : "border-white/10 bg-navy-800"
+                ? "border-[var(--ws-accent)] bg-[var(--ws-subtle)]"
+                : "border-[var(--ws-border)] bg-[var(--ws-subtle)]"
           }`}
         >
           {done ? (
-            <Check className="h-4 w-4 text-navy-950" />
+            <Check className="h-4 w-4 text-[var(--ws-surface)]" />
           ) : (
             <Icon
-              className={`h-4 w-4 ${active ? "text-accent-400" : "text-slate-500"}`}
+              className={`h-4 w-4 ${active ? "text-[var(--ws-accent)]" : "text-[var(--ws-muted)]"}`}
             />
           )}
         </div>
         <span
-          className={`text-[11px] font-medium sm:text-xs ${active ? "text-white" : done ? "text-accent-400" : "text-slate-500"}`}
+          className={`text-[11px] font-medium sm:text-xs ${active ? "text-[var(--ws-text)]" : done ? "text-[var(--ws-accent)]" : "text-[var(--ws-muted)]"}`}
         >
           {label}
         </span>
@@ -301,12 +301,7 @@ export default function Onboarding() {
   // Render
   // ---------------------------------------------------------------------------
   return (
-    <div className="workspace workspace-entry flex min-h-screen flex-col items-center justify-center bg-navy-950 px-6 py-12">
-      {/* Background glow */}
-      <div className="absolute inset-0 -z-10 overflow-hidden">
-        <div className="absolute left-1/2 top-1/2 h-[500px] w-[500px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-accent-500/10 blur-[120px]" />
-      </div>
-
+    <div className="workspace workspace-entry flex min-h-screen flex-col items-center justify-center bg-[var(--ws-bg)] px-6 py-12">
       <div className="w-full max-w-lg">
         {/* Progress bar */}
         <div className="mb-8 flex items-center justify-between">
@@ -321,17 +316,17 @@ export default function Onboarding() {
         </div>
 
         {/* Card */}
-        <div className="rounded-2xl border border-white/10 bg-navy-900/50 p-5 sm:p-8">
+        <div className="rounded-2xl border border-[var(--ws-border)] bg-[var(--ws-surface)] p-5 sm:p-8">
           {/* ================================================================
               STEP: PROFILE
               ============================================================== */}
           {step === "profile" && (
             <div className="space-y-6">
               <div className="text-center">
-                <h1 className="text-2xl font-bold text-white">
+                <h1 className="text-2xl font-bold text-[var(--ws-text)]">
                   Welcome to Disburse
                 </h1>
-                <p className="mt-2 text-slate-400">
+                <p className="mt-2 text-[var(--ws-muted)]">
                   Tell us a bit about yourself. Both fields are optional — you
                   can always update later.
                 </p>
@@ -341,7 +336,7 @@ export default function Onboarding() {
                 <div>
                   <label
                     htmlFor="onboarding-name"
-                    className="mb-1.5 block text-sm font-medium text-slate-300"
+                    className="mb-1.5 block text-sm font-medium text-[var(--ws-text)]"
                   >
                     Name
                   </label>
@@ -351,13 +346,13 @@ export default function Onboarding() {
                     value={name}
                     onChange={(e) => setName(e.target.value)}
                     placeholder="Your name"
-                    className="w-full rounded-lg border border-white/10 bg-navy-800 px-4 py-2.5 text-white placeholder-slate-500 focus:border-accent-500 focus:outline-none focus:ring-1 focus:ring-accent-500"
+                    className="w-full rounded-lg border border-[var(--ws-border)] bg-[var(--ws-subtle)] px-4 py-2.5 text-[var(--ws-text)] placeholder:text-[var(--ws-muted)] focus:border-[var(--ws-accent)] focus:outline-none focus:ring-1 focus:ring-accent-500"
                   />
                 </div>
                 <div>
                   <label
                     htmlFor="onboarding-email"
-                    className="mb-1.5 block text-sm font-medium text-slate-300"
+                    className="mb-1.5 block text-sm font-medium text-[var(--ws-text)]"
                   >
                     Email
                   </label>
@@ -367,7 +362,7 @@ export default function Onboarding() {
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     placeholder="you@example.com"
-                    className="w-full rounded-lg border border-white/10 bg-navy-800 px-4 py-2.5 text-white placeholder-slate-500 focus:border-accent-500 focus:outline-none focus:ring-1 focus:ring-accent-500"
+                    className="w-full rounded-lg border border-[var(--ws-border)] bg-[var(--ws-subtle)] px-4 py-2.5 text-[var(--ws-text)] placeholder:text-[var(--ws-muted)] focus:border-[var(--ws-accent)] focus:outline-none focus:ring-1 focus:ring-accent-500"
                   />
                 </div>
               </div>
@@ -387,10 +382,10 @@ export default function Onboarding() {
           {step === "create-org" && (
             <div className="space-y-6">
               <div className="text-center">
-                <h1 className="text-2xl font-bold text-white">
+                <h1 className="text-2xl font-bold text-[var(--ws-text)]">
                   Create your organization
                 </h1>
-                <p className="mt-2 text-slate-400">
+                <p className="mt-2 text-[var(--ws-muted)]">
                   Your organization is the workspace where you manage
                   disbursements and team members.
                 </p>
@@ -399,7 +394,7 @@ export default function Onboarding() {
               <div>
                 <label
                   htmlFor="onboarding-orgName"
-                  className="mb-1.5 block text-sm font-medium text-slate-300"
+                  className="mb-1.5 block text-sm font-medium text-[var(--ws-text)]"
                 >
                   Organization name
                 </label>
@@ -410,7 +405,7 @@ export default function Onboarding() {
                   onChange={(e) => setOrgName(e.target.value)}
                   placeholder="e.g. Acme Corp"
                   autoFocus
-                  className="w-full rounded-lg border border-white/10 bg-navy-800 px-4 py-2.5 text-white placeholder-slate-500 focus:border-accent-500 focus:outline-none focus:ring-1 focus:ring-accent-500"
+                  className="w-full rounded-lg border border-[var(--ws-border)] bg-[var(--ws-subtle)] px-4 py-2.5 text-[var(--ws-text)] placeholder:text-[var(--ws-muted)] focus:border-[var(--ws-accent)] focus:outline-none focus:ring-1 focus:ring-accent-500"
                 />
               </div>
 
@@ -451,10 +446,10 @@ export default function Onboarding() {
           {step === "team" && (
             <div className="space-y-6">
               <div className="text-center">
-                <h1 className="text-2xl font-bold text-white">
+                <h1 className="text-2xl font-bold text-[var(--ws-text)]">
                   Add team members
                 </h1>
-                <p className="mt-2 text-slate-400">
+                <p className="mt-2 text-[var(--ws-muted)]">
                   Invite people to your organization. You can always add more
                   later. This step is optional.
                 </p>
@@ -466,21 +461,21 @@ export default function Onboarding() {
                   {teamMembers.map((m, idx) => (
                     <div
                       key={idx}
-                      className="flex items-center justify-between rounded-lg border border-white/10 bg-navy-800 px-4 py-3"
+                      className="flex items-center justify-between rounded-lg border border-[var(--ws-border)] bg-[var(--ws-subtle)] px-4 py-3"
                     >
                       <div className="min-w-0">
-                        <p className="truncate text-sm font-medium text-white font-mono">
+                        <p className="truncate text-sm font-medium text-[var(--ws-text)] font-mono">
                           {m.walletAddress.slice(0, 8)}...
                           {m.walletAddress.slice(-4)}
                         </p>
-                        <p className="text-xs text-slate-500 capitalize">
+                        <p className="text-xs text-[var(--ws-muted)] capitalize">
                           {m.name || "No name"} · {m.role}
                         </p>
                       </div>
                       <button
                         aria-label={`Remove ${m.name || 'team member'} from this list`}
                         onClick={() => handleRemoveMember(idx)}
-                        className="text-slate-500 hover:text-red-400 transition-colors"
+                        className="text-[var(--ws-muted)] hover:text-red-400 transition-colors"
                       >
                         <Trash2 className="h-4 w-4" />
                       </button>
@@ -491,11 +486,11 @@ export default function Onboarding() {
 
               {/* Add member form */}
               {isAddingMember ? (
-                <div className="rounded-lg border border-accent-500/30 bg-navy-800/50 p-4 space-y-3">
+                <div className="rounded-lg border border-[var(--ws-accent)]/30 bg-[var(--ws-subtle)] p-4 space-y-3">
                   <div>
                     <label
                       htmlFor="onboarding-newMember-walletAddress"
-                      className="mb-1 block text-xs font-medium text-slate-400"
+                      className="mb-1 block text-xs font-medium text-[var(--ws-muted)]"
                     >
                       Wallet address *
                     </label>
@@ -511,14 +506,14 @@ export default function Onboarding() {
                       }
                       placeholder="0x..."
                       autoFocus
-                      className="w-full rounded-lg border border-white/10 bg-navy-800 px-3 py-2 font-mono text-sm text-white placeholder-slate-500 focus:border-accent-500 focus:outline-none focus:ring-1 focus:ring-accent-500"
+                      className="w-full rounded-lg border border-[var(--ws-border)] bg-[var(--ws-subtle)] px-3 py-2 font-mono text-sm text-[var(--ws-text)] placeholder:text-[var(--ws-muted)] focus:border-[var(--ws-accent)] focus:outline-none focus:ring-1 focus:ring-accent-500"
                     />
                   </div>
                   <div className="grid grid-cols-2 gap-3">
                     <div>
                       <label
                         htmlFor="onboarding-newMember-name"
-                        className="mb-1 block text-xs font-medium text-slate-400"
+                        className="mb-1 block text-xs font-medium text-[var(--ws-muted)]"
                       >
                         Name
                       </label>
@@ -533,13 +528,13 @@ export default function Onboarding() {
                           }))
                         }
                         placeholder="Name"
-                        className="w-full rounded-lg border border-white/10 bg-navy-800 px-3 py-2 text-sm text-white placeholder-slate-500 focus:border-accent-500 focus:outline-none focus:ring-1 focus:ring-accent-500"
+                        className="w-full rounded-lg border border-[var(--ws-border)] bg-[var(--ws-subtle)] px-3 py-2 text-sm text-[var(--ws-text)] placeholder:text-[var(--ws-muted)] focus:border-[var(--ws-accent)] focus:outline-none focus:ring-1 focus:ring-accent-500"
                       />
                     </div>
                     <div>
                       <label
                         htmlFor="onboarding-newMember-email"
-                        className="mb-1 block text-xs font-medium text-slate-400"
+                        className="mb-1 block text-xs font-medium text-[var(--ws-muted)]"
                       >
                         Email
                       </label>
@@ -554,14 +549,14 @@ export default function Onboarding() {
                           }))
                         }
                         placeholder="Email"
-                        className="w-full rounded-lg border border-white/10 bg-navy-800 px-3 py-2 text-sm text-white placeholder-slate-500 focus:border-accent-500 focus:outline-none focus:ring-1 focus:ring-accent-500"
+                        className="w-full rounded-lg border border-[var(--ws-border)] bg-[var(--ws-subtle)] px-3 py-2 text-sm text-[var(--ws-text)] placeholder:text-[var(--ws-muted)] focus:border-[var(--ws-accent)] focus:outline-none focus:ring-1 focus:ring-accent-500"
                       />
                     </div>
                   </div>
                   <div>
                     <label
                       htmlFor="onboarding-newMember-role"
-                      className="mb-1 block text-xs font-medium text-slate-400"
+                      className="mb-1 block text-xs font-medium text-[var(--ws-muted)]"
                     >
                       Role
                     </label>
@@ -574,7 +569,7 @@ export default function Onboarding() {
                           role: e.target.value as Role,
                         }))
                       }
-                      className="w-full rounded-lg border border-white/10 bg-navy-800 px-3 py-2 text-sm text-white focus:border-accent-500 focus:outline-none focus:ring-1 focus:ring-accent-500"
+                      className="w-full rounded-lg border border-[var(--ws-border)] bg-[var(--ws-subtle)] px-3 py-2 text-sm text-[var(--ws-text)] focus:border-[var(--ws-accent)] focus:outline-none focus:ring-1 focus:ring-accent-500"
                     >
                       <option value="approver">Approver</option>
                       <option value="initiator">Initiator</option>
@@ -644,33 +639,35 @@ export default function Onboarding() {
           {step === "safe" && (
             <div className="space-y-6">
               <div className="text-center">
-                <h1 className="text-2xl font-bold text-white">
+                <h1 className="text-2xl font-bold text-[var(--ws-text)]">
                   Set up your company account
                 </h1>
-                <p className="mt-2 text-slate-400">
-                  Create an account for your team, or connect one you already control.
+                <p className="mt-2 text-[var(--ws-muted)]">
+                  This account holds the stablecoins your team pays from. Disburse uses Safe
+                  to keep funds under your team's control. Connect an existing Safe account
+                  or create one below.
                 </p>
               </div>
 
               {/* Choice: existing or create new */}
               {hasSafe === null && (
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid gap-3 sm:grid-cols-2">
                   <button
                     onClick={() => setHasSafe(true)}
-                    className="rounded-xl border border-white/10 bg-navy-800 p-4 text-left transition-all hover:border-accent-500/40 hover:bg-navy-800/80"
+                    className="rounded-xl border border-[var(--ws-border)] bg-[var(--ws-subtle)] p-4 text-left transition-all hover:border-[var(--ws-accent)]/40 hover:bg-[var(--ws-subtle)]"
                   >
-                    <p className="font-semibold text-white">Yes, I have one</p>
-                    <p className="mt-1 text-xs text-slate-400">
-                      Link an existing Safe wallet
+                    <p className="font-semibold text-[var(--ws-text)]">Connect an existing account</p>
+                    <p className="mt-1 text-xs text-[var(--ws-muted)]">
+                      Use a company account your team already controls in Safe.
                     </p>
                   </button>
                   <button
                     onClick={() => setHasSafe(false)}
-                    className="rounded-xl border border-white/10 bg-navy-800 p-4 text-left transition-all hover:border-accent-500/40 hover:bg-navy-800/80"
+                    className="rounded-xl border border-[var(--ws-border)] bg-[var(--ws-subtle)] p-4 text-left transition-all hover:border-[var(--ws-accent)]/40 hover:bg-[var(--ws-subtle)]"
                   >
-                    <p className="font-semibold text-white">No, create one</p>
-                    <p className="mt-1 text-xs text-slate-400">
-                      We'll set it up for you
+                    <p className="font-semibold text-[var(--ws-text)]">Create a company account</p>
+                    <p className="mt-1 text-xs text-[var(--ws-muted)]">
+                      Choose who can approve payments and keep control of your funds.
                     </p>
                   </button>
                 </div>
@@ -682,9 +679,9 @@ export default function Onboarding() {
                   <div>
                     <label
                       htmlFor="onboarding-existingSafeAddress"
-                      className="mb-1.5 block text-sm font-medium text-slate-300"
+                      className="mb-1.5 block text-sm font-medium text-[var(--ws-text)]"
                     >
-                      Safe address
+                      Company account address in Safe
                     </label>
                     <input
                       id="onboarding-existingSafeAddress"
@@ -696,15 +693,15 @@ export default function Onboarding() {
                       }}
                       placeholder="0x..."
                       autoFocus
-                      className="w-full rounded-lg border border-white/10 bg-navy-800 px-4 py-2.5 font-mono text-sm text-white placeholder-slate-500 focus:border-accent-500 focus:outline-none focus:ring-1 focus:ring-accent-500"
+                      className="w-full rounded-lg border border-[var(--ws-border)] bg-[var(--ws-subtle)] px-4 py-2.5 font-mono text-sm text-[var(--ws-text)] placeholder:text-[var(--ws-muted)] focus:border-[var(--ws-accent)] focus:outline-none focus:ring-1 focus:ring-accent-500"
                     />
                   </div>
                   <div>
                     <label
                       htmlFor="onboarding-selectedChainId"
-                      className="mb-1.5 block text-sm font-medium text-slate-300"
+                      className="mb-1.5 block text-sm font-medium text-[var(--ws-text)]"
                     >
-                      Chain
+                      Payment network
                     </label>
                     <select
                       id="onboarding-selectedChainId"
@@ -713,7 +710,7 @@ export default function Onboarding() {
                       onChange={(e) =>
                         setSelectedChainId(Number(e.target.value))
                       }
-                      className="w-full rounded-lg border border-white/10 bg-navy-800 px-4 py-2.5 text-base text-white focus:border-accent-500 focus:outline-none focus:ring-1 focus:ring-accent-500"
+                      className="w-full rounded-lg border border-[var(--ws-border)] bg-[var(--ws-subtle)] px-4 py-2.5 text-base text-[var(--ws-text)] focus:border-[var(--ws-accent)] focus:outline-none focus:ring-1 focus:ring-accent-500"
                     >
                       {CHAINS_LIST.map((c) => (
                         <option key={c.chainId} value={c.chainId}>
@@ -748,7 +745,7 @@ export default function Onboarding() {
                           Validating...
                         </>
                       ) : (
-                        "Link Safe"
+                        "Connect account"
                       )}
                     </Button>
                   </div>
@@ -758,21 +755,21 @@ export default function Onboarding() {
               {/* --- Create new --- */}
               {hasSafe === false && (
                 <div className="space-y-4">
-                  <div className="rounded-lg border border-white/10 bg-navy-800 p-4">
-                    <p className="text-sm font-medium text-slate-300">
-                      Account owners
+                  <div className="rounded-lg border border-[var(--ws-border)] bg-[var(--ws-subtle)] p-4">
+                    <p className="text-sm font-medium text-[var(--ws-text)]">
+                      Who controls company funds?
                     </p>
-                    <p className="mt-2 text-xs leading-5 text-slate-400">
-                      Owners can authorize transfers and change account
-                      permissions outside Disburse. Choose them separately from
-                      application roles.
+                    <p className="mt-2 text-xs leading-5 text-[var(--ws-muted)]">
+                      These people are account owners. They can move funds and change
+                      account permissions, including outside Disburse. A workspace
+                      role alone does not give someone this control.
                     </p>
                     <div className="mt-2 space-y-1.5">
                       <div className="flex items-center gap-2">
                         <span className="rounded bg-accent-500/15 px-2 py-0.5 text-xs font-mono text-[var(--ws-text)]">
                           {primaryOwner?.slice(0, 8)}...{primaryOwner?.slice(-4)}
                         </span>
-                        <span className="text-xs text-slate-500">{primaryOwner?.toLowerCase() === address?.toLowerCase() ? '(you)' : '(setup owner)'}</span>
+                        <span className="text-xs text-[var(--ws-muted)]">{primaryOwner?.toLowerCase() === address?.toLowerCase() ? '(you)' : '(setup owner)'}</span>
                       </div>
                       {[...teamMembers, ...Array.from(new Set([...recoveredOwners, ...ownerWallets])).filter(wallet => wallet.toLowerCase() !== primaryOwner?.toLowerCase() && !teamMembers.some(member => member.walletAddress.toLowerCase() === wallet.toLowerCase())).map(walletAddress => ({ walletAddress, name: "" }))].map((m, idx) => (
                         <label key={idx} className="flex items-center gap-2">
@@ -792,12 +789,12 @@ export default function Onboarding() {
                               );
                             }}
                           />
-                          <span className="rounded bg-white/5 px-2 py-0.5 text-xs font-mono text-slate-300">
+                          <span className="rounded bg-[var(--ws-subtle)] px-2 py-0.5 text-xs font-mono text-[var(--ws-text)]">
                             {m.walletAddress.slice(0, 8)}...
                             {m.walletAddress.slice(-4)}
                           </span>
                           {m.name && (
-                            <span className="text-xs text-slate-500">
+                            <span className="text-xs text-[var(--ws-muted)]">
                               {m.name}
                             </span>
                           )}
@@ -809,12 +806,12 @@ export default function Onboarding() {
                   <div>
                     <label
                       htmlFor="onboarding-safeThreshold"
-                      className="mb-1.5 block text-sm font-medium text-slate-300"
+                      className="mb-1.5 block text-sm font-medium text-[var(--ws-text)]"
                     >
-                      Approval threshold
+                      Approvals required
                     </label>
-                    <p className="mb-2 text-xs text-slate-500">
-                      How many signatures are required to approve a transaction?
+                    <p className="mb-2 text-xs text-[var(--ws-muted)]">
+                      How many account owners must approve each payment or account change?
                     </p>
                     <div className="flex items-center gap-3">
                       <select
@@ -824,7 +821,7 @@ export default function Onboarding() {
                         onChange={(e) =>
                           setSafeThreshold(Number(e.target.value))
                         }
-                        className="w-24 rounded-lg border border-white/10 bg-navy-800 px-3 py-2 text-white focus:border-accent-500 focus:outline-none focus:ring-1 focus:ring-accent-500"
+                        className="w-24 rounded-lg border border-[var(--ws-border)] bg-[var(--ws-subtle)] px-3 py-2 text-[var(--ws-text)] focus:border-[var(--ws-accent)] focus:outline-none focus:ring-1 focus:ring-accent-500"
                       >
                         {Array.from(
                           { length: 1 + ownerWallets.length },
@@ -835,7 +832,7 @@ export default function Onboarding() {
                           </option>
                         ))}
                       </select>
-                      <span className="text-sm text-slate-400">
+                      <span className="text-sm text-[var(--ws-muted)]">
                         of {1 + ownerWallets.length}{" "}
                         {1 + ownerWallets.length === 1 ? "owner" : "owners"}
                       </span>
@@ -845,9 +842,9 @@ export default function Onboarding() {
                   <div>
                     <label
                       htmlFor="onboarding-selectedChainId"
-                      className="mb-1.5 block text-sm font-medium text-slate-300"
+                      className="mb-1.5 block text-sm font-medium text-[var(--ws-text)]"
                     >
-                      Chain
+                      Payment network
                     </label>
                     <select
                       id="onboarding-selectedChainId"
@@ -856,7 +853,7 @@ export default function Onboarding() {
                       onChange={(e) =>
                         setSelectedChainId(Number(e.target.value))
                       }
-                      className="w-full rounded-lg border border-white/10 bg-navy-800 px-4 py-2.5 text-base text-white focus:border-accent-500 focus:outline-none focus:ring-1 focus:ring-accent-500"
+                      className="w-full rounded-lg border border-[var(--ws-border)] bg-[var(--ws-subtle)] px-4 py-2.5 text-base text-[var(--ws-text)] focus:border-[var(--ws-accent)] focus:outline-none focus:ring-1 focus:ring-accent-500"
                     >
                       {CHAINS_LIST.map((c) => (
                         <option key={c.chainId} value={c.chainId}>
@@ -885,7 +882,7 @@ export default function Onboarding() {
         </div>
 
         {/* Footer hint */}
-        <p className="mt-6 text-center text-xs text-slate-400">
+        <p className="mt-6 text-center text-xs text-[var(--ws-muted)]">
           You can always configure these settings later in your organization's
           Settings page.
         </p>
