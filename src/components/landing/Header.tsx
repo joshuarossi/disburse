@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { buttonVariants } from '@/components/ui/button'
 import { LanguageSwitcher } from '@/components/ui/LanguageSwitcher'
 import { ThemeSwitcher } from '@/components/ui/ThemeSwitcher'
+import { cn } from '@/lib/utils'
 
 export function Header() {
   const { t } = useTranslation();
@@ -15,10 +16,10 @@ export function Header() {
         opacity: 0.95,
       }}
     >
-      <div className="mx-auto max-w-7xl px-6 lg:px-8">
-        <nav className="flex h-16 items-center justify-between">
+      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+        <nav className="flex h-16 items-center justify-between gap-3">
           {/* Logo */}
-          <Link to="/" className="flex items-center gap-2">
+          <Link to="/" aria-label="Disburse" className="flex shrink-0 items-center gap-2">
             <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-to-br from-accent-500 to-accent-400">
               <svg
                 className="h-5 w-5 text-navy-950"
@@ -34,16 +35,16 @@ export function Header() {
                 />
               </svg>
             </div>
-            <span className="text-xl font-bold tracking-tight" style={{ color: 'var(--color-text-primary)' }}>
+            <span className="hidden text-xl font-bold tracking-tight md:inline" style={{ color: 'var(--color-text-primary)' }}>
               Disburse
             </span>
           </Link>
 
           {/* Navigation */}
-          <div className="flex items-center gap-3">
-            <ThemeSwitcher variant="ghost" size="sm" />
-            <LanguageSwitcher variant="ghost" size="sm" />
-            <Link to="/login" className={buttonVariants({ size: 'sm', variant: 'ghost' })}>
+          <div className="flex items-center gap-1.5 md:gap-3">
+            <ThemeSwitcher variant="ghost" size="sm" compactOnSmallScreens />
+            <LanguageSwitcher variant="ghost" size="sm" compactOnSmallScreens />
+            <Link to="/login" className={cn(buttonVariants({ size: 'sm', variant: 'ghost' }), 'hidden md:inline-flex')}>
                 {t('landing.header.login')}
               </Link>
             <Link to="/login" className={buttonVariants({ size: 'sm' })}>{t('landing.header.tryForFree')}</Link>

@@ -4,7 +4,7 @@ Reviewed September 8, 2026, using Xero's public product, pricing and developer d
 
 ## Published prices
 
-The supplied link serves Xero's Global plans in USD. Regular prices below exclude introductory promotions; US plans have different names, features and prices.
+The supplied link first served Xero's Global plans in USD and later redirected to its US page. Check the selected region. Regular prices below exclude introductory promotions; US plans have different names, features and prices.
 
 | Market / plan | Current monthly USD price | Announced monthly USD price |
 | --- | ---: | ---: |
@@ -39,6 +39,10 @@ Our product judgments from those references:
 Xero is both a budget comparison and a potential companion system. Disburse can own the stablecoin payment, collection and treasury workflow while Xero remains the customer's ledger. Replacing a complete accounting system would add tax, inventory, accounting-policy and migration requirements that the current application does not meet.
 
 ## Implications for Disburse pricing
+
+Xero uses higher tiers to add more capable financial workflows. Global Standard adds automatic/bulk reconciliation, custom dashboards, budgeting and a 60-day forecast; Premium adds multicurrency accounting, KPI analysis, industry comparisons and a 180-day forecast. The US Growing/Established progression is similar, but Established includes projects and employee expenses that are optional extras on the Global plans. [Global comparison](https://www.xero.com/pricing-plans/), [US comparison](https://www.xero.com/us/pricing-plans/)
+
+For Disburse, useful upgrade candidates are greater automation capacity, saved accounting rules, consolidated reporting across accounts, cash forecasts and configurable treasury-policy administration. These are packaging candidates; forecasts and consolidated entity reporting still need implementation and acceptance. Basic recipient currency support, payment safety, ordinary accounting exports and fund access should remain core functionality. No new feature restriction follows from this comparison.
 
 The current 50/99 USDC prices are per 30 days; Xero prices are per calendar month. Treat these as different billing periods rather than labeling them interchangeable. The comparison puts Disburse within the budget of a substantial accounting subscription. It does not support a blanket claim that Disburse is the cheapest option.
 
