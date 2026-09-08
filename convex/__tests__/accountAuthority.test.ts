@@ -1,7 +1,7 @@
 import { beforeEach, expect, it, vi } from 'vitest';
 import { generatePrivateKey, privateKeyToAccount } from 'viem/accounts';
 import { padHex } from 'viem';
-import { approvalPaths, readAccountAuthority } from '../lib/accountAuthority';
+import { approvalPaths, readAccountAuthority, readProspectiveAccountAuthority } from '../lib/accountAuthority';
 import { prepareAccountTransaction, verifyAccountSignature } from '../lib/accountApproval';
 import { approvalSigningData } from '../../shared/safeSignatures';
 import { SAFE_4337_MODULE } from '../../shared/safe4337';
@@ -49,4 +49,26 @@ it('finds an upgraded key signer through an owning Safe with the verified 4337 h
 it.each(['0x6000', '0xef0100', `${delegation}00`, `0xef0100${'0'.repeat(40)}`])('never converts an unknown contract or malformed delegation into a key signer: %s', async walletCode => {
   code = walletCode;
   await expect(readAccountAuthority(84532, root)).rejects.toThrow('Unsupported account contract');
+});
+
+it('checks a new account owner without requiring the new account to exist yet', async () => {
+  const authority = await readProspectiveAccountAuthority(84532, root, [signer.address], 1);
+  expect(identity).not.toHaveBeenCalled();
+  expect(approvalPaths(authority, signer.address)).toEqual([[root]]);
+});
+it('verifies the contract and signature handler of a proposed owning Safe', async () => {
+  const authority = await readProspectiveAccountAuthority(84532, root, [parent], 1);
+  expect(identity.mock.calls.map(call => call[1])).toEqual([parent]);
+  expect(rpc.getStorageAt).toHaveBeenCalled();
+  expect(approvalPaths(authority, signer.address)).toEqual([[root, parent]]);
+  rpc.getStorageAt.mockResolvedValue(padHex(root, { size: 32 }));
+  await expect(readProspectiveAccountAuthority(84532, root, [parent], 1)).rejects.toThrow('signature handler');
+});
+it('refuses an unsupported proposed contract owner before an account deposit', async () => {
+  code = '0x6000';
+  await expect(readProspectiveAccountAuthority(84532, root, [signer.address], 1)).rejects.toThrow('Unsupported account contract');
+});
+it('refuses a proposed owner hierarchy that loops back to the new account', async () => {
+  rpc.readContract.mockImplementation(async ({ functionName }) => functionName === 'getOwners' ? [root] : functionName === 'getThreshold' ? 1n : 0n);
+  await expect(readProspectiveAccountAuthority(84532, root, [parent], 1)).rejects.toThrow('cycle');
 });

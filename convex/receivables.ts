@@ -15,6 +15,7 @@ import { amountToBaseUnits, formatBaseUnits } from "./lib/validation";
 import { receivableAmounts, receivableStatus } from "../shared/receivables";
 import { internal } from "./_generated/api";
 import { assertSameSettlement, validateSettlementBlock } from './lib/settlementBlock';
+import { supportsCircleFees } from '../shared/circleExecution';
 
 
 const scope = { orgId: v.id("orgs"), sessionToken: v.string() };
@@ -34,15 +35,12 @@ export const configuration = query({
           .map((s) => s.chainId!),
       ),
     ].map((chainId) => {
-      const testnet = [11155111, 84532].includes(chainId);
-      const configured = /^0x[\da-fA-F]{40}$/.test(
-        process.env[`AR_FACTORY_${chainId}`] ?? "",
-      );
+      const testnet = [11155111, 84532, 421614].includes(chainId);
       return {
         chainId,
         canIssue:
-          configured && (testnet || process.env.AR_MAINNET_ENABLED === "true"),
-        collectionFeeMode: "wallet" as const,
+          supportsCircleFees(chainId) && (testnet || process.env.AR_MAINNET_ENABLED === "true"),
+        collectionFeeMode: "stablecoin" as const,
       };
     });
   },

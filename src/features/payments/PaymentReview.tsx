@@ -1,4 +1,6 @@
 import { userErrorMessage } from '@/lib/userErrors';
+import { supportsCircleFees } from '../../../shared/circleExecution';
+import { CustomerPaidExecution } from './CustomerPaidExecution';
 import { AccountCancellation } from "@/components/payments/AccountCancellation";
 import { PaymentRecovery } from './PaymentRecovery';
 import { paymentStatus } from '../../../shared/paymentQueue';
@@ -61,13 +63,14 @@ export function PaymentReview({
     api.screeningQueries.checkDisbursementRecipients,
     sessionToken ? { disbursementId: id, sessionToken } : "skip",
   );
-  const feeQuote = useQuery(api.relayQuotes.preview,
-    RELAY_FEATURE_ENABLED && sessionToken ? { disbursementId: id, sessionToken } : "skip");
   const [usingAllowance, setUsingAllowance] = useState(false);
   const [allowanceFeeMode, setAllowanceFeeMode] = useState<"managed" | "wallet">(RELAY_FEATURE_ENABLED ? "managed" : "wallet");
+  const feeQuote = useQuery(api.relayQuotes.preview,
+    RELAY_FEATURE_ENABLED && (!supportsCircleFees(payment?.chainId) || usingAllowance && allowanceFeeMode === 'managed') && sessionToken ? { disbursementId: id, sessionToken } : "skip");
+  const customerPaid = supportsCircleFees(payment?.chainId) && !usingAllowance && !payment?.executionFee && !payment?.allowanceExecution && (!payment?.nativeExecution || payment.nativeExecution.service === 'circle');
   const displayedFee = payment?.executionFee ?? ((!usingAllowance || allowanceFeeMode === "managed") && payment && ["draft", "pending"].includes(payment.status) && !payment.safeTxHash ? feeQuote?.fee : undefined);
   const [reviewedFee, setReviewedFee] = useState("");
-  const feeBlocked = RELAY_FEATURE_ENABLED && (!feeQuote?.identity || reviewedFee !== feeQuote.identity);
+  const feeBlocked = RELAY_FEATURE_ENABLED && !customerPaid && (!feeQuote?.identity || reviewedFee !== feeQuote.identity);
   const [screeningAcknowledged, setScreeningAcknowledged] = useState("");
   const reviewKey = screening ? screeningReviewKey(screening.flagged) : "";
   const screeningBlocked =
@@ -460,7 +463,8 @@ export function PaymentReview({
                 onFeeModeChange={setAllowanceFeeMode}
               />
             )}
-          <PaymentRecovery id={id} canManage={canManage} payment={payment} retryDisabled={locked || screeningBlocked} onRetryNative={payment.allowanceExecution ? undefined : () => void actions.run(id, 'execute', screeningAcknowledged)} />
+          {customerPaid && canManage && payment.safeTxHash && ['proposed', 'relaying', 'executed', 'failed'].includes(payment.status) && <CustomerPaidExecution source={{ disbursementId: id }} ready={payment.status === 'proposed' && !!approvals.data?.ready} blocked={screeningBlocked || actions.busy} memberName={approverName} onBusyChange={setBusy} />}
+          {!customerPaid && <PaymentRecovery id={id} canManage={canManage} payment={payment} retryDisabled={locked || screeningBlocked} onRetryNative={payment.allowanceExecution ? undefined : () => void actions.run(id, 'execute', screeningAcknowledged)} />}
           {payment.relayError && payment.status !== 'failed' && !recovery && !payment.nativeExecution && <Notice>{userErrorMessage(payment.relayError, 'This payment needs review. Check its original settlement before trying again.')}</Notice>}
           {payment.status === "scheduled" && (
             <Notice tone="info">
@@ -647,7 +651,7 @@ export function PaymentReview({
                     <ArrowUpRight size={14} />
                   </button>
                 )}
-              {canManage && payment.status === "proposed" && (
+              {canManage && !customerPaid && payment.status === "proposed" && (
                 <button
                   className="workspace-button workspace-button-primary"
                   disabled={

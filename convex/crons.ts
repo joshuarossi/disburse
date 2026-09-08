@@ -10,6 +10,9 @@ crons.interval('Refresh recipient screening', { minutes: 1 }, internal.screening
 crons.interval('Prune replaced OFAC search snapshots', { hours: 12 }, internal.ofacRetention.prune, {});
 crons.interval('Recover managed payment submissions', { minutes: 1 }, internal.relayJobs.recover, {});
 crons.interval('Recover native wallet payments', { minutes: 1 }, internal.nativePayments.recover, {});
+crons.interval('Recover customer-paid USDC execution', { minutes: 1 }, internal.circlePayments.recover, {});
+crons.interval('Connect completed company accounts', { minutes: 1 }, internal.accountSetups.recover, {});
+crons.interval('Recover MetaMask company setup', { minutes: 1 }, internal.walletSetups.recover, {});
 crons.interval('Recover account policy changes', { minutes: 1 }, internal.spendingPolicyData.recover, {});
 crons.interval('Continue deposit history synchronization', { minutes: 1 }, internal.depositsData.recover, {});
 crons.interval('Track incoming invoice payments', { minutes: 1 }, internal.receivables.monitor, {});

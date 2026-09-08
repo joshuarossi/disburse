@@ -28,7 +28,7 @@ for (const [theme, width] of [['light', 1440], ['dark', 430]] as const) {
     await expect(queue.getByRole('alert')).toContainText('read-only');
   });
 }
-test('a policy request can include an owner and reviews the selected account fee', async ({ page }) => {
+test('a policy request preserves its allowance currency and reviews USDC execution fees after approval', async ({ page }) => {
   await page.goto('/org/demo/team');
   await page.getByRole('tab', { name: 'Delegated spending' }).click();
   await page.getByRole('button', { name: 'Set allowance', exact: true }).click();
@@ -36,26 +36,25 @@ test('a policy request can include an owner and reviews the selected account fee
   await expect(dialog.getByRole('combobox', { name: 'Team member' }).getByRole('option', { name: /Alex Morgan/ })).toHaveCount(1);
   await dialog.getByRole('combobox', { name: 'Team member' }).selectOption({ label: 'Alex Morgan · admin' });
   await dialog.getByRole('textbox', { name: 'Allowance', exact: true }).fill('250');
-  await expect(dialog).toContainText('0.05 USDC');
-  await dialog.getByRole('combobox', { name: 'Fee currency' }).selectOption('USDT');
-  await expect(dialog).toContainText('0.05 USDT');
+  await expect(dialog).toContainText('company account pays the execution fee in USDC');
+  await expect(dialog).toContainText('Review the exact limit after the account approves this policy');
+  await expect(dialog.getByRole('combobox', { name: 'Execution fee' })).toHaveCount(0);
   await expect(dialog.getByRole('combobox', { name: 'Currency', exact: true })).toHaveValue('USDC');
   await dialog.getByRole('checkbox').check();
   await expect(dialog.getByRole('button', { name: 'Request account approval' })).toBeEnabled();
   await dialog.getByRole('button', { name: 'Request account approval' }).click();
   await expect(dialog.getByRole('alert')).toContainText('read-only');
 });
-test('an unavailable fee does not silently change the execution method', async ({ page }) => {
-  await page.addInitScript(() => sessionStorage.setItem('qa:scenario', 'policy-fee-outage'));
+test('an unavailable USDC fee keeps the policy saved without offering native gas', async ({ page }) => {
+  await page.addInitScript(() => sessionStorage.setItem('qa:scenario', 'circle-policy-insufficient'));
   await page.goto('/org/demo/team');
   await page.getByRole('tab', { name: 'Delegated spending' }).click();
-  await page.getByRole('button', { name: 'Set allowance', exact: true }).click();
-  const dialog = page.getByRole('dialog');
-  await expect(dialog).toContainText('Managed fees are unavailable');
-  await expect(dialog.getByRole('button', { name: 'Request account approval' })).toBeDisabled();
-  await dialog.getByRole('combobox', { name: 'Execution fee' }).selectOption('wallet');
-  await expect(dialog).toContainText('Your wallet shows the estimate before sending');
-  await expect(dialog.getByRole('combobox', { name: 'Fee currency' })).toHaveCount(0);
+  const fees = page.getByRole('region', { name: 'Execution fees' });
+  await fees.getByRole('button', { name: 'Review execution fee', exact: true }).click();
+  await expect(fees.getByRole('alert')).toContainText('enough USDC');
+  await expect(fees.getByRole('button', { name: 'Review execution fee', exact: true })).toBeEnabled();
+  await expect(page.getByRole('button', { name: 'Apply policy', exact: true })).toHaveCount(0);
+  expect(await page.evaluate(() => sessionStorage.getItem('qa:circle-submissions'))).toBeNull();
 });
 test('changed policy state blocks approval and a declined send keeps its original retry', async ({ page }) => {
   await page.addInitScript(() => { if (!sessionStorage.getItem('qa:scenario')) sessionStorage.setItem('qa:scenario', 'policy-changed'); });

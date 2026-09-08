@@ -8,7 +8,7 @@ export const reportAssetFields = {
 };
 export const reportRowFields = {
   ...reportAssetFields,
-  sourceId: v.union(v.id('disbursements'), v.id('deposits'), v.id('outgoingTransfers')),
+  sourceId: v.union(v.id('disbursements'), v.id('deposits'), v.id('outgoingTransfers'), v.id('circleExecutions')),
   rowId: v.string(), createdAt: v.number(), amount: v.string(), status: v.string(),
   observedAt: v.optional(v.number()), dateSource: v.optional(v.union(v.literal('settlement'), v.literal('provider'), v.literal('recorded'))),
   blockNumber: v.optional(v.string()), blockHash: v.optional(v.string()),

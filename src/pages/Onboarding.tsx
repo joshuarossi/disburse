@@ -79,6 +79,7 @@ export default function Onboarding() {
   const [deploying, setDeploying] = useState(false);
   const [safeError, setSafeError] = useState<string | null>(null);
   const [linkingExisting, setLinkingExisting] = useState(false);
+  const primaryOwner = deploying && recoveredOwners.length ? recoveredOwners[0] : address;
 
   // ---- nav state ----
   const [step, setStep] = useState<Step>(searchParams.has("org") ? "safe" : "profile");
@@ -769,11 +770,11 @@ export default function Onboarding() {
                     <div className="mt-2 space-y-1.5">
                       <div className="flex items-center gap-2">
                         <span className="rounded bg-accent-500/15 px-2 py-0.5 text-xs font-mono text-[var(--ws-text)]">
-                          {address?.slice(0, 8)}...{address?.slice(-4)}
+                          {primaryOwner?.slice(0, 8)}...{primaryOwner?.slice(-4)}
                         </span>
-                        <span className="text-xs text-slate-500">(you)</span>
+                        <span className="text-xs text-slate-500">{primaryOwner?.toLowerCase() === address?.toLowerCase() ? '(you)' : '(setup owner)'}</span>
                       </div>
-                      {[...teamMembers, ...Array.from(new Set([...recoveredOwners, ...ownerWallets])).filter(wallet => wallet.toLowerCase() !== address?.toLowerCase() && !teamMembers.some(member => member.walletAddress.toLowerCase() === wallet.toLowerCase())).map(walletAddress => ({ walletAddress, name: "" }))].map((m, idx) => (
+                      {[...teamMembers, ...Array.from(new Set([...recoveredOwners, ...ownerWallets])).filter(wallet => wallet.toLowerCase() !== primaryOwner?.toLowerCase() && !teamMembers.some(member => member.walletAddress.toLowerCase() === wallet.toLowerCase())).map(walletAddress => ({ walletAddress, name: "" }))].map((m, idx) => (
                         <label key={idx} className="flex items-center gap-2">
                           <input
                             type="checkbox"
@@ -871,7 +872,7 @@ export default function Onboarding() {
                     threshold={safeThreshold}
                     chainId={selectedChainId}
                     onBusy={setDeploying}
-                    onRestore={saved => { setSelectedChainId(saved.chainId); setSafeThreshold(saved.threshold); setRecoveredOwners(saved.owners); setOwnerWallets(saved.owners.filter(owner => owner.toLowerCase() !== address.toLowerCase())); }}
+                    onRestore={saved => { setSelectedChainId(saved.chainId); setSafeThreshold(saved.threshold); setRecoveredOwners(saved.owners); setOwnerWallets(saved.owners.slice(1)); }}
                     onComplete={() => navigate(`/org/${orgId}/dashboard`)}
                   />}
                   {!deploying && <Button variant="secondary" aria-label="Back" onClick={() => setHasSafe(null)} className="w-12"><ArrowLeft className="h-4 w-4" /></Button>}

@@ -12,11 +12,13 @@ import { PLAN_LIMITS, hasPaidTerm } from "../shared/billing";
 import { billingCheckoutCall } from "./lib/billingCheckout";
 import { isValidTxHash } from "../shared/validation";
 import { appendAudit } from "./audit";
+import { ORG_READER_ROLES } from '../shared/roles';
+import { circleConfiguration } from '../shared/circleExecution';
 
 export const current = query({
   args: { orgId: v.id("orgs"), sessionToken: v.string() },
   handler: async (ctx, args) => {
-    await requireOrgAccess(ctx, args.orgId, args.sessionToken, ["admin"]);
+    await requireOrgAccess(ctx, args.orgId, args.sessionToken, ORG_READER_ROLES);
     return ctx.db
       .query("billingCheckouts")
       .withIndex("by_org_active", (q) =>
@@ -33,7 +35,7 @@ export const get = query({
     sessionToken: v.string(),
   },
   handler: async (ctx, args) => {
-    await requireOrgAccess(ctx, args.orgId, args.sessionToken, ["admin"]);
+    await requireOrgAccess(ctx, args.orgId, args.sessionToken, ORG_READER_ROLES);
     const checkout = await ctx.db.get(args.checkoutId);
     if (!checkout || checkout.orgId !== args.orgId)
       throw new Error("Subscription checkout not found");
@@ -51,6 +53,7 @@ export const create = mutation({
     treasury: v.string(),
     tokenAddress: v.string(),
     amountRaw: v.string(),
+    safeId: v.optional(v.id('safes')),
   },
   handler: async (ctx, args) => {
     const { user } = await requireOrgAccess(
@@ -68,7 +71,7 @@ export const create = mutation({
       )
       .unique();
     if (existing) {
-      if (existing.createdBy !== user._id || existing.plan !== args.plan)
+      if (existing.createdBy !== user._id || existing.plan !== args.plan || existing.safeId !== args.safeId || existing.chainId !== args.chainId || existing.treasury !== args.treasury.toLowerCase() || existing.tokenAddress !== args.tokenAddress.toLowerCase() || existing.amountRaw !== args.amountRaw)
         throw new Error("Checkout request changed");
       return existing._id;
     }
@@ -79,9 +82,11 @@ export const create = mutation({
       )
       .unique();
     if (active) {
+      const safe = args.safeId ? await ctx.db.get(args.safeId) : null;
       if (
         active.plan !== args.plan ||
-        active.payer !== user.walletAddress.toLowerCase() ||
+        active.safeId !== args.safeId ||
+        active.payer !== (safe?.safeAddress ?? user.walletAddress).toLowerCase() ||
         active.chainId !== args.chainId ||
         active.treasury !== args.treasury.toLowerCase() ||
         active.tokenAddress !== args.tokenAddress.toLowerCase() ||
@@ -93,6 +98,10 @@ export const create = mutation({
       return active._id;
     }
     if (args.plan === "starter") throw new Error("Starter limits are included in Free access. No subscription payment is needed for those limits.");
+    if (!args.safeId) throw new Error('Choose a company account to pay the subscription and execution fees in USDC.');
+    const safe = await ctx.db.get(args.safeId);
+    if (!safe || safe.orgId !== args.orgId || safe.isActive === false || safe.chainId !== args.chainId) throw new Error('Choose an active company account on the billing network.');
+    circleConfiguration(safe.chainId);
     const terms = paymentConfiguration();
     const amountRaw = String(BigInt(PLAN_LIMITS[args.plan].price) * 1_000_000n);
     if (
@@ -115,7 +124,7 @@ export const create = mutation({
       throw new Error(
         "A lower plan is available after the current paid term ends",
       );
-    const payer = user.walletAddress.toLowerCase();
+    const payer = safe.safeAddress.toLowerCase();
     if (
       await ctx.db
         .query("billingCheckouts")
@@ -133,6 +142,7 @@ export const create = mutation({
       createdBy: user._id,
       requestId: args.requestId,
       plan: args.plan,
+      safeId: safe._id,
       payer,
       chainId: terms.chainId,
       treasury: terms.treasury.toLowerCase(),
@@ -289,6 +299,8 @@ export const discard = mutation({
       throw new Error(
         "A wallet request already exists. Check its original receipt.",
       );
+    const execution = await ctx.db.query('circleExecutions').withIndex('by_checkout', q => q.eq('billingCheckoutId', checkout._id)).order('desc').first();
+    if (execution?.open) throw new Error('Check the saved fee authorization before discarding this checkout. It remains valid until its approval window ends.');
     await ctx.db.patch(checkout._id, {
       status: "cancelled",
       active: false,

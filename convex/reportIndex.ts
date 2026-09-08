@@ -7,6 +7,7 @@ import { depositReportRows, paymentReportRows, outgoingReportRows } from './lib/
 import type { Id } from './_generated/dataModel';
 import { reportPage } from './lib/reportPagination';
 import { matchOutgoingPayment } from './lib/outgoingTransfers';
+import { circleFeeReportRows, hasCircleFeeProof } from './lib/circleFeeReports';
 
 export const refresh = mutation({
   args: { orgId: v.id('orgs'), sessionToken: v.string() },
@@ -28,9 +29,10 @@ export const backfill = internalMutation({
     const result = payments
       ? await ctx.db.query('disbursements').withIndex('by_org', q => q.eq('orgId', orgId)).paginate(reportPage(state.cursor, 25))
       : state.stage === 'deposits' ? await ctx.db.query('deposits').withIndex('by_org', q => q.eq('orgId', orgId)).paginate(reportPage(state.cursor, 25))
-      : await ctx.db.query('outgoingTransfers').withIndex('by_org', q => q.eq('orgId', orgId)).paginate(reportPage(state.cursor, 25));
-    for (const source of result.page) await queueReportSource(ctx, orgId, payments ? 'payment' : state.stage === 'deposits' ? 'deposit' : 'outgoing', source._id);
-    const stage = result.isDone ? payments ? 'deposits' : state.stage === 'deposits' ? 'outgoing' : 'done' : state.stage;
+      : state.stage === 'outgoing' ? await ctx.db.query('outgoingTransfers').withIndex('by_org', q => q.eq('orgId', orgId)).paginate(reportPage(state.cursor, 25))
+      : await ctx.db.query('circleExecutions').withIndex('by_org', q => q.eq('orgId', orgId)).paginate(reportPage(state.cursor, 25));
+    for (const source of result.page) await queueReportSource(ctx, orgId, payments ? 'payment' : state.stage === 'deposits' ? 'deposit' : state.stage === 'outgoing' ? 'outgoing' : 'fee', source._id);
+    const stage = result.isDone ? payments ? 'deposits' : state.stage === 'deposits' ? 'outgoing' : state.stage === 'outgoing' ? 'fees' : 'done' : state.stage;
     await ctx.db.patch(state._id, { stage, cursor: result.isDone ? undefined : result.continueCursor,
       completeAt: stage === 'done' ? Date.now() : undefined, updatedAt: Date.now() });
     if (stage !== 'done') await ctx.scheduler.runAfter(100, internal.reportIndex.backfill, { orgId });
@@ -54,8 +56,30 @@ export const processJob = internalMutation({
         }
       }
     }
+    if (job.kind === 'fee') {
+      const execution = await ctx.db.get(job.sourceId as Id<'circleExecutions'>);
+      if (execution && hasCircleFeeProof(execution)) {
+        // Remove the two gross projections in the same transaction that adds
+        // their net fee. Later transfer syncs also consult the settled proof.
+        for (const direction of ['prefund', 'refund'] as const) {
+          const proof = execution.feeProof![direction];
+          if (!proof) continue;
+          const transferId = `e${execution.txHash!.slice(2).toLowerCase()}${proof.logIndex}`;
+          const transfer = direction === 'prefund'
+            ? await ctx.db.query('outgoingTransfers').withIndex('by_safe_transfer', q => q.eq('safeId', execution.safeId).eq('transferId', transferId)).unique()
+            : await ctx.db.query('deposits').withIndex('by_safe_transfer', q => q.eq('safeId', execution.safeId).eq('transferId', transferId)).unique();
+          if (!transfer || transfer.orgId !== job.orgId) continue;
+          const kind = direction === 'prefund' ? 'outgoing' as const : 'deposit' as const;
+          await queueReportSource(ctx, job.orgId, kind, transfer._id);
+          const transferJob = (await ctx.db.query('reportIndexJobs').withIndex('by_source', q => q.eq('sourceKey', `${kind}:${transfer._id}`)).unique())!;
+          const transferRows = direction === 'prefund' ? await outgoingReportRows(ctx, transfer._id as Id<'outgoingTransfers'>) : await depositReportRows(ctx, transfer._id as Id<'deposits'>);
+          await replaceReportRows(ctx, transferJob, transferRows);
+        }
+      }
+    }
     const rows = job.kind === 'payment' ? await paymentReportRows(ctx, job.sourceId as Id<'disbursements'>)
       : job.kind === 'deposit' ? await depositReportRows(ctx, job.sourceId as Id<'deposits'>)
+      : job.kind === 'fee' ? await circleFeeReportRows(ctx, job.sourceId as Id<'circleExecutions'>)
       : await outgoingReportRows(ctx, job.sourceId as Id<'outgoingTransfers'>);
     await replaceReportRows(ctx, job, rows);
   },

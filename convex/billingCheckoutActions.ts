@@ -25,33 +25,8 @@ export const begin = action({
       ...args,
       sender: true,
     });
-    if (checkout.status !== "prepared" || !checkout.active)
-      throw new Error(
-        "Check the original wallet request before sending another payment",
-      );
-    const client = billingClient(checkout.chainId);
-    if ((await client.getChainId()) !== checkout.chainId)
-      throw new Error("Billing RPC network mismatch");
-    const call = billingCheckoutCall(checkout);
-    await client.estimateGas({
-      account: checkout.payer as `0x${string}`,
-      to: call.to as `0x${string}`,
-      data: call.data,
-      value: 0n,
-    });
-    const [block, nonce] = await Promise.all([
-      client.getBlockNumber(),
-      client.getTransactionCount({
-        address: checkout.payer as `0x${string}`,
-        blockTag: "pending",
-      }),
-    ]);
-    return ctx.runMutation(internal.billingCheckoutData.claim, {
-      ...args,
-      nonce,
-      fromBlock: String(block > 12n ? block - 12n : 0n),
-      attemptId: crypto.randomUUID(),
-    });
+    // Native requests made by earlier releases retain receipt recovery only.
+    throw new Error(checkout.safeId ? 'Use this checkout’s saved USDC fee approval.' : 'Discard this unsubmitted checkout and choose a company account to pay all fees in USDC.');
   },
 });
 
@@ -60,6 +35,7 @@ async function settle(
   checkout: Doc<"billingCheckouts">,
   hash: string,
 ): Promise<"applied" | "reverted"> {
+  if (checkout.safeId) throw new Error('Use the saved company account execution to verify this subscription.');
   if (!isValidTxHash(hash)) throw new Error("Invalid transaction hash");
   if (checkout.nonce === undefined)
     throw new Error("This checkout has not requested a wallet payment");
@@ -108,6 +84,10 @@ async function check(
 ): Promise<string> {
   if (!checkout.active || checkout.status === "prepared")
     return checkout.status;
+  if (checkout.safeId) {
+    if (checkout.circleExecutionId) await ctx.runAction(internal.circlePayments.reconcile, { executionId: checkout.circleExecutionId });
+    return ctx.runAction(internal.circleBilling.settle, { checkoutId: checkout._id });
+  }
   if (checkout.txHash) return settle(ctx, checkout, checkout.txHash);
   if (checkout.fromBlock === undefined || checkout.nonce === undefined)
     throw new Error("Checkout is missing its recovery checkpoint");

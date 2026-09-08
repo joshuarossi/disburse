@@ -14,6 +14,7 @@ import { formatMoney } from "@/lib/formatMoney";
 import { AccountChangeApproval } from "./AccountChangeApproval";
 import { AccountCancellation } from "./AccountCancellation";
 import { Button } from "@/components/ui/button";
+import { supportsCircleFees } from '../../../shared/circleExecution';
 
 type PolicyRow = FunctionReturnType<
   typeof api.spendingPolicyData.list
@@ -138,6 +139,7 @@ function PolicyCard({
     rejected = useMutation(api.spendingPolicyData.walletRejected),
     recheck = useMutation(api.spendingPolicyData.recheck);
   const identity = { policyChangeId: p._id, sessionToken };
+  const circle = supportsCircleFees(p.chainId) && !p.executionFee && (!p.execution || p.execution.service === 'circle');
   const retryable =
     p.status === "processing" &&
     !!p.execution?.walletRejectedAt &&
@@ -149,7 +151,7 @@ function PolicyCard({
   return (
     <article
       aria-label={`${p.intent.kind === "grant" ? "Set allowance" : "Revoke allowance"} for ${memberName(p.intent.delegate)}`}
-      className="space-y-3 rounded-lg bg-[var(--ws-surface)] p-4"
+      className="space-y-3 border-t border-[var(--ws-border)] pt-4"
     >
       <div className="flex flex-wrap items-start justify-between gap-2">
         <h4 className="font-medium">
@@ -215,7 +217,7 @@ function PolicyCard({
         <p className="text-xs text-[var(--ws-muted)]">
           {p.executionFee
             ? `Execution fee: ${formatMoney(p.executionFee.amount, p.executionFee.token, true)} ${p.executionFee.token} from this account.`
-            : "Network fee paid from the signing wallet when the policy is applied."}
+            : circle ? 'Review the USDC execution fee after the account approvals are complete.' : "Network fee paid from the signing wallet when the policy is applied."}
         </p>
       )}
       {p.error && (
@@ -232,6 +234,7 @@ function PolicyCard({
           updatedAt={p.updatedAt}
           revision={revision}
           managed={!!p.executionFee}
+          feeSource={circle ? { policyChangeId: p._id } : undefined}
           walletRejectedAt={p.execution?.walletRejectedAt}
           txHash={p.execution?.txHash}
           canApprove={canApprove}

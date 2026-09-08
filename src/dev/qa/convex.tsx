@@ -21,6 +21,7 @@ import { receivableAmounts, receivableStatus } from '../../../shared/receivables
 import { accountingFixture } from './accounting';
 import { licenseQueryFixture, licenseBillingFixture, licenseMutationFixture } from './licenses';
 import { billingAccess } from '../../../shared/billing';
+import { createCircleFixture, readCircleFixture, saveCircleFixture } from './circle';
 const cache = new Map<string, any>();
 let fixtureRevision = 0;
 const fixtureListeners = new Set<() => void>();
@@ -36,18 +37,24 @@ export function readQueryFixture(reference: any, args: any) {
   if (cache.has(key)) return cache.get(key);
   let value: any;
   switch (name) {
+    case 'walletSetups:current':
+    case 'walletSetups:get': value = JSON.parse(sessionStorage.getItem('qa:walletSetup') ?? 'null'); if (name === 'walletSetups:current' && value?.stage === 'cancelled') value = null; break;
+    case 'accountSetups:current':
+    case 'accountSetups:get': value = JSON.parse(sessionStorage.getItem('qa:accountSetup') ?? 'null'); if (name === 'accountSetups:current' && value?.open === false) value = null; break;
+    case 'circlePayments:get': value = readCircleFixture(); break;
     case 'accountCancellationData:get': {
-      const active = scenario?.startsWith('cancel-') && scenario !== 'cancel-request';
+      const circleCancel = scenario?.startsWith('circle-cancel-');
+      const active = circleCancel || scenario?.startsWith('cancel-') && scenario !== 'cancel-request';
       const confirmed = scenario === 'cancel-confirmed', declined = scenario === 'cancel-declined';
       value = { canRequest: true, canApprove: true, safeName: 'Payroll', safeId: safes[0]._id, chainId: 8453, originalStatus: confirmed ? 'cancelled' : 'pending', originalAvailable: true,
-        cancellation: active ? { _id: 'cancellation1', status: confirmed ? 'applied' : declined ? 'processing' : 'pending', chainId: 8453, updatedAt: Date.now(), executionFee: declined ? undefined : { token: 'USDC', tokenAddress: configuredTokenAddress(8453, 'USDC'), collector: wallet, amount: '0.05' }, execution: declined ? { attemptId: 'cancel-attempt', phase: 'submitted', walletRejectedAt: Date.now()-30_000 } : undefined, txHash: confirmed ? `0x${'cd'.repeat(32)}` : undefined } : null };
+        cancellation: active ? { _id: 'cancellation1', status: confirmed ? 'applied' : declined ? 'processing' : 'pending', chainId: 8453, updatedAt: Date.now(), executionFee: declined || circleCancel ? undefined : { token: 'USDC', tokenAddress: configuredTokenAddress(8453, 'USDC'), collector: wallet, amount: '0.05' }, execution: declined ? { attemptId: 'cancel-attempt', phase: 'submitted', walletRejectedAt: Date.now()-30_000 } : undefined, txHash: confirmed ? `0x${'cd'.repeat(32)}` : undefined } : null };
       break;
     }
     case 'spendingPolicyData:fee':
       value = ['policy-fee-outage', 'cancel-fee-outage'].includes(scenario ?? '') ? { fee: null, error: 'Managed fees are unavailable for this account and currency.' } : { fee: { token: args.token, tokenAddress: configuredTokenAddress(8453, args.token), collector: wallet, amount: '0.05' }, error: null }; break;
     case 'spendingPolicyData:list':
-      value = { canApprove: true, proposals: [{ _id: 'policy1', safeId: args.safeId, orgId: 'demo', chainId: 8453, safeAddress: safes[0].safeAddress, safeTxHash: `0x${'ab'.repeat(32)}`, createdAt: Date.now(), updatedAt: Date.now(), cancellationId: scenario?.startsWith('cancel-') && scenario !== 'cancel-request' ? 'cancellation1' : undefined, status: scenario === 'policy-declined' ? 'processing' : scenario === 'policy-applied' ? 'applied' : 'pending', execution: scenario === 'policy-declined' ? { attemptId: 'wallet-attempt', startedAt: Date.now()-60_000, walletRejectedAt: Date.now()-30_000, phase: 'submitted' } : undefined,
-        executionFee: scenario === 'policy-declined' ? undefined : { token: 'USDC', tokenAddress: configuredTokenAddress(8453, 'USDC'), collector: wallet, amount: '0.05' },
+      value = { canApprove: true, proposals: [{ _id: 'policy1', safeId: args.safeId, orgId: 'demo', chainId: 8453, safeAddress: safes[0].safeAddress, safeTxHash: `0x${'ab'.repeat(32)}`, createdAt: Date.now(), updatedAt: Date.now(), cancellationId: scenario?.startsWith('circle-cancel-') || scenario?.startsWith('cancel-') && scenario !== 'cancel-request' ? 'cancellation1' : undefined, status: scenario === 'policy-declined' ? 'processing' : scenario === 'policy-applied' ? 'applied' : 'pending', execution: scenario === 'policy-declined' ? { attemptId: 'wallet-attempt', startedAt: Date.now()-60_000, walletRejectedAt: Date.now()-30_000, phase: 'submitted' } : undefined,
+        executionFee: scenario === 'policy-declined' || scenario?.startsWith('circle-policy-') ? undefined : { token: 'USDC', tokenAddress: configuredTokenAddress(8453, 'USDC'), collector: wallet, amount: '0.05' },
         intent: { kind: 'grant', module: '0x691f59471Bfd2B7d639DCF74671a2d648ED1E331', delegate: members[1].walletAddress, tokenAddress: configuredTokenAddress(8453, 'USDC'), token: 'USDC', amount: '1500', resetMinutes: 43200, moduleEnabled: true, delegateExists: true, previousAmount: '0', previousResetMinutes: 0 } }] }; break;
 
     case 'invoiceFiles:list':
@@ -59,7 +66,7 @@ export function readQueryFixture(reference: any, args: any) {
     case "receivables:list":
       value = { items: (scenario === 'empty' ? [] : customerInvoices).map(row => { const i = scenario === 'ar-void' ? { ...row, state: 'void' } : scenario === 'ar-archived-account' ? { ...row, safeId: 'archived-safe', token: 'USDT', tokenAddress: configuredTokenAddress(8453, 'USDT') } : row; return { ...i, status: receivableStatus(i), amounts: receivableAmounts(i) }; }), limited: false }; break;
     case "receivables:configuration":
-      value = [{ chainId: 8453, canIssue: true, collectionFeeMode: "wallet" }]; break;
+      value = [{ chainId: 8453, canIssue: true, collectionFeeMode: "stablecoin" }]; break;
     case "receivables:receipts":
       value = []; break;
     case "receivables:publicInvoice": {
@@ -145,6 +152,8 @@ export function readQueryFixture(reference: any, args: any) {
       value = p
         ? {
             ...p,
+            ...(scenario?.startsWith('circle-') ? { status: readCircleFixture()?.stage === 'submitting' ? 'relaying' : readCircleFixture()?.stage === 'confirmed' ? 'executed' : 'proposed', chainId: 8453, approvalMethod: 'workspace', safeTxHash: `0x${'ab'.repeat(32)}`, scheduledAt: undefined, executionFee: undefined,
+              nativeExecution: ['submitting', 'confirmed'].includes(readCircleFixture()?.stage) ? { service: 'circle', attemptId: 'circle1', startedAt: Date.now(), checks: 0 } : undefined } : {}),
             ...(scenario?.startsWith('cancel-') ? { status: scenario === 'cancel-confirmed' ? 'cancelled' : 'proposed', cancellationId: scenario !== 'cancel-request' ? 'cancellation1' : undefined, cancellationConfirmedAt: scenario === 'cancel-confirmed' ? Date.now() : undefined, safeTxHash: `0x${'ab'.repeat(32)}`, approvalMethod: 'workspace', scheduledAt: undefined } : {}),
             ...(scenario?.startsWith('nested-') ? { status: 'proposed', approvalMethod: 'workspace', safeTxHash: `0x${'ab'.repeat(32)}`, scheduledAt: undefined } : {}),
             ...(scenario === 'payout-review-payment' ? { payoutReviewError: 'Maya Chen: payout details were reviewed or changed after this payment was prepared. Its prior approvals cannot be used in Disburse. Cancel this payment and prepare a new one with the reviewed details.' } : {}),
@@ -223,6 +232,11 @@ export function readQueryFixture(reference: any, args: any) {
       break;
     case "billingCheckoutData:current":
     case "billingCheckoutData:get":
+      if (scenario?.startsWith('circle-billing-')) {
+        const saved = JSON.parse(sessionStorage.getItem('qa:checkout') ?? 'null');
+        value = name === 'billingCheckoutData:current' && saved?.active === false ? null : saved;
+        break;
+      }
       value = scenario?.startsWith('billing-server-') ? { _id: 'checkout-demo', orgId: 'demo', createdBy: 'u1', requestId: 'qa-checkout', plan: 'team', chainId: 11155111, payer: scenario === 'billing-server-other-payer' ? members[1].walletAddress.toLowerCase() : wallet.toLowerCase(), treasury: wallet, tokenAddress: configuredTokenAddress(11155111, 'USDC'), amountRaw: '50000000', status: scenario === 'billing-server-other-payer' ? 'prepared' : 'requested', active: true, nonce: 7, attemptId: 'qa-attempt', fromBlock: '100', checks: 1, createdAt: Date.now() - 100000, updatedAt: Date.now() - 1000 } : null;
       break;
     case "billing:get":
@@ -236,7 +250,7 @@ export function readQueryFixture(reference: any, args: any) {
         expiresAt: Date.now() + 30 * 86400000,
         limits: { maxUsers: 5, maxBeneficiaries: 100 },
         usage: { activeMembers: 2, reservedSeats: 4, pendingInvitations: 2, recipients: 12, archivedRecipients: 3, activeAccounts: 2 },
-        paymentConfig: ["billing-reverted", "billing-checkout"].includes(scenario ?? "") ? { treasury: wallet, chainId: 11155111, network: "Sepolia", testnet: true, tokenAddress: configuredTokenAddress(11155111, "USDC"), decimals: 6, explorer: "https://sepolia.etherscan.io" } : null,
+        paymentConfig: scenario?.startsWith('circle-billing-') ? { treasury: wallet, chainId: 8453, network: 'Base', testnet: false, tokenAddress: configuredTokenAddress(8453, 'USDC'), decimals: 6, explorer: 'https://basescan.org' } : ["billing-reverted", "billing-checkout"].includes(scenario ?? "") ? { treasury: wallet, chainId: 11155111, network: "Sepolia", testnet: true, tokenAddress: configuredTokenAddress(11155111, "USDC"), decimals: 6, explorer: "https://sepolia.etherscan.io" } : null,
         payments: [],
       };
       break;
@@ -339,6 +353,37 @@ const disabled = async () => {
   );
 };
 export function useMutation(reference?: any) {
+  if (getFunctionName(reference).startsWith('walletSetups:') && sessionStorage.getItem('qa:scenario')?.startsWith('customer-setup-')) return async (args: any) => {
+    const name = getFunctionName(reference), saved = JSON.parse(sessionStorage.getItem('qa:walletSetup') ?? 'null'), scenario = sessionStorage.getItem('qa:scenario') ?? '';
+    if (name === 'walletSetups:begin') {
+      if (scenario === 'customer-setup-save-failed') throw new Error('Database connection failed');
+      sessionStorage.setItem('qa:walletSetup', JSON.stringify({ ...saved, stage: 'requested', claimId: args.claimId }));
+      if (scenario.endsWith('claim-response-lost')) {
+        cache.clear(); fixtureRevision++; fixtureListeners.forEach(listener => listener());
+        throw new Error('Database response lost');
+      }
+    }
+    if (name === 'walletSetups:declined') {
+      if (scenario.endsWith('decline-save-failed') && !sessionStorage.getItem('qa:declineSaveFailed')) {
+        sessionStorage.setItem('qa:declineSaveFailed', 'true'); throw new Error('Database connection failed');
+      }
+      sessionStorage.setItem('qa:walletSetup', JSON.stringify({ ...saved, stage: 'prepared', claimId: undefined, batchId: '0x' + 'bc'.repeat(32) }));
+    }
+    if (name === 'walletSetups:discard') sessionStorage.removeItem('qa:walletSetup');
+    cache.clear(); fixtureRevision++; fixtureListeners.forEach(listener => listener()); return saved?.batchId;
+  };
+  if (getFunctionName(reference) === 'accountSetups:discard' && sessionStorage.getItem('qa:scenario')?.startsWith('circle-account-')) return async () => {
+    if (readCircleFixture()?.open) throw new Error('Check the saved execution before discarding this setup.');
+    const saved = JSON.parse(sessionStorage.getItem('qa:accountSetup') ?? 'null');
+    sessionStorage.setItem('qa:accountSetup', JSON.stringify({ ...saved, status: 'cancelled', open: false }));
+    cache.clear(); fixtureRevision++; fixtureListeners.forEach(listener => listener());
+  };
+  if (getFunctionName(reference) === 'billingCheckoutData:create' && sessionStorage.getItem('qa:scenario')?.startsWith('circle-billing-')) return async (args: any) => {
+    const saved = JSON.parse(sessionStorage.getItem('qa:checkout') ?? 'null');
+    if (saved?.active) return saved._id;
+    sessionStorage.setItem('qa:checkout', JSON.stringify({ ...args, _id: 'checkout-circle', payer: safes[0].safeAddress.toLowerCase(), status: 'prepared', active: true }));
+    cache.clear(); fixtureRevision++; fixtureListeners.forEach(listener => listener()); return 'checkout-circle';
+  };
   if (getFunctionName(reference) === 'customerOperations:begin' && sessionStorage.getItem('qa:scenario')?.startsWith('customer-setup-')) return async (args: any) => {
     if (sessionStorage.getItem('qa:scenario')?.endsWith('save-failed')) throw new Error('Database connection interrupted');
     const record = JSON.parse(args.record);
@@ -366,6 +411,78 @@ export function useConvex() {
   } };
 }
 export function useAction(reference: any) {
+  if (getFunctionName(reference).startsWith('walletSetups:') && sessionStorage.getItem('qa:scenario')?.startsWith('customer-setup-')) return async (args: any) => {
+    const name = getFunctionName(reference), scenario = sessionStorage.getItem('qa:scenario') ?? '';
+    if (name === 'walletSetups:validate') {
+      if (scenario.endsWith('owners-changed')) throw new Error('The account owners can no longer approve this setup. Review their wallet addresses.');
+      return;
+    }
+    if (name === 'walletSetups:prepare') {
+      if (scenario.endsWith('insufficient')) throw new Error('Your wallet needs enough USDC for the deposit and the setup fee. Add USDC or lower the deposit.');
+      if (scenario.endsWith('unavailable')) throw new Error('RPC https://rpc.invalid/private failed');
+      const saved = { ...args, _id: 'wallet-setup1', payer: wallet.toLowerCase(), address: safes[0].safeAddress, salt: '0x' + 'ab'.repeat(32), batchId: '0x' + 'ab'.repeat(32), stage: 'prepared', open: true };
+      sessionStorage.setItem('qa:walletSetup', JSON.stringify(saved));
+    }
+    if (name === 'walletSetups:complete') {
+      if (scenario.endsWith('link-failed')) throw new Error('RPC https://rpc.invalid/private failed');
+      const saved = JSON.parse(sessionStorage.getItem('qa:walletSetup')!);
+      sessionStorage.setItem('qa:walletSetup', JSON.stringify({ ...saved, stage: scenario.endsWith('reverted') ? 'prepared' : 'complete', open: scenario.endsWith('reverted') }));
+      if (scenario.endsWith('complete-response-lost')) {
+        cache.clear(); fixtureRevision++; fixtureListeners.forEach(listener => listener());
+        throw new Error('Database response lost');
+      }
+    }
+    cache.clear(); fixtureRevision++; fixtureListeners.forEach(listener => listener());
+    return name === 'walletSetups:prepare' ? 'wallet-setup1' : scenario.endsWith('reverted') ? 'failed' : 'complete';
+  };
+  if (getFunctionName(reference) === 'accountSetups:create' && sessionStorage.getItem('qa:scenario')?.startsWith('circle-account-')) return async (args: any) => {
+    if (sessionStorage.getItem('qa:scenario')?.endsWith('prepare-outage')) throw new Error('RPC https://rpc.invalid/private failed');
+    const saved = JSON.parse(sessionStorage.getItem('qa:accountSetup') ?? 'null');
+    if (saved?.open) return saved._id;
+    const setup = { ...args, _id: 'account-setup1', open: true, status: 'prepared' };
+    sessionStorage.setItem('qa:accountSetup', JSON.stringify(setup));
+    cache.clear(); fixtureRevision++; fixtureListeners.forEach(listener => listener()); return setup._id;
+  };
+  if (getFunctionName(reference) === 'receivableServices:status') return async () => {
+    const scenario = sessionStorage.getItem('qa:scenario') ?? '';
+    if (scenario === 'receiving-status-outage') throw new Error('RPC https://reader.invalid/private unavailable');
+    return { supported: true, ready: !scenario.startsWith('circle-factory-') || readCircleFixture()?.stage === 'confirmed', factory: '0x4444444444444444444444444444444444444444' };
+  };
+  if (getFunctionName(reference).startsWith('circlePayments:') && sessionStorage.getItem('qa:scenario')?.startsWith('circle-')) return async () => {
+    const scenario = sessionStorage.getItem('qa:scenario') ?? '', name = getFunctionName(reference), current = readCircleFixture();
+    if (name === 'circlePayments:approvals') {
+      if (scenario.endsWith('approval-outage')) throw new Error('RPC https://rpc.invalid/private unavailable');
+      const path = [safes[0].safeAddress.toLowerCase()], approved = current?.stage === 'ready' ? 1 : 0;
+      return { threshold: 1, approved, groups: [], paths: [{ path, approved: !!approved }] };
+    }
+    let result;
+    if (name === 'circlePayments:prepare') {
+      if (scenario.endsWith('insufficient')) throw new Error('The company account needs enough USDC for its payments and the maximum execution fee. Add USDC or lower the payment amount.');
+      result = createCircleFixture()._id;
+      if (scenario.endsWith('corrupt')) saveCircleFixture({ ...readCircleFixture(), record: '{broken' });
+    }
+    if (name === 'circlePayments:approve') {
+      if (scenario.endsWith('save-failed')) throw new Error('RPC https://database.invalid/private failed');
+      saveCircleFixture({ ...current, stage: current.stage === 'fee' ? 'operation' : 'ready', revision: current.revision + 1, updatedAt: Date.now() });
+    }
+    if (name === 'circlePayments:submit') {
+      sessionStorage.setItem('qa:circle-submissions', String(Number(sessionStorage.getItem('qa:circle-submissions') ?? '0') + 1));
+      saveCircleFixture({ ...current, stage: 'submitting', updatedAt: Date.now() });
+      if (scenario.startsWith('circle-billing-')) { const saved = JSON.parse(sessionStorage.getItem('qa:checkout')!); sessionStorage.setItem('qa:checkout', JSON.stringify({ ...saved, status: 'requested' })); }
+    }
+    if (name === 'circlePayments:recheck') {
+      if (scenario.endsWith('check-outage')) throw new Error('RPC https://network.invalid/private failed');
+      if (scenario.endsWith('failed')) saveCircleFixture({ ...current, stage: 'failed', open: false, fee: '7500' });
+      if (scenario.endsWith('expired')) saveCircleFixture({ ...current, stage: 'expired', open: false });
+      if (scenario.endsWith('success')) { saveCircleFixture({ ...current, stage: 'confirmed', open: false, fee: '7500' });
+        if (scenario.startsWith('circle-billing-')) { const saved = JSON.parse(sessionStorage.getItem('qa:checkout')!); sessionStorage.setItem('qa:checkout', JSON.stringify({ ...saved, status: 'applied', active: false, txHash: '0x' + 'ab'.repeat(32) })); }
+        if (scenario.startsWith('circle-account-')) { const saved = JSON.parse(sessionStorage.getItem('qa:accountSetup')!); sessionStorage.setItem('qa:accountSetup', JSON.stringify({ ...saved, status: 'complete', open: false, txHash: '0x' + 'ab'.repeat(32) })); }
+      }
+    }
+    cache.clear(); fixtureRevision++; fixtureListeners.forEach(listener => listener());
+    if (name === 'circlePayments:submit' && scenario.endsWith('unknown')) throw new Error('Your original execution request is saved. Check its status before trying another payment.');
+    return result;
+  };
   if (getFunctionName(reference) === 'teamInvitationLinks:create' && sessionStorage.getItem('qa:scenario') === 'invite-share') return async () => ({ invitationId: 'qa-invitation', url: `${location.origin}/invite#${'e'.repeat(64)}` });
   if (sessionStorage.getItem('qa:scenario')?.startsWith('customer-setup-')) {
     if (getFunctionName(reference) === 'customerExecution:refresh') return async () => {
@@ -385,7 +502,7 @@ export function useAction(reference: any) {
     const scenario = sessionStorage.getItem('qa:scenario');
     if (scenario === 'policy-approval-outage') throw new Error('Policy reader unavailable');
     const root = safes[0].safeAddress.toLowerCase(), parent = '0x9999999999999999999999999999999999999999';
-    const nested = ['policy-nested', 'cancel-nested'].includes(scenario ?? ''), ready = ['policy-declined', 'cancel-declined'].includes(scenario ?? '');
+    const nested = ['policy-nested', 'cancel-nested'].includes(scenario ?? ''), ready = ['policy-declined', 'cancel-declined'].includes(scenario ?? '') || !!scenario?.startsWith('circle-');
     const path = nested ? [root, parent] : [root];
     const group = { address: nested ? parent : root, path, owners: [wallet.toLowerCase(), members[1].walletAddress.toLowerCase()], confirmedOwners: ready ? [wallet.toLowerCase(), members[1].walletAddress.toLowerCase()] : [members[1].walletAddress.toLowerCase()], threshold: 2 };
     return { ready, blockedReason: scenario === 'policy-changed' ? 'The account spending policy changed after this request. Review its original intent before applying it.' : null, currentNonce: 3,
@@ -423,6 +540,7 @@ export function useAction(reference: any) {
     return async () => {
       const scenario = sessionStorage.getItem('qa:scenario');
       if (scenario === 'nested-outage') throw new Error('Current approving accounts could not be verified');
+      if (scenario?.startsWith('circle-')) return { owners: [wallet.toLowerCase()], confirmedOwners: [wallet.toLowerCase()], threshold: 1, currentNonce: 0, proposalNonce: 0, ready: true };
       if (scenario?.startsWith('nested-')) {
         const root = safes[0].safeAddress.toLowerCase(), parent = '0x9999999999999999999999999999999999999999';
         const ready = scenario === 'nested-ready';

@@ -249,6 +249,7 @@ export function useSettingsController() {
     relayFeeMode !== resolvedRelaySettings.relayFeeMode;
 
   return {
+    orgId, currentUserRole, members,
     ...checkout,
     settingsError,
     setSettingsError,

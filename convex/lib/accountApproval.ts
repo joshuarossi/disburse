@@ -11,6 +11,7 @@ import { getMultiSendCallOnlyDeployments } from "@safe-global/safe-deployments";
 import { approvalPaths, type AccountAuthority } from "./accountAuthority";
 import {
   approvalSigningData,
+  nestedSigningData,
   packSafeSignatures,
   recoverSafeSigner,
   type AccountSignature,
@@ -168,24 +169,34 @@ export async function verifyAccountSignature(
     ).toLowerCase() !== proposal.safeTxHash.toLowerCase()
   )
     throw new Error("The approval no longer matches the saved payment");
-  const digest = approvalSigningData(
-    chainId,
-    path,
-    proposal.safeTransactionData,
-  ).hash;
-  if (
-    (await recoverSafeSigner(digest, signed.signature)) !==
-    signed.owner.toLowerCase()
-  )
-    throw new Error("The approval signature does not belong to this member");
+  return verifyDataSignature(chainId, authority, approvalSigningData(chainId, [authority.root], proposal.safeTransactionData).data, signed);
+}
+
+export async function verifyDataSignature(chainId: number, authority: AccountAuthority, rootData: Hex, signed: SavedAccountSignature) {
+  const path = signed.path.map(a => a.toLowerCase());
+  if (!approvalPaths(authority, signed.owner).some(p => p.join(':') === path.join(':'))) {
+    throw new Error('Your current account authority does not include this approval path');
+  }
+  const digest = nestedSigningData(chainId, path, rootData).hash;
+  if ((await recoverSafeSigner(digest, signed.signature)) !== signed.owner.toLowerCase()) {
+    throw new Error('The approval signature does not belong to this member');
+  }
   return digest;
 }
+
 export async function assembleAccountApprovals(
   chainId: number,
   authority: AccountAuthority,
   proposal: PreparedOwnerProposal,
   saved: SavedAccountSignature[],
 ) {
+  if (approvalSigningData(chainId, [authority.root], proposal.safeTransactionData).hash.toLowerCase() !== proposal.safeTxHash.toLowerCase()) {
+    throw new Error('The approval no longer matches the saved payment');
+  }
+  return assembleDataApprovals(chainId, authority, approvalSigningData(chainId, [authority.root], proposal.safeTransactionData).data, saved);
+}
+
+export async function assembleDataApprovals(chainId: number, authority: AccountAuthority, rootData: Hex, saved: SavedAccountSignature[]) {
   if (saved.length > 500) throw new Error("Too many account approvals");
   const valid = new Map<string, AccountSignature[]>();
   for (const signature of saved) {
@@ -197,7 +208,7 @@ export async function assembleAccountApprovals(
       )
     )
       continue;
-    await verifyAccountSignature(chainId, authority, proposal, signature);
+    await verifyDataSignature(chainId, authority, rootData, signature);
     const key = signature.path.join(":");
     const list = valid.get(key) ?? [];
     if (!list.some((s) => s.owner === signature.owner))

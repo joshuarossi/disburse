@@ -73,18 +73,19 @@ Before declaring any service provider suitable, verify both its technical behavi
 6. Supported token and chain combinations are explicit. A USDC-only service does not establish support for paying fees in USDT or other stablecoins.
 7. Original account creation works from MetaMask with supported stablecoins and zero native tokens. Additional accounts, service setup and provider onboarding cannot introduce a hidden native-token prerequisite.
 
-Circle Paymaster addresses the customer-paid USDC gas component. Selecting it alone does not establish a complete execution service satisfying these requirements. The submission provider and its commercial terms still need verification. See the [provider review](GELATO_V2_SETUP.md).
+The implemented owner execution route combines Circle Paymaster with Candide's public bundler. The public endpoint has no application account, key or billing relationship. Its rate limits are an availability constraint, not an implied Disburse API bill. No paid or sponsored fallback is configured. See the [provider review](GELATO_V2_SETUP.md).
 
 ## Current implementation status
 
-This is the target behavior, not a claim that it is complete. The September 7 pass made these changes:
+The requirements remain broader than the completed work. The September 7 pass now includes:
 
-- Original onboarding now has a USDC permit, reviewed deposit/fee, durable request and recovery flow. Its live Biconomy submission fails during canonical Base Sepolia USDC token-slot detection, so initial MetaMask-only setup is not accepted yet.
-- Circle Paymaster and Candide's public bundler have executed real successful and failed Base Sepolia Safe operations, charging USDC from the Safe without an application/provider account. The code contains protocol helpers and a reproducible QA runner. Integration with the app's approval and execution flows remains unfinished.
-- The application-funded Turbo adapter rejects before any provider request, regardless of configured credentials. Historical transaction recovery remains available.
-- Team invitations use private links and the administrator's email application. The outgoing Resend adapter makes no provider request. A shared link does not verify an email inbox.
-- Invoice issuance predicts an address without deploying it. Stablecoin-paid first deployment/collection and shared-factory provisioning remain unfinished.
-- Subscription checkout still needs stablecoin-paid execution; receiving a USDC license payment alone does not meet its gas requirement.
-- RPC, archive, indexing and later paid integrations must not create Disburse usage bills. Their production capacity and billing acceptance remain open.
+- Owner-authorized payments, policy changes and signed cancellations use separately approved Circle USDC fees. Exact original Safe transaction signatures are preserved, with current direct/nested owner quorum required for both fee and operation approval.
+- Additional company accounts deploy with the parent Safe as their owner. The parent pays setup in USDC. Canonical deployment evidence and current authority are checked before the child is linked.
+- Receiving-factory setup, invoice collection and subscription checkout use the same customer-paid execution flow. Invoice principal and license price remain separate from execution costs. Live testnet evidence covers invoice setup/collection, child-account creation and exact-price Team subscription activation.
+- Original onboarding uses MetaMask's documented gas-included dapp transaction route on Base and Arbitrum. It prepares one atomic Safe deployment/deposit batch. The customer selects USDC and reviews the wallet's fee in MetaMask; EIP-5792 does not let the app force that selection. Testnet support is not claimed. Live zero-ETH onboarding acceptance remains open.
+- Onboarding persists the wallet request before prompting, restores rejected/interrupted steps and verifies the full deposit and account authority. Background recovery finds the exact deployment with the browser closed. An earlier failed receipt cannot unlock a later pending attempt.
+- App-funded Turbo and outgoing Resend submission remain disabled regardless of credentials. Invitations use private links. Existing recovery records are retained.
 
-These items are open in [the implementation TODO](../TODOS.md), with exact [QA evidence and limitations](CUSTOMER_PAID_SERVICES_QA_2026-09-07.md). Passing tests for older native-gas or sponsored flows does not close them.
+Delegated stablecoin-fee execution, unattended schedules, enabling the module on existing accounts and the broader conversion/yield integrations remain implementation work. A direct Circle execution from the published customer-owned Nexus account succeeded on testnet, and a read-only validator check confirmed exact transaction/time-window binding. This is protocol research, not completed delegated or scheduled application acceptance.
+
+See [the implementation TODO](../TODOS.md) and [QA evidence](CUSTOMER_PAID_SERVICES_QA_2026-09-07.md). Native-gas tests, browser fixtures and a provider quote do not substitute for actual stablecoin-paid settlement.

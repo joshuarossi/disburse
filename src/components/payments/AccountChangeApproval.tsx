@@ -9,6 +9,8 @@ import { walletDeclined, walletErrorMessage } from "@/lib/walletErrors";
 import { ApprovalPathReview } from "@/features/payments/ApprovalPathReview";
 import { Button } from "@/components/ui/button";
 import type { AccountApprovalView } from "../../../shared/accountApprovalView";
+import type { CircleSource } from '../../../convex/lib/circleSource';
+import { CustomerPaidExecution } from '@/features/payments/CustomerPaidExecution';
 
 type Prepared = {
   to: string;
@@ -37,6 +39,7 @@ export function AccountChangeApproval({
   execute,
   walletResult,
   recheck,
+  feeSource,
 }: {
   subject: "policy" | "cancellation";
   chainId: number;
@@ -64,6 +67,7 @@ export function AccountChangeApproval({
     rejected?: boolean;
   }) => Promise<unknown>;
   recheck: () => Promise<unknown>;
+  feeSource?: CircleSource;
 }) {
   const { address, chainId: connectedChain } = useAccount();
   const { switchChainAsync } = useSwitchChain();
@@ -152,6 +156,7 @@ export function AccountChangeApproval({
         }
         await sign(fresh, available[0].path);
       } else {
+        if (feeSource) throw new Error('Review and approve the USDC execution fee below');
         await prepareWallet();
         const prepared = await execute();
         if (!prepared.managed) {
@@ -258,7 +263,7 @@ export function AccountChangeApproval({
                   An earlier payment or account change must complete first.
                 </p>
               )}
-              {canApprove && !approvals.data.blockedReason && (
+              {canApprove && !approvals.data.blockedReason && (!feeSource || approvals.data.paths.some(p => !p.approved)) && (
                 <>
                   <label className="flex items-start gap-2 text-sm">
                     <input
@@ -295,7 +300,7 @@ export function AccountChangeApproval({
                               : `Approve ${subject}`}
                           </Button>
                         )}
-                      <Button
+                      {!feeSource && <Button
                         size="sm"
                         disabled={busy || !reviewed || !approvals.data.ready}
                         onClick={() => void act("apply")}
@@ -307,7 +312,7 @@ export function AccountChangeApproval({
                             : subject === "policy"
                               ? "Apply policy"
                               : "Complete cancellation"}
-                      </Button>
+                      </Button>}
                     </div>
                   )}
                 </>
@@ -315,7 +320,9 @@ export function AccountChangeApproval({
             </>
           )
         ))}
-      {(status === "processing" ||
+      {feeSource && <CustomerPaidExecution compact source={feeSource} ready={status === 'pending' && !!approvals.data?.ready}
+        blocked={busy || !canApprove || !!approvals.data?.blockedReason} memberName={name} onBusyChange={setBusy} />}
+      {!feeSource && (status === "processing" ||
         (subject === "cancellation" && status === "pending")) &&
         canCheck && (
           <Button

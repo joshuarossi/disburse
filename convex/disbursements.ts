@@ -1,3 +1,4 @@
+import { assertCircleReservation } from './lib/circleSource';
 import { submissionNeedsAttention, walletSendDeclined } from '../shared/paymentQueue';
 import { resolveFundingAccount } from "./lib/fundingAccount";
 import { reportPage } from './lib/reportPagination';
@@ -421,8 +422,6 @@ export const updateStatus = mutation({
         "Execution must be verified on chain before marking a payment paid",
       );
 
-    assertStatusTransition(disbursement.status, args.status);
-
     // Hash integrity: proposed/scheduled require a well-formed Safe tx hash;
     // executed requires an on-chain transaction hash.
     if (
@@ -436,6 +435,13 @@ export const updateStatus = mutation({
     if (disbursement.safeTxHash && args.safeTxHash && disbursement.safeTxHash.toLowerCase() !== args.safeTxHash.toLowerCase()) throw new Error("Resume the original saved proposal; its transaction identity cannot be replaced.");
     if (args.txHash) assertValidTxHash(args.txHash, "txHash");
     if (disbursement.txHash && args.txHash && disbursement.txHash.toLowerCase() !== args.txHash.toLowerCase()) throw new Error("The original broadcast is already recorded. Verify its settlement before replacing a transaction hash.");
+
+    // The proposal may have been saved even if its response was lost. A retry
+    // of that exact status/hash is a read of the existing result, not another
+    // authorization or a chance to change submission metadata.
+    if (args.status === 'proposed' && disbursement.status === 'proposed' && args.safeTxHash?.toLowerCase() === disbursement.safeTxHash?.toLowerCase()
+      && [args.txHash, args.relayTaskId, args.relayStatus, args.relayFeeToken, args.relayFeeTokenSymbol, args.relayFeeMode, args.relayError].every(value => value === undefined)) return { success: true };
+    assertStatusTransition(disbursement.status, args.status);
 
     if (
       ["pending", "proposed", "scheduled"].includes(args.status) ||
@@ -1131,7 +1137,7 @@ const nativeClaimArgs = {
     sessionToken: v.string(),
     safeTxHash: v.string(),
 };
-async function claimNative(ctx: MutationCtx, args: { disbursementId: Id<'disbursements'>; sessionToken: string; safeTxHash: string; searchFromBlock: string; attemptId: string }) {
+export async function claimNative(ctx: MutationCtx, args: { disbursementId: Id<'disbursements'>; sessionToken: string; safeTxHash: string; searchFromBlock: string; attemptId: string; circleExecutionId?: Id<'circleExecutions'> }) {
     const payment = await ctx.db.get(args.disbursementId);
     if (!payment) throw new Error("Payment not found");
     const { user } = await requireOrgAccess(
@@ -1147,6 +1153,7 @@ async function claimNative(ctx: MutationCtx, args: { disbursementId: Id<'disburs
       );
     if (payment.allowanceExecution || payment.executionFee)
       throw new Error("Use the execution method approved for this payment");
+    await assertCircleReservation(ctx, payment.safeId, args.circleExecutionId);
     if (!/^\d+$/.test(args.searchFromBlock))
       throw new Error("Invalid network recovery checkpoint");
     await assertPaymentMayProceed(ctx, payment);
@@ -1162,7 +1169,7 @@ async function claimNative(ctx: MutationCtx, args: { disbursementId: Id<'disburs
     await ctx.db.patch(payment._id, {
       status: "relaying",
       relayStatus: "preparing",
-      nativeExecution: { startedAt: Date.now(), searchFromBlock: payment.nativeExecution?.searchFromBlock && BigInt(payment.nativeExecution.searchFromBlock) < BigInt(args.searchFromBlock) ? payment.nativeExecution.searchFromBlock : args.searchFromBlock, checks: 0, attemptId: args.attemptId, actorUserId: user._id },
+      nativeExecution: { ...(args.circleExecutionId ? { service: 'circle' as const } : {}), startedAt: Date.now(), searchFromBlock: payment.nativeExecution?.searchFromBlock && BigInt(payment.nativeExecution.searchFromBlock) < BigInt(args.searchFromBlock) ? payment.nativeExecution.searchFromBlock : args.searchFromBlock, checks: 0, attemptId: args.attemptId, actorUserId: user._id },
       relayError: undefined,
       nativeRecoveryAt: Date.now(),
       updatedAt: Date.now(),

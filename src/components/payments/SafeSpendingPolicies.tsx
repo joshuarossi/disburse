@@ -1,3 +1,4 @@
+import { supportsCircleFees } from '../../../shared/circleExecution';
 import { userErrorMessage } from '@/lib/userErrors';
 import { useState } from "react";
 import { PolicyApprovalQueue } from "./PolicyApprovalQueue";
@@ -80,9 +81,11 @@ export function SafeSpendingPolicies({
   const [error, setError] = useState("");
   const [proposal, setProposal] = useState<string | null>(null);
   const [requestId, setRequestId] = useState("");
-  const [feeMethod, setFeeMethod] = useState(
+  const [legacyFeeMethod, setFeeMethod] = useState(
     RELAY_FEATURE_ENABLED ? "managed" : "wallet",
   );
+  const circle = !!safe && supportsCircleFees(safe.chainId);
+  const feeMethod = circle ? 'circle' : legacyFeeMethod;
   const [feeToken, setFeeToken] = useState("USDC");
   const feeQuote = useConvexQuery(
     api.spendingPolicyData.fee,
@@ -90,7 +93,7 @@ export function SafeSpendingPolicies({
       ? { safeId: safe._id, sessionToken, token: feeToken }
       : "skip",
   );
-  const feeReviewKey = feeMethod === 'managed' ? feeQuote?.fee ? feeIdentity(feeQuote.fee) : null : 'wallet';
+  const feeReviewKey = feeMethod === 'managed' ? feeQuote?.fee ? feeIdentity(feeQuote.fee) : null : feeMethod;
   const acknowledged = feeReviewKey !== null && acknowledgedFee === feeReviewKey;
   const setAcknowledged = (value: boolean) => setAcknowledgedFee(value ? feeReviewKey : null);
   const tokens = getTokensForChain(safe?.chainId ?? 0);
@@ -522,6 +525,7 @@ export function SafeSpendingPolicies({
               </>
             )}
             <div className="space-y-3 rounded-lg border border-[var(--ws-border)] p-4">
+              {circle ? <p className="text-sm text-[var(--ws-muted)]">The company account pays the execution fee in USDC. Review the exact limit after the account approves this policy.</p> : <>
               <label className="block">
                 <span className="finance-label">Execution fee</span>
                 <select
@@ -584,6 +588,7 @@ export function SafeSpendingPolicies({
                   sending.
                 </p>
               )}
+              </>}
             </div>
             <label className="flex gap-3 text-sm leading-5 text-slate-300">
               <input

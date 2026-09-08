@@ -13,6 +13,7 @@ export const CIRCLE_PAYMASTERS: Readonly<Record<number, Address>> = {
   84532: '0x31BE08D380A21fc740883c0BC434FcFc88740b58',
   421614: '0x31BE08D380A21fc740883c0BC434FcFc88740b58',
 };
+export function supportsCircleFees(chainId: number | undefined) { return chainId !== undefined && Object.prototype.hasOwnProperty.call(CIRCLE_PAYMASTERS, chainId); }
 export type CircleUserOperation = {
   sender: Address; nonce: bigint; factory?: Address; factoryData?: Hex; callData: Hex;
   callGasLimit: bigint; verificationGasLimit: bigint; preVerificationGas: bigint;
@@ -81,4 +82,20 @@ export function circlePrefund(op: CircleUserOperation, tokenPerNative: bigint, a
   const gas = op.callGasLimit + op.verificationGasLimit + op.preVerificationGas + op.paymasterVerificationGasLimit + op.paymasterPostOpGasLimit + additionalGas;
   const base = (gas * op.maxFeePerGas * tokenPerNative) / 10n ** 18n + 1n;
   return base + (base * spreadBps) / 10_000n;
+}
+/** ERC-4337 permits a bundler to omit paymaster estimates. Keep the reviewed
+ * limits in that case; require all three account estimates and validate every
+ * supplied field before adding the execution margin. */
+export function applyCircleGasEstimate(operation: CircleUserOperation, estimate: unknown): CircleUserOperation {
+  if (!estimate || typeof estimate !== 'object' || Array.isArray(estimate)) throw new Error('The execution service returned an unreadable fee estimate.');
+  const next = { ...operation };
+  for (const key of ['callGasLimit', 'verificationGasLimit', 'preVerificationGas', 'paymasterVerificationGasLimit', 'paymasterPostOpGasLimit'] as const) {
+    const value = (estimate as Record<string, unknown>)[key];
+    if (value === undefined && key.startsWith('paymaster')) continue;
+    if (typeof value !== 'string' || !/^0x[\da-f]{1,32}$/i.test(value) || BigInt(value) <= 0n) throw new Error('The execution service returned an invalid gas estimate.');
+    const gas = (BigInt(value) * 120n + 99n) / 100n;
+    if (gas > 60_000_000n) throw new Error('This payment is too large for the execution service. Use a smaller batch.');
+    next[key] = gas;
+  }
+  return next;
 }

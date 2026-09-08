@@ -1,4 +1,4 @@
-/** Isolated development/Sepolia proof. Never prints keys, sessions or signed payloads. */
+/** Historical native-gas protocol diagnostic. Customer-paid acceptance uses qa-circle-receiving.mjs. Never prints keys or sessions. */
 import { readFileSync, writeFileSync, existsSync } from "node:fs";
 import { ConvexHttpClient } from "convex/browser";
 import {
@@ -15,7 +15,7 @@ import {
 import { privateKeyToAccount } from "viem/accounts";
 import { sepolia } from "viem/chains";
 import { api } from "../convex/_generated/api.js";
-import { forwarderFactory } from "../shared/receivableAddress.ts";
+import { forwarderFactory, sweepCall } from "../shared/receivableAddress.ts";
 import { CHAIN_TOKENS } from "../shared/chains.ts";
 
 if (!process.env.CONVEX_DEPLOYMENT?.startsWith("dev:"))
@@ -255,7 +255,7 @@ if (!process.argv.includes("--deploy-only")) {
     throw new Error("Confirmed payment has not reconciled");
   pass("Exact USDC payment tracked before funds are forwarded");
   if (!report.steps.collection) {
-    const call = await client.action(api.receivableActions.nativeSweep, args);
+    const call = { ...sweepCall(invoice), chainId: invoice.chainId };
     if (
       call.chainId !== sepolia.id ||
       call.to.toLowerCase() !== report.factory.toLowerCase()

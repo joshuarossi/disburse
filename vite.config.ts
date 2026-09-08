@@ -40,6 +40,8 @@ export default defineConfig(({ command, mode }) => {
           if (/\/src\/lib\/session(?:\.ts)?$/.test(source))
             return path.join(root, 'session.ts');
           if (source === 'convex/react') return path.join(root, 'convex.tsx');
+          if (source === '@/lib/services/circleApproval' || /\/src\/lib\/services\/circleApproval(?:\.ts)?$/.test(source)) return path.join(root, 'circle.ts');
+          if (source === '@/lib/services/metamaskSetup' || /\/src\/lib\/services\/metamaskSetup(?:\.ts)?$/.test(source)) return path.join(root, 'metamaskSetup.ts');
           if (source === '@/lib/services/customerExecution' || /\/src\/lib\/services\/customerExecution(?:\.ts)?$/.test(source)) return path.join(root, 'customerExecution.ts');
           if (source === '@/lib/safeCreation' || /\/src\/lib\/safeCreation(?:\.ts)?$/.test(source)) return path.join(root, 'safeCreation.ts');
           if (

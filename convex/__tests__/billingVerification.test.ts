@@ -3,6 +3,9 @@ import { convexTest } from "convex-test";
 import schema from "../schema";
 import { api } from "../_generated/api";
 import { createFullOrgSetup, signIn, TEST_WALLETS } from "./factories";
+import { encodeEventTopics } from "viem";
+import { CIRCLE_ENTRY_POINT } from "../../shared/circleExecution";
+import { circleUserOperationEvent } from "../../shared/circleSettlement";
 const rpc = vi.hoisted(() => ({
   getChainId: vi.fn(),
   getBlockNumber: vi.fn(),
@@ -61,6 +64,16 @@ afterEach(() => {
   vi.clearAllMocks();
 });
 describe("Subscription receipt verification", () => {
+  it("cannot reserve an account bundle through legacy transaction-wide recovery", async () => {
+    const { t, args } = await setup();
+    rpc.getTransactionReceipt.mockResolvedValue({
+      status: "success", blockNumber: 100n,
+      logs: [transfer(), { address: CIRCLE_ENTRY_POINT,
+        topics: encodeEventTopics({ abi: [circleUserOperationEvent] }), data: "0x" }],
+    });
+    await expect(t.action(api.billing.verifySubscriptionPayment, args)).rejects.toThrow("saved subscription checkout");
+    expect(await t.run(ctx => ctx.db.query("billingPayments").collect())).toHaveLength(0);
+  });
   it("verifies the payer, token, treasury, amount and confirmations then activates exactly once", async () => {
     const { t, args } = await setup();
     await t.action(api.billing.verifySubscriptionPayment, args);

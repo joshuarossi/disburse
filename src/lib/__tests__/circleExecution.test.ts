@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { recoverTypedDataAddress, type Hex, type Log } from 'viem';
-import { circleAccountCall, circleConfiguration, circleOperationHash, circleOperationSigningData, circlePermitData, circlePrefund, type CircleUserOperation } from '../../../shared/circleExecution';
+import { applyCircleGasEstimate, circleAccountCall, circleConfiguration, circleOperationHash, circleOperationSigningData, circlePermitData, circlePrefund, type CircleUserOperation } from '../../../shared/circleExecution';
 import { readCircleSettlement } from '../../../shared/circleSettlement';
 import success from './fixtures/circleOperation.json';
 import successReceipt from './fixtures/circleSuccessReceipt.json';
@@ -15,6 +15,16 @@ const op = operation(success.userOperation);
 const receipt = (value: typeof successReceipt | typeof failureReceipt) => ({ ...value, logs: value.logs.map(log => ({ ...log, blockNumber: BigInt(log.blockNumber), blockTimestamp: BigInt(log.blockTimestamp) })) as Log[] });
 
 describe('Safe executions paid directly in USDC', () => {
+  it('accepts the live public bundler response without optional paymaster estimates', () => {
+    const result = applyCircleGasEstimate(op, { callGasLimit: '0x204a68', preVerificationGas: '0x493e0', verificationGasLimit: '0x1e8480' });
+    expect(result.callGasLimit).toBe((0x204a68n * 120n + 99n) / 100n);
+    expect(result.paymasterPostOpGasLimit).toBe(op.paymasterPostOpGasLimit);
+    expect(result.paymasterVerificationGasLimit).toBe(op.paymasterVerificationGasLimit);
+  });
+  it.each([{}, { callGasLimit: '-1' }, { paymasterPostOpGasLimit: '0x' }, { paymasterPostOpGasLimit: '0x100000000000' }])('rejects missing, malformed or excessive supplied gas estimates: %j', change => {
+    const estimate = Object.keys(change).length ? { callGasLimit: '0x10000', preVerificationGas: '0x10000', verificationGasLimit: '0x10000', ...change } : change;
+    expect(() => applyCircleGasEstimate(op, estimate)).toThrow();
+  });
   it('reproduces the operation hash included by the live Base Sepolia bundler', () => { expect(circleOperationHash(84532, op)).toBe(success.userOpHash); });
   it('verifies the live Safe owner signature against the complete Safe4337 operation', async () => {
     const validAfter = Number(BigInt(op.signature.slice(0, 14))), validUntil = Number(BigInt(`0x${op.signature.slice(14, 26)}`));
@@ -22,7 +32,8 @@ describe('Safe executions paid directly in USDC', () => {
     expect(await recoverTypedDataAddress({ ...signingData, signature: `0x${op.signature.slice(26)}` })).toBe(success.owner);
   });
   it('records the successful payment and its real USDC charge', () => {
-    expect(readCircleSettlement(84532, op, receipt(successReceipt))).toMatchObject({ status: 'confirmed', fee: 11_848n, token: 'USDC', userOpHash: success.userOpHash });
+    expect(readCircleSettlement(84532, op, receipt(successReceipt))).toMatchObject({ status: 'confirmed', fee: 11_848n, token: 'USDC', userOpHash: success.userOpHash,
+      feeProof: { prefund: { logIndex: 140, amountRaw: '77911' }, refund: { logIndex: 145, amountRaw: '66063' } } });
     expect(success.status.balances).toMatchObject({ ownerETH: '0', safeETH: '0' });
   });
   it('records a failed payment inside a successful bundle, including its charged USDC fee', () => {
@@ -51,6 +62,16 @@ describe('Safe executions paid directly in USDC', () => {
     if (variant === 'removed') value.logs = value.logs.map(l => ({ ...l, removed: true }));
     if (variant === 'duplicate') value.logs.push(...value.logs);
     if (variant === 'reverted bundle') value.status = 'reverted';
+    expect(() => readCircleSettlement(84532, op, value)).toThrow();
+  });
+  it.each(['missing prefund', 'missing refund', 'changed refund', 'removed refund', 'wrong token', 'fee without boundary'])('requires actual token movements for fee accounting: %s', variant => {
+    const value = receipt(successReceipt);
+    if (variant === 'missing prefund') value.logs = value.logs.filter(l => l.logIndex !== 140);
+    if (variant === 'missing refund') value.logs = value.logs.filter(l => l.logIndex !== 145);
+    if (variant === 'changed refund') value.logs = value.logs.map(l => l.logIndex === 145 ? { ...l, data: `0x${'0'.repeat(63)}1` as Hex } : l);
+    if (variant === 'removed refund') value.logs = value.logs.map(l => l.logIndex === 145 ? { ...l, removed: true } : l);
+    if (variant === 'wrong token') value.logs = value.logs.map(l => l.logIndex === 145 ? { ...l, address: success.owner as Hex } : l);
+    if (variant === 'fee without boundary') value.logs = value.logs.filter(l => l.logIndex !== 141);
     expect(() => readCircleSettlement(84532, op, value)).toThrow();
   });
   it('never substitutes a different gas token or unsupported chain', () => {

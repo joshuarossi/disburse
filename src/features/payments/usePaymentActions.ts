@@ -8,6 +8,7 @@ import type { Doc, Id } from '../../../convex/_generated/dataModel';
 import { convex } from '@/lib/convex';
 import { useSessionToken } from '@/lib/session';
 import { RELAY_FEATURE_ENABLED, resolveRelaySettings } from '@/lib/relayConfig';
+import { supportsCircleFees } from '../../../shared/circleExecution';
 
 
 type Operation = 'propose' | 'execute' | 'approve' | 'resumeProposal';
@@ -67,7 +68,7 @@ export function usePaymentActions(safes: Doc<'safes'>[] | undefined, org: Doc<'o
         } else {
           if (!['draft', 'pending'].includes(payment.status) || payment.safeTxHash) throw new Error('This payment already has a proposal. Resume the original payment.');
           await convex.mutation(api.disbursements.updateStatus, { ...identity, status: 'pending' });
-          fee = RELAY_FEATURE_ENABLED ? await convex.mutation(api.relayQuotes.accept, { ...identity, reviewedIdentity: reviewedFeeIdentity }) : undefined;
+          fee = RELAY_FEATURE_ENABLED && !supportsCircleFees(payment.chainId) ? await convex.mutation(api.relayQuotes.accept, { ...identity, reviewedIdentity: reviewedFeeIdentity }) : undefined;
           if (fee) await convex.action(api.relayExecutor.checkFee, { ...identity, reviewedIdentity: reviewedFeeIdentity });
           const result = await saveApproval();
           if (!result) return;
@@ -90,6 +91,7 @@ export function usePaymentActions(safes: Doc<'safes'>[] | undefined, org: Doc<'o
         if (payment.executionFee) {
           await convex.action(api.relayExecutor.submit, identity);
         } else {
+          if (supportsCircleFees(payment.chainId) && !payment.nativeExecution) throw new Error('Review the USDC execution fee in this payment before sending.');
           const transaction = await convex.action(api.accountApprovals.execution, identity);
           const attempt = await convex.action(api.nativePayments.start, { ...identity, safeTxHash: payment.safeTxHash });
           claimed = true;

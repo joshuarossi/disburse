@@ -11,6 +11,14 @@ import {
 import { invoiceForwarderArtifact } from "./invoiceForwarderArtifact";
 export const forwarderFactory =
   invoiceForwarderArtifact.InvoiceForwarderFactory;
+export const RECEIVING_DEPLOYER = '0x4e59b44847b379578588920ca78fbf26c0b4956c' as const;
+// The same immutable factory can be used by every organization. The first
+// customer that needs it pays deployment; subsequent customers reuse it.
+const receivingFactorySalt = keccak256(stringToHex('disburse-invoice-factory-v1'));
+export const RECEIVING_FACTORY_ADDRESS = getCreate2Address({ from: RECEIVING_DEPLOYER, salt: receivingFactorySalt, bytecode: forwarderFactory.bytecode });
+export function receivingFactoryCall() {
+  return { to: RECEIVING_DEPLOYER, data: concatHex([receivingFactorySalt, forwarderFactory.bytecode]) };
+}
 export function invoiceSalt(
   orgId: string,
   invoiceId: string,

@@ -17,6 +17,7 @@ import type * as accountCancellationRecovery from "../accountCancellationRecover
 import type * as accountCancellationRelay from "../accountCancellationRelay.js";
 import type * as accountCancellations from "../accountCancellations.js";
 import type * as accountReadiness from "../accountReadiness.js";
+import type * as accountSetups from "../accountSetups.js";
 import type * as accounting from "../accounting.js";
 import type * as audit from "../audit.js";
 import type * as auth from "../auth.js";
@@ -24,6 +25,8 @@ import type * as beneficiaries from "../beneficiaries.js";
 import type * as billing from "../billing.js";
 import type * as billingCheckoutActions from "../billingCheckoutActions.js";
 import type * as billingCheckoutData from "../billingCheckoutData.js";
+import type * as circleBilling from "../circleBilling.js";
+import type * as circlePayments from "../circlePayments.js";
 import type * as crons from "../crons.js";
 import type * as customerExecution from "../customerExecution.js";
 import type * as customerOperations from "../customerOperations.js";
@@ -50,6 +53,13 @@ import type * as lib_balanceProof from "../lib/balanceProof.js";
 import type * as lib_billingCheckout from "../lib/billingCheckout.js";
 import type * as lib_billingConfiguration from "../lib/billingConfiguration.js";
 import type * as lib_billingReceipt from "../lib/billingReceipt.js";
+import type * as lib_circleAccountService from "../lib/circleAccountService.js";
+import type * as lib_circleAccountSetup from "../lib/circleAccountSetup.js";
+import type * as lib_circleBilling from "../lib/circleBilling.js";
+import type * as lib_circleFeeProof from "../lib/circleFeeProof.js";
+import type * as lib_circleFeeReports from "../lib/circleFeeReports.js";
+import type * as lib_circleReceivables from "../lib/circleReceivables.js";
+import type * as lib_circleSource from "../lib/circleSource.js";
 import type * as lib_customerPaidAccount from "../lib/customerPaidAccount.js";
 import type * as lib_delegatedIntent from "../lib/delegatedIntent.js";
 import type * as lib_delegationReservations from "../lib/delegationReservations.js";
@@ -106,6 +116,7 @@ import type * as paymentFollowups from "../paymentFollowups.js";
 import type * as paymentRuns from "../paymentRuns.js";
 import type * as receiptEvidence from "../receiptEvidence.js";
 import type * as receivableActions from "../receivableActions.js";
+import type * as receivableServices from "../receivableServices.js";
 import type * as receivables from "../receivables.js";
 import type * as recipientCollectionActions from "../recipientCollectionActions.js";
 import type * as recipientCollections from "../recipientCollections.js";
@@ -129,6 +140,7 @@ import type * as spendingPolicyRelay from "../spendingPolicyRelay.js";
 import type * as teamInvitationLinks from "../teamInvitationLinks.js";
 import type * as teamInvitations from "../teamInvitations.js";
 import type * as users from "../users.js";
+import type * as walletSetups from "../walletSetups.js";
 import type * as workspace from "../workspace.js";
 
 import type {
@@ -147,6 +159,7 @@ declare const fullApi: ApiFromModules<{
   accountCancellationRelay: typeof accountCancellationRelay;
   accountCancellations: typeof accountCancellations;
   accountReadiness: typeof accountReadiness;
+  accountSetups: typeof accountSetups;
   accounting: typeof accounting;
   audit: typeof audit;
   auth: typeof auth;
@@ -154,6 +167,8 @@ declare const fullApi: ApiFromModules<{
   billing: typeof billing;
   billingCheckoutActions: typeof billingCheckoutActions;
   billingCheckoutData: typeof billingCheckoutData;
+  circleBilling: typeof circleBilling;
+  circlePayments: typeof circlePayments;
   crons: typeof crons;
   customerExecution: typeof customerExecution;
   customerOperations: typeof customerOperations;
@@ -180,6 +195,13 @@ declare const fullApi: ApiFromModules<{
   "lib/billingCheckout": typeof lib_billingCheckout;
   "lib/billingConfiguration": typeof lib_billingConfiguration;
   "lib/billingReceipt": typeof lib_billingReceipt;
+  "lib/circleAccountService": typeof lib_circleAccountService;
+  "lib/circleAccountSetup": typeof lib_circleAccountSetup;
+  "lib/circleBilling": typeof lib_circleBilling;
+  "lib/circleFeeProof": typeof lib_circleFeeProof;
+  "lib/circleFeeReports": typeof lib_circleFeeReports;
+  "lib/circleReceivables": typeof lib_circleReceivables;
+  "lib/circleSource": typeof lib_circleSource;
   "lib/customerPaidAccount": typeof lib_customerPaidAccount;
   "lib/delegatedIntent": typeof lib_delegatedIntent;
   "lib/delegationReservations": typeof lib_delegationReservations;
@@ -236,6 +258,7 @@ declare const fullApi: ApiFromModules<{
   paymentRuns: typeof paymentRuns;
   receiptEvidence: typeof receiptEvidence;
   receivableActions: typeof receivableActions;
+  receivableServices: typeof receivableServices;
   receivables: typeof receivables;
   recipientCollectionActions: typeof recipientCollectionActions;
   recipientCollections: typeof recipientCollections;
@@ -259,6 +282,7 @@ declare const fullApi: ApiFromModules<{
   teamInvitationLinks: typeof teamInvitationLinks;
   teamInvitations: typeof teamInvitations;
   users: typeof users;
+  walletSetups: typeof walletSetups;
   workspace: typeof workspace;
 }>;
 

@@ -1,3 +1,4 @@
+import { useReceivingService } from '@/features/receivables/useReceivingService';
 import { userErrorMessage } from '@/lib/userErrors';
 import { useActivityEnvironment } from "@/features/workspace/ActivityEnvironment";
 import { chainEnvironment } from "../../shared/assets";
@@ -11,6 +12,7 @@ import { useSessionToken } from "@/lib/session";
 import { Dialog } from "@/components/ui/Dialog";
 import { InvoiceItems } from "@/components/invoices/InvoiceItems";
 import { InvoiceCollection } from "@/features/receivables/InvoiceCollection";
+import { ReceivingSetup } from '@/features/receivables/ReceivingSetup';
 import {
   PageHeader,
   Notice,
@@ -359,6 +361,7 @@ function InvoiceDetails({
   const configuration = configurations?.find(
     (c) => c.chainId === invoice.chainId,
   );
+  const receivingService = useReceivingService(invoice.safeId, invoice.state === 'draft' && !!configuration?.canIssue);
   const [busy, setBusy] = useState(false),
     [message, setMessage] = useState(""),
     [messageTone, setMessageTone] = useState<"error" | "success" | "info">("success"),
@@ -426,9 +429,9 @@ function InvoiceDetails({
                 also activates this invoice's receiving address.
               </p>
               <p>
-                You pay collection gas with your connected wallet. Review its
-                network fee before confirming. Disburse does not cover network
-                or provider fees, including on a free plan.
+                Your company account pays collection fees in USDC. Its owners
+                review the complete fee before confirming. The invoice's full
+                balance moves into that account.
               </p>
             </div>
             {configuration && !configuration.canIssue && (
@@ -437,6 +440,7 @@ function InvoiceDetails({
                 keep editing this draft.
               </Notice>
             )}
+            {configuration?.canIssue && <ReceivingSetup safeId={invoice.safeId} state={receivingService} canManage={canManage} busy={busy} onBusyChange={setBusy} />}
             <div className="flex flex-wrap gap-2">
               {canManage && (
                 <>
@@ -449,7 +453,7 @@ function InvoiceDetails({
                   </button>
                   <button
                     className="workspace-button workspace-button-primary"
-                    disabled={busy || !configuration?.canIssue}
+                    disabled={busy || !configuration?.canIssue || !receivingService.data?.ready}
                     onClick={() =>
                       run(() => issue(args!), "Payment link created.")
                     }
@@ -534,7 +538,7 @@ function InvoiceDetails({
                 Check payments
               </button>
             </div>
-            <InvoiceCollection invoice={invoice} canManage={canManage} busy={busy} run={run} />
+            <InvoiceCollection invoice={invoice} canManage={canManage} busy={busy} onBusyChange={setBusy} />
             {!!events?.length && (
               <section>
                 <h3 className="font-semibold mb-3">Confirmed activity</h3>

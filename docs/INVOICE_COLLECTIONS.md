@@ -1,11 +1,23 @@
 # Customer-paid invoice collection
 
-The customer pays every network and provider fee directly in stablecoins. A free, trial, paid or complimentary software license does not include gas or external service fees. This applies to invoice creation and any receiving-address provisioning as well as collection. See the [product-wide service requirements](PRODUCT_AND_SERVICE_REQUIREMENTS.md).
+Updated September 7, 2026. Invoice receiving setup and collection now use the company Safe's USDC through Circle Paymaster and the public Candide bundler. Disburse has no provider account, gas balance or execution bill. License tier does not change who pays these costs.
 
-The current invoice collection flow uses the customer's connected wallet to pay native gas, so it does not yet satisfy the stablecoin-only service-cost requirement. It verifies the receiving factory and fixed destination before requesting the transaction. The receiving contract forwards the full principal to the company account. Confirmed token transfers determine the collected amount; a successful wallet submission alone does not mark funds collected.
+## Customer flow
 
-The sponsored Gelato collection path has been removed. A provider API key cannot enable automatic customer-fee subsidies. The old timeout-based `forward`, `sweepClaim` and `sweepResult` endpoints are also removed. Earlier submission evidence remains available if an existing record needs recovery.
+1. An administrator selects the receiving company account. If the shared receiving factory is absent, its deployment is an explicit setup operation. The owners review and approve its USDC fee before deployment.
+2. Issuing an invoice records the invoice and predicts its unique address. This step does not deploy a contract or incur a network fee. The customer sees that collecting funds later has a separate execution cost.
+3. Ordinary token transfers to the invoice address are reconciled from confirmed chain events. Received and collected amounts are tracked separately.
+4. Collection uses the immutable factory and invoice salt to deploy the forwarder if needed and move its full token balance into the selected company Safe. Its owners approve the complete call and a separate USDC execution fee.
+5. The application independently verifies the receipt, invoice transfer, fee and unused fee refund. A submitted request is not proof of collection.
 
-Managed collection with stablecoin fees needs an explicitly authorized company-account transaction or a contract-enforced standing fee allowance. The reviewed call must collect the full principal and pay a separately disclosed fee from the customer's account. Provider/network costs must not be absorbed by Disburse. That integration remains unfinished under A07/A11 in [the TODO](../TODOS.md).
+The fixed destination cannot be replaced by the person submitting the collection. The backend verifies factory code, token, invoice address and destination before constructing a call. A previously submitted collection must be resolved before another paid attempt. Late funds sent to a voided invoice remain collectable. An RPC outage during receiving setup leaves issuance disabled with a retry action.
 
-The invoice review and collection controls now state who pays. Browser coverage checks fee disclosure, mobile/dark layout, desktop/light layout and viewer access. Backend coverage verifies that refreshing confirmed receipts never sends a sponsored collection, even with a provider key configured. Earlier real Sepolia native collection evidence is in [receivables](ACCOUNTS_RECEIVABLE.md).
+The first customer's setup pays the shared immutable factory's deployment cost. Other customers can reuse that factory without another deployment charge. No deployment bill is advanced by Disburse. The canonical CREATE2 deployer, salt, factory bytecode and runtime are pinned in `shared/receivableAddress.ts`.
+
+## Acceptance
+
+The actual development application completed factory setup, issued an invoice, detected its 0.10 USDC payment and collected the full 0.10 USDC into the company Safe on Base Sepolia. Factory deployment cost 0.025571 USDC; collection cost 0.020242 USDC. Both the signing wallet and Safe had zero native ETH. See the [receipt evidence](CUSTOMER_PAID_SERVICES_QA_2026-09-07.md).
+
+Backend and browser coverage includes fee approval, recipient-principal preservation, insufficient funds, interrupted responses, stale requests, wallet cancellation, changed ownership, late funds and viewer restrictions. Collection fees have their own accounting source. If gross prefund/refund movements were already booked, late fee evidence preserves that basis instead of adding a second net fee expense.
+
+Independent forwarder-contract review, grouped-collection cost comparisons and external-ledger acceptance remain open. Automatic collection under a standing authorization is separate from the completed owner-approved flow. Historical native/sponsored receipt recovery remains available; the public native sweep action and sponsored submission path have been removed.

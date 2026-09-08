@@ -1,3 +1,6 @@
+import type { ObjectType } from 'convex/values';
+import type { MutationCtx } from './_generated/server';
+import { assertCircleReservation } from './lib/circleSource';
 import { accountChangeProgress } from './lib/accountChangeLifecycle';
 import { ORG_READER_ROLES } from '../shared/roles';
 import { v } from "convex/values";
@@ -44,7 +47,7 @@ async function account(
     : undefined;
   return { safe, access };
 }
-async function grantAccess(
+export async function grantAccess(
   ctx: QueryCtx,
   safeId: Id<"safes">,
   delegate: string,
@@ -156,6 +159,7 @@ export const list = query({
           execution: execution
             ? {
                 attemptId: execution.attemptId,
+                service: execution.service,
                 startedAt: execution.startedAt,
                 walletRejectedAt: execution.walletRejectedAt,
                 txHash: execution.txHash,
@@ -397,16 +401,16 @@ export const saveSignature = internalMutation({
     });
   },
 });
-export const reserve = internalMutation({
-  args: {
+const reserveArgs = {
     ...policyIdentity,
     safeTxHash: v.string(),
     to: v.string(),
     data: v.string(),
     searchFromBlock: v.string(),
     attemptId: v.string(),
-  },
-  handler: async (ctx, args) => {
+    circleExecutionId: v.optional(v.id('circleExecutions')),
+  };
+export async function reservePolicyExecution(ctx: MutationCtx, args: ObjectType<typeof reserveArgs>) {
     const p = await ctx.db.get(args.policyChangeId);
     if (p?.cancellationId) throw new Error("Complete or reconcile this policy cancellation");
     if (
@@ -423,6 +427,7 @@ export const reserve = internalMutation({
       throw new Error(
         "Check the original policy submission before trying again",
       );
+    await assertCircleReservation(ctx, p.safeId, args.circleExecutionId);
     const { user } = await requireOrgAccess(ctx, p.orgId, args.sessionToken, [
       "admin",
       "approver",
@@ -451,6 +456,7 @@ export const reserve = internalMutation({
     await ctx.db.patch(p._id, {
       status: "processing",
       execution: {
+        ...(args.circleExecutionId ? { service: 'circle' as const } : {}),
         attemptId: args.attemptId,
         actorUserId: user._id,
         startedAt: Date.now(),
@@ -469,8 +475,8 @@ export const reserve = internalMutation({
         policyChangeId: p._id,
       });
     return args.attemptId;
-  },
-});
+}
+export const reserve = internalMutation({ args: reserveArgs, handler: reservePolicyExecution });
 export const recordBroadcast = mutation({
   args: { ...policyIdentity, attemptId: v.string(), txHash: v.string() },
   handler: async (ctx, args) => {

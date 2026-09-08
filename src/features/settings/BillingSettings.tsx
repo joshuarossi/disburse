@@ -1,3 +1,4 @@
+import { billingNetwork } from '../../../shared/billingNetwork';
 import { Button } from "@/components/ui/button";
 import { CreditCard, Check } from "lucide-react";
 import { getPlanFeatures, PLANS, type PlanKey } from "@/lib/billingPlans";
@@ -303,7 +304,7 @@ export function BillingSettings({
                           className="underline"
                           target="_blank"
                           rel="noreferrer"
-                          href={`${payment.chainId === 11155111 ? "https://sepolia.etherscan.io" : "https://etherscan.io"}/tx/${payment.txHash}`}
+                          href={`${billingNetwork(payment.chainId)?.explorer}/tx/${payment.txHash}`}
                         >
                           View transaction
                         </a>

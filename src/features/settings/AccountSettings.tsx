@@ -5,6 +5,7 @@ import type { useSettingsController } from "./useSettingsController";
 import { useState } from "react";
 import type { Doc } from "../../../convex/_generated/dataModel";
 import { AccountNameEditor } from "@/features/treasury/AccountNameEditor";
+import { CompanyAccountSetup } from './CompanyAccountSetup';
 export function AccountSettings({
   controller,
 }: {
@@ -48,6 +49,7 @@ export function AccountSettings({
           </div>
         </div>
 
+        <CompanyAccountSetup controller={controller} />
         {linkingError && !isLinking && (
           <p role="alert" className="mb-4 text-sm text-red-400">
             {linkingError}

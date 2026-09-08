@@ -100,7 +100,7 @@ test("payments with invalidated payout instructions keep cancellation available 
   ).toBeDisabled();
   await expect(
     dialog.getByRole("button", { name: "Send payment", exact: true }),
-  ).toBeDisabled();
+  ).toHaveCount(0);
   await expect(
     dialog.getByRole("button", { name: "Cancel payment", exact: true }),
   ).toBeEnabled();

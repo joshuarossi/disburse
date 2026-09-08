@@ -1,8 +1,74 @@
 # Customer-paid services: implementation and QA
 
-September 7, 2026. **The complete requirement is not yet met. Do not release this as finished stablecoin-only execution.** Customer-paid USDC execution is proven on Base Sepolia. The remaining work includes its application integration and original onboarding, whose live provider submission currently fails. No Disburse-funded provider account was created or funded.
+Updated September 7, 2026. Owner payment execution, account changes, additional accounts, invoice receiving/collection and subscription checkout now have integrated customer-paid USDC execution. The complete v2 requirement is still open for original MetaMask live acceptance, existing-account migration, delegated execution and unattended schedules. No Disburse-funded provider account was created or funded.
 
-## Live execution evidence
+## Actual application receipts
+
+These actions used the authenticated development application backend, persisted its approvals and execution requests, and reconciled canonical receipts. The signing wallet and company Safe had zero Base Sepolia ETH. The Safe paid Circle in canonical test USDC; Candide's public bundler received the signed operations without an account, API key or application gas balance.
+
+| Story | Principal/result | Actual execution fee | Receipt |
+| --- | --- | --- | --- |
+| Owner payment | Recipient received 0.10 USDC | 0.015708 USDC | [Payment](https://sepolia.basescan.org/tx/0xf27b85db8017c054ebe7184e3a674b9b73b837d581488f8863f58492a4c64f96) |
+| Signed cancellation | Original payment authorization invalidated; no recipient transfer | 0.015167 USDC | [Cancellation](https://sepolia.basescan.org/tx/0x1b5c77fa80c6f7b7a5766c1258211f6fb28248a8ff037aee8e932754e628f49d) |
+| Set up invoice receiving | Shared immutable factory deployed | 0.025571 USDC | [Factory setup](https://sepolia.basescan.org/tx/0x401798eb55ab77aad0f1cd7d4bb416ca7d84142d6715c9fa7f735a9a889c5106) |
+| Pay issued invoice | Unique address received 0.10 USDC | 0.015708 USDC | [Invoice payment](https://sepolia.basescan.org/tx/0xc43712a1f8ddbd97c413a3f7edf61a4d419ea79f8048d2551646411decd7972c) |
+| Collect invoice | Full 0.10 USDC moved into company Safe; invoice address emptied | 0.020242 USDC | [Collection](https://sepolia.basescan.org/tx/0x420c1b58c2ae49e97090b2721f261547601dbe5152e7b6c928c52ef02afd776b) |
+| Team subscription | Exact 50 USDC license payment applied to the Team plan | 0.014584 USDC | [Subscription](https://sepolia.basescan.org/tx/0x23199fc4cf35b57746ab89c059a4b7429b67342372ff5f7853697fbf45681ba8) |
+| Create Payroll account | Child Safe deployed and linked with the parent Safe as its owner | 0.019559 USDC | [Company account](https://sepolia.basescan.org/tx/0x597c2beb0668d22201075c15a7382ecb8b4ec87d64bc538759b587145a7c188b) |
+
+Invoice `mx7efa63pakqhcpbxt26gswhxs8dz107` used `0x02a757fc1706bfb68145d64ba0403a6a73706984`. The application reconciled 100000 received and 100000 forwarded base units. The child account is `0xea9dab22e7ee7e33bcf639f5c603b42b19d5df56`, controlled by parent `0x1d724C69fEB3C75Ed33511E3a09aF5b4D0377aB5`.
+
+The subscription test used the unchanged Team price and a temporary testnet billing destination controlled by the QA wallet. Test funding used 40 Sepolia USDC through CCTP and an 8 USDC authorization from the Base Sepolia signing wallet. The source-chain CCTP preparation used previously authorized native test gas; it is not onboarding acceptance. The actual subscription transaction charged 50.014584 USDC from the Safe, activated the Team plan and used no native tokens in either Base Sepolia wallet.
+
+Policy grants/revocations use the same approval and execution component, with dedicated backend/browser coverage. Their older native Sepolia receipts do not establish new live USDC-fee policy acceptance.
+
+Application runners are `scripts/qa-circle-payment.mjs`, `qa-circle-receiving.mjs`, `qa-circle-account.mjs` and `qa-circle-billing.mjs`. They require the isolated development backend and Base Sepolia, keep private keys/session tokens out of output, persist a unique run before submission, and check existing requests with `--status`. Never reuse a paid run name to submit again.
+
+## Approval, fees and recovery
+
+The original Safe transaction remains unchanged. Its actual owner quorum approves the fee permit and then the exact SafeOp. Nested owners use the same current authority checks. A Circle operation cannot turn an allowance delegate into a Safe owner.
+
+An account-wide reservation prevents overlapping unresolved requests across workspaces. The fee permit keeps the same cap while its token nonce remains unconsumed. The signed operation fixes chain, sender, call, nonce, gas terms and bounded validity. The server claims the original operation hash before making one provider submission request. An unknown response never permits an automatic duplicate send.
+
+Reconciliation checks the exact EntryPoint operation, Circle fee result, canonical block and confirmation depth. It records failed execution fees independently of recipient settlement. Fee prefunding and refunds are matched by exact receipt/log identity. Late fee evidence preserves already-booked gross movements instead of adding a second net expense.
+
+## Original account setup
+
+New onboarding uses MetaMask's published atomic wallet-call interface for Safe deployment and the exact reviewed deposit on Base or Arbitrum. The customer chooses USDC and reviews the wallet's fee in MetaMask. The API cannot force the fee-token choice. MetaMask does not advertise gas-included transactions on testnets, so the new route has not been claimed as live-accepted from a zero-ETH wallet. [MetaMask gas-included transactions](https://support.metamask.io/manage-crypto/transactions/metamask-gas-station/).
+
+The account installs the pinned Safe4337 module and handler at creation. Preflight checks the selected owner hierarchy before deployment and again before the wallet request. EIP-7702 signing wallets are recognized without treating arbitrary contracts as ordinary key owners. The final receipt must contain one matching deployment, the full reviewed deposit and the expected current authority/module.
+
+The browser saves a claim before asking the backend to begin, saves its wallet phase before requesting the atomic batch, and preserves the same request on ambiguous errors. Lost database replies before the wallet prompt and lost rejection acknowledgments have separate recovery states. A completed setup is restored after a lost completion reply instead of inviting another deposit. Background recovery independently finds the predicted account's factory event when the browser is closed. It bounds scans, detects changed checkpoints and never sends a replacement transaction. An earlier failed receipt cannot release a newer pending attempt.
+
+The prior Biconomy MEE route rejected canonical Base Sepolia USDC during token-slot detection, including an already funded-account attempt. Expired original requests were checked without finding matching fee/work operations. That provider route is retained only for existing setup recovery; no newer experimental version was substituted.
+
+## Remaining execution research
+
+A published Nexus account executed through Circle and Candide directly, without the failing Biconomy execution API. It deployed and returned 0.01 USDC to the company Safe, paying 0.009981 USDC. [Direct Nexus execution](https://sepolia.basescan.org/tx/0x827c7470dd84164849f9a6f36ed4a8161b210385df971ad1d2e3d7ff419a808a).
+
+The counterfactual ERC-6492 envelope must be checked against the expected factory and initialization data and unwrapped before supplying its ERC-1271 permit to Circle. EntryPoint deploys the account before validating that permit. A separate read-only check against the deployed validator accepted the exact signed operation's validity window and rejected an altered call hash. The check reused an already consumed QA nonce, so it did not create a new spendable authorization.
+
+This is protocol evidence only. No member fee account, funding policy, delegated adapter or unattended scheduling flow has been enabled from that experiment. Fee custody, withdrawal authority, accounting and nonce ordering still require application implementation.
+
+## Failure and visual coverage
+
+| Area | Checked behavior |
+| --- | --- |
+| Wallet confirmation | Neutral cancellation; original form/approvals survive; nested RPC/SDK diagnostics do not spill into the page. Unknown errors do not count as rejection. |
+| Original setup | Wrong wallet/network, unsupported batching, insufficient USDC, changed owner hierarchy, database interruption, local-storage failure, unknown submission, malformed wallet status, lost completion response and reorg recovery. |
+| Owner execution | Fee/operation signatures use current direct/nested quorum, expired/stale intent cannot send, unknown submission retains its original hash, failed operation and actual fees remain visible. |
+| Receiving | First deployment, existing factory reuse, full-principal collection, late funds on voided invoices, expired/changed requests and unavailable RPC. |
+| Company accounts | Exact parent-controlled deployment; concurrent requests, changed hierarchy, missing module and incomplete linking retain recovery. |
+| Subscription | Immutable network/account/price, current approvals, failure/retry, confirmed transfer scoped to its UserOperation, replay rejection and durable activation recovery. Legacy transaction-wide recovery cannot reserve an ERC-4337 bundle ahead of its individual checkouts. |
+| Transport | Bounded timeouts/body size; invalid JSON-RPC IDs, malformed replies, rate limits, approval failures and provider liquidity errors have controlled messages. No paid or sponsored fallback. |
+| Accounting | Exact fee/prefund/refund identity; late evidence cannot double-book an expense. |
+| Invitations | Private links and manual copy work without a paid delivery service. A shared link does not verify the recipient's email inbox. |
+
+The full code check passed 981 tests across 97 files, frontend/Convex typecheck and lint. The final full browser pass completed 317 checks. The production build passes with existing deferred wallet/SDK chunk warnings. Mobile dark onboarding cancellation was visually inspected at 390px; it has a neutral notice, retained deposit and no horizontal overflow. Company-account creation was also inspected on mobile. Earlier light/dark payment, invitation and recovery inspections remain in the QA artifacts.
+
+Browser fixtures establish controlled UI behavior. Real receipts establish only the exact chain stories recorded here. Neither proves every possible provider failure, all wallet extensions, mainnet onboarding, unattended payroll or external-ledger acceptance.
+
+## Earlier protocol evidence
 
 These tests used the published Safe 1.4.1, Safe4337Module 0.3.0, EntryPoint 0.7, Circle Paymaster and Candide's public bundler. The signing wallet and Safe had zero Base Sepolia ETH. Fees came from the Safe's canonical test USDC balance. No Circle/Candide account, API key, application gas balance or paid API plan was used.
 
@@ -28,48 +94,10 @@ bun run qa:customer-fees --run=my-unique-paid-test --status
 
 The runner saves the original signed operation before its one submission request. Status checking reads the original hash on-chain; it does not resubmit. The force-failure flag is explicitly test-only and must not be copied into product execution. Public receipt fixtures reproduce operation hashes, signer recovery, failure classification and exact charged fees in unit tests.
 
-## Original account setup
-
-The new setup form reviews deposit, provider fee and total USDC debit before requesting a MetaMask permit. It no longer asks the connected wallet to broadcast a native-gas Safe deployment. The implementation validates the quote's complete operations, token, amount, payer, companion account, deployment calls, chain and expiry. Wallet and RPC identity, balance and permit nonce are rechecked around signing.
-
-The exact operation is persisted before provider submission. An ambiguous response locks the original request until canonical chain evidence resolves it. Locks are shared across workspaces for the same payer/network. Reload restores owners, threshold and funding details. A payer can inspect an old operation after losing workspace access, but linking the resulting account still requires current administrator authority. Receipt scans use bounded checkpoints and reject conflicting or reorganized evidence.
-
-New account creation now installs the released Safe4337Module 0.3.0 and its matching fallback handler, preserving the selected owners and threshold. The actual app configuration reproduces the address of the successfully tested Safe above. The backend checks the deployed module and handler before completing setup. Nested account approvals also recognize that handler only at its published address with the pinned, source-verified runtime hash. Missing, disabled or changed module code leaves the original setup recoverable.
-
-The owner reader also recognizes the exact EIP-7702 delegation indicator as a key-controlled wallet. Previously, any code at an owner's address was treated as another Safe, so a wallet upgrade could prevent approvals. Eight regressions cover direct and nested owner paths, real ECDSA signatures, unrelated signers, ordinary contracts and malformed indicators. This does not trust signatures from an arbitrary delegated implementation or grant new wallet permissions. It is protocol-level compatibility coverage, not a claim that every MetaMask extension configuration has been tested. [EIP-7702 delegation indicator](https://eips.ethereum.org/EIPS/eip-7702#delegation-indicator).
-
-The live Biconomy MEE 2.2.3 / Nexus 1.3.3 attempt quoted canonical Base Sepolia USDC successfully, then returned HTTP 400: `Failed to detect token slot. Please check your token overrides`. A fresh simulated quote failed the same way. After their full execution windows expired, canonical scans found no matching fee or work operations and no deployed target Safe. No Biconomy charge was found for either request. The UI does not turn that provider response alone into proof that a payment failed or a fee cannot settle.
-
-This is an unresolved provider failure. The newer experimental MEE versions have not been substituted for the published audited configuration. Mainnet success is not inferred from these failed testnet requests.
-
-A subsequent check used the application’s actual quote/signing implementation and the authenticated development backend. Simulation passed with a 1 USDC deposit and a 0.032347 USDC fee. The provider again rejected the single live submission. Its original request, `0xd182802d2529955a67467365dda4b372228cfa0cf7d63dfa6003e50f0e334995`, was persisted before that request and checked through the application’s recovery action. After the full signed window and canonical scan, the app marked it expired with no provider fee. The signing wallet retained its 11 USDC and zero Base Sepolia ETH; the target account had no deposit or deployment. No replacement request was submitted. This check exercises application persistence and recovery; it does not establish successful onboarding.
-
-Use `bun run qa:customer-setup --run=<unique-name>` for simulation, add `--execute` for one testnet setup attempt, and use the same name with `--status` to check its original request. The runner refuses production, existing runs and native-funded test wallets. The first runner attempt stopped in its local wallet adapter before any provider submission; that adapter was corrected before the recorded request above.
-
-## Failure and visual coverage
-
-| Area | Checked behavior |
-| --- | --- |
-| Wallet confirmation | Explicit rejection is neutral, form state survives, retry uses the original draft. Nested RPC/SDK diagnostics do not spill into the page. Uncertain errors never count as cancellation. |
-| Setup signing | Wrong account/network, changed permit nonce, insufficient USDC, stale quote, invalid provider response, failed signature recovery and disconnected wallet are rejected. |
-| Setup recovery | Database failure before submission, interrupted provider response, reload with multiple owners, corrupt saved metadata, cross-workspace lock, expired request, failed reconciliation and failed account linking retain clear recovery actions. |
-| Provider transport | Bounded timeout, malformed JSON-RPC, mismatched ID, null/array errors, rate limiting, invalid signatures, simulation failures, expiry and provider liquidity failure have controlled messages. Response streams are stopped at their byte limit, including a never-ending body or interrupted UTF-8. There is no paid/sponsored fallback. |
-| Chain settlement | Failed UserOperation inside a successful bundle, altered hashes/senders/nonces, missing fees and contradictory logs cannot mark a payment paid. |
-| Existing payment failure | Both native and historical relay recovery require the original Safe failure event, confirmation depth and canonical block evidence. A provider’s unverified hash cannot pin the payment to another receipt. Finalized failures keep their evidence, show “Payment failed” near the top of the dialog and offer a new draft instead of reusing the consumed authorization. |
-| Invitations | Private sharing works without a delivery service; denied clipboard leaves manual copy available. The link does not confer email-verification status. Wrong wallet, expired/revoked invitation and failed revocation retain specific messages. |
-| Provider billing | Old Gelato and Resend credentials cannot trigger a request through the retired adapters. Tests assert zero network calls. |
-
-The latest full code check passed 859 tests across 89 files, typecheck and lint. The full browser suite passed 288 checks. The production build passed, with existing large on-demand wallet/SDK chunk warnings. Setup cancellation was visually inspected in desktop light and mobile dark. Private invitation manual-copy recovery, corrupt setup recovery and finalized payment failure were inspected on mobile; the historical relay failure view was also inspected on desktop.
-
-Fixture browser stories establish UI behavior under controlled failures. The three network receipts establish the narrower protocol behavior above. Neither proves every possible external failure, all browser extensions, production throughput or full finance-team acceptance.
-
 ## Work still required
 
-1. Resolve and repeat original setup from canonical USDC in MetaMask, with zero native tokens, no existing Safe and no application-funded service.
-2. Integrate the working USDC execution protocol with in-app approvals. Ordinary Safe transaction signatures cannot become SafeOp signatures. Preserve thresholds, nested ownership, nonce ordering, cancellation, schedules and receipt recovery.
-3. Preserve allowance delegation without granting owner authority. Resolve outstanding authorizations on-chain before releasing reservations.
-4. Integrate account changes, additional accounts, invoice collection and subscription checkout. Do not leave a native-gas step hidden in these flows.
-5. Finish fee authorization limits and accounting, including a mined failed operation's expense. A quoted estimate and an ERC-20 allowance are not automatically a strict signed per-operation fee cap.
-6. Establish production provider availability and terms without a Disburse bill, then repeat the full browser-wallet workflow and unattended execution.
-
-The broader v2 work remains in [TODOS.md](../TODOS.md); this pass does not close unbuilt conversion or yield integrations.
+1. Live original MetaMask setup with USDC and zero native tokens on a documented supported mainnet. No mainnet transaction has been signed or paid in this pass.
+2. Existing-account module installation, delegated stablecoin-fee execution and unattended schedules, preserving exact authority and recovery.
+3. A full multi-approver finance cycle, actual external-ledger import and accountant-led close.
+4. Production capacity, restore/incident acceptance and independent contract review.
+5. Broader optional yield/conversion integrations and remaining receivable follow-ons listed in [TODOS.md](../TODOS.md).

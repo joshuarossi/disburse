@@ -165,7 +165,7 @@ test("S06 review shows individual approvals and cannot send a partially approved
   await expect(approvals).toContainText("Awaiting approval");
   await expect(
     dialog.getByRole("button", { name: "Send payment" }),
-  ).toBeDisabled();
+  ).toHaveCount(0);
   await expect(
     dialog.getByRole("button", { name: "Approve", exact: true }),
   ).toBeEnabled();

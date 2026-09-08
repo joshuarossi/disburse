@@ -38,6 +38,8 @@ export const begin = mutation({
       throw new Error('An earlier setup request is still unresolved. Check its status before starting another.');
     }
     const payer = user.walletAddress.toLowerCase();
+    const walletSetup = await ctx.db.query('walletSetups').withIndex('by_payer_open', q => q.eq('payer', payer).eq('chainId', record.intent.chainId).eq('open', true)).first();
+    if (walletSetup) throw new Error('Finish the saved MetaMask account setup before using another execution service.');
     const otherRequest = await ctx.db.query('customerOperations').withIndex('by_payer_state', q => q.eq('walletAddress', payer).eq('chainId', record.intent.chainId).eq('state', 'pending')).first();
     if (otherRequest) throw new Error('Finish the earlier account setup for this wallet and network before starting another.');
     const verified = verifyCustomerQuote(record.quote, restoreCustomerIntent(record));

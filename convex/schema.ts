@@ -10,8 +10,33 @@ import { reportAssetFields, reportRowFields } from './lib/reportValidators';
 import { settlementBlockValidator } from './lib/settlementBlock';
 import { balanceProof } from './lib/balanceProof';
 import { licenseTierValidator, licenseGrantValidator } from './lib/licenseValidators';
+import { circleFeeProofValidator } from './lib/circleFeeProof';
 
 export default defineSchema({
+  walletSetups: defineTable({ orgId: v.id('orgs'), userId: v.id('users'), chainId: v.number(), payer: v.string(), owners: v.array(v.string()), threshold: v.number(), salt: v.string(), address: v.string(), deposit: v.string(),
+    requestId: v.string(), attempt: v.number(), batchId: v.string(), claimId: v.optional(v.string()), stage: v.union(v.literal('prepared'), v.literal('requested'), v.literal('complete'), v.literal('cancelled')),
+    open: v.boolean(), startBlock: v.string(), scanFrom: v.optional(v.string()), scanHash: v.optional(v.string()), recoveryAt: v.optional(v.number()), safeId: v.optional(v.id('safes')), txHash: v.optional(v.string()), createdAt: v.number(), updatedAt: v.number(),
+  }).index('by_org_open', ['orgId', 'open']).index('by_org_stage', ['orgId', 'stage']).index('by_request', ['orgId', 'requestId']).index('by_payer_open', ['payer', 'chainId', 'open']).index('by_recovery', ['stage', 'recoveryAt']),
+  walletSetupFailures: defineTable({ setupId: v.id('walletSetups'), batchId: v.string(), txHash: v.string(), createdAt: v.number() })
+    .index('by_setup_hash', ['setupId', 'txHash']),
+  accountSetups: defineTable({ orgId: v.id('orgs'), parentSafeId: v.id('safes'), createdBy: v.id('users'), requestId: v.string(), name: v.string(),
+    chainId: v.number(), parentAddress: v.string(), address: v.string(), salt: v.string(), open: v.boolean(), status: v.union(v.literal('prepared'), v.literal('complete'), v.literal('cancelled')),
+    safeId: v.optional(v.id('safes')), txHash: v.optional(v.string()), recoveryAt: v.optional(v.number()), createdAt: v.number(), updatedAt: v.number(),
+  }).index('by_org_open', ['orgId', 'open']).index('by_request', ['orgId', 'requestId']).index('by_due', ['recoveryAt']),
+  circleExecutions: defineTable({
+    orgId: v.id('orgs'), safeId: v.id('safes'), accountKey: v.string(), disbursementId: v.optional(v.id('disbursements')),
+    policyChangeId: v.optional(v.id('spendingPolicyChanges')), cancellationId: v.optional(v.id('accountCancellations')),
+    receivableId: v.optional(v.id('receivables')), receivingSetupSafeId: v.optional(v.id('safes')), billingCheckoutId: v.optional(v.id('billingCheckouts')), accountSetupId: v.optional(v.id('accountSetups')),
+    createdBy: v.id('users'), record: v.string(), revision: v.number(), open: v.boolean(),
+    stage: v.union(v.literal('fee'), v.literal('operation'), v.literal('ready'), v.literal('submitting'), v.literal('confirmed'), v.literal('failed'), v.literal('expired')),
+    createdAt: v.number(), updatedAt: v.number(), scanFrom: v.string(), recoveryAt: v.optional(v.number()),
+    userOpHash: v.optional(v.string()), txHash: v.optional(v.string()), fee: v.optional(v.string()),
+    settlement: v.optional(settlementBlockValidator), feeProof: v.optional(circleFeeProofValidator), error: v.optional(v.string()),
+  }).index('by_payment', ['disbursementId']).index('by_policy', ['policyChangeId']).index('by_cancellation', ['cancellationId']).index('by_invoice', ['receivableId']).index('by_receiving_setup', ['receivingSetupSafeId']).index('by_checkout', ['billingCheckoutId']).index('by_account_setup', ['accountSetupId']).index('by_org', ['orgId']).index('by_safe_tx', ['safeId', 'txHash']).index('by_account_open', ['accountKey', 'open']).index('by_account_created', ['accountKey', 'createdAt']).index('by_due', ['recoveryAt']),
+  circleSignatures: defineTable({
+    executionId: v.id('circleExecutions'), stage: v.union(v.literal('fee'), v.literal('operation')), pathKey: v.string(), path: v.array(v.string()),
+    owner: v.string(), signature: v.string(), digest: v.string(), createdBy: v.id('users'), createdAt: v.number(),
+  }).index('by_execution_stage', ['executionId', 'stage']).index('by_signer', ['executionId', 'stage', 'pathKey', 'owner']),
   customerOperations: defineTable({
     orgId: v.id('orgs'), userId: v.id('users'), walletAddress: v.string(),
     record: v.string(), hash: v.string(), chainId: v.number(), safeId: v.optional(v.id('safes')),
@@ -65,11 +90,11 @@ export default defineSchema({
     .index('by_org_environment_address', ['orgId', 'environment', 'tokenAddress']),
   reportRecipientAssets: defineTable({ orgId: v.id('orgs'), beneficiaryId: v.id('beneficiaries'), ...reportAssetFields, count: v.number() })
     .index('by_recipient_asset', ['orgId', 'beneficiaryId', 'assetId']).index('by_org_environment', ['orgId', 'environment']),
-  reportIndexStates: defineTable({ orgId: v.id('orgs'), stage: v.union(v.literal('payments'), v.literal('deposits'), v.literal('outgoing'), v.literal('done')),
+  reportIndexStates: defineTable({ orgId: v.id('orgs'), stage: v.union(v.literal('payments'), v.literal('deposits'), v.literal('outgoing'), v.literal('fees'), v.literal('done')),
     cursor: v.optional(v.string()), pending: v.number(), revision: v.number(), firstAt: v.optional(v.number()), completeAt: v.optional(v.number()), updatedAt: v.number(),
   }).index('by_org', ['orgId']),
-  reportIndexJobs: defineTable({ orgId: v.id('orgs'), sourceKey: v.string(), sourceId: v.union(v.id('disbursements'), v.id('deposits'), v.id('outgoingTransfers')),
-    kind: v.union(v.literal('payment'), v.literal('deposit'), v.literal('outgoing')), nextAt: v.number(), attempts: v.number(), error: v.optional(v.string()), hasError: v.boolean(),
+  reportIndexJobs: defineTable({ orgId: v.id('orgs'), sourceKey: v.string(), sourceId: v.union(v.id('disbursements'), v.id('deposits'), v.id('outgoingTransfers'), v.id('circleExecutions')),
+    kind: v.union(v.literal('payment'), v.literal('deposit'), v.literal('outgoing'), v.literal('fee')), nextAt: v.number(), attempts: v.number(), error: v.optional(v.string()), hasError: v.boolean(),
   }).index('by_source', ['sourceKey']).index('by_due', ['nextAt']).index('by_org_error', ['orgId', 'hasError']),
   reportMaintenance: defineTable({ key: v.string(), cursor: v.optional(v.string()) }).index('by_key', ['key']),
   ownerProposals: defineTable({ disbursementId: v.id("disbursements"), proposal: ownerProposalValidator, createdAt: v.number() }).index("by_payment", ["disbursementId"]),
@@ -411,6 +436,7 @@ export default defineSchema({
     preparedProposalAt: v.optional(v.number()),
     approvalMethod: v.optional(v.literal('workspace')),
     nativeExecution: v.optional(v.object({
+      service: v.optional(v.literal('circle')),
       attemptId: v.optional(v.string()),
       actorUserId: v.optional(v.id('users')),
       walletRejectedAt: v.optional(v.number()),
@@ -562,6 +588,7 @@ export default defineSchema({
 
   billingCheckouts: defineTable({
     orgId: v.id('orgs'), createdBy: v.id('users'), requestId: v.string(),
+    safeId: v.optional(v.id('safes')), circleExecutionId: v.optional(v.id('circleExecutions')),
     plan: v.union(v.literal('starter'), v.literal('team'), v.literal('pro')),
     chainId: v.number(), payer: v.string(), treasury: v.string(), tokenAddress: v.string(), amountRaw: v.string(),
     status: v.union(v.literal('prepared'), v.literal('requested'), v.literal('submitted'), v.literal('applied'), v.literal('declined'), v.literal('reverted'), v.literal('cancelled')),
@@ -573,6 +600,7 @@ export default defineSchema({
   // Verified subscription payments (server-verified on-chain before plan activation)
   billingPayments: defineTable({
     checkoutId: v.optional(v.id('billingCheckouts')),
+    transferId: v.optional(v.string()),
     orgId: v.id("orgs"),
     txHash: v.string(),
     chainId: v.number(),
@@ -584,6 +612,8 @@ export default defineSchema({
     redeemedAt: v.optional(v.number()),
   })
     .index("by_org", ["orgId"])
+    .index("by_checkout", ["checkoutId"])
+    .index("by_transfer", ["chainId", "transferId"])
     .index("by_tx", ["txHash"]),
 
   // Billing records

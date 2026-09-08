@@ -1,3 +1,6 @@
+import type { ObjectType } from 'convex/values';
+import type { MutationCtx } from './_generated/server';
+import { assertCircleReservation } from './lib/circleSource';
 import { accountChangeProgress } from './lib/accountChangeLifecycle';
 import { ORG_READER_ROLES } from '../shared/roles';
 import { v } from "convex/values";
@@ -81,7 +84,7 @@ function canCancel(
       "Check the original submission before requesting a cancellation",
     );
 }
-async function assertCurrent(ctx: QueryCtx, c: Doc<"accountCancellations">) {
+export async function assertCurrent(ctx: QueryCtx, c: Doc<"accountCancellations">) {
   const original = await ctx.db.get(c.originalProposalId);
   if (!original) throw new Error("Original signed evidence is missing");
   const { target } = await readOriginal(ctx, original);
@@ -145,6 +148,7 @@ export const get = query({
             execution: record.execution
               ? {
                   attemptId: record.execution.attemptId,
+                  service: record.execution.service,
                   phase: record.execution.phase,
                   walletRejectedAt: record.execution.walletRejectedAt,
                   txHash: record.execution.txHash,
@@ -404,15 +408,15 @@ export const sign = internalMutation({
     });
   },
 });
-export const reserve = internalMutation({
-  args: {
+const reserveArgs = {
     ...cancellationIdentity,
     safeTxHash: v.string(),
     to: v.string(),
     data: v.string(),
     attemptId: v.string(),
-  },
-  handler: async (ctx, args) => {
+    circleExecutionId: v.optional(v.id('circleExecutions')),
+  };
+export async function reserveCancellationExecution(ctx: MutationCtx, args: ObjectType<typeof reserveArgs>) {
     const c = await ctx.db.get(args.cancellationId);
     if (
       !c ||
@@ -428,6 +432,7 @@ export const reserve = internalMutation({
       throw new Error(
         "Check the original cancellation submission before trying again",
       );
+    await assertCircleReservation(ctx, c.safeId, args.circleExecutionId);
     const { user } = await requireOrgAccess(ctx, c.orgId, args.sessionToken, [
       "admin",
       "approver",
@@ -449,6 +454,7 @@ export const reserve = internalMutation({
       status: "processing",
       checks: 0,
       execution: {
+        ...(args.circleExecutionId ? { service: 'circle' as const } : {}),
         attemptId: args.attemptId,
         actorUserId: user._id,
         startedAt: Date.now(),
@@ -481,8 +487,8 @@ export const reserve = internalMutation({
         { cancellationId: c._id },
       );
     return args.attemptId;
-  },
-});
+}
+export const reserve = internalMutation({ args: reserveArgs, handler: reserveCancellationExecution });
 export const walletResult = mutation({
   args: {
     ...cancellationIdentity,

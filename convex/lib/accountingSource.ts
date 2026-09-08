@@ -5,6 +5,7 @@ import type { Id } from '../_generated/dataModel';
 import { identifyAsset } from '../../shared/assets';
 import { accountingFact, accountingSource } from './accountingValidators';
 import { depositReportRows, outgoingReportRows, paymentReportRows, type ReportRow } from './reportRows';
+import { circleFeeReportRows } from './circleFeeReports';
 
 export type AccountingFact = Infer<typeof accountingFact>;
 export type AccountingSource = Infer<typeof accountingSource>;
@@ -22,7 +23,7 @@ function finish(fact: Omit<AccountingFact, 'key' | 'fingerprint'>): AccountingFa
   if (![fact.accountAddress, fact.counterpartyAddress].every(address => /^0x[\da-fA-F]{40}$/.test(address))
     || !/^\d{1,30}$/.test(fact.blockNumber) || !Number.isSafeInteger(fact.settledAt) || fact.settledAt <= 0)
     throw new Error('The settled account, counterparty or date evidence is incomplete');
-  if (!/^(e[\da-fA-F]{64}\d+|i[\da-fA-F]{64}\d*(,\d+)*)$/.test(fact.transferId))
+  if (!/^(e[\da-fA-F]{64}\d+|i[\da-fA-F]{64}\d*(,\d+)*|c[\da-fA-F]{64}:\d+:(\d+|none))$/.test(fact.transferId))
     throw new Error('This movement needs its canonical chain-transfer identifier');
   const from = fact.direction === 'outflow' ? fact.accountAddress : fact.counterpartyAddress;
   const to = fact.direction === 'inflow' ? fact.accountAddress : fact.counterpartyAddress;
@@ -77,15 +78,17 @@ export async function loadAccountingFact(ctx: QueryCtx, orgId: Id<'orgs'>, sourc
   let rows: ReportRow[];
   if (indexed.kind === 'deposit') rows = await depositReportRows(ctx, indexed.sourceId as Id<'deposits'>);
   else if (indexed.kind === 'account_transfer') rows = await outgoingReportRows(ctx, indexed.sourceId as Id<'outgoingTransfers'>);
+  else if (indexed.kind === 'fee' && ctx.db.normalizeId('circleExecutions', indexed.sourceId)) rows = await circleFeeReportRows(ctx, indexed.sourceId as Id<'circleExecutions'>);
   else rows = await paymentReportRows(ctx, indexed.sourceId as Id<'disbursements'>);
   const row = rows.find(row => row.rowId === indexed.rowId);
   if (!row || !row.includedInTotals || !row.chainId || row.environment === 'unclassified'
     || !row.tokenAddress || row.decimals === undefined || !row.transferId || !row.txHash || !row.blockNumber
     || row.dateSource === 'recorded' || !row.dateSource || row.transferMatch === 'pending')
     throw new Error('Refresh account history to match this movement to settled transfer evidence first');
-  // Safe's documented e+tx+log / i+tx+trace IDs identify each leg, including batches.
+  // Safe IDs identify individual transfers. Circle's c+tx:prefund:refund ID
+  // represents the verified net of two transfers, retained in its fee proof.
   const prefix = row.transferId.slice(0, 65).toLowerCase();
-  if (!['e', 'i'].includes(prefix[0]) || prefix.slice(1) !== row.txHash.slice(2).toLowerCase())
+  if (!['e', 'i', 'c'].includes(prefix[0]) || prefix.slice(1) !== row.txHash.slice(2).toLowerCase())
     throw new Error('This historical transfer needs its canonical chain-transfer identifier');
   const raw = row.amountRaw ?? parseUnits(row.amount, row.decimals).toString();
   if (!/^\d{1,100}$/.test(raw) || BigInt(raw) <= 0n) throw new Error('This movement has no positive settled quantity');

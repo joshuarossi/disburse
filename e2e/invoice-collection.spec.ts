@@ -20,10 +20,10 @@ for (const theme of ["light", "dark"]) {
       .click();
     const section = page.getByRole("region", { name: "Invoice collection" });
     await section.scrollIntoViewIfNeeded();
-    await expect(section).toContainText("You pay the collection network fee");
-    await expect(section).toContainText("including on a free plan");
+    await expect(section).toContainText("Your company account pays the execution service directly");
+    await expect(section).toContainText("full invoice balance moves into your company account");
     await expect(
-      section.getByRole("button", { name: "Collect with wallet", exact: true }),
+      section.getByRole("button", { name: "Review execution fee", exact: true }),
     ).toBeEnabled();
     await expect(section.getByRole("button")).toHaveCount(1);
     expect(
@@ -55,6 +55,6 @@ test("a viewer can inspect collection fees without sending a wallet transaction"
     .getByRole("button", { name: "INV-2026-1042", exact: true })
     .click();
   const section = page.getByRole("region", { name: "Invoice collection" });
-  await expect(section).toContainText("You pay the collection network fee");
-  await expect(section.getByRole("button")).toHaveCount(0);
+  await expect(section).toContainText("Your company account pays the execution service directly");
+  await expect(section.getByRole("button", { name: "Review execution fee" })).toBeDisabled();
 });
