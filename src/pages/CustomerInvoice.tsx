@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { useParams } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { Link, useParams } from "react-router-dom";
 import { useQuery } from "convex/react";
 import { QRCodeSVG } from "qrcode.react";
 import { api } from "../../convex/_generated/api";
@@ -13,19 +13,49 @@ export default function CustomerInvoice() {
     token ? { token } : "skip",
   );
   const [copied, setCopied] = useState("");
-  if (invoice === undefined)
+  const [slowToken, setSlowToken] = useState<string>();
+  useEffect(() => {
+    if (invoice !== undefined) return;
+    const timer = setTimeout(() => setSlowToken(token), 10_000);
+    return () => clearTimeout(timer);
+  }, [invoice, token]);
+  if (invoice === undefined || !invoice)
     return (
-      <main className="mx-auto max-w-2xl p-8">
-        <p role="status">Loading invoice…</p>
-      </main>
-    );
-  if (!invoice)
-    return (
-      <main className="mx-auto max-w-2xl p-8">
-        <h1 className="text-2xl font-semibold">Invoice not found</h1>
-        <p className="mt-4">
-          Check the payment link with the business that sent it.
-        </p>
+      <main className="customer-invoice mx-auto max-w-2xl space-y-6 px-5 py-10">
+        <Link to="/" className="text-sm font-semibold text-[var(--ws-accent)]">
+          Disburse
+        </Link>
+        <section className="workspace-panel space-y-4 p-6">
+          {invoice === undefined ? (
+            <>
+              <h1 className="text-2xl font-semibold">
+                {slowToken === token
+                  ? "Invoice taking longer to load"
+                  : "Loading invoice"}
+              </h1>
+              <p role="status" className="workspace-description">
+                {slowToken === token
+                  ? "Check your connection and try loading the invoice again."
+                  : "Getting the latest invoice and payment status…"}
+              </p>
+              {slowToken === token && (
+                <button
+                  className="workspace-button workspace-button-primary"
+                  onClick={() => window.location.reload()}
+                >
+                  Reload invoice
+                </button>
+              )}
+            </>
+          ) : (
+            <>
+              <h1 className="text-2xl font-semibold">Invoice not found</h1>
+              <p className="workspace-description">
+                Check the payment link with the business that sent it.
+              </p>
+            </>
+          )}
+        </section>
       </main>
     );
   const testnet = [11155111, 84532].includes(invoice.chainId);

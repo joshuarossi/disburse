@@ -68,7 +68,7 @@ export const reconcile = internalAction({
     try {
       const status = payment.txHash
         ? { transactionHash: payment.txHash, taskState: "Submitted" }
-        : await ctx.runAction(api.relay.getTaskStatus, {
+        : await ctx.runAction(internal.relay.getTaskStatus, {
             taskId: payment.relayTaskId!,
           });
       if (status.transactionHash) {
@@ -110,7 +110,7 @@ export const reconcile = internalAction({
         await ctx.runMutation(internal.disbursements.updateStatusInternal, {
           disbursementId: args.disbursementId,
           status: "failed",
-          relayStatus: status.taskState,
+          relayStatus: status.taskState ?? undefined,
           relayError: "The payment service did not complete this payment.",
         });
         return;

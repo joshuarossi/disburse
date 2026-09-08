@@ -33,3 +33,9 @@ Existing Safes still need a complete customer-paid module-installation flow. Del
 Biconomy's published MEE 2.2.3 route was tested with both canonical-USDC permits and an already funded Nexus account. Its execution endpoint rejected both with a token-slot-detection error. Old requests remain recoverable; that route is no longer offered for new onboarding. A direct Circle/Candide execution on the published Nexus account succeeded without the Biconomy service, and its validator accepted an exact bounded authorization while rejecting altered calldata in a read-only test. This is a candidate for the remaining execution work, not an integrated delegated-payment feature.
 
 Relay's permit/solver routes were also investigated. No verified quote-to-signature binding and complete Safe execution was established, so no Relay adapter is enabled. Conversion/bridging research remains separate from the working owner payment route.
+
+## Existing Safe accounts
+
+Open **Settings → Funding accounts → Execution fee setup**. Check support, prepare the setup and collect the current owners’ approvals. The completing member uses MetaMask on Base or Arbitrum and selects USDC in the wallet’s Network fee field. The fee comes from that member’s connected wallet for this one-time change; subsequent payments use the company account’s USDC. No provider account, app key or app-funded balance is part of this flow.
+
+The app verifies the released module/runtime and refuses an unknown custom signature handler. Pending requests, rejections and interrupted responses remain visible in the same panel. Check the original receipt before another paid attempt. Mainnet acceptance with the actual MetaMask service remains open; browser fixtures are not a live fee payment.

@@ -13,7 +13,7 @@ async function start(page: Page, scenario: string) {
   await page
     .getByRole("button", { name: "Review account setup", exact: true })
     .click();
-  return page.getByRole("region", { name: "Execution fees" });
+  return page.getByRole('dialog').getByRole("region", { name: "Execution fees", exact: true });
 }
 test("cancelled account creation shows a neutral message, preserves the name and fits a phone", async ({
   page,

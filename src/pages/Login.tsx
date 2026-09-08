@@ -156,7 +156,7 @@ export default function Login() {
           <div className="mb-8 flex justify-center">
             <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-accent-500 to-accent-400">
               <svg
-                className="h-6 w-6 text-navy-950"
+                className="h-6 w-6 text-[var(--ws-accent)]"
                 fill="none"
                 viewBox="0 0 24 24"
                 stroke="currentColor"

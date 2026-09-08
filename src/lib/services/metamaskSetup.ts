@@ -18,7 +18,7 @@ export function walletSetupNotAccepted(error: unknown): boolean {
 }
 
 export async function checkSetupWallet(
-  intent: WalletSetupIntent,
+  intent: Pick<WalletSetupIntent, 'chainId' | 'payer'>,
   supplied?: Eip1193Provider,
 ) {
   const provider = supplied ?? (await getConnectedProvider(intent.chainId));

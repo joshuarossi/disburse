@@ -5,7 +5,8 @@ import type { useSettingsController } from "./useSettingsController";
 import { useState } from "react";
 import type { Doc } from "../../../convex/_generated/dataModel";
 import { AccountNameEditor } from "@/features/treasury/AccountNameEditor";
-import { CompanyAccountSetup } from './CompanyAccountSetup';
+import { CompanyAccountSetup } from "./CompanyAccountSetup";
+import { AccountFeeSetup } from "./AccountFeeSetup";
 export function AccountSettings({
   controller,
 }: {
@@ -44,7 +45,8 @@ export function AccountSettings({
               {t("settings.safe.title")}
             </h2>
             <p className="text-xs sm:text-sm text-slate-400">
-              Separate your operations, payroll and reserves into named accounts.
+              Separate your operations, payroll and reserves into named
+              accounts.
             </p>
           </div>
         </div>
@@ -66,57 +68,64 @@ export function AccountSettings({
                   return (
                     <div
                       key={safe._id}
-                      className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 rounded-lg border border-white/10 bg-navy-800 p-4"
+                      className="rounded-lg border border-white/10 bg-navy-800 p-4"
                     >
-                      <div className="flex items-center gap-3">
-                        <span className="rounded-full bg-green-500/10 px-3 py-1 text-xs font-medium text-green-400">
-                          {getChainName(safe.chainId)}
-                        </span>
-                        <div className="text-xs text-slate-400">
-                          <p className="font-medium text-white">
-                            {safe.name ??
-                              `${getChainName(safe.chainId)} account`}
-                          </p>
-                          <p className="font-mono">
-                            {safe.safeAddress.slice(0, 6)}…
-                            {safe.safeAddress.slice(-4)}
-                          </p>
-                          {safe.threshold && (
-                            <p>
-                              {safe.threshold} of {safe.owners?.length}{" "}
-                              signatures when linked
+                      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                        <div className="flex items-center gap-3">
+                          <span className="rounded-full bg-green-500/10 px-3 py-1 text-xs font-medium text-green-400">
+                            {getChainName(safe.chainId)}
+                          </span>
+                          <div className="text-xs text-slate-400">
+                            <p className="font-medium text-white">
+                              {safe.name ??
+                                `${getChainName(safe.chainId)} account`}
                             </p>
-                          )}
+                            <p className="font-mono">
+                              {safe.safeAddress.slice(0, 6)}…
+                              {safe.safeAddress.slice(-4)}
+                            </p>
+                            {safe.threshold && (
+                              <p>
+                                {safe.threshold} of {safe.owners?.length}{" "}
+                                signatures when linked
+                              </p>
+                            )}
+                          </div>
+                          <a
+                            href={getSafeAppUrl(safe.chainId, safe.safeAddress)}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex items-center gap-1 text-sm text-accent-400 hover:text-accent-300 transition-colors"
+                          >
+                            {t("settings.safe.openSafe")}
+                            <ArrowUpRight className="h-4 w-4" />
+                          </a>
                         </div>
-                        <a
-                          href={getSafeAppUrl(safe.chainId, safe.safeAddress)}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="flex items-center gap-1 text-sm text-accent-400 hover:text-accent-300 transition-colors"
-                        >
-                          {t("settings.safe.openSafe")}
-                          <ArrowUpRight className="h-4 w-4" />
-                        </a>
+                        {isAdmin && (
+                          <div className="flex flex-wrap gap-2">
+                            <Button
+                              variant="secondary"
+                              size="sm"
+                              onClick={() => setRenaming(safe)}
+                            >
+                              Rename
+                            </Button>
+                            <Button
+                              variant="secondary"
+                              size="sm"
+                              onClick={() => handleUnlinkSafe(safe._id)}
+                              className="w-full sm:w-auto"
+                            >
+                              {t("settings.safe.unlinkSafe")}
+                            </Button>
+                          </div>
+                        )}
                       </div>
-                      {isAdmin && (
-                        <div className="flex flex-wrap gap-2">
-                          <Button
-                            variant="secondary"
-                            size="sm"
-                            onClick={() => setRenaming(safe)}
-                          >
-                            Rename
-                          </Button>
-                          <Button
-                            variant="secondary"
-                            size="sm"
-                            onClick={() => handleUnlinkSafe(safe._id)}
-                            className="w-full sm:w-auto"
-                          >
-                            {t("settings.safe.unlinkSafe")}
-                          </Button>
-                        </div>
-                      )}
+                      <AccountFeeSetup
+                        account={safe}
+                        isAdmin={isAdmin}
+                        canApprove={controller.canApprove}
+                      />
                     </div>
                   );
                 })}
@@ -142,9 +151,14 @@ export function AccountSettings({
           <form onSubmit={handleLinkSafe} className="mt-6 space-y-6">
             <label className="block">
               <span className="finance-label">Account name</span>
-              <input className="finance-field" value={accountName}
-                onChange={e => setAccountName(e.target.value)}
-                placeholder="e.g. Operations or Payroll" maxLength={80} required />
+              <input
+                className="finance-field"
+                value={accountName}
+                onChange={(e) => setAccountName(e.target.value)}
+                placeholder="e.g. Operations or Payroll"
+                maxLength={80}
+                required
+              />
             </label>
             <div>
               <label

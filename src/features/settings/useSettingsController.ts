@@ -283,6 +283,7 @@ export function useSettingsController() {
     billing,
     isAdmin,
     screeningEnforcement,
+    canApprove: isAdmin || currentUserRole === 'approver',
     savingEnforcement,
     handleSaveOrgName,
     handleSaveRelaySettings,

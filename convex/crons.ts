@@ -13,6 +13,7 @@ crons.interval('Recover native wallet payments', { minutes: 1 }, internal.native
 crons.interval('Recover customer-paid USDC execution', { minutes: 1 }, internal.circlePayments.recover, {});
 crons.interval('Connect completed company accounts', { minutes: 1 }, internal.accountSetups.recover, {});
 crons.interval('Recover MetaMask company setup', { minutes: 1 }, internal.walletSetups.recover, {});
+crons.interval('Recover account fee setup', { minutes: 1 }, internal.accountFeeSetups.recover, {});
 crons.interval('Recover account policy changes', { minutes: 1 }, internal.spendingPolicyData.recover, {});
 crons.interval('Continue deposit history synchronization', { minutes: 1 }, internal.depositsData.recover, {});
 crons.interval('Track incoming invoice payments', { minutes: 1 }, internal.receivables.monitor, {});

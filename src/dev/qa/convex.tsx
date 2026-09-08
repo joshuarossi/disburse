@@ -22,6 +22,7 @@ import { accountingFixture } from './accounting';
 import { licenseQueryFixture, licenseBillingFixture, licenseMutationFixture } from './licenses';
 import { billingAccess } from '../../../shared/billing';
 import { createCircleFixture, readCircleFixture, saveCircleFixture } from './circle';
+import { accountFeeSetupFixture, readAccountFeeSetup } from './accountFeeSetup';
 const cache = new Map<string, any>();
 let fixtureRevision = 0;
 const fixtureListeners = new Set<() => void>();
@@ -37,6 +38,7 @@ export function readQueryFixture(reference: any, args: any) {
   if (cache.has(key)) return cache.get(key);
   let value: any;
   switch (name) {
+    case 'accountFeeSetups:current': value = readAccountFeeSetup(); if (value && value.safeId !== args.safeId) value = null; break;
     case 'walletSetups:current':
     case 'walletSetups:get': value = JSON.parse(sessionStorage.getItem('qa:walletSetup') ?? 'null'); if (name === 'walletSetups:current' && value?.stage === 'cancelled') value = null; break;
     case 'accountSetups:current':
@@ -70,6 +72,7 @@ export function readQueryFixture(reference: any, args: any) {
     case "receivables:receipts":
       value = []; break;
     case "receivables:publicInvoice": {
+      if (scenario === 'ar-public-offline') { value = undefined; break; }
       const row = customerInvoices.find(i => i.publicToken === args.token);
       const i = row ? { ...row, ...(scenario === 'ar-paid' ? { received: '1500000000', forwarded: '1500000000' } : {}), ...(scenario === 'ar-void' ? { state: 'void' } : {}) } : null;
       value = i ? { ...i, issuer: org.name, status: receivableStatus(i), amounts: receivableAmounts(i), voided: i.state === 'void', syncDelayed: false } : null;
@@ -353,6 +356,10 @@ const disabled = async () => {
   );
 };
 export function useMutation(reference?: any) {
+  if (getFunctionName(reference).startsWith('accountFeeSetups:')) return async (args: any) => {
+    try { return await accountFeeSetupFixture(getFunctionName(reference), args); }
+    finally { cache.clear(); fixtureRevision++; fixtureListeners.forEach(listener => listener()); }
+  };
   if (getFunctionName(reference).startsWith('walletSetups:') && sessionStorage.getItem('qa:scenario')?.startsWith('customer-setup-')) return async (args: any) => {
     const name = getFunctionName(reference), saved = JSON.parse(sessionStorage.getItem('qa:walletSetup') ?? 'null'), scenario = sessionStorage.getItem('qa:scenario') ?? '';
     if (name === 'walletSetups:begin') {
@@ -411,6 +418,10 @@ export function useConvex() {
   } };
 }
 export function useAction(reference: any) {
+  if (getFunctionName(reference).startsWith('accountFeeSetups:')) return async (args: any) => {
+    try { return await accountFeeSetupFixture(getFunctionName(reference), args); }
+    finally { cache.clear(); fixtureRevision++; fixtureListeners.forEach(listener => listener()); }
+  };
   if (getFunctionName(reference).startsWith('walletSetups:') && sessionStorage.getItem('qa:scenario')?.startsWith('customer-setup-')) return async (args: any) => {
     const name = getFunctionName(reference), scenario = sessionStorage.getItem('qa:scenario') ?? '';
     if (name === 'walletSetups:validate') {

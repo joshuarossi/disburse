@@ -13,6 +13,14 @@ import { licenseTierValidator, licenseGrantValidator } from './lib/licenseValida
 import { circleFeeProofValidator } from './lib/circleFeeProof';
 
 export default defineSchema({
+  accountFeeSetups: defineTable({ orgId: v.id('orgs'), safeId: v.id('safes'), accountKey: v.string(), chainId: v.number(), safeAddress: v.string(),
+    createdBy: v.id('users'), requestId: v.string(), handler: v.string(), enabled: v.boolean(), proposal: ownerProposalValidator,
+    signatures: v.array(v.object({ path: v.array(v.string()), owner: v.string(), signature: v.string(), digest: v.string() })),
+    stage: v.union(v.literal('approval'), v.literal('requested'), v.literal('complete'), v.literal('cancelled'), v.literal('failed')),
+    open: v.boolean(), attempt: v.number(), batchId: v.string(), claimId: v.optional(v.string()), payer: v.optional(v.string()), callData: v.optional(v.string()),
+    startBlock: v.string(), scanFrom: v.optional(v.string()), scanHash: v.optional(v.string()), recoveryAt: v.optional(v.number()),
+    txHash: v.optional(v.string()), failedHashes: v.array(v.string()), error: v.optional(v.string()), createdAt: v.number(), updatedAt: v.number(),
+  }).index('by_safe', ['safeId']).index('by_account_open', ['accountKey', 'open']).index('by_request', ['orgId', 'requestId']).index('by_due', ['recoveryAt']),
   walletSetups: defineTable({ orgId: v.id('orgs'), userId: v.id('users'), chainId: v.number(), payer: v.string(), owners: v.array(v.string()), threshold: v.number(), salt: v.string(), address: v.string(), deposit: v.string(),
     requestId: v.string(), attempt: v.number(), batchId: v.string(), claimId: v.optional(v.string()), stage: v.union(v.literal('prepared'), v.literal('requested'), v.literal('complete'), v.literal('cancelled')),
     open: v.boolean(), startBlock: v.string(), scanFrom: v.optional(v.string()), scanHash: v.optional(v.string()), recoveryAt: v.optional(v.number()), safeId: v.optional(v.id('safes')), txHash: v.optional(v.string()), createdAt: v.number(), updatedAt: v.number(),
@@ -117,7 +125,7 @@ export default defineSchema({
     execution: v.optional(policyExecutionValidator), recoveryAt: v.optional(v.number()), error: v.optional(v.string()),
     txHash: v.optional(v.string()), appliedAt: v.optional(v.number()), createdAt: v.number(), updatedAt: v.number(),
   }).index('by_safe_status', ['safeId', 'status']).index('by_org', ['orgId']).index('by_request', ['orgId', 'requestId']).index('by_recovery', ['recoveryAt']),
-  accountProposals: defineTable({ disbursementId: v.optional(v.id('disbursements')), policyChangeId: v.optional(v.id('spendingPolicyChanges')), cancellationId: v.optional(v.id('accountCancellations')), accountKey: v.string(), nonce: v.number(), proposal: ownerProposalValidator, createdAt: v.number() }).index('by_payment', ['disbursementId']).index('by_account_nonce', ['accountKey', 'nonce']).index('by_policy', ['policyChangeId']).index('by_cancellation', ['cancellationId']),
+  accountProposals: defineTable({ accountFeeSetupId: v.optional(v.id('accountFeeSetups')), disbursementId: v.optional(v.id('disbursements')), policyChangeId: v.optional(v.id('spendingPolicyChanges')), cancellationId: v.optional(v.id('accountCancellations')), accountKey: v.string(), nonce: v.number(), proposal: ownerProposalValidator, createdAt: v.number() }).index('by_fee_setup', ['accountFeeSetupId']).index('by_payment', ['disbursementId']).index('by_account_nonce', ['accountKey', 'nonce']).index('by_policy', ['policyChangeId']).index('by_cancellation', ['cancellationId']),
   accountSignatures: defineTable({ disbursementId: v.optional(v.id('disbursements')), policyChangeId: v.optional(v.id('spendingPolicyChanges')), cancellationId: v.optional(v.id('accountCancellations')), pathKey: v.string(), path: v.array(v.string()), owner: v.string(), signature: v.string(), digest: v.string(), actorUserId: v.id('users'), createdAt: v.number() }).index('by_payment', ['disbursementId']).index('by_payment_signer', ['disbursementId', 'pathKey', 'owner']).index('by_policy', ['policyChangeId']).index('by_policy_signer', ['policyChangeId', 'pathKey', 'owner']).index('by_cancellation', ['cancellationId']).index('by_cancellation_signer', ['cancellationId', 'pathKey', 'owner']),
   receivables: defineTable({
     orgId: v.id("orgs"), safeId: v.id("safes"), createdBy: v.id("users"),

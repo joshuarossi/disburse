@@ -6,7 +6,6 @@ import {
   keccak256,
   concatHex,
   encodeAbiParameters,
-  parseAbi,
   toHex,
   type Address,
   type Hex,
@@ -16,12 +15,17 @@ import {
   companyFactoryAbi,
 } from "./companyAccountSetup";
 import { circleConfiguration } from "./circleExecution";
+import {
+  customerWalletBatch,
+  customerWalletExecutionData,
+  USDC_WALLET_CHAINS,
+} from "./walletCalls";
 
 // MetaMask's own gas-included service supports these mainnets. Its documented
 // list excludes testnets. Restrict new company accounts to networks where their
 // subsequent Safe transactions can use the integrated USDC paymaster too.
 // https://support.metamask.io/manage-crypto/transactions/metamask-gas-station/
-export const WALLET_SETUP_CHAINS = [8453, 42161] as const;
+export const WALLET_SETUP_CHAINS = USDC_WALLET_CHAINS;
 export type WalletSetupIntent = {
   chainId: number;
   payer: Address;
@@ -90,45 +94,20 @@ export function walletSetupBatch(intent: WalletSetupIntent, batchId: Hex) {
       }),
       value: "0x0",
     });
-  return {
-    version: "2.0.0",
-    id: batchId,
-    from: intent.payer,
-    chainId: toHex(intent.chainId),
-    atomicRequired: true,
-    calls,
-  };
+  return customerWalletBatch(
+    { chainId: intent.chainId, payer: intent.payer, calls },
+    batchId,
+  );
 }
 
 /** MetaMask's published ERC-7821 encoding. A failed transaction only releases
  * this setup if the payer signed these exact calls on the correct network. */
 export function walletSetupExecutionData(intent: WalletSetupIntent) {
   const batch = walletSetupBatch(intent, `0x${"00".repeat(32)}`);
-  return encodeFunctionData({
-    abi: parseAbi(["function execute(bytes32 mode,bytes executionData)"]),
-    functionName: "execute",
-    args: [
-      `0x01${"00".repeat(31)}`,
-      encodeAbiParameters(
-        [
-          {
-            type: "tuple[]",
-            components: [
-              { name: "to", type: "address" },
-              { name: "value", type: "uint256" },
-              { name: "data", type: "bytes" },
-            ],
-          },
-        ],
-        [
-          batch.calls.map((call) => ({
-            to: call.to,
-            value: 0n,
-            data: call.data,
-          })),
-        ],
-      ),
-    ],
+  return customerWalletExecutionData({
+    chainId: intent.chainId,
+    payer: intent.payer,
+    calls: batch.calls,
   });
 }
 

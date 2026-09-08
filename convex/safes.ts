@@ -219,6 +219,9 @@ export const unlink = mutation({
     );
 
     await assertCircleReservation(ctx, safe._id);
+    const feeSetup = await ctx.db.query('accountFeeSetups').withIndex('by_account_open', q =>
+      q.eq('accountKey', `${safe.chainId}:${safe.safeAddress.toLowerCase()}`).eq('open', true)).first();
+    if (feeSetup) throw new Error('Complete or reconcile this account’s fee setup before disconnecting it.');
     const payments = await ctx.db
       .query("disbursements")
       .withIndex("by_safe", (q) => q.eq("safeId", safe._id))

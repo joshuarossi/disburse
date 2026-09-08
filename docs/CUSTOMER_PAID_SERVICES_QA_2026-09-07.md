@@ -1,6 +1,6 @@
 # Customer-paid services: implementation and QA
 
-Updated September 7, 2026. Owner payment execution, account changes, additional accounts, invoice receiving/collection and subscription checkout now have integrated customer-paid USDC execution. The complete v2 requirement is still open for original MetaMask live acceptance, existing-account migration, delegated execution and unattended schedules. No Disburse-funded provider account was created or funded.
+Updated September 7, 2026. Owner payment execution, account changes, additional accounts, invoice receiving/collection and subscription checkout now have integrated customer-paid USDC execution. The complete v2 requirement is still open for MetaMask mainnet acceptance, delegated execution and unattended schedules. No Disburse-funded provider account was created or funded.
 
 ## Actual application receipts
 
@@ -42,6 +42,16 @@ The browser saves a claim before asking the backend to begin, saves its wallet p
 
 The prior Biconomy MEE route rejected canonical Base Sepolia USDC during token-slot detection, including an already funded-account attempt. Expired original requests were checked without finding matching fee/work operations. That provider route is retained only for existing setup recovery; no newer experimental version was substituted.
 
+## Existing-account fee setup
+
+Funding accounts now includes an Execution fee setup panel. An administrator prepares the exact module/handler change, and the current direct or nested owner quorum approves it. A member then completes the atomic request in MetaMask, choosing USDC and paying the one-time fee from their own wallet. Subsequent payments use the company Safe’s USDC. Disburse has no setup provider account or bill.
+
+The setup only enables the pinned, published Safe4337 module and installs its matching signature handler. It accepts the standard Safe handler or an empty handler and refuses an unknown custom handler. It preserves owners and thresholds, reserves the shared Safe nonce, checks exact signatures and simulates the complete execution before claiming a wallet request. Unsigned setup can be discarded only when it cannot leave a gap below another queued transaction.
+
+The saved batch survives rejection, lost database acknowledgments, unknown wallet responses and reload. Receipt recovery checks canonical Safe execution events and the fee configuration at that block. An unrelated failed transaction or an earlier failed receipt cannot release a newer attempt. Bounded background scans detect reorged checkpoints and close a setup replaced by another confirmed Safe transaction. Disconnecting the account cannot remove an unresolved request.
+
+Sixteen backend lifecycle stories, four contract-configuration checks, four shared wallet-call checks and nine browser stories cover this path. Mobile dark rejection and desktop light completion were visually inspected with no overflow or accessibility violations. This is code/browser acceptance, not a claim that a mainnet MetaMask fee transaction was sent.
+
 ## Remaining execution research
 
 A published Nexus account executed through Circle and Candide directly, without the failing Biconomy execution API. It deployed and returned 0.01 USDC to the company Safe, paying 0.009981 USDC. [Direct Nexus execution](https://sepolia.basescan.org/tx/0x827c7470dd84164849f9a6f36ed4a8161b210385df971ad1d2e3d7ff419a808a).
@@ -55,6 +65,7 @@ This is protocol evidence only. No member fee account, funding policy, delegated
 | Area | Checked behavior |
 | --- | --- |
 | Wallet confirmation | Neutral cancellation; original form/approvals survive; nested RPC/SDK diagnostics do not spill into the page. Unknown errors do not count as rejection. |
+| Existing-account setup | Direct/nested quorum, unknown handler, stale nonce, rejected simulation, duplicate claims, declined prompts, lost acknowledgments, failed receipt replay, external nonce consumption and browser-closed recovery. |
 | Original setup | Wrong wallet/network, unsupported batching, insufficient USDC, changed owner hierarchy, database interruption, local-storage failure, unknown submission, malformed wallet status, lost completion response and reorg recovery. |
 | Owner execution | Fee/operation signatures use current direct/nested quorum, expired/stale intent cannot send, unknown submission retains its original hash, failed operation and actual fees remain visible. |
 | Receiving | First deployment, existing factory reuse, full-principal collection, late funds on voided invoices, expired/changed requests and unavailable RPC. |
@@ -64,7 +75,7 @@ This is protocol evidence only. No member fee account, funding policy, delegated
 | Accounting | Exact fee/prefund/refund identity; late evidence cannot double-book an expense. |
 | Invitations | Private links and manual copy work without a paid delivery service. A shared link does not verify the recipient's email inbox. |
 
-The full code check passed 981 tests across 97 files, frontend/Convex typecheck and lint. The final full browser pass completed 317 checks. The production build passes with existing deferred wallet/SDK chunk warnings. Mobile dark onboarding cancellation was visually inspected at 390px; it has a neutral notice, retained deposit and no horizontal overflow. Company-account creation was also inspected on mobile. Earlier light/dark payment, invitation and recovery inspections remain in the QA artifacts.
+The full code check passed 1013 tests across 102 files, frontend/Convex typecheck and lint. The complete browser suite passed all 327 stories. The production build passes with existing deferred wallet/SDK chunk warnings. Mobile dark onboarding cancellation was visually inspected at 390px; it has a neutral notice, retained deposit and no horizontal overflow. Company-account creation was also inspected on mobile. Blocked browser storage no longer breaks theme initialization. Public invoice connection stalls show a reload action instead of an endless spinner; unavailable invoices never expose payment instructions. The light-theme sign-in icon is now legible. Legacy Gelato task lookup is internal, bounded and treated only as an untrusted receipt hint. Earlier light/dark payment, invitation and recovery inspections remain in the QA artifacts.
 
 Browser fixtures establish controlled UI behavior. Real receipts establish only the exact chain stories recorded here. Neither proves every possible provider failure, all wallet extensions, mainnet onboarding, unattended payroll or external-ledger acceptance.
 
@@ -97,7 +108,7 @@ The runner saves the original signed operation before its one submission request
 ## Work still required
 
 1. Live original MetaMask setup with USDC and zero native tokens on a documented supported mainnet. No mainnet transaction has been signed or paid in this pass.
-2. Existing-account module installation, delegated stablecoin-fee execution and unattended schedules, preserving exact authority and recovery.
+2. Delegated stablecoin-fee execution and unattended schedules, preserving exact authority and recovery. Existing-account module installation is implemented; its real MetaMask mainnet acceptance remains with item 1.
 3. A full multi-approver finance cycle, actual external-ledger import and accountant-led close.
 4. Production capacity, restore/incident acceptance and independent contract review.
 5. Broader optional yield/conversion integrations and remaining receivable follow-ons listed in [TODOS.md](../TODOS.md).
