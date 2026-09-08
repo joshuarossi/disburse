@@ -35,16 +35,16 @@ export function Header() {
                 />
               </svg>
             </div>
-            <span className="hidden text-xl font-bold tracking-tight sm:inline" style={{ color: 'var(--color-text-primary)' }}>
+            <span className="hidden text-xl font-bold tracking-tight md:inline" style={{ color: 'var(--color-text-primary)' }}>
               Disburse
             </span>
           </Link>
 
           {/* Navigation */}
-          <div className="flex items-center gap-1.5 sm:gap-3">
+          <div className="flex items-center gap-1.5 md:gap-3">
             <ThemeSwitcher variant="ghost" size="sm" compactOnSmallScreens />
             <LanguageSwitcher variant="ghost" size="sm" compactOnSmallScreens />
-            <Link to="/login" className={cn(buttonVariants({ size: 'sm', variant: 'ghost' }), 'hidden sm:inline-flex')}>
+            <Link to="/login" className={cn(buttonVariants({ size: 'sm', variant: 'ghost' }), 'hidden md:inline-flex')}>
                 {t('landing.header.login')}
               </Link>
             <Link to="/login" className={buttonVariants({ size: 'sm' })}>{t('landing.header.tryForFree')}</Link>

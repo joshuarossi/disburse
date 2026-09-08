@@ -16,7 +16,7 @@ async function expectControlsInViewport(header: Locator, width: number) {
   }
 }
 
-for (const width of [320, 390]) {
+for (const width of [320, 390, 640, 768]) {
   for (const language of ['en', 'es', 'pt-BR'] as const) {
     for (const theme of ['light', 'dark'] as const) {
       test(`public header fits and works at ${width}px in ${language}/${theme}`, async ({ page }) => {

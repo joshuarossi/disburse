@@ -31,14 +31,14 @@ export function ThemeSwitcher({ variant = 'ghost', size = 'sm', compactOnSmallSc
         size={size}
         onClick={() => setIsOpen(!isOpen)}
         aria-expanded={isOpen}
-        className={cn('gap-2 w-full justify-start', compactOnSmallScreens && 'h-10 w-10 justify-center px-0 sm:h-9 sm:w-auto sm:justify-start sm:px-3')}
+        className={cn('gap-2 w-full justify-start', compactOnSmallScreens && 'h-10 w-10 justify-center px-0 md:h-9 md:w-auto md:justify-start md:px-3')}
       >
         {theme === 'light' ? (
           <Sun className="h-4 w-4" />
         ) : (
           <Moon className="h-4 w-4" />
         )}
-        <span className={compactOnSmallScreens ? 'sr-only sm:not-sr-only' : undefined}>{currentTheme.label}</span>
+        <span className={compactOnSmallScreens ? 'sr-only md:not-sr-only' : undefined}>{currentTheme.label}</span>
       </Button>
 
       {isOpen && (
@@ -48,7 +48,7 @@ export function ThemeSwitcher({ variant = 'ghost', size = 'sm', compactOnSmallSc
             onClick={() => setIsOpen(false)}
           />
           <div 
-            className={cn('absolute right-0 top-full mt-2 z-[60] w-48 rounded-lg border shadow-xl overflow-hidden', compactOnSmallScreens && 'fixed inset-x-4 top-16 w-auto sm:absolute sm:left-auto sm:right-0 sm:top-full sm:w-48')}
+            className={cn('absolute right-0 top-full mt-2 z-[60] w-48 rounded-lg border shadow-xl overflow-hidden', compactOnSmallScreens && 'fixed inset-x-4 top-16 w-auto md:absolute md:left-auto md:right-0 md:top-full md:w-48')}
             style={{
               borderColor: 'var(--color-border)',
               backgroundColor: 'var(--color-bg-secondary)',
