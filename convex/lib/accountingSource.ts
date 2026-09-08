@@ -32,7 +32,7 @@ function finish(fact: Omit<AccountingFact, 'key' | 'fingerprint'>): AccountingFa
   return { ...fact, key, fingerprint: [key, fact.tokenAddress.toLowerCase(), fact.amountRaw, from.toLowerCase(), to.toLowerCase(),
     fact.blockNumber, fact.blockHash ?? '', fact.settledAt, fact.companyTransfer, fact.invoiceAppliedRaw ?? '', fact.invoiceExcessRaw ?? '',
     ...(fact.treasuryTransferId ? [fact.treasuryTransferId, fact.deliveryFeeRaw ?? ''] : []),
-    ...(fact.treasuryServiceId ? [fact.treasuryServiceId, fact.lendingMovement ?? ''] : [])].join('|') };
+    ...(fact.treasuryServiceId ? [fact.treasuryServiceId, fact.lendingMovement ?? '', fact.conversionMovement ?? ''] : [])].join('|') };
 }
 
 /** Read the underlying records again, not just an asynchronously built report.
@@ -113,7 +113,8 @@ export async function loadAccountingFact(ctx: QueryCtx, orgId: Id<'orgs'>, sourc
     accountName: account.name ?? 'Company account', counterpartyAddress: row.beneficiaryWallet.toLowerCase(),
     direction: row.direction, companyTransfer: !!companyAccountName, companyAccountName,
     treasuryTransferId: transfer?._id, deliveryFeeRaw: transfer && row.direction === 'inflow' ? transfer.deliveryFee : undefined,
-    treasuryServiceId: row.treasuryServiceId, lendingMovement: row.serviceKind,
+    treasuryServiceId: row.treasuryServiceId, lendingMovement: row.serviceKind === "conversion" ? undefined : row.serviceKind,
+    conversionMovement: row.serviceKind === "conversion" ? row.direction : undefined,
     references: bills.filter(bill => bill.orgId === orgId && bill.beneficiaryId === row.beneficiaryId).map(bill => ({ kind: 'bill', id: bill._id, number: bill.invoiceNumber })),
   });
 }

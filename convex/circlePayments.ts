@@ -3,7 +3,7 @@ import { settleDelegatedCircle } from "./lib/circleDelegation";
 import { assertDelegatedCircleReceipt } from "../shared/delegatedSettlement";
 import { v } from "convex/values";
 import { assertCctpBurn, decodeCctpQuote } from "../shared/cctp";
-import { assertLendingSettlement, decodeLendingQuote } from "../shared/lending";
+import { assertTreasuryServiceSettlement, decodeTreasuryServiceQuote } from "../shared/treasuryService";
 import {
   action,
   internalAction,
@@ -901,6 +901,7 @@ export const reconcile = internalAction({
         });
       return;
     }
+    let receiptFound = false;
     try {
       const request = decodeCircleRequest(execution.record),
         client = getChainClient(request.chainId);
@@ -975,6 +976,7 @@ export const reconcile = internalAction({
             hash: logs[0].transactionHash,
           }));
         if (receipt.blockNumber > confirmed) return;
+        receiptFound = true;
         const settlement = await readSettlementBlock(
           client,
           request.chainId,
@@ -990,13 +992,15 @@ export const reconcile = internalAction({
         let treasuryDebitIndex: number | undefined;
         let serviceTransferIndex: number | undefined;
         let serviceAmount: string | undefined;
+        let serviceOutputIndex: number | undefined;
         if (execution.treasuryServiceId && result.status === "confirmed") {
           const service = await ctx.runQuery(internal.treasuryServices.internalGet, {treasuryServiceId: execution.treasuryServiceId});
           if (!service || service.circleExecutionId !== execution._id || service.hash !== request.originalHash)
             throw new Error("The original treasury request changed.");
-          const proof = assertLendingSettlement(decodeLendingQuote(service.quote), receipt.logs, result);
+          const proof = assertTreasuryServiceSettlement(decodeTreasuryServiceQuote(service.quote), receipt.logs, result);
           serviceTransferIndex = proof.logIndex ?? undefined;
           serviceAmount = proof.amount;
+          serviceOutputIndex = proof.outputLogIndex ?? undefined;
         }
         if (execution.treasuryTransferId && result.status === "confirmed") {
           const data = await ctx.runQuery(internal.treasury.internalGet, { treasuryTransferId: execution.treasuryTransferId });
@@ -1053,6 +1057,7 @@ export const reconcile = internalAction({
           treasuryDebitIndex,
           serviceTransferIndex,
           serviceAmount,
+          serviceOutputIndex,
         });
         if (execution.stage === "submitting") {
           if (execution.disbursementId)
@@ -1111,8 +1116,9 @@ export const reconcile = internalAction({
         revision: execution.revision,
         scanFrom: execution.scanFrom,
         nextBlock: execution.scanFrom,
-        error:
-          "The network has not supplied confirmed execution evidence yet. Check this original request again shortly.",
+        error: receiptFound
+          ? "A transaction receipt was found, but its details still need verification. Your original request is saved; do not repeat this operation."
+          : "The network has not supplied confirmed execution evidence yet. Check this original request again shortly.",
       });
     }
   },
@@ -1121,6 +1127,7 @@ export const checkpoint = internalMutation({
   args: {
     serviceTransferIndex: v.optional(v.number()),
     serviceAmount: v.optional(v.string()),
+    serviceOutputIndex: v.optional(v.number()),
     treasuryDebitIndex: v.optional(v.number()),
     executionId: v.id("circleExecutions"),
     revision: v.number(),
@@ -1213,13 +1220,18 @@ export const checkpoint = internalMutation({
       const service = await ctx.db.get(execution.treasuryServiceId);
       if (!service || service.circleExecutionId !== execution._id || service.hash !== decodeCircleRequest(execution.record).originalHash)
         throw new Error("The original treasury fee request changed.");
-      const quote = decodeLendingQuote(service.quote);
-      if (args.state === "confirmed" && (!/^[1-9]\d{0,99}$/.test(args.serviceAmount ?? "") || !quote.withdrawAll && args.serviceAmount !== quote.amount))
-        throw new Error("The settled lending amount does not match the authorized request.");
+      const quote = decodeTreasuryServiceQuote(service.quote);
+      if (args.state === "confirmed") {
+        if (!/^[1-9]\d{0,99}$/.test(args.serviceAmount ?? "")) throw new Error("The treasury debit has not been verified.");
+        if (quote.provider === "aave_v3" ? !quote.withdrawAll && args.serviceAmount !== quote.amount
+          : BigInt(args.serviceAmount!) > BigInt(quote.maximumInput) || !Number.isSafeInteger(args.serviceOutputIndex) || args.serviceOutputIndex! < 0 || args.serviceOutputIndex === args.serviceTransferIndex)
+          throw new Error("The settled treasury amounts do not match the authorized request.");
+      }
       await ctx.db.patch(service._id, args.state === "confirmed" ? {
         open: false, status: "completed", sourceTxHash: args.txHash, sourceSettlement: args.settlement,
         sourceTransferId: `e${args.txHash!.slice(2)}${args.serviceTransferIndex}`, recoveryAt: undefined, error: undefined, updatedAt: Date.now(),
         settledAmount: args.serviceAmount,
+        outputTransferId: quote.provider === "uniswap_v3" ? `e${args.txHash!.slice(2)}${args.serviceOutputIndex}` : undefined,
       } : {open: false, status: args.state, recoveryAt: undefined, error: undefined, updatedAt: Date.now()});
       if (args.state === "confirmed") await queueReportSource(ctx, service.orgId, "service", service._id);
       await appendAudit(ctx, {orgId: service.orgId, actorUserId: execution.createdBy, action: `treasury_service.${args.state}`, objectType: "treasury_service", objectId: service._id, metadata: {executionId: execution._id, txHash: args.txHash, fee: args.fee}});

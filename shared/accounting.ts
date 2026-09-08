@@ -1,12 +1,13 @@
 export const BOOK_CURRENCIES = { USD: 2, EUR: 2, GBP: 2, CAD: 2, AUD: 2, JPY: 0 } as const;
 export type BookCurrency = keyof typeof BOOK_CURRENCIES;
-export type AccountingTreatment = 'existing_payable' | 'existing_receivable' | 'expense' | 'customer_advance' | 'internal_transfer' | 'investment_deposit' | 'investment_withdrawal' | 'fee' | 'already_recorded';
+export type AccountingTreatment = 'existing_payable' | 'existing_receivable' | 'expense' | 'customer_advance' | 'internal_transfer' | 'investment_deposit' | 'investment_withdrawal' | 'currency_conversion' | 'fee' | 'already_recorded';
 export const accountingTreatments: Record<AccountingTreatment, string> = {
   existing_payable: 'Settle a bill already in the books',
   existing_receivable: 'Collect an invoice already in the books',
   expense: 'Record an expense not yet in the books',
   customer_advance: 'Customer advance or unapplied receipt',
   internal_transfer: 'Transfer between company accounts',
+  currency_conversion: 'Exchange currencies through conversion clearing',
   investment_deposit: 'Move cash into a lending position',
   investment_withdrawal: 'Withdraw from a lending position',
   fee: 'Payment or provider fee',
@@ -42,6 +43,7 @@ export function buildSettlementJournal(input: {
   assetAccount: BookAccount; counterAccount: BookAccount; differenceAccount?: BookAccount; externalName?: string;
   companyTransfer: boolean;
   lendingMovement?: 'supply' | 'withdraw';
+  conversionMovement?: 'inflow' | 'outflow';
   receiptHasExcess?: boolean; advanceBookValue?: string; advanceAccount?: BookAccount;
   deliveryFeeRequired?: boolean; deliveryFeeBookValue?: string; deliveryFeeAccount?: BookAccount;
 }): JournalLine[] {
@@ -49,6 +51,8 @@ export function buildSettlementJournal(input: {
   if (assetAccount.kind !== 'asset') throw new Error('Choose an asset account for the settled currency holding');
   if (assetAccount.id === counterAccount.id) throw new Error('Choose different accounts for the two sides of the journal');
   if (input.companyTransfer && treatment !== 'internal_transfer') throw new Error('A transfer between company accounts must not be posted as income, an expense or a customer collection');
+  if (input.conversionMovement ? treatment !== 'currency_conversion' || direction !== input.conversionMovement : treatment === 'currency_conversion')
+    throw new Error('The accounting treatment must match a verified currency conversion');
   const investment = treatment === 'investment_deposit' || treatment === 'investment_withdrawal';
   if (input.lendingMovement ? treatment !== (input.lendingMovement === 'supply' ? 'investment_deposit' : 'investment_withdrawal') : investment)
     throw new Error('The accounting treatment must match the verified lending movement');
@@ -60,13 +64,13 @@ export function buildSettlementJournal(input: {
   const kind: Record<Exclude<AccountingTreatment, 'already_recorded'>, AccountKind[]> = {
     existing_payable: ['payable'], existing_receivable: ['receivable'], expense: ['expense'],
     customer_advance: ['liability'], internal_transfer: ['asset'], fee: ['expense'],
-    investment_deposit: ['asset'], investment_withdrawal: ['asset'],
+    investment_deposit: ['asset'], investment_withdrawal: ['asset'], currency_conversion: ['asset'],
   };
   if (!kind[treatment].includes(counterAccount.kind)) throw new Error('The selected offset account does not match this accounting treatment');
   const obligation = treatment === 'existing_payable' || treatment === 'existing_receivable';
   if (obligation && !input.externalName?.trim()) throw new Error('Enter the exact vendor or customer name used in the books');
   const assetValue = bookUnits(input.assetBookValue, currency);
-  const settledValue = obligation || treatment === 'investment_withdrawal' ? bookUnits(input.obligationBookValue ?? '', currency, treatment === 'investment_withdrawal') : assetValue;
+  const settledValue = obligation || treatment === 'investment_withdrawal' || treatment === 'currency_conversion' && direction === 'inflow' ? bookUnits(input.obligationBookValue ?? '', currency, treatment === 'investment_withdrawal') : assetValue;
   const hasAdvance = treatment === 'existing_receivable' && input.receiptHasExcess;
   const hasDeliveryFee = treatment === 'internal_transfer' && direction === 'inflow' && input.deliveryFeeRequired;
   const deliveryFee = hasDeliveryFee ? bookUnits(input.deliveryFeeBookValue ?? '', currency, true) : 0n;

@@ -13,18 +13,18 @@ import type { Id } from "./_generated/dataModel";
 import { requireOrgAccess } from "./lib/rbac";
 import { readTreasuryService } from "./lib/treasuryService";
 import { ORG_READER_ROLES, TREASURY_OPERATOR_ROLES } from "../shared/roles";
-import {
-  decodeLendingQuote,
-  lendingMarket,
-  lendingQuoteHash,
-} from "../shared/lending";
+import { lendingMarket } from "../shared/lending";
+import { conversionAssets, conversionMarket, CONVERSION_SLIPPAGE_BPS } from "../shared/conversion";
+import { decodeTreasuryServiceQuote, treasuryServiceHash } from "../shared/treasuryService";
 import { chainEnvironment } from "../shared/assets";
 import { appendAudit } from "./audit";
 
 export const servicePreparationArgs = {
   orgId: v.id("orgs"),
   safeId: v.id("safes"),
-  kind: v.union(v.literal("supply"), v.literal("withdraw")),
+  kind: v.union(v.literal("supply"), v.literal("withdraw"), v.literal("conversion")),
+  tokenIn: v.optional(v.string()),
+  slippageBps: v.optional(v.number()),
   amount: v.string(),
   requestId: v.string(),
   sessionToken: v.string(),
@@ -40,7 +40,9 @@ async function preparationData(
   args: {
     orgId: Id<"orgs">;
     safeId: Id<"safes">;
-    kind: "supply" | "withdraw";
+    kind: "supply" | "withdraw" | "conversion";
+    tokenIn?: string;
+    slippageBps?: number;
     amount: string;
     requestId: string;
     sessionToken: string;
@@ -70,13 +72,17 @@ async function preparationData(
     (args.withdrawAll !== true || args.kind !== "withdraw")
   )
     throw new Error("Choose a full withdrawal or enter a fixed amount.");
+  const existingQuote = existing ? decodeTreasuryServiceQuote(existing.quote) : undefined;
+  if (args.kind === "conversion" ? !args.tokenIn || !(CONVERSION_SLIPPAGE_BPS as readonly number[]).includes(args.slippageBps ?? -1) : args.tokenIn !== undefined || args.slippageBps !== undefined)
+    throw new Error("Choose valid conversion currencies and price tolerance.");
   if (
     existing &&
     (existing.safeId !== args.safeId ||
       existing.kind !== args.kind ||
       (!args.withdrawAll &&
-        decodeLendingQuote(existing.quote).amount !== args.amount) ||
-      !!decodeLendingQuote(existing.quote).withdrawAll !== !!args.withdrawAll)
+        existingQuote!.amount !== args.amount) ||
+      (existingQuote!.provider === "aave_v3" ? !!existingQuote!.withdrawAll : false) !== !!args.withdrawAll ||
+      (existingQuote!.provider === "uniswap_v3" && (existingQuote!.tokenIn.toLowerCase() !== args.tokenIn?.toLowerCase() || existingQuote!.slippageBps !== args.slippageBps)))
   )
     throw new Error(
       "This request already has different instructions. Resume its saved review.",
@@ -84,7 +90,8 @@ async function preparationData(
   const safe = await ctx.db.get(args.safeId);
   if (!safe || safe.orgId !== args.orgId || safe.isActive === false)
     throw new Error("Choose an active company account in this workspace.");
-  lendingMarket(safe.chainId);
+  if (args.kind === "conversion") { conversionMarket(safe.chainId); conversionAssets(safe.chainId, args.tokenIn!); }
+  else lendingMarket(safe.chainId);
   if (
     !existing &&
     (await ctx.db
@@ -123,6 +130,7 @@ export const list = query({
     sessionToken: v.string(),
     environment: v.union(v.literal("production"), v.literal("test")),
     paginationOpts: paginationOptsValidator,
+    provider: v.optional(v.union(v.literal("aave_v3"), v.literal("uniswap_v3"))),
   },
   handler: async (ctx, args) => {
     await requireOrgAccess(
@@ -137,13 +145,10 @@ export const list = query({
       args.paginationOpts.numItems > 100
     )
       throw new Error("Load up to 100 treasury requests at a time.");
-    return ctx.db
-      .query("treasuryServices")
-      .withIndex("by_org_environment", (q) =>
-        q.eq("orgId", args.orgId).eq("environment", args.environment),
-      )
-      .order("desc")
-      .paginate(args.paginationOpts);
+    const rows = ctx.db.query("treasuryServices");
+    const scope = args.provider ? rows.withIndex("by_org_provider", q => q.eq("orgId", args.orgId).eq("environment", args.environment).eq("provider", args.provider!))
+      : rows.withIndex("by_org_environment", q => q.eq("orgId", args.orgId).eq("environment", args.environment));
+    return scope.order("desc").paginate(args.paginationOpts);
   },
 });
 export const get = query({
@@ -162,19 +167,20 @@ export const save = internalMutation({
   handler: async (ctx, args) => {
     const { user, safe, existing } = await preparationData(ctx, args);
     if (existing) return existing._id;
-    const quote = decodeLendingQuote(args.quote);
+    const quote = decodeTreasuryServiceQuote(args.quote);
     if (
       quote.chainId !== safe.chainId ||
       quote.account.toLowerCase() !== safe.safeAddress.toLowerCase() ||
       (!args.withdrawAll && quote.amount !== args.amount) ||
       quote.kind !== args.kind ||
-      !!quote.withdrawAll !== !!args.withdrawAll ||
+      (quote.provider === "aave_v3" ? !!quote.withdrawAll : false) !== !!args.withdrawAll ||
+      (quote.provider === "uniswap_v3" && (quote.tokenIn.toLowerCase() !== args.tokenIn?.toLowerCase() || quote.slippageBps !== args.slippageBps)) ||
       quote.reference !== keccak256(toHex(`${args.orgId}:${args.requestId}`)) ||
       quote.expiresAt <= Date.now() ||
       quote.createdAt > Date.now() + 5000
     )
       throw new Error(
-        "The lending review or company account changed. Review the amount again.",
+        "The treasury review or company account changed. Review the amount again.",
       );
     const id = await ctx.db.insert("treasuryServices", {
       orgId: args.orgId,
@@ -186,7 +192,7 @@ export const save = internalMutation({
       createdBy: user._id,
       requestId: args.requestId,
       quote: args.quote,
-      hash: lendingQuoteHash(quote),
+      hash: treasuryServiceHash(quote),
       status: "quoted",
       open: true,
       recoveryAt: quote.expiresAt + 5000,
@@ -302,7 +308,7 @@ export const checkpoint = internalMutation({
       : null;
     if (
       !execution &&
-      decodeLendingQuote(transfer.quote).expiresAt <= Date.now()
+      decodeTreasuryServiceQuote(transfer.quote).expiresAt <= Date.now()
     ) {
       await ctx.db.patch(transfer._id, {
         open: false,

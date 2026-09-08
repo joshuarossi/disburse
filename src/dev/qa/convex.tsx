@@ -40,7 +40,7 @@ import {
 } from "./circle";
 import { accountFeeSetupFixture, readAccountFeeSetup } from "./accountFeeSetup";
 import { readTreasuryFixture, treasuryAccounts, treasuryCircleStep, treasuryFixtureAction } from "./treasury";
-import { readLendingFixture, lendingFixtureAction, lendingCircleStep } from "./lending";
+import { readServiceFixture, serviceFixtureAction, serviceCircleStep } from "./treasuryService";
 const cache = new Map<string, any>();
 let fixtureRevision = 0;
 const fixtureListeners = new Set<() => void>();
@@ -68,10 +68,10 @@ export function readQueryFixture(reference: any, args: any) {
   let value: any;
   switch (name) {
     case "treasuryServices:list":
-      value = {page: readLendingFixture() ? [readLendingFixture()] : [], isDone: true, continueCursor: ""};
+      value = {page: readServiceFixture() && (!args.provider || readServiceFixture().provider === args.provider) ? [readServiceFixture()] : [], isDone: true, continueCursor: ""};
       break;
     case "treasuryServices:get":
-      value = readLendingFixture();
+      value = readServiceFixture();
       break;
     case "treasury:list":
       value = { page: readTreasuryFixture() ? [readTreasuryFixture()] : [], isDone: true, continueCursor: "" };
@@ -109,7 +109,7 @@ export function readQueryFixture(reference: any, args: any) {
         : [];
     case "circlePayments:get":
       value = readCircleFixture();
-      if (scenario?.startsWith("circle-lending-") && args.treasuryServiceId && sessionStorage.getItem("qa:lending-originalCircle")) value = JSON.parse(sessionStorage.getItem("qa:lending-originalCircle")!);
+      if ((scenario?.startsWith("circle-lending-") || scenario?.startsWith("circle-conversion-")) && args.treasuryServiceId && sessionStorage.getItem("qa:treasury-service-originalCircle")) value = JSON.parse(sessionStorage.getItem("qa:treasury-service-originalCircle")!);
       if (scenario?.startsWith("circle-treasury-") && args.treasuryTransferId && sessionStorage.getItem("qa:treasury-originalCircle")) value = JSON.parse(sessionStorage.getItem("qa:treasury-originalCircle")!);
       break;
     case "paymentSchedules:get":
@@ -1462,7 +1462,7 @@ const disabled = async () => {
 };
 export function useMutation(reference?: any) {
   if (getFunctionName(reference).startsWith("treasuryServices:")) return async (args: any) => {
-    try {return await lendingFixtureAction(getFunctionName(reference), args);}
+    try {return await serviceFixtureAction(getFunctionName(reference), args);}
     finally {cache.clear(); fixtureRevision++; fixtureListeners.forEach(listener => listener());}
   };
   if (getFunctionName(reference).startsWith("treasury:")) return async (args: any) => {
@@ -1740,8 +1740,8 @@ export function useConvex() {
   };
 }
 export function useAction(reference: any) {
-  if (getFunctionName(reference).startsWith("treasuryServiceActions:")) return async (args: any) => {
-    try {return await lendingFixtureAction(getFunctionName(reference), args);}
+  if ((getFunctionName(reference).startsWith("treasuryServiceActions:") || getFunctionName(reference).startsWith("conversionActions:"))) return async (args: any) => {
+    try {return await serviceFixtureAction(getFunctionName(reference), args);}
     finally {cache.clear(); fixtureRevision++; fixtureListeners.forEach(listener => listener());}
   };
   if (getFunctionName(reference).startsWith("treasuryActions:")) return async (args: any) => {
@@ -2032,8 +2032,8 @@ export function useAction(reference: any) {
         treasuryCircleStep(name);
         cache.clear(); fixtureRevision++; fixtureListeners.forEach(listener => listener());
       }
-      if (scenario.startsWith("circle-lending-")) {
-        lendingCircleStep(name);
+      if (scenario.startsWith("circle-lending-") || scenario.startsWith("circle-conversion-")) {
+        serviceCircleStep(name);
         cache.clear(); fixtureRevision++; fixtureListeners.forEach(listener => listener());
       }
       if (name === "circlePayments:submit" && scenario.endsWith("unknown"))

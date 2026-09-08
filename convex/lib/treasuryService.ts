@@ -2,13 +2,8 @@ import type { Id } from "../_generated/dataModel";
 import type { QueryCtx } from "../_generated/server";
 import { requireOrgAccess } from "./rbac";
 import { ORG_READER_ROLES, TREASURY_OPERATOR_ROLES } from "../../shared/roles";
-import {
-  decodeLendingQuote,
-  lendingCall,
-  lendingMarket,
-  lendingQuoteHash,
-} from "../../shared/lending";
-import { circleConfiguration } from "../../shared/circleExecution";
+import { decodeTreasuryServiceQuote, treasuryServiceCall, treasuryServiceHash, treasuryServicePrincipalUSDC } from "../../shared/treasuryService";
+import { chainEnvironment } from "../../shared/assets";
 import type { CircleSource } from "./circleSource";
 
 export async function readTreasuryService(
@@ -26,13 +21,15 @@ export async function readTreasuryService(
     write ? TREASURY_OPERATOR_ROLES : ORG_READER_ROLES,
   );
   const safe = await ctx.db.get(transfer.safeId),
-    quote = decodeLendingQuote(transfer.quote);
+    quote = decodeTreasuryServiceQuote(transfer.quote);
   if (
     !safe ||
     safe.orgId !== transfer.orgId ||
     safe.chainId !== quote.chainId ||
+    transfer.chainId !== quote.chainId ||
+    transfer.environment !== chainEnvironment(quote.chainId) ||
     safe.safeAddress.toLowerCase() !== quote.account.toLowerCase() ||
-    transfer.hash !== lendingQuoteHash(quote) ||
+    transfer.hash !== treasuryServiceHash(quote) ||
     transfer.kind !== quote.kind ||
     transfer.provider !== quote.provider
   )
@@ -70,13 +67,8 @@ export async function readTreasuryService(
     kind: "treasury_service",
     sourceId: transfer._id,
     directCall: true as const,
-    call: lendingCall(quote),
-    principalUSDC:
-      quote.kind === "supply" &&
-      lendingMarket(quote.chainId).asset.toLowerCase() ===
-        circleConfiguration(quote.chainId).token.toLowerCase()
-        ? quote.amount
-        : "0",
+    call: treasuryServiceCall(quote),
+    principalUSDC: treasuryServicePrincipalUSDC(quote),
     window: { validAfter: 0, validUntil: Math.floor(quote.expiresAt / 1000) },
   };
 }

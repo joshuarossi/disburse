@@ -1,8 +1,16 @@
+import {
+  conversionMarket,
+  conversionAssets,
+  conversionPool,
+  CONVERSION_QUOTE_LIFETIME,
+  maximumConversionInput,
+  type ConversionQuote,
+} from "../../../shared/conversion";
+import { treasuryServiceHash } from "../../../shared/treasuryService";
 import { keccak256, toHex, type Address } from "viem";
 import {
   assertLendingAvailable,
   lendingMarket,
-  lendingQuoteHash,
   LENDING_QUOTE_LIFETIME,
   type LendingQuote,
   type LendingSnapshot,
@@ -10,22 +18,24 @@ import {
 import { readCircleFixture, saveCircleFixture } from "./circle";
 import { safes } from "./fixtures";
 
-export const readLendingFixture = () =>
-  JSON.parse(sessionStorage.getItem("qa:lending") ?? "null");
+export const readServiceFixture = () =>
+  JSON.parse(sessionStorage.getItem("qa:treasury-service") ?? "null");
 const save = (value: unknown) =>
-  sessionStorage.setItem("qa:lending", JSON.stringify(value));
-export async function lendingFixtureAction(
+  sessionStorage.setItem("qa:treasury-service", JSON.stringify(value));
+export async function serviceFixtureAction(
   name: string,
   args: {
     safeId?: string;
-    kind?: "supply" | "withdraw";
+    kind?: "supply" | "withdraw" | "conversion";
+    tokenIn?: string;
+    slippageBps?: number;
     amount?: string;
     requestId?: string;
     withdrawAll?: boolean;
   },
 ) {
   const scenario = sessionStorage.getItem("qa:scenario") ?? "",
-    saved = readLendingFixture();
+    saved = readServiceFixture();
   const account = safes.find((a) => a._id === args.safeId) ?? safes[0],
     market = lendingMarket(account.chainId);
   const s: LendingSnapshot = {
@@ -51,12 +61,32 @@ export async function lendingFixtureAction(
     priceUpdatedAt: Date.now() - 1000,
     priceAvailable: !scenario.endsWith("stale-price"),
   };
+  if (name === "conversionActions:balances") {
+    if (scenario.endsWith("balance-outage"))
+      throw new Error("Provider RPC https://private.example.invalid failed");
+    const route = conversionMarket(account.chainId);
+    return {
+      chainId: account.chainId,
+      account: account.safeAddress,
+      checkedAt: Date.now(),
+      blockNumber: "123",
+      feeBalance: "25000000000",
+      balances: route.assets.map((a) => ({ ...a, amount: "25000000000" })),
+    };
+  }
   if (name === "treasuryServiceActions:position") {
     if (scenario.endsWith("position-outage"))
       throw new Error("Provider RPC https://private.example.invalid failed");
     return s;
   }
-  if (name === "treasuryServiceActions:prepare") {
+  if (
+    name === "treasuryServiceActions:prepare" ||
+    name === "conversionActions:prepare"
+  ) {
+    if (scenario.endsWith("no-liquidity"))
+      throw new Error(
+        "No supported quote has enough liquidity at an acceptable exchange rate. Try a smaller amount or refresh later. Your funds have not moved.",
+      );
     if (scenario.endsWith("quote-outage"))
       throw new Error("Aave could not be reached. Try again shortly.");
     if (saved?.open) {
@@ -65,23 +95,51 @@ export async function lendingFixtureAction(
         "This account already has a treasury request. Complete or stop it before reviewing another.",
       );
     }
-    assertLendingAvailable(args.kind!, args.amount!, s, Date.now());
+    if (args.kind !== "conversion")
+      assertLendingAvailable(args.kind!, args.amount!, s, Date.now());
     const now = Date.now(),
-      quote: LendingQuote = {
-        version: 1,
-        provider: "aave_v3",
-        kind: args.kind!,
-        chainId: account.chainId,
-        account: account.safeAddress as Address,
-        reference: keccak256(toHex(args.requestId!)),
-        amount: args.amount!,
-        rateRay: s.rateRay,
-        price: s.price,
-        priceUnit: s.priceUnit,
-        createdAt: now,
-        expiresAt: now + LENDING_QUOTE_LIFETIME,
-      };
-    if (args.withdrawAll) quote.withdrawAll = true;
+      quote: LendingQuote | ConversionQuote =
+        args.kind === "conversion"
+          ? {
+              version: 1,
+              provider: "uniswap_v3",
+              kind: "conversion",
+              chainId: account.chainId,
+              account: account.safeAddress as Address,
+              reference: keccak256(toHex(args.requestId!)),
+              tokenIn: args.tokenIn! as Address,
+              tokenOut: conversionAssets(account.chainId, args.tokenIn!).output
+                .address,
+              amount: args.amount!,
+              expectedInput: args.amount!,
+              maximumInput: maximumConversionInput(
+                args.amount!,
+                args.slippageBps!,
+              ),
+              pool: conversionPool(account.chainId, 100),
+              poolFee: 100,
+              slippageBps: args.slippageBps!,
+              priceImpactBps: 1,
+              blockNumber: "123",
+              createdAt: now,
+              expiresAt: now + CONVERSION_QUOTE_LIFETIME,
+            }
+          : {
+              version: 1,
+              provider: "aave_v3",
+              kind: args.kind!,
+              chainId: account.chainId,
+              account: account.safeAddress as Address,
+              reference: keccak256(toHex(args.requestId!)),
+              amount: args.amount!,
+              rateRay: s.rateRay,
+              price: s.price,
+              priceUnit: s.priceUnit,
+              createdAt: now,
+              expiresAt: now + LENDING_QUOTE_LIFETIME,
+            };
+    if (args.withdrawAll && quote.provider === "aave_v3")
+      quote.withdrawAll = true;
     save({
       _id: "service1",
       orgId: "demo",
@@ -91,7 +149,7 @@ export async function lendingFixtureAction(
       provider: quote.provider,
       requestId: args.requestId,
       quote: JSON.stringify(quote),
-      hash: lendingQuoteHash(quote),
+      hash: treasuryServiceHash(quote),
       status: "quoted",
       open: true,
       createdAt: now,
@@ -100,7 +158,7 @@ export async function lendingFixtureAction(
     sessionStorage.removeItem("qa:circle");
     if (scenario.endsWith("quote-lost"))
       throw new Error(
-        "The review response was interrupted. Open the saved request from your lending activity.",
+        "The review response was interrupted. Open the saved request from your treasury activity.",
       );
     return "service1";
   }
@@ -110,7 +168,7 @@ export async function lendingFixtureAction(
       throw new Error("Check the original request before cancelling.");
     if (current?.operationApprovalStartedAt || current?.stage === "ready") {
       sessionStorage.setItem(
-        "qa:lending-originalCircle",
+        "qa:treasury-service-originalCircle",
         JSON.stringify(current),
       );
       save({
@@ -127,8 +185,8 @@ export async function lendingFixtureAction(
     return { cancelled: true };
   }
 }
-export function lendingCircleStep(name: string) {
-  const saved = readLendingFixture();
+export function serviceCircleStep(name: string) {
+  const saved = readServiceFixture();
   if (!saved) return;
   if (name === "circlePayments:prepare" && !saved.cancellationRequestedAt)
     save({ ...saved, status: "approving", circleExecutionId: "circle1" });
@@ -149,7 +207,13 @@ export function lendingCircleStep(name: string) {
               : current.stage,
         settledAmount:
           !saved.cancellationRequestedAt && current.stage === "confirmed"
-            ? String(BigInt(quote.amount) + (quote.withdrawAll ? 1n : 0n))
+            ? String(
+                BigInt(
+                  quote.provider === "uniswap_v3"
+                    ? quote.expectedInput
+                    : quote.amount,
+                ) + (quote.withdrawAll ? 1n : 0n),
+              )
             : undefined,
         sourceTxHash:
           !saved.cancellationRequestedAt && current.stage === "confirmed"
@@ -158,10 +222,10 @@ export function lendingCircleStep(name: string) {
       });
       if (saved.cancellationRequestedAt && current.stage !== "expired") {
         const original = JSON.parse(
-          sessionStorage.getItem("qa:lending-originalCircle")!,
+          sessionStorage.getItem("qa:treasury-service-originalCircle")!,
         );
         sessionStorage.setItem(
-          "qa:lending-originalCircle",
+          "qa:treasury-service-originalCircle",
           JSON.stringify({ ...original, stage: "cancelled", open: false }),
         );
       }

@@ -184,13 +184,14 @@ export default defineSchema({
     .index("by_request", ["orgId", "requestId"])
     .index("by_due", ["recoveryAt"]),
   treasuryServices: defineTable({
+    outputTransferId: v.optional(v.string()),
     settledAmount: v.optional(v.string()),
     orgId: v.id("orgs"),
     environment: v.union(v.literal("production"), v.literal("test")),
     safeId: v.id("safes"),
     chainId: v.number(),
-    provider: v.literal("aave_v3"),
-    kind: v.union(v.literal("supply"), v.literal("withdraw")),
+    provider: v.union(v.literal("aave_v3"), v.literal("uniswap_v3")),
+    kind: v.union(v.literal("supply"), v.literal("withdraw"), v.literal("conversion")),
     createdBy: v.id("users"),
     requestId: v.string(),
     quote: v.string(),
@@ -210,6 +211,7 @@ export default defineSchema({
     .index("by_request", ["orgId", "requestId"])
     .index("by_safe_open", ["safeId", "open"])
     .index("by_org_environment", ["orgId", "environment"])
+    .index("by_org_provider", ["orgId", "environment", "provider"])
     .index("by_source_receipt", ["chainId", "sourceTxHash"])
     .index("by_due", ["recoveryAt"]),
   treasuryTransfers: defineTable({

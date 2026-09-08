@@ -1,10 +1,6 @@
+import { treasuryRequestStatuses as statuses } from "./treasuryPresentation";
 import { useRef, useState } from "react";
-import {
-  useAction,
-  useMutation,
-  usePaginatedQuery,
-  useQuery,
-} from "convex/react";
+import { useAction, usePaginatedQuery, useQuery } from "convex/react";
 import {
   useQuery as useRemoteQuery,
   useQueryClient,
@@ -19,33 +15,22 @@ import {
   lendingAvailability,
   lendingMarket,
   LENDING_CHAINS,
-  type LendingQuote,
 } from "../../../shared/lending";
-import { circleConfiguration } from "../../../shared/circleExecution";
 import { TREASURY_OPERATOR_ROLES } from "../../../shared/roles";
 import { amountToBaseUnits } from "../../../shared/validation";
 import { chainEnvironment } from "../../../shared/assets";
 import { useActivityEnvironment } from "@/features/workspace/ActivityEnvironment";
-import { CustomerPaidExecution } from "@/features/payments/CustomerPaidExecution";
+import { TreasuryServiceReview } from "./TreasuryServiceReview";
 import { Dialog } from "@/components/ui/Dialog";
 import {
   LoadingRows,
   Notice,
 } from "@/components/workspace/WorkspacePrimitives";
 import { useSessionToken } from "@/lib/session";
-import { getBlockExplorerTxUrl, getChainName } from "@/lib/chains";
+import { getChainName } from "@/lib/chains";
 import { userErrorMessage } from "@/lib/userErrors";
 import { scheduleDateTime } from "@/lib/formatMoney";
 
-const statuses = {
-  quoted: "Ready for review",
-  approving: "Needs approval",
-  processing: "Processing",
-  completed: "Completed",
-  cancelled: "Cancelled",
-  expired: "Review expired",
-  failed: "Not completed",
-};
 const units = (raw: string) => formatUnits(BigInt(raw), 6);
 const apr = (raw: string) => `${(Number(raw) / 1e25).toFixed(2)}%`;
 
@@ -71,7 +56,7 @@ export function Earn({
   const { results, status, loadMore } = usePaginatedQuery(
     api.treasuryServices.list,
     sessionToken && environment !== "unclassified"
-      ? { orgId, sessionToken, environment }
+      ? { orgId, sessionToken, environment, provider: "aave_v3" }
       : "skip",
     { initialNumItems: 10 },
   );
@@ -81,15 +66,13 @@ export function Earn({
   const [kind, setKind] = useState<"supply" | "withdraw">("supply"),
     [amount, setAmount] = useState("");
   const [withdrawAll, setWithdrawAll] = useState(false);
-  const [consent, setConsent] = useState(""),
-    [error, setError] = useState("");
+  const [error, setError] = useState("");
   const [busy, setBusy] = useState(false),
     [executing, setExecuting] = useState(false);
   const lock = useRef(false),
     requestId = useRef(crypto.randomUUID());
   const position = useAction(api.treasuryServiceActions.position),
-    prepare = useAction(api.treasuryServiceActions.prepare),
-    stop = useMutation(api.treasuryServices.stop);
+    prepare = useAction(api.treasuryServiceActions.prepare);
   const sources = accounts.filter(
     (a) =>
       a.isActive !== false &&
@@ -105,27 +88,6 @@ export function Earn({
     staleTime: 30_000,
     retry: 1,
   });
-  const saved = useQuery(
-    api.treasuryServices.get,
-    selected && sessionToken
-      ? { treasuryServiceId: selected, sessionToken }
-      : "skip",
-  );
-  const cancellation = useQuery(
-    api.circlePayments.get,
-    saved?.cancellationRequestedAt && saved.circleExecutionId && sessionToken
-      ? { cancelExecutionId: saved.circleExecutionId, sessionToken }
-      : "skip",
-  );
-  let quote: LendingQuote | undefined,
-    quoteError = "";
-  if (saved)
-    try {
-      quote = decodeLendingQuote(saved.quote);
-    } catch {
-      quoteError =
-        "The saved review could not be read. Check the original request before creating another.";
-    }
   const accountName = (id: string) =>
     accounts.find((a) => a._id === id)?.name ?? "Company account";
   const memberName = (wallet: string) =>
@@ -156,7 +118,6 @@ export function Earn({
     : undefined;
   const open = (id?: Id<"treasuryServices">) => {
     setSelected(id);
-    setConsent("");
     setError("");
     setAmount("");
     setWithdrawAll(false);
@@ -241,197 +202,27 @@ export function Earn({
           <div className="space-y-5 p-6">
             {error && <Notice>{error}</Notice>}
             {selected ? (
-              saved === undefined ? (
-                <LoadingRows />
-              ) : !saved ? (
-                <Notice>
-                  This request could not be found. Refresh the page before
-                  continuing.
-                </Notice>
-              ) : quoteError || !quote ? (
-                <Notice>{quoteError}</Notice>
-              ) : (
-                <>
-                  <div className="rounded-lg border border-[var(--ws-border)] p-5">
-                    <p className="finance-label">
-                      {quote.kind === "supply"
-                        ? "Lending deposit"
-                        : "Withdrawal to your account"}
-                    </p>
-                    <p className="mt-1 text-2xl font-semibold">
-                      {quote.withdrawAll && !saved.settledAmount
-                        ? "Estimated "
-                        : ""}
-                      {units(saved.settledAmount ?? quote.amount)}{" "}
-                      {lendingMarket(quote.chainId).assetLabel}
-                    </p>
-                    <p className="mt-2 text-sm text-[var(--ws-muted)]">
-                      {accountName(saved.safeId)} ·{" "}
-                      {getChainName(quote.chainId)}
-                    </p>
-                    <p className="mt-3 text-sm">{statuses[saved.status]}</p>
-                  </div>
-                  {quote.kind === "supply" && (
-                    <p className="text-sm text-[var(--ws-muted)]">
-                      Variable supply APR at review: {apr(quote.rateRay)}. Your
-                      lending position stays separate from funds available for
-                      payments.
-                    </p>
-                  )}
-                  {saved.sourceTxHash && (
-                    <a
-                      className="workspace-action-link"
-                      href={getBlockExplorerTxUrl(
-                        quote.chainId,
-                        saved.sourceTxHash,
-                      )}
-                      target="_blank"
-                      rel="noreferrer"
-                    >
-                      View confirmed transaction <ExternalLink size={13} />
-                    </a>
-                  )}
-                  {saved.status === "processing" && (
-                    <Notice tone="info">
-                      Your original request is being checked. You can close this
-                      window while it completes. Do not create a replacement.
-                    </Notice>
-                  )}
-                  {saved.status === "failed" && (
-                    <Notice>
-                      The lending operation did not complete. Any execution fee
-                      charged is shown below. Refresh the account position
-                      before reviewing another request.
-                    </Notice>
-                  )}
-                  {saved.status === "expired" && (
-                    <Notice tone="info">
-                      The approval window ended. Review a fresh amount after
-                      refreshing your account's current position.
-                    </Notice>
-                  )}
-                  {saved.open &&
-                    ["quoted", "approving"].includes(saved.status) &&
-                    !saved.cancellationRequestedAt && (
-                      <>
-                        <p className="text-sm text-[var(--ws-muted)]">
-                          This review expires{" "}
-                          {scheduleDateTime(quote.expiresAt)}.{" "}
-                          {quote.kind === "withdraw"
-                            ? quote.withdrawAll
-                              ? "Aave will return the full position to this account. The final amount depends on its balance and accrued interest at execution."
-                              : "Aave will return this amount to the same company account."
-                            : "The amount goes directly to Aave's lending pool. This flow does not borrow or enable the position as collateral."}{" "}
-                          You pay the execution cost in USDC.
-                        </p>
-                        <label className="flex items-start gap-3 text-sm">
-                          <input
-                            type="checkbox"
-                            className="mt-1"
-                            checked={consent === saved.hash}
-                            disabled={busy || executing || !canWrite}
-                            onChange={(e) =>
-                              setConsent(e.target.checked ? saved.hash : "")
-                            }
-                          />
-                          <span>
-                            I reviewed the company account, amount and Aave's
-                            lending and withdrawal terms.
-                          </span>
-                        </label>
-                      </>
-                    )}
-                  <CustomerPaidExecution
-                    key={saved._id}
-                    source={{ treasuryServiceId: saved._id }}
-                    ready={
-                      canWrite &&
-                      consent === saved.hash &&
-                      !saved.cancellationRequestedAt &&
-                      quote.expiresAt > Date.now() &&
-                      ["quoted", "approving"].includes(saved.status)
-                    }
-                    blocked={
-                      busy || !canWrite || !!saved.cancellationRequestedAt
-                    }
-                    memberName={memberName}
-                    onBusyChange={setExecuting}
-                    actionLabel={
-                      quote.kind === "supply"
-                        ? "Deposit with Aave"
-                        : "Withdraw to account"
-                    }
-                    principalUSDC={
-                      quote.kind === "supply" &&
-                      lendingMarket(quote.chainId).asset.toLowerCase() ===
-                        circleConfiguration(quote.chainId).token.toLowerCase()
-                        ? quote.amount
-                        : undefined
-                    }
-                  />
-                  {saved.cancellationRequestedAt && saved.circleExecutionId && (
-                    <>
-                      {saved.open && (
-                        <Notice tone="info">
-                          An approval may already exist. Confirm cancellation to
-                          invalidate it before preparing another request. You
-                          pay its execution cost in USDC.
-                        </Notice>
-                      )}
-                      {(saved.open || cancellation) && (
-                        <CustomerPaidExecution
-                          source={{
-                            cancelExecutionId: saved.circleExecutionId,
-                          }}
-                          ready={saved.open && canWrite}
-                          blocked={busy || !canWrite}
-                          memberName={memberName}
-                          onBusyChange={setExecuting}
-                        />
-                      )}
-                    </>
-                  )}
-                  {canWrite &&
-                    saved.open &&
-                    !saved.cancellationRequestedAt &&
-                    ["quoted", "approving"].includes(saved.status) && (
-                      <button
-                        className="workspace-button"
-                        disabled={busy || executing}
-                        onClick={() =>
-                          void run(() =>
-                            stop({
-                              treasuryServiceId: saved._id,
-                              sessionToken: sessionToken!,
-                            }),
-                          )
-                        }
-                      >
-                        Stop this request
-                      </button>
-                    )}
-                  {!saved.open && (
-                    <button
-                      className="workspace-button"
-                      onClick={() => {
-                        setSelected(undefined);
-                        setConsent("");
-                        setWithdrawAll(false);
-                        setAmount("");
-                        requestId.current = crypto.randomUUID();
-                        void queryClient.invalidateQueries({
-                          queryKey: ["lending-position"],
-                        });
-                        void queryClient.invalidateQueries({
-                          queryKey: ["account-readiness"],
-                        });
-                      }}
-                    >
-                      Review current position
-                    </button>
-                  )}
-                </>
-              )
+              <TreasuryServiceReview
+                key={selected}
+                id={selected}
+                accountName={accountName}
+                memberName={memberName}
+                canWrite={canWrite}
+                onBusyChange={setExecuting}
+                refreshLabel="Review current position"
+                onNew={() => {
+                  setSelected(undefined);
+                  setWithdrawAll(false);
+                  setAmount("");
+                  requestId.current = crypto.randomUUID();
+                  void queryClient.invalidateQueries({
+                    queryKey: ["lending-position"],
+                  });
+                  void queryClient.invalidateQueries({
+                    queryKey: ["account-readiness"],
+                  });
+                }}
+              />
             ) : !account ? (
               <Notice tone="info">
                 Lending is available for connected accounts on Base and
@@ -585,7 +376,6 @@ export function Earn({
                                 sessionToken,
                               });
                               setSelected(id);
-                              setConsent("");
                             });
                           }}
                         >

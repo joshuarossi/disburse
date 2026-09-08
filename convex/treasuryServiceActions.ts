@@ -1,3 +1,5 @@
+import { conversionCall } from "../shared/conversion";
+import { verifyConversionFunding } from "./lib/conversionProvider";
 import { v } from "convex/values";
 import { keccak256, toHex, type Address, type Hex } from "viem";
 import { action, internalAction } from "./_generated/server";
@@ -33,6 +35,7 @@ export const prepare = action({
       internal.treasuryServices.preparation,
       args,
     );
+    if (args.kind === "conversion") throw new Error("Use the conversion review to exchange currencies.");
     if (existing) return existing._id;
     const snapshot = await readLendingPosition(
       safe.chainId,
@@ -93,6 +96,7 @@ export const verify = internalAction({
       internal.treasuryServices.context,
       args,
     );
+    if (quote.provider === "uniswap_v3") { await verifyConversionFunding(quote); return conversionCall(quote); }
     await verifyLendingFunding(quote);
     return lendingCall(quote);
   },
