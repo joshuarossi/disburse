@@ -39,7 +39,7 @@ The production treasury address and billing network have not been confirmed. Unc
 | Gusto | Simple $49/month plus $6/person; Plus $80/month plus $12/person | Full payroll calculations and services make it a complement and workflow reference. Disburse is not an equivalent payroll replacement. [Gusto pricing](https://gusto.com/product/pricing) |
 | Ramp | Free plan; Plus $15/user/month **plus a platform fee based on team size** | Per-seat price alone is not the complete bill. A free incumbent also raises the bar for generic finance features. [Ramp pricing](https://ramp.com/pricing) |
 
-A five-member Team workspace costs 50 USDC per 30 days. That is inexpensive relative to many paid finance tools, but a lower price does not compensate for payment uncertainty, missing accounting sync or signing friction. Request's free stablecoin payouts also weaken any simple claim that transaction-fee savings alone justify Disburse.
+A five-member Team workspace costs 50 USDC per 30 days. The September 8 [Xero comparison](XERO_COMPARISON.md) places that within the budget of a substantial accounting subscription, so it is not automatically a bargain. Payment certainty, accounting handoff and signing convenience must justify the added subscription. Request's free stablecoin payouts also weaken any simple claim that transaction-fee savings alone justify Disburse.
 
 ## Recommended launch experiment
 
@@ -63,3 +63,7 @@ Get five design partners through two payment cycles and ask for payment. Record 
 Billing displays active members, reserved invitation seats, saved recipients including archived records and connected accounts using the same definitions as enforcement. It keeps renewal available if usage cannot be counted. No per-network account cap is advertised or enforced. All plans describe the implemented core workflows; obsolete per-plan feature restrictions and the unvalidated priority-support promise were removed. English, Spanish and Portuguese show the same USD price and 30-day billing period. Trial copy explains its actual end date and absence of paid credit. Current paid prices remain 50/99 USDC. Free replaces the former Starter offer for new checkout.
 
 Core payment approvals, native and managed submission, scheduling, delegated authorization and account-readiness checks no longer use the old subscription gate. Customer authority, recipient review, screening policy, balances and fee checks remain. Paid checkout keeps its verified-receipt and recovery rules. Operator changes are audited and reject stale revisions or an outstanding checkout. The [license guide](LICENSE_MANAGEMENT.md) records implemented controls and evidence boundaries.
+
+## September 8 Xero comparison
+
+See [Xero comparison](XERO_COMPARISON.md) for the supplied Global USD plans, the separate US plans and their announced price increases. Its collaboration model also makes member count alone a weak reason for a higher tier. Preserve Free core payments; validate paid convenience and accounting-workflow value with actual teams. Current license prices and entitlement rules are unchanged.
