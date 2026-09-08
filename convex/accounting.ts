@@ -143,7 +143,7 @@ export const review = mutation({
     if (args.treatment === 'existing_receivable' && fact.invoiceAppliedRaw === '0')
       throw new Error('The invoice was already fully funded. Record this receipt as a customer advance or match its existing book entry.');
     const lines: JournalLine[] = args.treatment === 'already_recorded' ? [] : buildSettlementJournal({
-      ...args, treatment: args.treatment, direction: fact.direction, companyTransfer: fact.companyTransfer, currency: profile.currency,
+      ...args, treatment: args.treatment, direction: fact.direction, companyTransfer: fact.companyTransfer, lendingMovement: fact.lendingMovement, currency: profile.currency,
       assetAccount: await bookAccount(ctx, args.orgId, args.assetAccountId),
       counterAccount: await bookAccount(ctx, args.orgId, args.counterAccountId),
       differenceAccount: args.differenceAccountId ? await bookAccount(ctx, args.orgId, args.differenceAccountId) : undefined,
@@ -155,8 +155,8 @@ export const review = mutation({
     const movement = await ctx.db.query('accountingMovements').withIndex('by_movement', q => q.eq('orgId', args.orgId).eq('key', fact.key)).unique();
     const previous = movement ? await ctx.db.get(movement.entryId) : null;
     const core = { fact, currency: profile.currency, treatment: args.treatment, postingDate: args.postingDate, assetBookValue: value,
-      obligationBookValue: ['existing_payable', 'existing_receivable'].includes(args.treatment) && args.obligationBookValue
-        ? formatBookUnits(bookUnits(args.obligationBookValue, profile.currency), profile.currency) : undefined,
+      obligationBookValue: ['existing_payable', 'existing_receivable', 'investment_withdrawal'].includes(args.treatment) && args.obligationBookValue
+        ? formatBookUnits(bookUnits(args.obligationBookValue, profile.currency, args.treatment === 'investment_withdrawal'), profile.currency) : undefined,
       advanceBookValue: receiptHasExcess && args.treatment === 'existing_receivable' ? formatBookUnits(bookUnits(args.advanceBookValue ?? '', profile.currency), profile.currency) : undefined,
       deliveryFeeBookValue: deliveryFeeRequired && args.treatment === 'internal_transfer' ? formatBookUnits(bookUnits(args.deliveryFeeBookValue ?? '', profile.currency, true), profile.currency) : undefined,
       bookReference, externalName: args.externalName?.trim() || undefined, valuationEvidence, memo, lines, profileVersion: profile.version };

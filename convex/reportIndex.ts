@@ -9,6 +9,7 @@ import { reportPage } from './lib/reportPagination';
 import { matchOutgoingPayment } from './lib/outgoingTransfers';
 import { circleFeeReportRows, hasCircleFeeProof } from './lib/circleFeeReports';
 import { treasuryReportRows } from './lib/treasuryReports';
+import { treasuryServiceReportRows } from './lib/treasuryServiceReports';
 
 export const refresh = mutation({
   args: { orgId: v.id('orgs'), sessionToken: v.string() },
@@ -32,9 +33,10 @@ export const backfill = internalMutation({
       : state.stage === 'deposits' ? await ctx.db.query('deposits').withIndex('by_org', q => q.eq('orgId', orgId)).paginate(reportPage(state.cursor, 25))
       : state.stage === 'outgoing' ? await ctx.db.query('outgoingTransfers').withIndex('by_org', q => q.eq('orgId', orgId)).paginate(reportPage(state.cursor, 25))
       : state.stage === 'fees' ? await ctx.db.query('circleExecutions').withIndex('by_org', q => q.eq('orgId', orgId)).paginate(reportPage(state.cursor, 25))
-      : await ctx.db.query('treasuryTransfers').withIndex('by_org', q => q.eq('orgId', orgId)).paginate(reportPage(state.cursor, 25));
-    for (const source of result.page) await queueReportSource(ctx, orgId, payments ? 'payment' : state.stage === 'deposits' ? 'deposit' : state.stage === 'outgoing' ? 'outgoing' : state.stage === 'fees' ? 'fee' : 'treasury', source._id);
-    const stage = result.isDone ? payments ? 'deposits' : state.stage === 'deposits' ? 'outgoing' : state.stage === 'outgoing' ? 'fees' : state.stage === 'fees' ? 'treasury' : 'done' : state.stage;
+      : state.stage === 'treasury' ? await ctx.db.query('treasuryTransfers').withIndex('by_org', q => q.eq('orgId', orgId)).paginate(reportPage(state.cursor, 25))
+      : await ctx.db.query('treasuryServices').withIndex('by_org_environment', q => q.eq('orgId', orgId)).paginate(reportPage(state.cursor, 25));
+    for (const source of result.page) await queueReportSource(ctx, orgId, payments ? 'payment' : state.stage === 'deposits' ? 'deposit' : state.stage === 'outgoing' ? 'outgoing' : state.stage === 'fees' ? 'fee' : state.stage === 'treasury' ? 'treasury' : 'service', source._id);
+    const stage = result.isDone ? payments ? 'deposits' : state.stage === 'deposits' ? 'outgoing' : state.stage === 'outgoing' ? 'fees' : state.stage === 'fees' ? 'treasury' : state.stage === 'treasury' ? 'services' : 'done' : state.stage;
     await ctx.db.patch(state._id, { stage, cursor: result.isDone ? undefined : result.continueCursor,
       completeAt: stage === 'done' ? Date.now() : undefined, updatedAt: Date.now() });
     if (stage !== 'done') await ctx.scheduler.runAfter(100, internal.reportIndex.backfill, { orgId });
@@ -79,8 +81,9 @@ export const processJob = internalMutation({
         }
       }
     }
-    if (job.kind === 'treasury') {
-      for (const row of await treasuryReportRows(ctx, job.sourceId as Id<'treasuryTransfers'>)) {
+    if (job.kind === 'treasury' || job.kind === 'service') {
+      const rows = job.kind === 'service' ? await treasuryServiceReportRows(ctx, job.sourceId as Id<'treasuryServices'>) : await treasuryReportRows(ctx, job.sourceId as Id<'treasuryTransfers'>);
+      for (const row of rows) {
         const transfer = row.direction === 'outflow'
           ? await ctx.db.query('outgoingTransfers').withIndex('by_safe_transfer', q => q.eq('safeId', row.safeId).eq('transferId', row.transferId!)).unique()
           : await ctx.db.query('deposits').withIndex('by_safe_transfer', q => q.eq('safeId', row.safeId).eq('transferId', row.transferId)).unique();
@@ -96,6 +99,7 @@ export const processJob = internalMutation({
       : job.kind === 'deposit' ? await depositReportRows(ctx, job.sourceId as Id<'deposits'>)
       : job.kind === 'fee' ? await circleFeeReportRows(ctx, job.sourceId as Id<'circleExecutions'>)
       : job.kind === 'treasury' ? await treasuryReportRows(ctx, job.sourceId as Id<'treasuryTransfers'>)
+      : job.kind === 'service' ? await treasuryServiceReportRows(ctx, job.sourceId as Id<'treasuryServices'>)
       : await outgoingReportRows(ctx, job.sourceId as Id<'outgoingTransfers'>);
     await replaceReportRows(ctx, job, rows);
   },

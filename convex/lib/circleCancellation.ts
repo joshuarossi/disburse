@@ -15,7 +15,7 @@ export async function readCircleCancellation(
   write = false,
 ) {
   const original = await ctx.db.get(cancelExecutionId);
-  if (original?.treasuryTransferId) return readTreasuryCancellation(ctx, original, sessionToken, write);
+  if (original?.treasuryTransferId || original?.treasuryServiceId) return readTreasuryCancellation(ctx, original, sessionToken, write);
   if (!original?.delegatedDisbursementId)
     throw new Error("The original delegated execution was not found.");
   const { user } = await requireOrgAccess(
@@ -126,7 +126,7 @@ export async function settleCircleCancellation(
   // EntryPoint consumes the sequence even when the no-op's execution fails.
   // Actual gas charged is still recorded on the cancellation's own fee row.
   const original = await ctx.db.get(execution.cancelExecutionId);
-  if (original?.treasuryTransferId) return settleTreasuryCancellation(ctx, original, execution);
+  if (original?.treasuryTransferId || original?.treasuryServiceId) return settleTreasuryCancellation(ctx, original, execution);
   const payment = original?.delegatedDisbursementId
     ? await ctx.db.get(original.delegatedDisbursementId)
     : null;

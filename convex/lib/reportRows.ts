@@ -7,6 +7,7 @@ import { configuredTokenAddress, identifyAsset, type AssetIdentity } from '../..
 import { reportRowFields } from './reportValidators';
 import { isCircleFeeMovement } from './circleFeeReports';
 import { isTreasuryMovement } from './treasuryReports';
+import { isTreasuryServiceMovement } from './treasuryServiceReports';
 
 export const reportRowValidator = v.object(reportRowFields);
 export type ReportRow = Infer<typeof reportRowValidator>;
@@ -74,7 +75,7 @@ export async function paymentReportRows(ctx: QueryCtx, id: Id<'disbursements'>, 
 
 export async function depositReportRows(ctx: QueryCtx, id: Id<'deposits'>): Promise<ReportRow[]> {
   const d = await ctx.db.get(id);
-  if (!d || d.supersededBy || await isCircleFeeMovement(ctx, d, 'refund') || await isTreasuryMovement(ctx, d, 'inflow')) return [];
+  if (!d || d.supersededBy || await isCircleFeeMovement(ctx, d, 'refund') || await isTreasuryMovement(ctx, d, 'inflow') || await isTreasuryServiceMovement(ctx, d, 'inflow')) return [];
   const account = await ctx.db.get(d.safeId);
   const asset = identifyAsset(d.chainId, d.tokenAddress, d.tokenSymbol);
   const validRaw = d.amountRaw.length <= 100 && /^\d+$/.test(d.amountRaw);
@@ -88,7 +89,7 @@ export async function depositReportRows(ctx: QueryCtx, id: Id<'deposits'>): Prom
 
 export async function outgoingReportRows(ctx: QueryCtx, id: Id<'outgoingTransfers'>): Promise<ReportRow[]> {
   const t = await ctx.db.get(id);
-  if (!t || await isCircleFeeMovement(ctx, t, 'prefund') || await isTreasuryMovement(ctx, t, 'outflow')) return [];
+  if (!t || await isCircleFeeMovement(ctx, t, 'prefund') || await isTreasuryMovement(ctx, t, 'outflow') || await isTreasuryServiceMovement(ctx, t, 'outflow')) return [];
   if (t.matchError) throw new Error(t.matchError);
   if (t.paymentId && t.paymentRowId) {
     const payment = await ctx.db.get(t.paymentId);

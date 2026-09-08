@@ -110,6 +110,7 @@ function ReviewForm({ orgId, details, config, onSaved }: { orgId: Id<'orgs'>; de
     return { id: row._id, externalId: row.externalId, name: row.name, kind: row.kind, version: row.version };
   };
   const obligation = treatment === 'existing_payable' || treatment === 'existing_receivable';
+  const withdrawal = treatment === 'investment_withdrawal';
   const receiptHasExcess = !!fact.invoiceExcessRaw && BigInt(fact.invoiceExcessRaw) > 0n;
   const needsAdvance = treatment === 'existing_receivable' && receiptHasExcess;
   const deliveryFeeRequired = !!fact.deliveryFeeRaw && BigInt(fact.deliveryFeeRaw) > 0n;
@@ -120,14 +121,14 @@ function ReviewForm({ orgId, details, config, onSaved }: { orgId: Id<'orgs'>; de
     if (treatment === 'already_recorded') bookUnits(assetValue, profile.currency, true);
     else lines = buildSettlementJournal({ treatment, direction: fact.direction, currency: profile.currency,
       assetBookValue: assetValue, obligationBookValue: obligationValue, assetAccount: account(assetId), counterAccount: account(counterId),
-      differenceAccount: differenceId ? account(differenceId) : undefined, externalName, companyTransfer: fact.companyTransfer,
+      differenceAccount: differenceId ? account(differenceId) : undefined, externalName, companyTransfer: fact.companyTransfer, lendingMovement: fact.lendingMovement,
       receiptHasExcess, advanceBookValue: advanceValue, advanceAccount: advanceId ? account(advanceId) : undefined,
       deliveryFeeRequired, deliveryFeeBookValue: deliveryFeeValue, deliveryFeeAccount: deliveryFeeId ? account(deliveryFeeId) : undefined });
   } catch (e) { previewError = userErrorMessage(e, 'Review the journal values'); }
   const options = (Object.keys(accountingTreatments) as AccountingTreatment[]).filter(value => value === 'already_recorded'
-    || (fact.companyTransfer ? value === 'internal_transfer'
+    || (fact.lendingMovement ? value === (fact.lendingMovement === 'supply' ? 'investment_deposit' : 'investment_withdrawal') : fact.companyTransfer ? value === 'internal_transfer'
       : fact.direction === 'inflow' ? (value === 'customer_advance' || value === 'existing_receivable' && fact.invoiceAppliedRaw !== '0') : ['existing_payable', 'expense', 'fee'].includes(value)));
-  const counterKind: AccountKind[] = treatment === 'internal_transfer' ? ['asset'] : treatment === 'existing_payable' ? ['payable']
+  const counterKind: AccountKind[] = ['internal_transfer', 'investment_deposit', 'investment_withdrawal'].includes(treatment) ? ['asset'] : treatment === 'existing_payable' ? ['payable']
     : treatment === 'existing_receivable' ? ['receivable'] : treatment === 'customer_advance' ? ['liability'] : ['expense'];
   const selectAccount = (label: string, value: string, onChange: (value: string) => void, kinds: AccountKind[]) => <label className="block">
     <span className="finance-label">{label}</span><select className="finance-field" aria-label={label} value={value} onChange={e => { onChange(e.target.value); setReviewed(false); }}>
@@ -138,7 +139,7 @@ function ReviewForm({ orgId, details, config, onSaved }: { orgId: Id<'orgs'>; de
     setBusy(true); setError('');
     try {
       await save({ orgId, sessionToken, source: fact.source, expectedFingerprint: fact.fingerprint, expectedProfileVersion: profile.version,
-        treatment, postingDate, assetBookValue: assetValue, obligationBookValue: obligation ? obligationValue : undefined,
+        treatment, postingDate, assetBookValue: assetValue, obligationBookValue: obligation || withdrawal ? obligationValue : undefined,
         assetAccountId: assetId ? assetId as Id<'accountingAccounts'> : undefined, counterAccountId: counterId ? counterId as Id<'accountingAccounts'> : undefined,
         differenceAccountId: differenceId ? differenceId as Id<'accountingAccounts'> : undefined,
         advanceAccountId: needsAdvance && advanceId ? advanceId as Id<'accountingAccounts'> : undefined,
@@ -155,6 +156,7 @@ function ReviewForm({ orgId, details, config, onSaved }: { orgId: Id<'orgs'>; de
     {previous && <Notice tone="info">{previous.state === 'reconciled' ? 'This correction creates a reversal and a replacement for export together. The original journal is retained.' : 'The unexported review will be retained as voided and replaced with this journal.'}</Notice>}
     {error && <Notice>{error}</Notice>}
     {fact.treasuryTransferId && <Notice tone="info">Reconcile both sides through the same transfer clearing account. The sending account records the full debit; the receiving account records its net receipt and the provider's retained delivery fee. Keep the separate execution fee in its own review.</Notice>}
+    {fact.lendingMovement && <Notice tone="info">Use a separate asset account for the Aave lending position. For withdrawals, use the carrying value of the units redeemed, including income already accrued in your books. Only a remaining difference creates an income or loss entry. Execution fees have their own review.</Notice>}
     <label className="block"><span className="finance-label">How is this recorded in your books?</span>
       <select className="finance-field" value={treatment} onChange={e => { setTreatment(e.target.value as AccountingTreatment); setCounterId(''); setDifferenceId(''); setReviewed(false); }} required>
         <option value="">Choose accounting treatment</option>{options.map(value => <option key={value} value={value}>{accountingTreatments[value]}</option>)}
@@ -171,6 +173,7 @@ function ReviewForm({ orgId, details, config, onSaved }: { orgId: Id<'orgs'>; de
     <div className="grid gap-4 sm:grid-cols-2">
       <label><span className="finance-label">Asset book value · {profile.currency}</span><input className="finance-field" inputMode="decimal" value={assetValue} onChange={e => { setAssetValue(e.target.value); setReviewed(false); }} placeholder="Enter the reviewed book value" required /></label>
       {obligation && <label><span className="finance-label">Obligation settled · {profile.currency}</span><input className="finance-field" inputMode="decimal" value={obligationValue} onChange={e => { setObligationValue(e.target.value); setReviewed(false); }} placeholder="Value of this settlement in the books" required /></label>}
+      {withdrawal && <label><span className="finance-label">Lending asset carrying value released · {profile.currency}</span><input className="finance-field" inputMode="decimal" value={obligationValue} onChange={e => { setObligationValue(e.target.value); setReviewed(false); }} placeholder="Reviewed basis, including recorded accruals" required /></label>}
     </div>
     {needsDeliveryFee && <div className="grid gap-4 sm:grid-cols-2">
       <label><span className="finance-label">Delivery fee book value · {profile.currency}</span><input className="finance-field" inputMode="decimal" value={deliveryFeeValue} onChange={e => { setDeliveryFeeValue(e.target.value); setReviewed(false); }} required placeholder="Reviewed value of the retained fee" /></label>
@@ -185,6 +188,7 @@ function ReviewForm({ orgId, details, config, onSaved }: { orgId: Id<'orgs'>; de
       </div>}
       {selectAccount('Valuation difference account, if needed', differenceId, setDifferenceId, ['income', 'expense'])}
     </>}
+    {withdrawal && selectAccount('Unrecorded income or valuation difference account, if needed', differenceId, setDifferenceId, ['income', 'expense'])}
     <label className="block"><span className="finance-label">Book value evidence</span><textarea className="finance-field min-h-20" value={evidence}
       onChange={e => { setEvidence(e.target.value); setReviewed(false); }} minLength={10} maxLength={1000} required placeholder="Carrying-value schedule, settlement valuation and policy reference" /></label>
     <label className="block"><span className="finance-label">Journal description</span><input className="finance-field" value={memo} onChange={e => { setMemo(e.target.value); setReviewed(false); }} maxLength={500} required /></label>

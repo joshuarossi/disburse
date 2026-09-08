@@ -10,6 +10,7 @@ import {
 import { safes, wallet } from "./fixtures";
 import type { Address } from "viem";
 import { cctpCall, decodeCctpQuote } from "../../../shared/cctp";
+import { decodeLendingQuote, lendingCall } from "../../../shared/lending";
 export function readCircleFixture() {
   return JSON.parse(sessionStorage.getItem("qa:circle") ?? "null");
 }
@@ -79,6 +80,16 @@ export function createCircleFixture() {
     request.operation.nonce = 3n << 64n;
     request.operation.callData = circleAccountCall(call.to, call.data, call.operation);
     request.operation.signature = circleSignature(0, request.validUntil, `0x${"11".repeat(32)}${"22".repeat(32)}1b`);
+  }
+  if (sessionStorage.getItem("qa:scenario")?.startsWith("circle-lending-")) {
+    const service = JSON.parse(sessionStorage.getItem("qa:lending") ?? "null");
+    if (service) {
+      const quote = decodeLendingQuote(service.quote), call = service.cancellationRequestedAt ? {to: safe, data: "0x" as const, operation: 0 as const} : lendingCall(quote);
+      request.transaction = call; request.directCall = true; request.originalHash = service.hash;
+      request.validUntil = Math.floor(quote.expiresAt / 1000); request.operation.nonce = 4n << 64n;
+      request.operation.callData = circleAccountCall(call.to, call.data, call.operation);
+      request.operation.signature = circleSignature(0, request.validUntil, `0x${"11".repeat(32)}${"22".repeat(32)}1b`);
+    }
   }
   const result = {
     _id: "circle1",

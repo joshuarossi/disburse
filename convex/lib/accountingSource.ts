@@ -6,6 +6,7 @@ import { identifyAsset } from '../../shared/assets';
 import { accountingFact, accountingSource } from './accountingValidators';
 import { depositReportRows, outgoingReportRows, paymentReportRows, type ReportRow } from './reportRows';
 import { circleFeeReportRows } from './circleFeeReports';
+import { treasuryServiceReportRows } from './treasuryServiceReports';
 
 export type AccountingFact = Infer<typeof accountingFact>;
 export type AccountingSource = Infer<typeof accountingSource>;
@@ -30,7 +31,8 @@ function finish(fact: Omit<AccountingFact, 'key' | 'fingerprint'>): AccountingFa
   const key = `${fact.chainId}:${fact.transferId.toLowerCase()}`;
   return { ...fact, key, fingerprint: [key, fact.tokenAddress.toLowerCase(), fact.amountRaw, from.toLowerCase(), to.toLowerCase(),
     fact.blockNumber, fact.blockHash ?? '', fact.settledAt, fact.companyTransfer, fact.invoiceAppliedRaw ?? '', fact.invoiceExcessRaw ?? '',
-    ...(fact.treasuryTransferId ? [fact.treasuryTransferId, fact.deliveryFeeRaw ?? ''] : [])].join('|') };
+    ...(fact.treasuryTransferId ? [fact.treasuryTransferId, fact.deliveryFeeRaw ?? ''] : []),
+    ...(fact.treasuryServiceId ? [fact.treasuryServiceId, fact.lendingMovement ?? ''] : [])].join('|') };
 }
 
 /** Read the underlying records again, not just an asynchronously built report.
@@ -77,7 +79,8 @@ export async function loadAccountingFact(ctx: QueryCtx, orgId: Id<'orgs'>, sourc
   const indexed = await ctx.db.query('reportEntries').withIndex('by_org_row', q => q.eq('orgId', orgId).eq('rowId', source.id)).unique();
   if (!indexed) throw new Error('Activity not found. Refresh account history before reconciling.');
   let rows: ReportRow[];
-  if (indexed.treasuryTransferId) rows = await treasuryReportRows(ctx, indexed.treasuryTransferId);
+  if (indexed.treasuryServiceId) rows = await treasuryServiceReportRows(ctx, indexed.treasuryServiceId);
+  else if (indexed.treasuryTransferId) rows = await treasuryReportRows(ctx, indexed.treasuryTransferId);
   else if (indexed.kind === 'deposit') rows = await depositReportRows(ctx, indexed.sourceId as Id<'deposits'>);
   else if (indexed.kind === 'account_transfer') rows = await outgoingReportRows(ctx, indexed.sourceId as Id<'outgoingTransfers'>);
   else if (indexed.kind === 'fee' && ctx.db.normalizeId('circleExecutions', indexed.sourceId)) rows = await circleFeeReportRows(ctx, indexed.sourceId as Id<'circleExecutions'>);
@@ -110,6 +113,7 @@ export async function loadAccountingFact(ctx: QueryCtx, orgId: Id<'orgs'>, sourc
     accountName: account.name ?? 'Company account', counterpartyAddress: row.beneficiaryWallet.toLowerCase(),
     direction: row.direction, companyTransfer: !!companyAccountName, companyAccountName,
     treasuryTransferId: transfer?._id, deliveryFeeRaw: transfer && row.direction === 'inflow' ? transfer.deliveryFee : undefined,
+    treasuryServiceId: row.treasuryServiceId, lendingMovement: row.serviceKind,
     references: bills.filter(bill => bill.orgId === orgId && bill.beneficiaryId === row.beneficiaryId).map(bill => ({ kind: 'bill', id: bill._id, number: bill.invoiceNumber })),
   });
 }

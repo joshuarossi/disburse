@@ -60,4 +60,4 @@ An earlier compatibility test used the composable hook described in Circle's con
 
 Public receipt fixtures for both runs are committed under `src/lib/__tests__/fixtures/cctp-*.json`. They include no credentials or private keys. Regression tests check the actual protocol events and reject a different request or hook format.
 
-This adapter implements USDC account bridging. Same-network token swaps and yield positions are separate work in the v2 program.
+This adapter implements USDC account bridging. Same-network token swaps remain separate work in the v2 program. The direct Aave provider integration is documented in [lending](LENDING.md).

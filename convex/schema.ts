@@ -183,6 +183,35 @@ export default defineSchema({
     .index("by_org_open", ["orgId", "open"])
     .index("by_request", ["orgId", "requestId"])
     .index("by_due", ["recoveryAt"]),
+  treasuryServices: defineTable({
+    settledAmount: v.optional(v.string()),
+    orgId: v.id("orgs"),
+    environment: v.union(v.literal("production"), v.literal("test")),
+    safeId: v.id("safes"),
+    chainId: v.number(),
+    provider: v.literal("aave_v3"),
+    kind: v.union(v.literal("supply"), v.literal("withdraw")),
+    createdBy: v.id("users"),
+    requestId: v.string(),
+    quote: v.string(),
+    hash: v.string(),
+    status: v.union(v.literal("quoted"), v.literal("approving"), v.literal("processing"), v.literal("completed"), v.literal("cancelled"), v.literal("failed"), v.literal("expired")),
+    open: v.boolean(),
+    circleExecutionId: v.optional(v.id("circleExecutions")),
+    cancellationRequestedAt: v.optional(v.number()),
+    sourceTxHash: v.optional(v.string()),
+    sourceTransferId: v.optional(v.string()),
+    sourceSettlement: v.optional(settlementBlockValidator),
+    error: v.optional(v.string()),
+    recoveryAt: v.optional(v.number()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_request", ["orgId", "requestId"])
+    .index("by_safe_open", ["safeId", "open"])
+    .index("by_org_environment", ["orgId", "environment"])
+    .index("by_source_receipt", ["chainId", "sourceTxHash"])
+    .index("by_due", ["recoveryAt"]),
   treasuryTransfers: defineTable({
     orgId: v.id("orgs"),
     environment: v.union(v.literal("production"), v.literal("test")),
@@ -224,6 +253,7 @@ export default defineSchema({
     .index("by_hash", ["hash"])
     .index("by_due", ["recoveryAt"]),
   circleExecutions: defineTable({
+    treasuryServiceId: v.optional(v.id("treasuryServices")),
     treasuryTransferId: v.optional(v.id("treasuryTransfers")),
     cancelExecutionId: v.optional(v.id("circleExecutions")),
     delegatedDisbursementId: v.optional(v.id("disbursements")),
@@ -267,6 +297,7 @@ export default defineSchema({
     feeProof: v.optional(circleFeeProofValidator),
     error: v.optional(v.string()),
   })
+    .index("by_treasury_service", ["treasuryServiceId"])
     .index("by_treasury_transfer", ["treasuryTransferId"])
     .index("by_payment", ["disbursementId"])
     .index("by_delegated_payment", ["delegatedDisbursementId"])
@@ -493,6 +524,7 @@ export default defineSchema({
       v.literal("outgoing"),
       v.literal("fees"),
       v.literal("treasury"),
+      v.literal("services"),
       v.literal("done"),
     ),
     cursor: v.optional(v.string()),
@@ -511,6 +543,7 @@ export default defineSchema({
       v.id("outgoingTransfers"),
       v.id("circleExecutions"),
       v.id("treasuryTransfers"),
+      v.id("treasuryServices"),
     ),
     kind: v.union(
       v.literal("payment"),
@@ -518,6 +551,7 @@ export default defineSchema({
       v.literal("outgoing"),
       v.literal("fee"),
       v.literal("treasury"),
+      v.literal("service"),
     ),
     nextAt: v.number(),
     attempts: v.number(),

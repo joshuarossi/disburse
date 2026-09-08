@@ -81,6 +81,7 @@ import type * as lib_encodeSafeExecution from "../lib/encodeSafeExecution.js";
 import type * as lib_executionReceipt from "../lib/executionReceipt.js";
 import type * as lib_fundingAccount from "../lib/fundingAccount.js";
 import type * as lib_fundingBalance from "../lib/fundingBalance.js";
+import type * as lib_lendingProvider from "../lib/lendingProvider.js";
 import type * as lib_licenseManagement from "../lib/licenseManagement.js";
 import type * as lib_licenseValidators from "../lib/licenseValidators.js";
 import type * as lib_managedRelay from "../lib/managedRelay.js";
@@ -90,6 +91,7 @@ import type * as lib_ownerProposalValidator from "../lib/ownerProposalValidator.
 import type * as lib_paymentLimits from "../lib/paymentLimits.js";
 import type * as lib_paymentProposal from "../lib/paymentProposal.js";
 import type * as lib_paymentSettlement from "../lib/paymentSettlement.js";
+import type * as lib_pinnedContract from "../lib/pinnedContract.js";
 import type * as lib_rbac from "../lib/rbac.js";
 import type * as lib_receivableVerification from "../lib/receivableVerification.js";
 import type * as lib_recipientReview from "../lib/recipientReview.js";
@@ -114,6 +116,8 @@ import type * as lib_spendingPolicyValidators from "../lib/spendingPolicyValidat
 import type * as lib_tags from "../lib/tags.js";
 import type * as lib_teamSeats from "../lib/teamSeats.js";
 import type * as lib_treasuryReports from "../lib/treasuryReports.js";
+import type * as lib_treasuryService from "../lib/treasuryService.js";
+import type * as lib_treasuryServiceReports from "../lib/treasuryServiceReports.js";
 import type * as lib_treasuryTransfer from "../lib/treasuryTransfer.js";
 import type * as lib_users from "../lib/users.js";
 import type * as lib_validation from "../lib/validation.js";
@@ -158,6 +162,8 @@ import type * as teamInvitationLinks from "../teamInvitationLinks.js";
 import type * as teamInvitations from "../teamInvitations.js";
 import type * as treasury from "../treasury.js";
 import type * as treasuryActions from "../treasuryActions.js";
+import type * as treasuryServiceActions from "../treasuryServiceActions.js";
+import type * as treasuryServices from "../treasuryServices.js";
 import type * as users from "../users.js";
 import type * as walletSetups from "../walletSetups.js";
 import type * as workspace from "../workspace.js";
@@ -242,6 +248,7 @@ declare const fullApi: ApiFromModules<{
   "lib/executionReceipt": typeof lib_executionReceipt;
   "lib/fundingAccount": typeof lib_fundingAccount;
   "lib/fundingBalance": typeof lib_fundingBalance;
+  "lib/lendingProvider": typeof lib_lendingProvider;
   "lib/licenseManagement": typeof lib_licenseManagement;
   "lib/licenseValidators": typeof lib_licenseValidators;
   "lib/managedRelay": typeof lib_managedRelay;
@@ -251,6 +258,7 @@ declare const fullApi: ApiFromModules<{
   "lib/paymentLimits": typeof lib_paymentLimits;
   "lib/paymentProposal": typeof lib_paymentProposal;
   "lib/paymentSettlement": typeof lib_paymentSettlement;
+  "lib/pinnedContract": typeof lib_pinnedContract;
   "lib/rbac": typeof lib_rbac;
   "lib/receivableVerification": typeof lib_receivableVerification;
   "lib/recipientReview": typeof lib_recipientReview;
@@ -275,6 +283,8 @@ declare const fullApi: ApiFromModules<{
   "lib/tags": typeof lib_tags;
   "lib/teamSeats": typeof lib_teamSeats;
   "lib/treasuryReports": typeof lib_treasuryReports;
+  "lib/treasuryService": typeof lib_treasuryService;
+  "lib/treasuryServiceReports": typeof lib_treasuryServiceReports;
   "lib/treasuryTransfer": typeof lib_treasuryTransfer;
   "lib/users": typeof lib_users;
   "lib/validation": typeof lib_validation;
@@ -319,6 +329,8 @@ declare const fullApi: ApiFromModules<{
   teamInvitations: typeof teamInvitations;
   treasury: typeof treasury;
   treasuryActions: typeof treasuryActions;
+  treasuryServiceActions: typeof treasuryServiceActions;
+  treasuryServices: typeof treasuryServices;
   users: typeof users;
   walletSetups: typeof walletSetups;
   workspace: typeof workspace;

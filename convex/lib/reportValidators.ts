@@ -8,7 +8,9 @@ export const reportAssetFields = {
 };
 export const reportRowFields = {
   ...reportAssetFields,
-  sourceId: v.union(v.id('disbursements'), v.id('deposits'), v.id('outgoingTransfers'), v.id('circleExecutions'), v.id('treasuryTransfers')),
+  sourceId: v.union(v.id('disbursements'), v.id('deposits'), v.id('outgoingTransfers'), v.id('circleExecutions'), v.id('treasuryTransfers'), v.id('treasuryServices')),
+  treasuryServiceId: v.optional(v.id('treasuryServices')),
+  serviceKind: v.optional(v.union(v.literal('supply'), v.literal('withdraw'))),
   treasuryTransferId: v.optional(v.id('treasuryTransfers')),
   rowId: v.string(), createdAt: v.number(), amount: v.string(), status: v.string(),
   observedAt: v.optional(v.number()), dateSource: v.optional(v.union(v.literal('settlement'), v.literal('provider'), v.literal('recorded'))),
@@ -18,6 +20,6 @@ export const reportRowFields = {
   memo: v.optional(v.string()), txHash: v.optional(v.string()),
   beneficiaryId: v.optional(v.id('beneficiaries')), beneficiaryName: v.string(), beneficiaryWallet: v.string(),
   safeId: v.id('safes'), accountAddress: v.string(),
-  kind: v.union(v.literal('payment'), v.literal('fee'), v.literal('deposit'), v.literal('account_transfer')),
+  kind: v.union(v.literal('payment'), v.literal('fee'), v.literal('deposit'), v.literal('account_transfer'), v.literal('investment')),
   direction: v.union(v.literal('inflow'), v.literal('outflow')), includedInTotals: v.boolean(),
 };

@@ -3,6 +3,7 @@ import { settleDelegatedCircle } from "./lib/circleDelegation";
 import { assertDelegatedCircleReceipt } from "../shared/delegatedSettlement";
 import { v } from "convex/values";
 import { assertCctpBurn, decodeCctpQuote } from "../shared/cctp";
+import { assertLendingSettlement, decodeLendingQuote } from "../shared/lending";
 import {
   action,
   internalAction,
@@ -89,6 +90,8 @@ export const get = query({
       args,
       args.sessionToken,
     );
+    if (source.treasuryServiceId)
+      return ctx.db.query("circleExecutions").withIndex("by_treasury_service", q => q.eq("treasuryServiceId", source.treasuryServiceId)).order("desc").first();
     if (source.treasuryTransferId)
       return ctx.db.query("circleExecutions").withIndex("by_treasury_transfer", q => q.eq("treasuryTransferId", source.treasuryTransferId)).order("desc").first();
     if (source.paymentScheduleId || source.scheduleCancellationId) {
@@ -420,6 +423,8 @@ export const persist = internalMutation({
       await ctx.db.patch(source.identity.delegatedDisbursementId, {
         allowanceCircleExecutionId: id,
       });
+    if (source.identity.treasuryServiceId)
+      await ctx.db.patch(source.identity.treasuryServiceId, {circleExecutionId: id, status: "approving", recoveryAt: request.validUntil * 1000 + 5000, updatedAt: Date.now()});
     if (source.identity.treasuryTransferId)
       await ctx.db.patch(source.identity.treasuryTransferId, { circleExecutionId: id, status: "approving", recoveryAt: request.validUntil * 1000 + 5000, updatedAt: Date.now() });
     await appendAudit(ctx, {
@@ -832,6 +837,8 @@ export const claim = internalMutation({
         checks: 0,
         updatedAt: Date.now(),
       });
+    if (execution.treasuryServiceId)
+      await ctx.db.patch(execution.treasuryServiceId, {status: "processing", recoveryAt: Date.now(), updatedAt: Date.now()});
     if (execution.treasuryTransferId)
       await ctx.db.patch(execution.treasuryTransferId, { status: "processing", recoveryAt: Date.now(), updatedAt: Date.now() });
     await ctx.db.patch(execution._id, {
@@ -981,6 +988,16 @@ export const reconcile = internalAction({
         if (execution.paymentScheduleId && result.status === "confirmed")
           assertScheduledTransfers(request, receipt.logs, result);
         let treasuryDebitIndex: number | undefined;
+        let serviceTransferIndex: number | undefined;
+        let serviceAmount: string | undefined;
+        if (execution.treasuryServiceId && result.status === "confirmed") {
+          const service = await ctx.runQuery(internal.treasuryServices.internalGet, {treasuryServiceId: execution.treasuryServiceId});
+          if (!service || service.circleExecutionId !== execution._id || service.hash !== request.originalHash)
+            throw new Error("The original treasury request changed.");
+          const proof = assertLendingSettlement(decodeLendingQuote(service.quote), receipt.logs, result);
+          serviceTransferIndex = proof.logIndex ?? undefined;
+          serviceAmount = proof.amount;
+        }
         if (execution.treasuryTransferId && result.status === "confirmed") {
           const data = await ctx.runQuery(internal.treasury.internalGet, { treasuryTransferId: execution.treasuryTransferId });
           if (!data || data.transfer.circleExecutionId !== execution._id || data.transfer.hash !== request.originalHash)
@@ -1027,12 +1044,15 @@ export const reconcile = internalAction({
           originalNonceAvailable: nonce === BigInt(request.safeNonce),
           principalVerified:
             (execution.paymentScheduleId ||
+              execution.treasuryServiceId ||
               execution.treasuryTransferId ||
               execution.delegatedDisbursementId) &&
             result.status === "confirmed"
               ? true
               : undefined,
           treasuryDebitIndex,
+          serviceTransferIndex,
+          serviceAmount,
         });
         if (execution.stage === "submitting") {
           if (execution.disbursementId)
@@ -1099,6 +1119,8 @@ export const reconcile = internalAction({
 });
 export const checkpoint = internalMutation({
   args: {
+    serviceTransferIndex: v.optional(v.number()),
+    serviceAmount: v.optional(v.string()),
     treasuryDebitIndex: v.optional(v.number()),
     executionId: v.id("circleExecutions"),
     revision: v.number(),
@@ -1160,13 +1182,15 @@ export const checkpoint = internalMutation({
       throw new Error("Fee transfer evidence is inconsistent");
     if (
       args.state === "confirmed" &&
-      (execution.paymentScheduleId || execution.delegatedDisbursementId || execution.treasuryTransferId) &&
+      (execution.paymentScheduleId || execution.delegatedDisbursementId || execution.treasuryTransferId || execution.treasuryServiceId) &&
       !args.principalVerified
     )
       throw new Error("The principal transfers have not been verified.");
     if (execution.treasuryTransferId && args.state === "confirmed" &&
       (!Number.isSafeInteger(args.treasuryDebitIndex) || args.treasuryDebitIndex! < 0))
       throw new Error("The transfer's account debit has not been verified.");
+    if (execution.treasuryServiceId && args.state === "confirmed" && (!Number.isSafeInteger(args.serviceTransferIndex) || args.serviceTransferIndex! < 0))
+      throw new Error("The treasury request's asset transfer has not been verified.");
     await ctx.db.patch(execution._id, {
       stage: args.state ?? execution.stage,
       open: !args.state,
@@ -1185,6 +1209,21 @@ export const checkpoint = internalMutation({
     });
     if (args.feeProof)
       await queueReportSource(ctx, execution.orgId, "fee", execution._id);
+    if (execution.treasuryServiceId && args.state) {
+      const service = await ctx.db.get(execution.treasuryServiceId);
+      if (!service || service.circleExecutionId !== execution._id || service.hash !== decodeCircleRequest(execution.record).originalHash)
+        throw new Error("The original treasury fee request changed.");
+      const quote = decodeLendingQuote(service.quote);
+      if (args.state === "confirmed" && (!/^[1-9]\d{0,99}$/.test(args.serviceAmount ?? "") || !quote.withdrawAll && args.serviceAmount !== quote.amount))
+        throw new Error("The settled lending amount does not match the authorized request.");
+      await ctx.db.patch(service._id, args.state === "confirmed" ? {
+        open: false, status: "completed", sourceTxHash: args.txHash, sourceSettlement: args.settlement,
+        sourceTransferId: `e${args.txHash!.slice(2)}${args.serviceTransferIndex}`, recoveryAt: undefined, error: undefined, updatedAt: Date.now(),
+        settledAmount: args.serviceAmount,
+      } : {open: false, status: args.state, recoveryAt: undefined, error: undefined, updatedAt: Date.now()});
+      if (args.state === "confirmed") await queueReportSource(ctx, service.orgId, "service", service._id);
+      await appendAudit(ctx, {orgId: service.orgId, actorUserId: execution.createdBy, action: `treasury_service.${args.state}`, objectType: "treasury_service", objectId: service._id, metadata: {executionId: execution._id, txHash: args.txHash, fee: args.fee}});
+    }
     if (execution.treasuryTransferId && args.state) {
       const transfer = await ctx.db.get(execution.treasuryTransferId);
       if (!transfer || transfer.circleExecutionId !== execution._id || transfer.hash !== decodeCircleRequest(execution.record).originalHash)

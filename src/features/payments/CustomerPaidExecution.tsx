@@ -21,6 +21,7 @@ export function CustomerPaidExecution({
   compact = false,
   armed = false,
   principalUSDC,
+  actionLabel,
 }: {
   source: CircleSource;
   ready: boolean;
@@ -30,8 +31,11 @@ export function CustomerPaidExecution({
   compact?: boolean;
   armed?: boolean;
   principalUSDC?: string;
+  actionLabel?: string;
 }) {
-  const subject = source.treasuryTransferId
+  const subject = source.treasuryServiceId
+    ? "treasury request"
+    : source.treasuryTransferId
     ? "account transfer"
     : source.accountSetupId
       ? "account setup"
@@ -48,7 +52,7 @@ export function CustomerPaidExecution({
               : source.receivingSetupSafeId
                 ? "receiving setup"
                 : "cancellation";
-  const submitLabel = source.paymentScheduleId
+  const submitLabel = actionLabel ?? (source.paymentScheduleId
     ? "Schedule payment"
     : subject === "account transfer"
       ? "Start transfer"
@@ -64,7 +68,7 @@ export function CustomerPaidExecution({
                 ? "Collect invoice funds"
                 : subject === "receiving setup"
                   ? "Set up receiving"
-                  : "Confirm cancellation";
+                  : "Confirm cancellation");
   const sessionToken = useSessionToken(),
     { address } = useAccount();
   const execution = useQuery(

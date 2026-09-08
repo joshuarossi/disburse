@@ -7,6 +7,7 @@ import { decodeCircleRequest } from "../../shared/circleRequest";
 import { requireOrgAccess } from "./rbac";
 import type { CircleSource } from "./circleSource";
 import { appendAudit } from "../audit";
+import { readTreasuryService } from "./treasuryService";
 
 export async function readTreasuryTransfer(
   ctx: QueryCtx,
@@ -86,7 +87,7 @@ export async function readTreasuryCancellation(
   sessionToken: string,
   write = false,
 ) {
-  const { transfer, safe, user } = await readTreasuryTransfer(
+  const { transfer, safe, user } = original.treasuryServiceId ? await readTreasuryService(ctx, original.treasuryServiceId, sessionToken) : await readTreasuryTransfer(
     ctx,
     original.treasuryTransferId!,
     sessionToken,
@@ -154,7 +155,7 @@ export async function settleTreasuryCancellation(
   original: Doc<"circleExecutions">,
   cancellation: Doc<"circleExecutions">,
 ) {
-  const transfer = await ctx.db.get(original.treasuryTransferId!);
+  const transfer = original.treasuryServiceId ? await ctx.db.get(original.treasuryServiceId) : await ctx.db.get(original.treasuryTransferId!);
   if (
     !transfer ||
     transfer.circleExecutionId !== original._id ||
@@ -185,8 +186,8 @@ export async function settleTreasuryCancellation(
   await appendAudit(ctx, {
     orgId: transfer.orgId,
     actorUserId: cancellation.createdBy,
-    action: "treasury_transfer.cancelled",
-    objectType: "treasury_transfer",
+    action: original.treasuryServiceId ? "treasury_service.cancelled" : "treasury_transfer.cancelled",
+    objectType: original.treasuryServiceId ? "treasury_service" : "treasury_transfer",
     objectId: transfer._id,
     metadata: {
       executionId: original._id,
