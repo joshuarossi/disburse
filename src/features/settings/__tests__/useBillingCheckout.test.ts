@@ -86,79 +86,38 @@ beforeEach(() => {
 afterEach(() => vi.restoreAllMocks());
 
 describe("subscription checkout recovery", () => {
-  it("keeps an unknown wallet request across remounts and refuses another payment", async () => {
-    mocks.send.mockImplementation(async () => {
-      expect(JSON.parse(localStorage.getItem(storageKey)!)).toMatchObject({
-        plan: "team",
-        payer: props.address,
-        chainId: 11155111,
-      });
-      throw new Error("Wallet transport lost after broadcast");
-    });
-    const first = open();
-    await act(() => first.result.current.handlePayWithWallet());
-    expect(first.result.current.paymentStep).toBe("confirm");
-    expect(first.result.current.billingError).toContain(
-      "response was interrupted",
-    );
-    first.unmount();
-    const second = open();
-    expect(second.result.current.hasPendingBilling).toBe(true);
-    expect(second.result.current.txHash).toBeUndefined();
-    await act(() => second.result.current.handlePayWithWallet());
-    expect(mocks.send).toHaveBeenCalledTimes(1);
-    expect(mocks.subscribe).not.toHaveBeenCalled();
-  });
-
-  it("releases an explicitly declined send for a fresh reviewed attempt", async () => {
-    mocks.send.mockRejectedValueOnce({ cause: { code: 4001 } });
-    const hook = open();
-    await act(() => hook.result.current.handlePayWithWallet());
-    expect(localStorage.getItem(storageKey)).toBeNull();
-    expect(hook.result.current.hasPendingBilling).toBe(false);
-    expect(hook.result.current.billingError).toContain(
-      "Wallet approval declined",
-    );
-    await act(() => hook.result.current.handlePayWithWallet());
-    expect(mocks.send).toHaveBeenCalledTimes(2);
-    expect(mocks.verifyCheckout).toHaveBeenCalledWith(expect.objectContaining({ txHash: hash, checkoutId: 'checkout-test' }));
-    expect(hook.result.current.paymentStep).toBe("success");
-  });
-
-  it("does not open a payment request when recovery storage fails", async () => {
-    const hook = open();
-    vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
-      throw new Error("Storage quota exceeded");
-    });
-    await act(() => hook.result.current.handlePayWithWallet());
-    expect(mocks.send).not.toHaveBeenCalled();
-    expect(hook.result.current.billingError).toContain(
-      "Could not save billing recovery",
-    );
-  });
-
-  it("holds checkout when an earlier record is unreadable", async () => {
-    localStorage.setItem(storageKey, "truncated recovery data");
+  it("restores an earlier unknown wallet request without exposing another send", () => {
+    localStorage.setItem(storageKey, JSON.stringify({ attemptId: 'unknown', startedAt: Date.now(), plan: 'team' }));
     const hook = open();
     expect(hook.result.current.hasPendingBilling).toBe(true);
-    expect(hook.result.current.billingError).toContain("could not be read");
-    await act(() => hook.result.current.handlePayWithWallet());
-    expect(mocks.send).not.toHaveBeenCalled();
+    expect(hook.result.current.paymentStep).toBe('confirm');
+    expect(hook.result.current).not.toHaveProperty('handlePayWithWallet');
   });
 
-  it("keeps the original receipt when confirmation fails after the wallet returns its hash", async () => {
-    mocks.receipt.mockRejectedValueOnce(new Error("RPC unavailable"));
+  it("holds checkout when recovery storage is unreadable", () => {
+    localStorage.setItem(storageKey, 'truncated recovery');
     const hook = open();
-    await act(() => hook.result.current.handlePayWithWallet());
-    expect(JSON.parse(localStorage.getItem(storageKey)!)).toMatchObject({
-      hash,
-      plan: "team",
-    });
-    expect(hook.result.current.paymentStep).toBe("confirm");
-    await act(() => hook.result.current.handleConfirmPayment(hash));
-    expect(mocks.send).toHaveBeenCalledTimes(1);
-    expect(mocks.verifyCheckout).toHaveBeenCalledTimes(1);
-    expect(localStorage.getItem(storageKey)).toBeNull();
+    expect(hook.result.current.hasPendingBilling).toBe(true);
+    expect(hook.result.current.billingError).toContain('could not be read');
+  });
+
+  it("recovers a saved company account checkout with its original plan", () => {
+    mocks.current = { _id: 'checkout-test', safeId: 'safe-test', plan: 'pro', status: 'requested', active: true, payer: props.address, chainId: 8453, amountRaw: '99000000' };
+    const hook = open();
+    expect(hook.result.current.selectedPlan).toBe('pro');
+    expect(hook.result.current.paymentStep).toBe('select');
+    expect(hook.result.current.hasPendingBilling).toBe(false);
+    expect(hook.result.current.checkout?.safeId).toBe('safe-test');
+  });
+
+  it("shows success after the server applies the account receipt", async () => {
+    const hook = open();
+    act(() => hook.result.current.setCheckoutId('checkout-test' as any));
+    mocks.saved = { _id: 'checkout-test', safeId: 'safe-test', plan: 'team', status: 'applied', active: false, payer: props.address, chainId: 8453, amountRaw: '50000000', txHash: hash };
+    hook.rerender();
+    expect(hook.result.current.paymentStep).toBe('success');
+    expect(hook.result.current.txHash).toBe(hash);
+    expect(mocks.subscribe).not.toHaveBeenCalled();
   });
 
   it("does not use an unrelated reverted receipt to release a request with an unknown hash", async () => {
@@ -200,20 +159,4 @@ describe("subscription checkout recovery", () => {
     expect(localStorage.getItem(storageKey)).toBeNull();
   });
 
-  it("does not request funds while another tab owns checkout", async () => {
-    Object.defineProperty(navigator, "locks", {
-      configurable: true,
-      value: {
-        request: async (
-          _name: string,
-          _options: unknown,
-          callback: (lock: object | null) => Promise<unknown>,
-        ) => callback(null),
-      },
-    });
-    const hook = open();
-    await act(() => hook.result.current.handlePayWithWallet());
-    expect(mocks.send).not.toHaveBeenCalled();
-    expect(hook.result.current.billingError).toContain("another tab");
-  });
 });

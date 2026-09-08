@@ -1,3 +1,4 @@
+import { userErrorMessage } from '@/lib/userErrors';
 import { useState } from "react";
 import { useParams } from "react-router-dom";
 import { useAction, useMutation, useQuery } from "convex/react";
@@ -31,9 +32,7 @@ export function ScreeningSource({ isAdmin }: { isAdmin: boolean }) {
       setMessage(await operation());
     } catch (e) {
       setError(
-        e instanceof Error
-          ? e.message
-          : "This screening update did not complete.",
+        userErrorMessage(e, "This screening update did not complete."),
       );
     } finally {
       setBusy("");

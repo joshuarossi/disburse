@@ -11,7 +11,7 @@ export const CURRENT_ALLOWANCE = {
   codeHash:
     "0xfafc86ce3000fbdc8ad155875c0b3b5a20d17662e7c2cdbf3e95f15945a46657" as Hex,
 };
-const verifiedNetworks = new Set([1, 137, 8453, 42161, 11155111]);
+const verifiedNetworks = new Set([1, 137, 8453, 42161, 11155111, 84532]);
 export type AllowanceDeployment = {
   address: Address;
   version: string;
@@ -59,4 +59,5 @@ export function assertAllowanceRuntime(address: string, code: Hex | undefined) {
     );
 }
 
-export const supportsCurrentAllowance = (safeVersion: string) => ['1.3.0', '1.4.1'].includes(safeVersion);
+export const supportsCurrentAllowance = (safeVersion: string) =>
+  ["1.3.0", "1.4.1"].includes(safeVersion);

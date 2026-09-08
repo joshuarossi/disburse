@@ -1,11 +1,15 @@
 import { convexTest } from 'convex-test';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import schema from '../schema';
 import { api, internal } from '../_generated/api';
 import { createFullOrgSetup, createTestBeneficiary, signIn, TEST_WALLETS } from './factories';
 import { allowanceModules, type DelegatedIntent } from '../../shared/allowanceTransfer';
 import { CHAIN_TOKENS } from '../../shared/chains';
 import { allowanceDeployments } from '../../shared/allowanceDeployments';
+
+// Historical fee authorizations still need nonce and recovery coverage. The
+// production adapter is disabled and is checked without mocks in serviceBillingBoundary.
+vi.mock('../lib/relayConfiguration', () => ({ relayConfiguration: () => ({ fee: { token: 'USDC', tokenAddress: CHAIN_TOKENS[11155111].USDC.address, collector: TEST_WALLETS.viewer, amount: '0.05' } }) }));
 
 async function setup() {
   const t = convexTest(schema);
@@ -87,7 +91,7 @@ describe('delegated payment reservations and recovery', () => {
   });
 });
 
-describe('stablecoin-paid delegated execution', () => {
+describe('historical delegated fee authorizations', () => {
   it('atomically reserves recipient and fee authorizations and queues a relay', async () => {
     const { vi } = await import('vitest');
     vi.useFakeTimers();

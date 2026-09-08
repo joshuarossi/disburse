@@ -1,3 +1,4 @@
+import { userErrorMessage } from '@/lib/userErrors';
 import { useState } from 'react';
 import { useMutation, useQuery } from 'convex/react';
 import { ShieldCheck } from 'lucide-react';
@@ -46,7 +47,7 @@ export function MemberSpendingLimits({
       setSelected(null);
     } catch (e) {
       setError(
-        e instanceof Error ? e.message : 'Could not update payment limits',
+        userErrorMessage(e, 'Could not update payment limits'),
       );
     } finally {
       setBusy(false);

@@ -1,8 +1,12 @@
+import { StableDelegatedPayment } from "./StableDelegatedPayment";
+import { supportsCircleFees } from "../../../shared/circleExecution";
+import { userErrorMessage } from "@/lib/userErrors";
 import { useRef, useState } from "react";
 import { useAction, useMutation } from "convex/react";
+import { ConvexError } from "convex/values";
 import { RELAY_FEATURE_ENABLED } from "@/lib/relayConfig";
 import { sendApprovedAccountPayment } from "@/lib/accountApproval";
-import { walletDeclined } from "@/lib/walletErrors";
+import { walletDeclined, walletErrorMessage } from "@/lib/walletErrors";
 import type { FunctionReturnType } from "convex/server";
 import { useAccount, useSwitchChain } from "wagmi";
 import { formatUnits } from "viem";
@@ -14,7 +18,32 @@ import { formatMoney } from "@/lib/formatMoney";
 import { signAllowanceAuthorization } from "@/lib/delegatedTransfer";
 
 type AllowanceQuote = FunctionReturnType<typeof api.delegatedPayments.quote>;
-export function DelegatedPayment({
+type DelegatedPaymentProps = {
+  payment: Doc<"disbursements">;
+  blocked: boolean;
+  onBusyChange: (value: boolean) => void;
+  onModeChange: (value: boolean) => void;
+  onFeeModeChange: (mode: "managed" | "wallet") => void;
+};
+export function DelegatedPayment(props: DelegatedPaymentProps) {
+  if (
+    (supportsCircleFees(props.payment.chainId) &&
+      !props.payment.allowanceExecution) ||
+    props.payment.allowanceFeeSafeId
+  )
+    return <StableDelegatedPayment {...props} />;
+  // Earlier native testnet authorizations remain recoverable. New production
+  // execution never falls back to buying native gas or a retired relay.
+  if (!props.payment.allowanceExecution && props.payment.chainId !== 11155111)
+    return (
+      <p className="workspace-description">
+        USDC-paid spending allowances are available on Base and Arbitrum. Use a
+        supported account to prepare this payment.
+      </p>
+    );
+  return <LegacyDelegatedPayment {...props} />;
+}
+function LegacyDelegatedPayment({
   payment,
   blocked,
   onBusyChange,
@@ -47,6 +76,7 @@ export function DelegatedPayment({
   const quote = quoteContext === reviewContext ? storedQuote : null;
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [reservedPaymentId, setReservedPaymentId] = useState<string>();
   const [message, setMessage] = useState("");
   const [txHash, setTxHash] = useState(payment.txHash ?? "");
   const [acknowledgedContext, setAcknowledgedContext] = useState("");
@@ -68,7 +98,9 @@ export function DelegatedPayment({
     setBusy(true);
     onBusyChange(true);
     setError("");
+    setReservedPaymentId(undefined);
     setMessage("");
+    let confirmingWallet = false;
     try {
       const args = { disbursementId: payment._id, sessionToken };
       if (operation === "quote") {
@@ -89,8 +121,11 @@ export function DelegatedPayment({
         return;
       }
       if (!acknowledged || !payment.chainId || !isDelegate) return;
-      if (chainId !== payment.chainId)
+      if (chainId !== payment.chainId) {
+        confirmingWallet = true;
         await switchChainAsync({ chainId: payment.chainId });
+        confirmingWallet = false;
+      }
       let intent = payment.allowanceExecution;
       if (!intent) {
         if (!quote) return;
@@ -99,11 +134,13 @@ export function DelegatedPayment({
             throw new Error(
               "The payment or connected member changed. Review the allowance again.",
             );
+          confirmingWallet = true;
           const signature = await signAllowanceAuthorization(
             quote.chainId,
             quote.delegate,
             hash,
           );
+          confirmingWallet = false;
           if (currentContext.current !== reviewContext)
             throw new Error(
               "The payment or connected member changed. Review the allowance again.",
@@ -139,9 +176,10 @@ export function DelegatedPayment({
         } catch (error) {
           if (walletDeclined(error)) {
             await walletRejected({ ...args, attemptId: prepared.attemptId });
-            throw new Error(
+            setMessage(
               "Wallet approval declined. The original allowance authorization is saved. Review it again to retry.",
             );
+            return;
           }
           throw new Error(
             "The wallet response was interrupted. Check the original payment settlement before trying again.",
@@ -154,13 +192,28 @@ export function DelegatedPayment({
         "Payment submitted. We will verify settlement before marking it paid.",
       );
     } catch (error) {
-      setError(
-        walletDeclined(error)
-          ? "Wallet approval declined. No allowance authorization was saved."
-          : error instanceof Error
-            ? error.message
-            : "Could not complete this payment.",
-      );
+      if (
+        error instanceof ConvexError &&
+        error.data?.code === "ALLOWANCE_AUTHORIZATION_RESERVED"
+      ) {
+        setError(
+          userErrorMessage(
+            error,
+            "This allowance authorization is already in use. Open the original payment to check its status.",
+          ),
+        );
+        setReservedPaymentId(error.data.disbursementId);
+      } else if (confirmingWallet && walletDeclined(error))
+        setMessage(walletErrorMessage(error, ""));
+      else {
+        const fallback =
+          "Could not complete this payment. Check its status before trying again.";
+        setError(
+          walletDeclined(error)
+            ? fallback
+            : walletErrorMessage(error, fallback),
+        );
+      }
     } finally {
       operationLock.current = false;
       setBusy(false);
@@ -182,7 +235,7 @@ export function DelegatedPayment({
           allowance, without collecting owner approvals for this payment.
         </p>
         {error && (
-          <p role="alert" className="text-sm text-red-400">
+          <p role="alert" className="min-w-0 break-words text-sm text-red-400">
             {error}
           </p>
         )}
@@ -190,6 +243,14 @@ export function DelegatedPayment({
           <p role="status" className="text-sm text-accent-400">
             {message}
           </p>
+        )}
+        {reservedPaymentId && (
+          <a
+            className="text-sm text-accent-400 underline"
+            href={`/org/${payment.orgId}/disbursements?focus=${encodeURIComponent(reservedPaymentId)}`}
+          >
+            Open the original payment
+          </a>
         )}
         {!payment.allowanceExecution && (
           <label className="block">

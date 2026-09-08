@@ -1,7 +1,7 @@
 import { QueryCtx, MutationCtx } from "../_generated/server";
 import { Id } from "../_generated/dataModel";
 
-type Role = "admin" | "approver" | "initiator" | "clerk" | "viewer";
+import type { OrgRole as Role } from '../../shared/roles';
 
 const SESSION_MIN_TOKEN_LENGTH = 32;
 
@@ -65,7 +65,7 @@ export async function requireOrgAccess(
   ctx: QueryCtx | MutationCtx,
   orgId: Id<"orgs">,
   sessionToken: string,
-  allowedRoles: Role[]
+  allowedRoles: readonly Role[]
 ) {
   const { user } = await requireUser(ctx, sessionToken);
 

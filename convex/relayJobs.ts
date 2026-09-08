@@ -6,6 +6,7 @@ import { assertPaymentMayProceed } from './lib/disbursementPolicy';
 import { assertMemberPaymentPolicy } from './lib/paymentLimits';
 import { appendAudit } from './audit';
 import { assertCurrentAllowance } from '../shared/allowanceDeployments';
+import { settlementBlockValidator, validateSettlementBlock } from './lib/settlementBlock';
 
 export const get = internalQuery({ args: { jobId: v.id('relayJobs') }, handler: (ctx, args) => ctx.db.get(args.jobId) });
 export const reserve = internalMutation({
@@ -56,14 +57,32 @@ export const update = internalMutation({
   args: { jobId: v.id('relayJobs'), status: v.union(v.literal('submitted'), v.literal('confirmed'), v.literal('exception')), searchFromBlock: v.optional(v.string()), providerId: v.optional(v.string()), txHash: v.optional(v.string()), error: v.optional(v.string()) },
   handler: async (ctx, args) => {
     const job = await ctx.db.get(args.jobId);
-    if (!job || job.status === 'confirmed') return;
+    if (!job || job.status === 'confirmed' || job.status === 'failed') return;
     if (job.providerId && args.providerId && job.providerId !== args.providerId) throw new Error('Provider request cannot be replaced');
+    if (job.txHash && args.txHash && job.txHash.toLowerCase() !== args.txHash.toLowerCase()) throw new Error('Original transaction cannot be replaced');
     const patch = { status: args.status, error: args.error, searchFromBlock: args.searchFromBlock ?? job.searchFromBlock };
     await ctx.db.patch(job._id, { ...patch, providerId: args.providerId ?? job.providerId, txHash: args.txHash ?? job.txHash, attempts: job.attempts + 1, updatedAt: Date.now() });
     const p = await ctx.db.get(job.disbursementId);
-    if (p && p.status !== 'executed') {
+    if (p && p.status !== 'executed' && p.status !== 'failed') {
       await ctx.db.patch(p._id, { relayTaskId: args.providerId ?? job.providerId, txHash: args.txHash ?? job.txHash, relayStatus: args.status === 'exception' ? 'Needs investigation' : 'Submitted', relayError: args.error, updatedAt: Date.now() });
     }
+  },
+});
+/** A canonical Safe ExecutionFailure consumes the signed Safe nonce. Keep this
+ * terminal outcome distinct from an unavailable provider or an unknown receipt. */
+export const confirmFailure = internalMutation({
+  args: { jobId: v.id('relayJobs'), safeTxHash: v.string(), txHash: v.string(), settlement: settlementBlockValidator },
+  handler: async (ctx, args) => {
+    const job = await ctx.db.get(args.jobId);
+    if (!job || job.status === 'confirmed' || job.status === 'failed') return;
+    const p = await ctx.db.get(job.disbursementId);
+    if (!p || p.status !== 'relaying' || p.allowanceExecution || p.safeTxHash !== args.safeTxHash || job.safeTxHash !== args.safeTxHash) return;
+    if ((job.txHash && job.txHash.toLowerCase() !== args.txHash.toLowerCase()) || (p.txHash && p.txHash.toLowerCase() !== args.txHash.toLowerCase())) throw new Error('Original transaction cannot be replaced');
+    validateSettlementBlock(args.settlement);
+    const error = 'This payment failed. No money was sent to the recipients. Create a new payment to try again.';
+    await ctx.db.patch(job._id, { status: 'failed', txHash: args.txHash, error, updatedAt: Date.now() });
+    await ctx.db.patch(p._id, { status: 'failed', txHash: args.txHash, executionFailure: { safeTxHash: args.safeTxHash, txHash: args.txHash, block: args.settlement }, relayStatus: 'Execution failed', relayError: error, updatedAt: Date.now(), followupAt: Date.now() });
+    await appendAudit(ctx, { orgId: p.orgId, actorUserId: p.createdBy, action: 'disbursement.execution_failed', objectType: 'disbursement', objectId: p._id, metadata: { jobId: job._id, txHash: args.txHash, safeTxHash: args.safeTxHash, settlement: args.settlement } });
   },
 });
 export const recover = internalMutation({ args: {}, handler: async ctx => {
@@ -112,7 +131,7 @@ export const recheck = mutation({ args: { disbursementId: v.id('disbursements'),
   const { user } = await requireOrgAccess(ctx, payment.orgId, args.sessionToken, ['admin', 'approver', 'initiator']);
   const job = await ctx.db.query('relayJobs').withIndex('by_payment', q => q.eq('disbursementId', payment._id)).first();
   if (!job) throw new Error('No managed submission exists for this payment');
-  if (payment.status === 'executed') return;
+  if (payment.status === 'executed' || job.status === 'failed') return;
   if (job.neverSubmitted) throw new Error('This payment was never submitted. Resume the approved payment instead.');
   if (job.status === 'prepared') throw new Error('The original submission is still being prepared');
   // Reconciliation only. Never reset to prepared or issue another provider request.

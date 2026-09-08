@@ -67,7 +67,10 @@ async function setup() {
     tokenAddress: token,
     amountRaw: "50000000",
   };
-  const id = await t.mutation(api.billingCheckoutData.create, args);
+  // Receipt recovery fixture from the retired EOA checkout path.
+  const terms = { ...args };
+  Reflect.deleteProperty(terms, "sessionToken");
+  const id = await t.run(ctx => ctx.db.insert('billingCheckouts', { ...terms, createdBy: admin.userId, payer: TEST_WALLETS.admin.toLowerCase(), status: 'prepared', active: true, checks: 0, createdAt: Date.now(), updatedAt: Date.now() }));
   const scope = { checkoutId: id, sessionToken: admin.sessionToken };
   return {
     t,
@@ -75,6 +78,7 @@ async function setup() {
     id,
     scope,
     admin,
+    claim: () => t.mutation(internal.billingCheckoutData.claim, { ...scope, nonce: 7, fromBlock: '90', attemptId: 'legacy-attempt' }),
     org,
     read: () =>
       t.query(api.billingCheckoutData.get, { ...scope, orgId: org.orgId }),
@@ -131,82 +135,26 @@ describe("durable subscription checkout", () => {
         sessionToken: other.sessionToken,
       }),
     ).rejects.toThrow("Connect the wallet");
-    const first = await s.t.action(api.billingCheckoutActions.begin, s.scope);
-    expect(first).toMatchObject({
-      to: token,
-      data: input,
-      nonce: 7,
-      chainId: 11155111,
-    });
-    await expect(
-      s.t.action(api.billingCheckoutActions.begin, s.scope),
-    ).rejects.toThrow("original wallet request");
-    expect((await s.read()).status).toBe("requested");
+    await expect(s.t.action(api.billingCheckoutActions.begin, s.scope)).rejects.toThrow('pay all fees in USDC');
+    expect((await s.read()).status).toBe('prepared');
+    expect(rpc.estimateGas).not.toHaveBeenCalled();
   });
 
-  it("binds terms, refuses a changed quote, and coordinates the payer across organizations", async () => {
+  it("refuses new EOA checkouts and permits discarding only an unsubmitted request", async () => {
     const s = await setup();
-    const next = await s.t.run((ctx) => createTestOrg(ctx, s.admin.userId));
-    await expect(
-      s.t.mutation(api.billingCheckoutData.create, {
-        ...s.args,
-        orgId: next.orgId,
-        requestId: crypto.randomUUID(),
-        amountRaw: "1",
-      }),
-    ).rejects.toThrow("terms changed");
-    await expect(
-      s.t.mutation(api.billingCheckoutData.create, {
-        ...s.args,
-        orgId: next.orgId,
-        requestId: crypto.randomUUID(),
-      }),
-    ).rejects.toThrow("another workspace");
     await s.t.mutation(api.billingCheckoutData.discard, s.scope);
-    expect((await s.read()).status).toBe("cancelled");
-    expect(
-      await s.t.mutation(api.billingCheckoutData.create, {
-        ...s.args,
-        orgId: next.orgId,
-        requestId: crypto.randomUUID(),
-      }),
-    ).toBeDefined();
-  });
-
-  it("keeps a failed network preflight unsubmitted and allows only an explicit wallet decline after claim", async () => {
-    const s = await setup();
-    rpc.estimateGas.mockRejectedValueOnce(new Error("Insufficient funds"));
-    await expect(
-      s.t.action(api.billingCheckoutActions.begin, s.scope),
-    ).rejects.toThrow("Insufficient funds");
-    expect((await s.read()).status).toBe("prepared");
-    const attempt = await s.t.action(api.billingCheckoutActions.begin, s.scope);
-    await expect(
-      s.t.mutation(api.billingCheckoutData.discard, s.scope),
-    ).rejects.toThrow("wallet request");
-    await expect(
-      s.t.mutation(api.billingCheckoutData.walletResult, {
-        ...s.scope,
-        attemptId: "other",
-        declined: true,
-      }),
-    ).rejects.toThrow("does not belong");
-    await s.t.mutation(api.billingCheckoutData.walletResult, {
-      ...s.scope,
-      attemptId: attempt.attemptId,
-      declined: true,
-    });
-    await s.t.mutation(api.billingCheckoutData.walletResult, {
-      ...s.scope,
-      attemptId: attempt.attemptId,
-      declined: true,
-    });
-    expect((await s.read()).active).toBe(false);
+    await expect(s.t.mutation(api.billingCheckoutData.create, { ...s.args, requestId: crypto.randomUUID() })).rejects.toThrow('company account');
+    const pending = await setup();
+    const attempt = await pending.claim();
+    await expect(pending.t.mutation(api.billingCheckoutData.discard, pending.scope)).rejects.toThrow('wallet request');
+    await expect(pending.t.mutation(api.billingCheckoutData.walletResult, { ...pending.scope, attemptId: 'other', declined: true })).rejects.toThrow('does not belong');
+    await pending.t.mutation(api.billingCheckoutData.walletResult, { ...pending.scope, attemptId: attempt.attemptId, declined: true });
+    expect((await pending.read()).active).toBe(false);
   });
 
   it("finds a withheld receipt with the browser closed and activates exactly once after trial expiry", async () => {
     const s = await setup();
-    await s.t.action(api.billingCheckoutActions.begin, s.scope);
+    await s.claim();
     await s.t.run((ctx) =>
       ctx.db.patch(s.org.billingId, { trialEndsAt: Date.now() - 1 }),
     );
@@ -234,7 +182,7 @@ describe("durable subscription checkout", () => {
 
   it("honors the saved terms after billing configuration changes", async () => {
     const s = await setup();
-    await s.t.action(api.billingCheckoutActions.begin, s.scope);
+    await s.claim();
     vi.stubEnv("DISBURSE_BENEFICIARY_CHAIN_ID", "1");
     vi.stubEnv("DISBURSE_BENEFICIARY_ADDRESS", TEST_WALLETS.viewer);
     expect(
@@ -247,7 +195,7 @@ describe("durable subscription checkout", () => {
 
   it("does not release an unrelated revert or accept a receipt for another wallet nonce", async () => {
     const s = await setup();
-    await s.t.action(api.billingCheckoutActions.begin, s.scope);
+    await s.claim();
     rpc.getTransaction.mockResolvedValue({ ...transaction(), nonce: 6 });
     rpc.getTransactionReceipt.mockResolvedValue({
       ...receipt(),
@@ -283,7 +231,7 @@ describe("durable subscription checkout", () => {
 
   it("releases an unknown request only after a replacement consumes its original nonce", async () => {
     const s = await setup();
-    await s.t.action(api.billingCheckoutActions.begin, s.scope);
+    await s.claim();
     rpc.getTransaction.mockResolvedValue({
       ...transaction(),
       input: "0x",
@@ -312,7 +260,7 @@ describe("durable subscription checkout", () => {
 
   it("keeps an unknown submission reserved through provider outages and rejects changed receipts", async () => {
     const s = await setup();
-    const attempt = await s.t.action(api.billingCheckoutActions.begin, s.scope);
+    const attempt = await s.claim();
     rpc.getLogs.mockRejectedValueOnce(new Error("Network unavailable"));
     await s.t.action(internal.billingCheckoutActions.reconcile, {
       checkoutId: s.id,

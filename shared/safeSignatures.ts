@@ -30,7 +30,13 @@ export function messageSigningData(chainId: number, account: string, message: He
 /** Path contains the paying account, then each owning account up to the human signer. */
 export function approvalSigningData(chainId: number, path: string[], tx: SafeTransactionData) {
   if (!path.length || path.length > 4) throw new Error('Unsupported approval path');
-  let data = transactionSigningData(chainId, path[0], tx);
+  return nestedSigningData(chainId, path, transactionSigningData(chainId, path[0], tx));
+}
+/** Wrap the exact root preimage for each owning Safe. SafeOp approvals use a
+ * different root preimage from SafeTx approvals; their signatures are never interchangeable. */
+export function nestedSigningData(chainId: number, path: string[], rootData: Hex) {
+  if (!path.length || path.length > 4) throw new Error('Unsupported approval path');
+  let data = rootData;
   let message = data;
   for (const account of path.slice(1)) {
     message = data;

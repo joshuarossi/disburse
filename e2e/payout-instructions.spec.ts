@@ -45,12 +45,12 @@ test("S10 choosing an account carries its network into the payment form", async 
     .getByRole("dialog")
     .getByText("Payment defaults", { exact: true })
     .click();
-  await expect(page.getByRole("dialog").getByLabel("Default payment network")).toHaveValue(
-    "11155111",
-  );
-  await expect(page.getByRole("dialog").getByLabel("Default payment network")).toContainText(
-    "No linked funding account",
-  );
+  await expect(
+    page.getByRole("dialog").getByLabel("Default payment network"),
+  ).toHaveValue("11155111");
+  await expect(
+    page.getByRole("dialog").getByLabel("Default payment network"),
+  ).toContainText("No linked funding account");
 });
 
 test("S02 saved USDC instructions cannot be replaced by changing a payment default", async ({
@@ -88,7 +88,7 @@ test("S02 saved USDC instructions cannot be replaced by changing a payment defau
   ).toBeEnabled();
 });
 
-test("S03 mixed payment review checks the combined principal and both fees against one account", async ({
+test("S03 mixed payment review checks principal and explains separate USDC fees for one account", async ({
   page,
 }) => {
   await page.goto("/org/demo/disbursements?new=1");
@@ -102,8 +102,14 @@ test("S03 mixed payment review checks the combined principal and both fees again
   }
   const funding = dialog.getByRole("region", { name: "Base funding check" });
   await expect(funding).toHaveCount(1);
-  await expect(funding).toContainText("1.100001 USDC");
+  await expect(funding).toContainText("1.000001 USDC");
   await expect(funding).toContainText("2.000002 USDT");
+  await expect(funding).toContainText(
+    "Execution fees are paid from this account in USDC.",
+  );
+  await expect(funding).toContainText(
+    "review and approve the separate fee limit before sending",
+  );
   await expect(funding).toContainText("2 of 2 owners required");
   await expect(funding).toContainText("Alex Morgan · Jordan Lee");
 });
@@ -165,7 +171,7 @@ test("S06 review shows individual approvals and cannot send a partially approved
   await expect(approvals).toContainText("Awaiting approval");
   await expect(
     dialog.getByRole("button", { name: "Send payment" }),
-  ).toBeDisabled();
+  ).toHaveCount(0);
   await expect(
     dialog.getByRole("button", { name: "Approve", exact: true }),
   ).toBeEnabled();
@@ -232,37 +238,34 @@ test("S09 policy changes show reviewable authority and cannot execute without ap
   });
 });
 
-test("S09 a single-recipient draft can review a delegated allowance inside Disburse", async ({
+test("S09 a single-recipient draft reviews an allowance without a reusable recipient signature", async ({
   page,
 }) => {
   await page.addInitScript(() =>
-    sessionStorage.setItem("qa:scenario", "delegated"),
+    sessionStorage.setItem("qa:scenario", "circle-delegated-single"),
   );
   await page.goto("/org/demo/disbursements?focus=p1");
   const dialog = page.getByRole("dialog");
   await dialog
     .getByText("Pay with a spending allowance", { exact: true })
     .click();
-  await dialog.getByRole("button", { name: "Check my allowance" }).click();
-  await expect(dialog).toContainText("Available allowance: $25,000.00 USDC");
+  await dialog
+    .getByRole("button", { name: "Check my allowance", exact: true })
+    .click();
+  await expect(dialog).toContainText("Available allowance: 25000 USDC");
   await expect(
-    dialog.getByRole("checkbox", {
-      name: /including a 0.05 USDC fee from the funding account/,
+    dialog.getByRole("button", {
+      name: "Review fee and approval",
+      exact: true,
     }),
-  ).toBeVisible();
-  await expect(dialog).not.toContainText("paid by my signing wallet");
-  await expect(dialog.getByRole("checkbox")).toHaveCount(1);
+  ).toBeEnabled();
   await expect(
-    dialog.getByRole("button", { name: "Review in wallet" }),
+    dialog.getByRole("button", { name: "Review in wallet", exact: true }),
   ).toHaveCount(0);
   await expect(dialog).toContainText("Member spending allowance");
-  await page.screenshot({
-    path: ".local/qa/story-delegated-payment.png",
-    fullPage: true,
-  });
-  await expect(
-    dialog.getByRole("button", { name: "Pay using allowance" }),
-  ).toBeDisabled();
+  expect(
+    await page.evaluate(() => sessionStorage.getItem("qa:circle-signatures")),
+  ).toBeNull();
 });
 
 test("S14 mobile overview shows complete amounts, statuses and one create action", async ({
@@ -288,43 +291,59 @@ test("S14 mobile overview shows complete amounts, statuses and one create action
   await expect(page.getByRole("dialog")).toBeVisible();
 });
 
-test("delegated batches disclose every authorization and one fee", async ({
+test("delegated batches use one account approval for every saved recipient", async ({
   page,
 }) => {
   await page.addInitScript(() =>
-    sessionStorage.setItem("qa:scenario", "delegated-batch"),
+    sessionStorage.setItem("qa:scenario", "circle-delegated-batch"),
   );
   await page.goto("/org/demo/disbursements?focus=p1");
   const dialog = page.getByRole("dialog");
   await dialog
     .getByText("Pay with a spending allowance", { exact: true })
     .click();
-  await dialog.getByRole("button", { name: "Check my allowance" }).click();
-  await expect(dialog).toContainText("3 signatures");
+  await dialog
+    .getByRole("button", { name: "Check my allowance", exact: true })
+    .click();
   await expect(dialog).toContainText(
-    "recipient amounts and a separate fee",
+    "authorize every saved recipient together",
   );
-  await expect(dialog.getByRole("checkbox")).toHaveCount(1);
-  await expect(dialog).toContainText("$28,450.05 USDC");
-  await page.screenshot({
-    path: ".local/qa/story-delegated-batch.png",
-    fullPage: true,
-  });
+  await expect(dialog).toContainText("Review the USDC gas fee before signing");
+  await expect(dialog).toContainText("Maya Chen");
+  await expect(dialog).toContainText("James Okafor");
+  await expect(
+    dialog.getByRole("combobox", { name: "Execution fee" }),
+  ).toHaveCount(0);
+  expect(
+    await page.evaluate(() => sessionStorage.getItem("qa:circle-signatures")),
+  ).toBeNull();
 });
 
-test('wallet-paid delegated batches remove the managed fee and preserve recipient instructions', async ({ page }) => {
-  await page.addInitScript(() => sessionStorage.setItem('qa:scenario', 'delegated-batch'));
-  await page.goto('/org/demo/disbursements?focus=p1');
-  const dialog = page.getByRole('dialog');
-  await dialog.getByText('Pay with a spending allowance', { exact: true }).click();
-  await dialog.getByRole('combobox', { name: 'Execution fee' }).selectOption('wallet');
-  await dialog.getByRole('button', { name: 'Check my allowance' }).click();
-  await expect(dialog).toContainText('2 signatures to authorize the recipient amounts');
-  await expect(dialog).toContainText('My signing wallet pays the network fee');
-  await expect(dialog).not.toContainText('Total account debit');
-  await expect(dialog).not.toContainText('0.05');
-  await expect(dialog).toContainText('Maya Chen');
-  await dialog.getByRole('checkbox').check();
-  await dialog.getByRole('button', { name: 'Pay using allowance' }).click();
-  await expect(dialog.getByRole('alert')).toContainText('read-only');
+test("the delegate reviews a separate USDC execution fee without changing recipient amounts", async ({
+  page,
+}) => {
+  await page.addInitScript(() =>
+    sessionStorage.setItem("qa:scenario", "circle-delegated-batch"),
+  );
+  await page.goto("/org/demo/disbursements?focus=p1");
+  const dialog = page.getByRole("dialog");
+  await dialog
+    .getByText("Pay with a spending allowance", { exact: true })
+    .click();
+  await dialog
+    .getByRole("button", { name: "Check my allowance", exact: true })
+    .click();
+  await dialog
+    .getByRole("button", { name: "Review fee and approval", exact: true })
+    .click();
+  const fees = dialog.getByRole("region", { name: "Execution fees" });
+  await fees
+    .getByRole("button", { name: "Review execution fee", exact: true })
+    .click();
+  await expect(fees).toContainText("0.5 USDC");
+  await expect(dialog).toContainText(
+    "Recipient amounts and the original allowance authorization stay unchanged",
+  );
+  await expect(dialog).toContainText("Maya Chen");
+  await expect(dialog).toContainText("James Okafor");
 });

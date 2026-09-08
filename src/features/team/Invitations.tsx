@@ -1,3 +1,4 @@
+import { userErrorMessage } from '@/lib/userErrors';
 import { useState } from "react";
 import { useAction, useMutation, useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
@@ -9,8 +10,10 @@ import {
 } from "@/components/workspace/WorkspacePrimitives";
 import { roles } from "./memberTypes";
 import { formatDate } from "@/lib/formatMoney";
+import { InvitationLink } from './InvitationLink';
 
 const deliveryLabels: Record<string, string> = {
+  ready_to_share: 'Link ready to share',
   queued: "Queued for email",
   sending: "Sending email",
   submitted: "Accepted by email service",
@@ -33,7 +36,9 @@ export function Invitations({
     sessionToken ? { orgId, sessionToken } : "skip",
   );
   const revoke = useMutation(api.teamInvitations.revoke),
-    send = useAction(api.teamInvitationEmail.send);
+    createLink = useAction(api.teamInvitationLinks.create),
+    getLink = useAction(api.teamInvitationLinks.get);
+  const [shared, setShared] = useState<{ id: string; url: string } | null>(null);
   const [busy, setBusy] = useState(""),
     [error, setError] = useState(""),
     [confirm, setConfirm] = useState("");
@@ -41,9 +46,9 @@ export function Invitations({
     <section className="workspace-panel" aria-label="Team invitations">
       <div className="workspace-toolbar">
         <div>
-          <h2 className="font-semibold">Email invitations</h2>
+          <h2 className="font-semibold">Invitations</h2>
           <p className="workspace-table-secondary">
-            Track delivery and acceptance. Resending expires the old link.
+            Share private links and track acceptance. Replacing a link expires the old one.
           </p>
         </div>
       </div>
@@ -53,7 +58,7 @@ export function Invitations({
           <LoadingRows />
         ) : !rows.length ? (
           <p className="workspace-description">
-            No email invitations yet. Invite a teammate using their work email.
+            No invitations yet. Create a private link for a teammate using their work email.
           </p>
         ) : (
           rows.map((row) => (
@@ -97,11 +102,18 @@ export function Invitations({
               </p>
               {row.deliveryError && (
                 <p className="text-sm workspace-funding-warning">
-                  {row.deliveryError}
+                  {userErrorMessage(row.deliveryError, 'The earlier email delivery could not be confirmed.')}
                 </p>
               )}
               {isAdmin && row.status !== "accepted" && (
                 <div className="flex flex-wrap gap-2">
+                  {row.status === 'pending' && row.deliveryStatus === 'ready_to_share' && <button className="workspace-button" disabled={!!busy} onClick={async () => {
+                    if (!sessionToken) return;
+                    setBusy(row.id); setError('');
+                    try { const result = await getLink({ invitationId: row.id, sessionToken }); setShared({ id: row.id, url: result.url }); }
+                    catch (error) { setError(userErrorMessage(error, 'The invitation link could not be opened. Try again.')); }
+                    finally { setBusy(''); }
+                  }}>Share invitation</button>}
                   <button
                     className="workspace-button"
                     disabled={!!busy}
@@ -110,7 +122,7 @@ export function Invitations({
                       setBusy(row.id);
                       setError("");
                       try {
-                        await send({
+                        const result = await createLink({
                           orgId,
                           sessionToken,
                           requestId: crypto.randomUUID(),
@@ -120,18 +132,17 @@ export function Invitations({
                           role: row.role,
                           expectedWallet: row.expectedWallet,
                         });
+                        setShared({ id: result.invitationId, url: result.url });
                       } catch (e) {
                         setError(
-                          e instanceof Error
-                            ? e.message
-                            : "The invitation could not be resent.",
+                          userErrorMessage(e, "The invitation link could not be replaced."),
                         );
                       } finally {
                         setBusy("");
                       }
                     }}
                   >
-                    {busy === row.id ? "Updating…" : "Resend invitation"}
+                    {busy === row.id ? "Updating…" : "Replace invitation link"}
                   </button>
                   {["pending", "unavailable"].includes(row.status) && (
                     <button
@@ -144,6 +155,7 @@ export function Invitations({
                   )}
                 </div>
               )}
+              {shared?.id === row.id && row.status === 'pending' && <InvitationLink url={shared.url} email={row.email} />}
               {confirm === row.id && (
                 <div className="space-y-3 border-t border-white/10 pt-3">
                   <p className="text-sm">
@@ -174,9 +186,7 @@ export function Invitations({
                           setConfirm("");
                         } catch (e) {
                           setError(
-                            e instanceof Error
-                              ? e.message
-                              : "The invitation could not be revoked.",
+                            userErrorMessage(e, "The invitation could not be revoked."),
                           );
                         } finally {
                           setBusy("");
@@ -193,9 +203,9 @@ export function Invitations({
         )}
         {!!rows?.length && (
           <p className="workspace-table-secondary">
-            Showing the latest {rows.length} email invitations. Wallet
-            invitations appear under Members. Delivery confirms arrival at the
-            mail server, not that the invitation was read.
+            Showing the latest {rows.length} invitations. Invitations for a known
+            sign-in wallet appear under Members. A shared link does not confirm
+            that the invitation has been read or accepted.
           </p>
         )}
       </div>

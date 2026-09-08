@@ -116,3 +116,7 @@ Funded execution is opt-in through `bun run qa:testnet --execute`.
 ## V2 release review
 
 Current release assessment: [Launch readiness](docs/LAUNCH_READINESS.md). The report separates implemented features from browser, provider and production acceptance still required. See [user stories](docs/USER_STORY_QA.md), [QA evidence](docs/QA_V2.md), [architecture](docs/ARCHITECTURE_V2.md), and [billing/pricing](docs/BILLING_AND_PRICING.md).
+
+Product-wide requirements: the subscription licenses the software; customers pay all external service costs directly in stablecoins, including original Safe setup. Getting started must require only MetaMask and supported stablecoins, with zero native tokens. Disburse's application operating costs are limited to Convex and Cloudflare. This target and the remaining implementation gaps are recorded in [product and service requirements](docs/PRODUCT_AND_SERVICE_REQUIREMENTS.md).
+
+Current customer-paid service status and testnet receipts: [September 7 QA report](docs/CUSTOMER_PAID_SERVICES_QA_2026-09-07.md).

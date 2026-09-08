@@ -1,8 +1,10 @@
 # Deploying the v2 release candidate
 
-Prepared September 6, 2026 for `2.0.0-rc.1`. The repository targets Cloudflare Pages for the React app and Convex for the API, database, file storage and scheduled jobs. The PR prepares that release path. It does not enable mainnet receiving contracts or establish live provider acceptance.
+Updated September 8, 2026 for `2.0.0-rc.1`. Cloudflare Pages hosts the React app; Convex provides the API, database, file storage and scheduled jobs. The PR remains a release candidate. Mainnet enablement requires the acceptance listed below.
 
-Local release verification passed 644 unit/integration tests, 267 browser stories, receiving-contract tests, fifteen release configuration/deployment tests, typecheck, lint and the release build. A Convex dry run passed against the project's existing production target, `benevolent-mole-466`, without publishing functions or schema. The staged source and six incoming commits were scanned with Gitleaks 8.30.1; its matches were the published USDC token addresses used in fixtures. Environment files, QA wallet keys and private acceptance journals are excluded from the PR. Hosted CI and actual deployment are separate evidence.
+Current local checks pass 1,192 unit/backend tests across 120 files, frontend/Convex typecheck, lint and the release build. All 410 browser stories pass, including the separate Circle USDC fee review. Receiving-contract and release-configuration tests also pass. These browser stories use fixtures; the built-app testnet evidence below uses actual customer-funded receipts.
+
+The previous committed build passed GitHub CI and Cloudflare Pages. Its deployed sign-in page was opened and verified in Chromium. A full development snapshot was restored into an isolated schema-only backend: 96,275 records across 62 nonempty tables and one stored file matched exactly. See [operations rehearsal](OPERATIONS_REHEARSAL.md). Production has not been modified by this rehearsal. Keys, sessions, authorizations and private journals stay outside source control.
 
 ## Release commands
 
@@ -64,6 +66,8 @@ Public RPC URLs may contain browser-restricted provider identifiers. Never use a
 
 ## Convex configuration
 
+The [product-wide cost requirements](PRODUCT_AND_SERVICE_REQUIREMENTS.md) limit Disburse's application operating costs to Convex and Cloudflare. The configurations below describe current capabilities, not permission to open a paid third-party account. Do not enable customer services through Disburse-funded gas, email, RPC, indexing or other provider usage. Live MetaMask-and-stablecoins onboarding with zero native gas remains COST02 in [the TODO](../TODOS.md).
+
 Set these on the selected Convex deployment through its environment settings or the installed CLI's `convex env set`. Setting them only in Cloudflare does not configure backend actions. Do not copy the QA deployment's credentials, wallet files, sessions or journals.
 
 | Area | Server settings and behavior |
@@ -71,13 +75,13 @@ Set these on the selected Convex deployment through its environment settings or 
 | Sign-in | `SIWE_ALLOWED_DOMAINS` lists exact allowed hosts, comma-separated. `SIWE_DOMAIN` is the canonical host. Include the intended preview host only on its isolated backend. |
 | RPC | `RPC_URL_<chainId>` for current reads; `ARCHIVE_RPC_URL_<chainId>` for historical accounting checkpoints. Public defaults are fallbacks. |
 | Licensing | `DISBURSE_LICENSE_OPERATORS` contains the full operator wallet addresses. Empty means no operator. Configure signup trial/free terms through `/admin/licenses`. |
-| Paid subscriptions | `DISBURSE_BENEFICIARY_ADDRESS` is the receiving treasury; `DISBURSE_BENEFICIARY_CHAIN_ID` is `1` or `11155111`. Missing configuration disables new paid checkout. Free access and operator grants remain available. |
-| Managed payments | `GELATO_API_KEY` for production or `GELATO_TESTNET_API_KEY` for test networks; per-chain `GELATO_<chainId>_FEE_COLLECTOR` and `GELATO_<chainId>_FEE_USDC` / `FEE_USDT`. Use the configured provider collector and whole-token decimal fees. Customers authorize and pay the fee. |
+| Paid subscriptions | `DISBURSE_BENEFICIARY_ADDRESS` is the receiving treasury; `DISBURSE_BENEFICIARY_CHAIN_ID` selects a supported billing network. Missing configuration disables new paid checkout. Free access and operator grants remain available. |
+| Managed payments | Circle Paymaster charges the customer's Safe in USDC; the public submission endpoint requires no Disburse-funded account. Owner/delegate payments, schedules, policy changes, account operations, receivables and billing use durable customer-approved execution. Turbo remains disabled. See [managed payments](MANAGED_RELAY.md) and the [provider review](GELATO_V2_SETUP.md). |
 | New workspace defaults | The current backend also reads `VITE_GELATO_DEFAULT_FEE_TOKEN` and `VITE_GELATO_DEFAULT_FEE_MODE`. Set these non-secret defaults on Convex if overriding the built-in USDC/preferred choices. |
-| Email | `RESEND_API_KEY`, `EMAIL_FROM`, `PUBLIC_APP_URL`, `EMAIL_OUTBOX_KEY`, `RESEND_WEBHOOK_SECRET`. The outbox key is an independent 32-byte secret encoded as 64 hex characters. `EMAIL_OUTBOX_PREVIOUS_KEY` supports rotation. |
-| Receiving invoices | `AR_FACTORY_<chainId>` must match the pinned deployed factory. Keep `AR_MAINNET_ENABLED` unset or `false` until contract review and mainnet acceptance. Current collection uses the customer's native gas wallet. |
+| Private invitations | `PUBLIC_APP_URL`, `EMAIL_OUTBOX_KEY` (independent 32-byte secret encoded as 64 hex characters), and optional `EMAIL_OUTBOX_PREVIOUS_KEY` for rotation. No sending account is used. `RESEND_WEBHOOK_SECRET` only verifies historical callbacks. |
+| Receiving invoices | `AR_FACTORY_<chainId>` must match the pinned deployed factory. Keep `AR_MAINNET_ENABLED` unset or `false` until contract review and mainnet acceptance. Issue/setup and collection use customer-approved Circle USDC fees on supported networks; the complete invoice principal reaches its treasury. Mainnet contract review remains required. |
 
-Email callbacks use `POST /webhooks/email` on the backend's HTTP-action origin. Verify signatures and delivery events before enabling invitations and reminders. Details are in [team invitations](TEAM_INVITATIONS.md), [managed payments](MANAGED_RELAY.md), [billing checkout](BILLING_CHECKOUT.md), [licensing](LICENSE_MANAGEMENT.md) and [receiving invoices](ACCOUNTS_RECEIVABLE.md).
+Invitations are shared privately by their administrator; the app can open an email draft but never sends through a paid delivery API. Historical callbacks use `POST /webhooks/email` and retain signature verification. Details are in [team invitations](TEAM_INVITATIONS.md), [managed payments](MANAGED_RELAY.md), [billing checkout](BILLING_CHECKOUT.md), [licensing](LICENSE_MANAGEMENT.md) and [receiving invoices](ACCOUNTS_RECEIVABLE.md).
 
 ## Database review and rollout
 
@@ -94,15 +98,15 @@ Email callbacks use `POST /webhooks/email` on the backend's HTTP-action origin. 
 
 | Area | Evidence still needed |
 | --- | --- |
-| Managed fee payment | Real provider settlement, exact principal and fee, interrupted-submission recovery |
-| Unattended schedule | A due approved payment completes once with browsers closed; provider timeout and cancellation behavior verified |
-| Paid license | Real activation, renewal, upgrade credit and replay rejection |
-| Customer wallet | Browser extension/mobile connector, second approver, rejection, reload and reconciliation |
+| Managed fee payment | Built-app exact principal/fee settlement, declined approvals and durable reconciliation pass on Base Sepolia. Broader provider-outage and production acceptance remain. |
+| Unattended schedule | Due USDC-fee execution with browsers closed, independent authorization order and on-chain cancellation pass on Base Sepolia. Production outage acceptance remains. |
+| Paid license | Real 50 USDC Team activation and renewal pass. Pro upgrade credit has automated coverage; the live receipt remains acceptance work. |
+| Customer wallet | Direct/nested two-owner approval, rejection/reload and real testnet settlement pass through isolated EIP-1193 wallets. Original/existing-account MetaMask mainnet and extension/mobile connector acceptance remain. |
 | Accountant workflow | Actual external-ledger import, corrections and period-close acceptance |
-| Operations | Target schema acceptance, backup/restore rehearsal, alert delivery and incident response |
-| Mainnet receivables | Independent receiving-contract review; customer-authorized managed collection remains unbuilt |
+| Operations | Development schema acceptance, exact backup/restore and bounded queue-monitoring failure/recovery pass. Production target review, alert delivery, staffing and independent security review remain. |
+| Mainnet receivables | USDC-fee setup/collection and reviewed customer refunds pass on Base Sepolia. Independent receiving-contract review and broader live failure acceptance remain. |
 
-The full current assessment is [launch readiness](LAUNCH_READINESS.md). Yield and conversion integrations are outside this candidate's implemented scope. Customer funds remain in their Safes; license changes never alter ownership or cover network/provider fees.
+The full current assessment is [launch readiness](LAUNCH_READINESS.md). Direct Aave lending, reviewed Uniswap conversion and Circle CCTP account transfers are implemented and have exact live testnet receipts. See [lending](LENDING.md), [conversions](CONVERSIONS.md) and [account transfers](ACCOUNT_TRANSFERS.md). Mainnet acceptance is separate. Customer funds remain in their Safes; license changes never alter ownership or cover network/provider fees.
 
 ## Recovery and rollback
 
@@ -110,4 +114,4 @@ Retain the previous Pages deployment, its commit and corresponding backend sourc
 
 For a release failure, preserve current payment attempts and approvals, investigate provider/chain settlement, and deploy a reviewed compatible fix. Do not restore an old database snapshot over live transaction evidence or replay a payment whose outcome is unknown. For new relay submissions, remove the affected server provider/fee configuration while investigating; removing a browser flag alone does not stop server jobs, and an already accepted transaction can still settle. Continue read-only receipt checks for existing attempts where provider access remains available.
 
-Inspect Convex function failures, scheduled jobs, payment exception queues, email delivery failures and relay outcomes after release. Assign an operator to investigate unresolved attempts using the original payment record. External alert delivery and a restore rehearsal remain launch acceptance work, not claims made by this PR.
+Inspect function failures, scheduled jobs, payment exception queues and provider outcomes after release. Run the bounded read-only operator check in [operations rehearsal](OPERATIONS_REHEARSAL.md). Assign an operator to investigate unresolved attempts using the original record. External alert delivery and incident staffing remain launch work; the isolated backup/restore and monitoring failure/recovery rehearsal is complete.

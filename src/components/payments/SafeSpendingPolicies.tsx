@@ -1,3 +1,5 @@
+import { supportsCircleFees } from "../../../shared/circleExecution";
+import { userErrorMessage } from "@/lib/userErrors";
 import { useState } from "react";
 import { PolicyApprovalQueue } from "./PolicyApprovalQueue";
 import { useAction, useQuery as useConvexQuery } from "convex/react";
@@ -50,7 +52,10 @@ export function SafeSpendingPolicies({
   const [moduleAddress, setModuleAddress] = useState("");
   const safe =
     safes?.find((s) => s._id === safeId) ??
-    safes?.find((s) => s.isActive !== false && chainEnvironment(s.chainId) === environment) ??
+    safes?.find(
+      (s) =>
+        s.isActive !== false && chainEnvironment(s.chainId) === environment,
+    ) ??
     safes?.[0];
   const deployments = getAllowanceDeployments(safe?.chainId ?? 0);
   const module =
@@ -79,9 +84,11 @@ export function SafeSpendingPolicies({
   const [error, setError] = useState("");
   const [proposal, setProposal] = useState<string | null>(null);
   const [requestId, setRequestId] = useState("");
-  const [feeMethod, setFeeMethod] = useState(
+  const [legacyFeeMethod, setFeeMethod] = useState(
     RELAY_FEATURE_ENABLED ? "managed" : "wallet",
   );
+  const circle = !!safe && supportsCircleFees(safe.chainId);
+  const feeMethod = circle ? "circle" : legacyFeeMethod;
   const [feeToken, setFeeToken] = useState("USDC");
   const feeQuote = useConvexQuery(
     api.spendingPolicyData.fee,
@@ -89,15 +96,43 @@ export function SafeSpendingPolicies({
       ? { safeId: safe._id, sessionToken, token: feeToken }
       : "skip",
   );
-  const feeReviewKey = feeMethod === 'managed' ? feeQuote?.fee ? feeIdentity(feeQuote.fee) : null : 'wallet';
-  const acknowledged = feeReviewKey !== null && acknowledgedFee === feeReviewKey;
-  const setAcknowledged = (value: boolean) => setAcknowledgedFee(value ? feeReviewKey : null);
+  const feeReviewKey =
+    feeMethod === "managed"
+      ? feeQuote?.fee
+        ? feeIdentity(feeQuote.fee)
+        : null
+      : feeMethod;
+  const acknowledged =
+    feeReviewKey !== null && acknowledgedFee === feeReviewKey;
+  const setAcknowledged = (value: boolean) =>
+    setAcknowledgedFee(value ? feeReviewKey : null);
   const tokens = getTokensForChain(safe?.chainId ?? 0);
   const canManage = isAdmin && !snapshot.isError;
-  const name = (wallet: string) =>
-    members?.find(
-      (m) => m?.walletAddress.toLowerCase() === wallet.toLowerCase(),
-    )?.name || shortAddress(wallet);
+  const assignedAccounts =
+    safes?.filter(
+      (s) =>
+        s.chainId === safe?.chainId &&
+        s.isActive !== false &&
+        !!s.assignedUserId &&
+        members?.some(
+          (m) =>
+            !!m &&
+            m.userId === s.assignedUserId &&
+            m.status === "active" &&
+            ["admin", "approver", "initiator"].includes(m.role),
+        ),
+    ) ?? [];
+  const name = (wallet: string) => {
+    const account = safes?.find(
+      (s) => s.safeAddress.toLowerCase() === wallet.toLowerCase(),
+    );
+    const member = members?.find(
+      (m) =>
+        m?.userId === account?.assignedUserId ||
+        m?.walletAddress.toLowerCase() === wallet.toLowerCase(),
+    );
+    return member?.name || account?.name || shortAddress(wallet);
+  };
   const formatAmount = (row: OnchainAllowance, value: bigint) => {
     const config = Object.values(tokens).find(
       (t) => t.address.toLowerCase() === row.token.toLowerCase(),
@@ -135,9 +170,7 @@ export function SafeSpendingPolicies({
       setRevoking(null);
       await snapshot.refetch();
     } catch (e) {
-      setError(
-        e instanceof Error ? e.message : "Could not propose the policy change",
-      );
+      setError(userErrorMessage(e, "Could not propose the policy change"));
     } finally {
       setBusy(false);
     }
@@ -235,7 +268,13 @@ export function SafeSpendingPolicies({
                 </details>
               )}
             </div>
-            {safe.isActive === false && <p className="text-sm text-[var(--ws-warning)]">This account is archived in Disburse. Existing allowances can still authorize transfers. Review and revoke spending access here; new grants are disabled.</p>}
+            {safe.isActive === false && (
+              <p className="text-sm text-[var(--ws-warning)]">
+                This account is archived in Disburse. Existing allowances can
+                still authorize transfers. Review and revoke spending access
+                here; new grants are disabled.
+              </p>
+            )}
             {module?.legacy && (
               <p role="alert" className="text-sm leading-6 text-amber-300">
                 This older spending module has a known replay vulnerability. New
@@ -264,7 +303,11 @@ export function SafeSpendingPolicies({
               </p>
             ) : snapshot.isError ? (
               <p role="alert" className="text-sm text-red-400">
-                Could not verify current allowances: {snapshot.error.message}
+                Could not verify current allowances:{" "}
+                {userErrorMessage(
+                  snapshot.error,
+                  "The account could not be checked. Try again shortly.",
+                )}
               </p>
             ) : (
               snapshot.data && (
@@ -443,34 +486,55 @@ export function SafeSpendingPolicies({
             ) : (
               <>
                 <label className="block">
-                  <span className="finance-label">Team member</span>
+                  <span className="finance-label">
+                    {circle ? "Assigned payment account" : "Team member"}
+                  </span>
                   <select
                     className="finance-field"
                     value={delegate}
                     onChange={(e) => setDelegate(e.target.value)}
                   >
-                    <option value="">Choose a member</option>
-                    {members
-                      ?.filter(
-                        (m) =>
-                          m &&
-                          m.status === "active" &&
-                          ["admin", "approver", "initiator"].includes(m.role),
-                      )
-                      .map(
-                        (m) =>
-                          m && (
-                            <option
-                              key={m.membershipId}
-                              value={m.walletAddress}
-                            >
-                              {m.name || shortAddress(m.walletAddress)} ·{" "}
-                              {m.role}
-                            </option>
-                          ),
-                      )}
+                    <option value="">
+                      {circle ? "Choose a member’s account" : "Choose a member"}
+                    </option>
+                    {circle
+                      ? assignedAccounts.map((s) => (
+                          <option key={s._id} value={s.safeAddress}>
+                            {name(s.safeAddress)} ·{" "}
+                            {s.name ?? "Payment account"}
+                          </option>
+                        ))
+                      : members
+                          ?.filter(
+                            (m) =>
+                              m &&
+                              m.status === "active" &&
+                              ["admin", "approver", "initiator"].includes(
+                                m.role,
+                              ),
+                          )
+                          .map(
+                            (m) =>
+                              m && (
+                                <option
+                                  key={m.membershipId}
+                                  value={m.walletAddress}
+                                >
+                                  {m.name || shortAddress(m.walletAddress)} ·{" "}
+                                  {m.role}
+                                </option>
+                              ),
+                          )}
                   </select>
                 </label>
+                {circle && !assignedAccounts.length && (
+                  <p className="text-sm text-[var(--ws-muted)]">
+                    Create an assigned payment account for the member in
+                    Settings → Funding accounts first. Its own USDC balance pays
+                    execution costs; this allowance controls the separate
+                    company funds it can send.
+                  </p>
+                )}
                 <div className="grid grid-cols-2 gap-4">
                   <label>
                     <span className="finance-label">Currency</span>
@@ -521,67 +585,76 @@ export function SafeSpendingPolicies({
               </>
             )}
             <div className="space-y-3 rounded-lg border border-[var(--ws-border)] p-4">
-              <label className="block">
-                <span className="finance-label">Execution fee</span>
-                <select
-                  className="finance-field"
-                  value={feeMethod}
-                  onChange={(e) => {
-                    setFeeMethod(e.target.value);
-                    setAcknowledged(false);
-                  }}
-                >
-                  <option value="managed">Pay from this account</option>
-                  <option value="wallet">
-                    Pay network fees from my signing wallet
-                  </option>
-                </select>
-              </label>
-              {feeMethod === "managed" ? (
+              {circle ? (
+                <p className="text-sm text-[var(--ws-muted)]">
+                  The company account pays the execution fee in USDC. Review the
+                  exact limit after the account approves this policy.
+                </p>
+              ) : (
                 <>
                   <label className="block">
-                    <span className="finance-label">Fee currency</span>
+                    <span className="finance-label">Execution fee</span>
                     <select
                       className="finance-field"
-                      value={feeToken}
+                      value={feeMethod}
                       onChange={(e) => {
-                        setFeeToken(e.target.value);
+                        setFeeMethod(e.target.value);
                         setAcknowledged(false);
                       }}
                     >
-                      {["USDC", "USDT"]
-                        .filter((t) => tokens[t])
-                        .map((t) => (
-                          <option key={t}>{t}</option>
-                        ))}
+                      <option value="managed">Pay from this account</option>
+                      <option value="wallet">
+                        Pay network fees from my signing wallet
+                      </option>
                     </select>
                   </label>
-                  {feeQuote?.fee ? (
-                    <p className="text-sm">
-                      {formatMoney(
-                        feeQuote.fee.amount,
-                        feeQuote.fee.token,
-                        true,
-                      )}{" "}
-                      {feeQuote.fee.token} from {safe.name ?? "this account"}{" "}
-                      when the policy is applied. This fee is included in the
-                      account approval.
-                    </p>
+                  {feeMethod === "managed" ? (
+                    <>
+                      <label className="block">
+                        <span className="finance-label">Fee currency</span>
+                        <select
+                          className="finance-field"
+                          value={feeToken}
+                          onChange={(e) => {
+                            setFeeToken(e.target.value);
+                            setAcknowledged(false);
+                          }}
+                        >
+                          {["USDC", "USDT"]
+                            .filter((t) => tokens[t])
+                            .map((t) => (
+                              <option key={t}>{t}</option>
+                            ))}
+                        </select>
+                      </label>
+                      {feeQuote?.fee ? (
+                        <p className="text-sm">
+                          {formatMoney(
+                            feeQuote.fee.amount,
+                            feeQuote.fee.token,
+                            true,
+                          )}{" "}
+                          {feeQuote.fee.token} from{" "}
+                          {safe.name ?? "this account"} when the policy is
+                          applied. This fee is included in the account approval.
+                        </p>
+                      ) : (
+                        <p
+                          role={feeQuote?.error ? "alert" : "status"}
+                          className="text-sm text-[var(--ws-muted)]"
+                        >
+                          {feeQuote?.error ?? "Checking the execution fee…"}
+                        </p>
+                      )}
+                    </>
                   ) : (
-                    <p
-                      role={feeQuote?.error ? "alert" : "status"}
-                      className="text-sm text-[var(--ws-muted)]"
-                    >
-                      {feeQuote?.error ?? "Checking the execution fee…"}
+                    <p className="text-sm text-[var(--ws-muted)]">
+                      The signing wallet pays the network fee when an approver
+                      applies this policy. Your wallet shows the estimate before
+                      sending.
                     </p>
                   )}
                 </>
-              ) : (
-                <p className="text-sm text-[var(--ws-muted)]">
-                  The signing wallet pays the network fee when an approver
-                  applies this policy. Your wallet shows the estimate before
-                  sending.
-                </p>
               )}
             </div>
             <label className="flex gap-3 text-sm leading-5 text-slate-300">
@@ -594,7 +667,7 @@ export function SafeSpendingPolicies({
               <span>
                 {revoking
                   ? "I understand that revocation requires owner approvals and execution."
-                  : "I authorize this wallet to transfer the allowed currency to any address within this allowance, independently of Disburse’s approval rules."}
+                  : "I authorize this payment account to transfer the allowed currency to any address within this allowance, independently of Disburse’s approval rules."}
               </span>
             </label>
             <Button

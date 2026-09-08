@@ -1,4 +1,9 @@
 import { pathToFileURL } from 'node:url';
+import { loadEnv } from 'vite';
+
+export function loadReleaseEnvironment(root = process.cwd(), mode = 'production') {
+  return { ...loadEnv(mode, root, ''), ...process.env };
+}
 
 function httpsOrigin(value) {
   try {
@@ -44,7 +49,7 @@ export function releaseConfigurationErrors(env) {
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  const errors = releaseConfigurationErrors(process.env);
+  const errors = releaseConfigurationErrors(loadReleaseEnvironment());
   if (errors.length) {
     for (const error of errors) console.error(error);
     process.exitCode = 1;

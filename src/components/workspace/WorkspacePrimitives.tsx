@@ -161,7 +161,7 @@ export function Notice({
   return (
     <div
       role={tone === 'error' ? 'alert' : 'status'}
-      className="workspace-notice"
+      className="workspace-notice min-w-0 break-words [overflow-wrap:anywhere]"
       data-tone={tone}
     >
       {children}

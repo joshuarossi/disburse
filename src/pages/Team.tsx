@@ -1,3 +1,4 @@
+import { userErrorMessage } from "@/lib/userErrors";
 import { lazy, Suspense, useState } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
 import { useAccount } from "wagmi";
@@ -149,25 +150,34 @@ export default function Team() {
             />
           ) : (
             <div className="workspace-table-wrap">
-              <table className="workspace-table">
-                <thead>
-                  <tr>
-                    <th>Member</th>
-                    <th>Workspace role</th>
-                    <th>Status</th>
-                    <th>
+              <table
+                className="workspace-table workspace-table-responsive"
+                role="table"
+              >
+                <thead role="rowgroup">
+                  <tr role="row">
+                    <th role="columnheader" scope="col">
+                      Member
+                    </th>
+                    <th role="columnheader" scope="col">
+                      Workspace role
+                    </th>
+                    <th role="columnheader" scope="col">
+                      Status
+                    </th>
+                    <th role="columnheader" scope="col">
                       <span className="sr-only">Actions</span>
                     </th>
                   </tr>
                 </thead>
-                <tbody>
+                <tbody role="rowgroup">
                   {visible.map((m) => {
                     if (!m) return null;
                     const self =
                       m.walletAddress.toLowerCase() === address?.toLowerCase();
                     return (
-                      <tr key={m.membershipId}>
-                        <td>
+                      <tr role="row" key={m.membershipId}>
+                        <td role="cell" data-primary>
                           <div className="workspace-person">
                             <span className="workspace-avatar">
                               {(m.name || "TM").slice(0, 2).toUpperCase()}
@@ -192,8 +202,10 @@ export default function Team() {
                             </span>
                           </div>
                         </td>
-                        <td>{roles[m.role][0]}</td>
-                        <td>
+                        <td role="cell" data-label="Workspace role">
+                          {roles[m.role][0]}
+                        </td>
+                        <td role="cell" data-label="Status">
                           <StatusBadge
                             status={m.status}
                             label={
@@ -206,7 +218,7 @@ export default function Team() {
                             }
                           />
                         </td>
-                        <td>
+                        <td role="cell" data-actions>
                           <div className="flex justify-end gap-2">
                             <button
                               className="workspace-button"
@@ -261,7 +273,7 @@ export default function Team() {
             setEditor(null);
             if (created)
               setParams({
-                tab: created === "email" ? "invitations" : "members",
+                tab: created === "link" ? "invitations" : "members",
               });
           }}
         />
@@ -329,11 +341,7 @@ export default function Team() {
                     setRemoving(null);
                     setRemoved(true);
                   } catch (e) {
-                    setError(
-                      e instanceof Error
-                        ? e.message
-                        : "Could not remove member",
-                    );
+                    setError(userErrorMessage(e, "Could not remove member"));
                   } finally {
                     setBusy(false);
                   }

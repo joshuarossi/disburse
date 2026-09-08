@@ -1,3 +1,4 @@
+import { userErrorMessage } from '@/lib/userErrors';
 import { useState, type FormEvent } from "react";
 import { useLocation } from "react-router-dom";
 import { useMutation, useQuery } from "convex/react";
@@ -94,7 +95,7 @@ function DetailsForm({ token }: { token: string }) {
       setReviewing(true);
       setConfirmed(false);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Check your payment details.");
+      setError(userErrorMessage(e, "Check your payment details."));
     }
   };
   const send = async (event: FormEvent) => {
@@ -113,9 +114,7 @@ function DetailsForm({ token }: { token: string }) {
       setReceived(true);
     } catch (e) {
       setError(
-        e instanceof Error
-          ? e.message
-          : "Your details could not be submitted. Try again using this link.",
+        userErrorMessage(e, "Your details could not be submitted. Try again using this link."),
       );
     } finally {
       setBusy(false);

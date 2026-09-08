@@ -1,3 +1,4 @@
+import { userErrorMessage } from '@/lib/userErrors';
 import { useState } from "react";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
@@ -64,7 +65,7 @@ export function PayoutReview({
       await operation();
       if (close) onClose();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Could not save the review");
+      setError(userErrorMessage(e, "Could not save the review"));
     } finally {
       setBusy(false);
     }

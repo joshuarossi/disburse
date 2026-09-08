@@ -1,3 +1,4 @@
+import { userErrorMessage } from '@/lib/userErrors';
 import { useBillingCheckout } from "./useBillingCheckout";
 import { billingAccess } from "../../../shared/billing";
 import { useEffect, useState } from "react";
@@ -144,9 +145,7 @@ export function useSettingsController() {
       setIsEditingName(false);
     } catch (error) {
       setOrgNameError(
-        error instanceof Error
-          ? error.message
-          : "Could not save the workspace name",
+        userErrorMessage(error, "Could not save the workspace name"),
       );
     } finally {
       setSavingName(false);
@@ -167,9 +166,7 @@ export function useSettingsController() {
     } catch (error) {
       console.error("Failed to update relay settings:", error);
       setRelaySettingsError(
-        error instanceof Error
-          ? error.message
-          : "Failed to update relay settings",
+        userErrorMessage(error, "Failed to update relay settings"),
       );
     } finally {
       setSavingRelaySettings(false);
@@ -197,7 +194,7 @@ export function useSettingsController() {
     } catch (error) {
       console.error("Failed to link safe:", error);
       setLinkingError(
-        error instanceof Error ? error.message : "Failed to link Safe",
+        userErrorMessage(error, "Failed to link Safe"),
       );
     } finally {
       setIsValidating(false);
@@ -212,9 +209,7 @@ export function useSettingsController() {
     } catch (error) {
       console.error("Failed to unlink safe:", error);
       setLinkingError(
-        error instanceof Error
-          ? error.message
-          : "Could not unlink this account",
+        userErrorMessage(error, "Could not unlink this account"),
       );
     }
   };
@@ -232,9 +227,7 @@ export function useSettingsController() {
       });
     } catch (error) {
       setSettingsError(
-        error instanceof Error
-          ? error.message
-          : "Could not save screening settings",
+        userErrorMessage(error, "Could not save screening settings"),
       );
     } finally {
       setSavingEnforcement(false);
@@ -256,6 +249,7 @@ export function useSettingsController() {
     relayFeeMode !== resolvedRelaySettings.relayFeeMode;
 
   return {
+    orgId, currentUserRole, members,
     ...checkout,
     settingsError,
     setSettingsError,
@@ -289,6 +283,7 @@ export function useSettingsController() {
     billing,
     isAdmin,
     screeningEnforcement,
+    canApprove: isAdmin || currentUserRole === 'approver',
     savingEnforcement,
     handleSaveOrgName,
     handleSaveRelaySettings,

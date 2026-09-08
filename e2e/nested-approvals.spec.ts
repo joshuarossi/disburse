@@ -15,7 +15,7 @@ for (const [theme, width] of [['light', 1440], ['dark', 390]] as const) {
     await expect(treasury).toContainText('1 of 2 approvals received');
     await expect(treasury).toContainText('one approval for Payroll');
     await expect(treasury.getByRole('listitem').filter({ hasText: 'Alex Morgan' })).toContainText('Awaiting approval');
-    await expect(dialog.getByRole('button', { name: 'Send payment', exact: true })).toBeDisabled();
+    await expect(dialog.getByRole('button', { name: 'Send payment', exact: true })).toHaveCount(0);
     await treasury.scrollIntoViewIfNeeded();
     await page.screenshot({ path: `.local/qa/nested-approvals-${theme}.png`, fullPage: true });
     await dialog.getByRole('button', { name: 'Approve', exact: true }).click();
@@ -40,14 +40,14 @@ test('the parent contributes one approval only when its full threshold is verifi
   await expect(dialog).toContainText('1 of 1 required approvals received');
   await expect(dialog.getByRole('region', { name: 'Treasury approvals' })).toContainText('2 of 2 approvals received');
   await expect(dialog.getByRole('button', { name: 'Approved by you', exact: true })).toBeDisabled();
-  await expect(dialog.getByRole('button', { name: 'Send payment', exact: true })).toBeEnabled();
+  await expect(dialog.getByRole('button', { name: 'Review execution fee', exact: true })).toBeEnabled();
 });
 test('an unavailable parent verification cannot enable approval or sending', async ({ page }) => {
   await page.addInitScript(() => sessionStorage.setItem('qa:scenario', 'nested-outage'));
   await page.goto('/org/demo/disbursements?focus=p1');
   const dialog = page.getByRole('dialog');
   await expect(dialog.getByRole('button', { name: 'Approve', exact: true })).toBeDisabled();
-  await expect(dialog.getByRole('button', { name: 'Send payment', exact: true })).toBeDisabled();
+  await expect(dialog.getByRole('button', { name: 'Send payment', exact: true })).toHaveCount(0);
   await expect(dialog.getByRole('region', { name: 'Treasury approvals' })).toHaveCount(0);
 });
 test('a declined native request offers the original payment after reload, while an uncertain broadcast offers settlement checking', async ({ page }) => {

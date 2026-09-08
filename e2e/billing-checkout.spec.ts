@@ -48,7 +48,7 @@ for (const theme of ["light", "dark"])
     await dialog.getByRole("button", { name: "Back", exact: true }).click();
     await expect(
       dialog.getByRole("button", { name: "Pay with connected wallet" }),
-    ).toBeDisabled();
+    ).toHaveCount(0);
     await page.reload();
     await page.getByRole("button", { name: "Review saved checkout" }).click();
     await expect(
@@ -72,7 +72,7 @@ test("another administrator can inspect an unsubmitted checkout without paying f
   );
   await expect(
     dialog.getByRole("button", { name: "Pay with connected wallet" }),
-  ).toBeDisabled();
+  ).toHaveCount(0);
   await expect(
     dialog.getByRole("button", { name: "Discard unsubmitted checkout" }),
   ).toBeEnabled();
@@ -104,7 +104,7 @@ test("an unknown wallet response keeps checkout blocked after reload on mobile",
   await dialog.getByRole("button", { name: "Back", exact: true }).click();
   await expect(
     dialog.getByRole("button", { name: "Pay with connected wallet" }),
-  ).toBeDisabled();
+  ).toHaveCount(0);
   expect(
     (await new AxeBuilder({ page }).include("dialog").analyze()).violations,
   ).toEqual([]);
@@ -131,42 +131,16 @@ test("unreadable billing recovery does not offer another wallet payment", async 
   await dialog.getByRole("button", { name: "Back", exact: true }).click();
   await expect(
     dialog.getByRole("button", { name: "Pay with connected wallet" }),
-  ).toBeDisabled();
+  ).toHaveCount(0);
 });
 
-test("checkout in another tab prevents a concurrent send", async ({
-  page,
-  context,
-}) => {
-  await page.goto("/org/demo/settings?tab=billing");
-  await page.evaluate(
-    () =>
-      new Promise<void>((acquired) => {
-        void navigator.locks.request(
-          "disburse:billing-checkout:demo",
-          () => new Promise<void>(() => acquired()),
-        );
-      }),
-  );
-  const other = await context.newPage();
-  await other.goto("/org/demo/settings?tab=billing");
-  await other.getByRole("button", { name: "Renew for 30 days" }).click();
-  const dialog = other.getByRole("dialog");
-  await dialog
-    .getByRole("button", { name: "Pay with connected wallet" })
-    .click();
-  await expect(dialog).toContainText(
-    "Subscription checkout is already open in another tab",
-  );
-  expect(
-    await other.evaluate(() =>
-      localStorage.getItem("disburse:pending-billing:demo"),
-    ),
-  ).toBeNull();
-  await other.screenshot({
-    path: ".local/qa/story-billing-concurrent-light.png",
-  });
-  await page.close();
+test("an unsupported billing network never falls back to native gas", async ({ page }) => {
+  await page.goto('/org/demo/settings?tab=billing');
+  await page.getByRole('button', { name: 'Renew for 30 days' }).click();
+  const dialog = page.getByRole('dialog');
+  await expect(dialog).toContainText('USDC execution fees are not available on the configured billing network');
+  await expect(dialog.getByRole('button', { name: 'Pay with connected wallet' })).toHaveCount(0);
+  await expect(dialog.getByRole('button', { name: 'Review subscription payment' })).toHaveCount(0);
 });
 
 test("subscription checkout resumes an existing receipt after reload", async ({
@@ -192,7 +166,7 @@ test("subscription checkout resumes an existing receipt after reload", async ({
   await dialog.getByRole("button", { name: "Back", exact: true }).click();
   await expect(
     dialog.getByRole("button", { name: "Pay with connected wallet" }),
-  ).toBeDisabled();
+  ).toHaveCount(0);
   await page.reload();
   await page.getByRole("button", { name: "Renew for 30 days" }).click();
   await expect(page.getByLabel("Payment transaction hash")).toHaveValue(hash);
@@ -217,7 +191,7 @@ test("a confirmed reverted billing receipt releases checkout for another attempt
   await expect(dialog).toContainText("No subscription payment was collected");
   await expect(
     dialog.getByRole("button", { name: "Pay with connected wallet" }),
-  ).toBeEnabled();
+  ).toHaveCount(0);
   expect(
     await page.evaluate(() =>
       localStorage.getItem("disburse:pending-billing:demo"),

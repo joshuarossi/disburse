@@ -1,3 +1,4 @@
+import { PAYMENT_OPERATOR_ROLES } from "../shared/roles";
 import { v } from "convex/values";
 import { formatUnits, parseAbi, type Address } from "viem";
 import { action, internalQuery } from "./_generated/server";
@@ -5,8 +6,13 @@ import { internal } from "./_generated/api";
 import { requireOrgAccess } from "./lib/rbac";
 import { getChainClient } from "./lib/safeVerification";
 import { assertSafeIdentity } from "./lib/safeIdentity";
-import { approvalPaths, availableAccountApprovals, readAccountAuthority } from './lib/accountAuthority';
-import { relayConfiguration } from "./lib/relayConfiguration";
+import {
+  approvalPaths,
+  availableAccountApprovals,
+  readAccountAuthority,
+} from "./lib/accountAuthority";
+import { supportsCircleFees } from "../shared/circleExecution";
+import { assertCustomerPaidAccount } from "./lib/customerPaidAccount";
 import {
   CHAIN_TOKENS,
   CHAIN_NAMES,
@@ -16,7 +22,7 @@ import { chainEnvironment } from "../shared/assets";
 import type { AccountReadiness } from "../shared/accountReadiness";
 
 const args = { safeId: v.id("safes"), sessionToken: v.string() };
-const writers = ["admin", "approver", "initiator"];
+
 const abi = parseAbi([
   "function getOwners() view returns (address[])",
   "function getThreshold() view returns (uint256)",
@@ -35,8 +41,10 @@ export const context = internalQuery({
       args.sessionToken,
       ["admin", "approver", "initiator", "clerk", "viewer"],
     );
-    const org = await ctx.db.get(safe.orgId);
-    const accountNames = await ctx.db.query('safes').withIndex('by_org', q => q.eq('orgId', safe.orgId)).collect();
+    const accountNames = await ctx.db
+      .query("safes")
+      .withIndex("by_org", (q) => q.eq("orgId", safe.orgId))
+      .collect();
     const members = await ctx.db
       .query("orgMemberships")
       .withIndex("by_org", (q) => q.eq("orgId", safe.orgId))
@@ -47,27 +55,26 @@ export const context = internalQuery({
         .map(async (m) => ({
           wallet: (await ctx.db.get(m.userId))?.walletAddress.toLowerCase(),
           name: m.name ?? null,
-          canApprove: writers.includes(m.role),
+          canApprove: PAYMENT_OPERATOR_ROLES.includes(m.role),
         })),
     );
-    let fee: AccountReadiness["managed"]["fee"] = null;
-    let error: string | null = null;
-    try {
-      fee = relayConfiguration(
-        safe.chainId,
-        org?.relayFeeTokenSymbol ?? "USDC",
-      ).fee;
-    } catch {
-      error =
-        "Stablecoin payment fees are unavailable for this account. You can save a draft and finish it when the payment service is available.";
-    }
     return {
       safe,
-      accountNames: accountNames.filter(a => a.chainId === safe.chainId).map(a => ({ address: a.safeAddress.toLowerCase(), name: a.name })),
+      accountNames: accountNames
+        .filter((a) => a.chainId === safe.chainId)
+        .map((a) => ({ address: a.safeAddress.toLowerCase(), name: a.name })),
       people,
       userWallet: user.walletAddress,
-      canPrepare: writers.includes(membership.role),
-      managed: { fee, error },
+      canPrepare: PAYMENT_OPERATOR_ROLES.includes(membership.role),
+      managed: {
+        fee: null,
+        error: supportsCircleFees(safe.chainId)
+          ? null
+          : "Fees in USDC are not supported on this network. Choose a supported account or keep this payment as a draft.",
+        service: supportsCircleFees(safe.chainId)
+          ? ("circle" as const)
+          : undefined,
+      },
     };
   },
 });
@@ -158,13 +165,52 @@ export const get = action({
       result.isOwner = owners.some(
         (o) => o.toLowerCase() === source.userWallet.toLowerCase(),
       );
-      const ownerCode = await Promise.all(owners.map(owner => client.getCode({ address: owner, blockNumber })));
-      if (ownerCode.some(code => code && code !== '0x')) {
-        const authority = await readAccountAuthority(safe.chainId, safe.safeAddress, blockNumber);
+      const ownerCode = await Promise.all(
+        owners.map((owner) => client.getCode({ address: owner, blockNumber })),
+      );
+      if (ownerCode.some((code) => code && code !== "0x")) {
+        const authority = await readAccountAuthority(
+          safe.chainId,
+          safe.safeAddress,
+          blockNumber,
+        );
         result.approvalPaths = approvalPaths(authority, source.userWallet);
-        const members = source.people.filter(p => p.canApprove && p.wallet).map(p => p.wallet!);
-        result.allApprovalsAvailable = availableAccountApprovals(authority, members);
-        result.owners = result.owners.map(owner => authority.nodes.some(n => n.address === owner.address) ? { ...owner, name: source.accountNames.find(a => a.address === owner.address)?.name ?? 'Owning account', canApproveInApp: availableAccountApprovals({ ...authority, root: owner.address }, members) } : owner);
+        const members = source.people
+          .filter((p) => p.canApprove && p.wallet)
+          .map((p) => p.wallet!);
+        result.allApprovalsAvailable = availableAccountApprovals(
+          authority,
+          members,
+        );
+        result.owners = result.owners.map((owner) =>
+          authority.nodes.some((n) => n.address === owner.address)
+            ? {
+                ...owner,
+                name:
+                  source.accountNames.find((a) => a.address === owner.address)
+                    ?.name ?? "Owning account",
+                canApproveInApp: availableAccountApprovals(
+                  { ...authority, root: owner.address },
+                  members,
+                ),
+              }
+            : owner,
+        );
+      }
+      if (supportsCircleFees(safe.chainId)) {
+        try {
+          await assertCustomerPaidAccount(
+            client,
+            address,
+            safe.chainId,
+            blockNumber,
+          );
+          result.managed.ready = true;
+        } catch {
+          result.managed.ready = false;
+          result.managed.error =
+            "The account’s USDC fee setup could not be verified. Open Accounts to check its setup, then refresh. Your balances and saved drafts remain available.";
+        }
       }
       result.assets = tokens.map((token, i) => ({
         token: token.symbol,

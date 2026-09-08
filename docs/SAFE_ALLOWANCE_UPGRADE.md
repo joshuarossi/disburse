@@ -8,7 +8,7 @@ September 6, 2026. The review found that Disburse selected AllowanceModule 0.1.1
 
 - Address: `0x691f59471Bfd2B7d639DCF74671a2d648ED1E331`.
 - Full runtime keccak256: `0xfafc86ce3000fbdc8ad155875c0b3b5a20d17662e7c2cdbf3e95f15945a46657`.
-- Verified networks: Ethereum, Polygon, Base, Arbitrum and Ethereum Sepolia. Base Sepolia had no code at that address and is not enabled for the fixed module.
+- Verified networks: Ethereum, Polygon, Base, Arbitrum, Ethereum Sepolia and Base Sepolia. On September 8, the exact published deployment was reproduced on Base Sepolia at the canonical address and its complete runtime hash verified.
 
 The member and policy reads verify the full deployed bytecode. Delegated quotes use the same check, pin allowance and authorization-hash reads to one block, and keep the transfer-counter and fee limits. New grants require an account version supported by Disburse (Safe 1.3.0 or 1.4.1); the upstream module no longer supports Safe 1.0.0. Existing legacy policy proposals remain visible with an explanation, but cannot be approved or executed through Disburse. Revocation remains available.
 
@@ -23,3 +23,8 @@ Existing on-chain grants are not migrated or revoked automatically. Owners must 
 Evidence is saved to `.local/qa/safe-allowance-release/evidence.json`. The source verification helper runs under Node because solc's remote loader requires Node's module compilation API. Neither verification script signs or sends transactions. The runtime fixture in `src/lib/__tests__/fixtures/allowance-v1-runtime.json` was read from the published address and is used to test bytecode mismatch rejection. The upstream contract is LGPL-3.0-only; [source and license](https://github.com/safe-fndn/safe-modules/tree/allowances/v1.0.0/modules/allowances) remain available from Safe.
 
 Regression coverage includes legacy grant rejection and revocation, a queued legacy send held before submission, reconciliation of existing authorization, bytecode mismatch, member-specific and orphaned grant discovery, disabled modules and oversized histories. This verifies the integration; it does not substitute for the independent security review tracked in the launch program.
+
+
+## Base Sepolia deployment
+
+The [September 8 deployment](https://sepolia.basescan.org/tx/0x40838a2669b57503ad527021d42cd1658cc57ee7f10e374e6249600a8d9ee99b) reproduced the published Base mainnet CREATE2 call, using the same factory, salt and init code. The full runtime matches the pinned 1.0.0 hash above. This deploys Safe's released contract, not a Disburse modification. The isolated customer Safe paid 0.082375 test USDC in execution fees and held zero native ETH. Production networks were read only.

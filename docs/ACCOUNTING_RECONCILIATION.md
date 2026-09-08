@@ -14,6 +14,10 @@ The v2 accounting baseline is U.S. GAAP, as requested by the product owner. Repo
 
 Trial expiry does not block reading or reconciling recorded history. Review permissions are separate from payment-signing authority. All accounting endpoints verify workspace membership. Test activity uses `DSB-TEST-` journal numbers, separate export batches and explicit test labels.
 
+## Transfers between networks
+
+Cross-network company transfers also use reviewed clearing-account journals. The sending debit retains its gross quantity and original settlement date. The receiving receipt records the net quantity and a separately reviewed book value for the provider's retained delivery fee. This avoids counting the fee as an additional debit from the receiving wallet. Both sides retain their own canonical log references, and subsequent history syncs cannot duplicate the movements or journals. See [account-transfer accounting and acceptance](ACCOUNT_TRANSFERS.md).
+
 ## Period balance checks
 
 Reports → Reconciliation → Balance checks verifies a named account and configured currency over 1–366 completed UTC days. It locates the last finalized block before the opening date and the last block before the following day at period end. Historical `balanceOf` reads use those exact blocks. Opening units + recorded receipts − recorded payments must equal closing units.

@@ -31,6 +31,7 @@ const Team = lazy(() => import("./pages/Team"));
 const LicenseAdmin = lazy(() => import("./pages/LicenseAdmin"));
 import { AuthRequired, OrgRequired } from "./components/ProtectedRoute";
 import { ScrollToHash } from "./components/ScrollToHash";
+import { ApplicationLanguage } from "./providers/ApplicationLanguage";
 
 function App() {
   return (
@@ -41,8 +42,8 @@ function App() {
           <Routes>
             {/* Public routes */}
             <Route path="/" element={<Landing />} />
-            <Route path="/pay/:token" element={<CustomerInvoice />} />
-            <Route path="/recipient-details" element={<RecipientDetails />} />
+            <Route path="/pay/:token" element={<ApplicationLanguage><CustomerInvoice /></ApplicationLanguage>} />
+            <Route path="/recipient-details" element={<ApplicationLanguage><RecipientDetails /></ApplicationLanguage>} />
             <Route path="/docs" element={<Docs />} />
             <Route path="/about" element={<About />} />
             <Route path="/blog" element={<Blog />} />
@@ -51,7 +52,7 @@ function App() {
             <Route path="/terms" element={<Terms />} />
 
             {/* Protected routes - require authentication */}
-            <Route element={<WalletRoutes />}>
+            <Route element={<ApplicationLanguage><WalletRoutes /></ApplicationLanguage>}>
             <Route path="/invite" element={<AcceptInvitation />} />
             <Route path="/login" element={<Login />} />
             <Route path="/admin/licenses" element={<AuthRequired><LicenseAdmin /></AuthRequired>} />

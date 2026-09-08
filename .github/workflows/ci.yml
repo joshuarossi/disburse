@@ -42,6 +42,9 @@ jobs:
       - name: Release configuration and deployment checks
         run: node --test scripts/check-release-config.test.mjs scripts/deploy.test.mjs
 
+      - name: Snapshot verifier failure cases
+        run: python3 -m unittest discover -s scripts/operations -p 'test_*.py'
+
       - name: Production build
         run: bun run build:release
         env:

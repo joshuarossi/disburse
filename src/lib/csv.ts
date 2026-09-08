@@ -6,6 +6,7 @@
 export interface CsvColumn {
   key: string;
   label: string;
+  numeric?: boolean;
 }
 
 /**
@@ -28,7 +29,7 @@ export function exportToCsv<T extends Record<string, unknown>>(
       columns
         .map((c) => {
           const value = row[c.key];
-          return escapeValue(value);
+          return escapeValue(value, c.numeric);
         })
         .join(","),
     )
@@ -60,7 +61,7 @@ export function exportToCsv<T extends Record<string, unknown>>(
  * - Neutralizes formula injection (H-01): leading = + - @ \t \r are prefixed
  *   with a single quote so spreadsheet apps treat the cell as text
  */
-function escapeValue(value: unknown): string {
+function escapeValue(value: unknown, numeric = false): string {
   if (value === null || value === undefined) {
     return "";
   }
@@ -68,7 +69,7 @@ function escapeValue(value: unknown): string {
   let str = String(value);
 
   // CSV injection defense: never allow cells to begin with a formula character
-  if (/^[=+\-@\t\r]/.test(str)) {
+  if (/^[=+\-@\t\r]/.test(str) && !(numeric && /^-?\d+(?:\.\d+)?$/.test(str))) {
     str = `'` + str;
   }
 

@@ -36,7 +36,9 @@ export function deploymentCommands(env, { dryRun = false, yes = false } = {}) {
     throw new Error('Cloudflare must supply an HTTPS preview origin in CF_PAGES_URL.');
   }
 
-  const alias = branch.toLowerCase().replace(/[^a-z0-9]/g, '-');
+  // Pages limits branch aliases to 28 characters; DNS's 63-character limit
+  // is not the provider's limit. Keep the immutable origin usable as well.
+  const alias = branch.toLowerCase().replace(/[^a-z0-9]/g, '-').slice(0, 28).replace(/^-+|-+$/g, '');
   const projectHost = url.hostname.split('.').slice(1).join('.');
   const aliasHost = /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/.test(alias)
     ? `${alias}.${projectHost}` : url.hostname;

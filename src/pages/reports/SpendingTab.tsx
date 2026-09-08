@@ -1,3 +1,4 @@
+import { userErrorMessage } from '@/lib/userErrors';
 import { useActivityEnvironment } from "@/features/workspace/ActivityEnvironment";
 import { chainEnvironment } from "../../../shared/assets";
 import { useMemo, useState, useEffect, useRef } from "react";
@@ -178,7 +179,7 @@ export function SpendingTab({ orgId, address }: SpendingTabProps) {
       rows,
       columns,
     );
-    } catch (error) { setExportError(error instanceof Error ? error.message : 'The export could not be completed. Try again.'); }
+    } catch (error) { setExportError(userErrorMessage(error, 'The export could not be completed. Try again.')); }
     finally { setExportCount(null); exportController.current = null; }
   };
 

@@ -1,5 +1,11 @@
+import { ORG_READER_ROLES, RECORD_EDITOR_ROLES } from "../shared/roles";
 import { v } from "convex/values";
-import { internalMutation, internalQuery, query } from "./_generated/server";
+import {
+  internalMutation,
+  internalQuery,
+  mutation,
+  query,
+} from "./_generated/server";
 import type { MutationCtx } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
 import { requireOrgAccess } from "./lib/rbac";
@@ -11,12 +17,12 @@ import {
   invoiceFileName,
 } from "../shared/invoiceSource";
 
-const writers = ["admin", "approver", "initiator", "clerk"] as const;
-const readers = [...writers, "viewer"] as const;
 export const uploadAccess = internalQuery({
   args: { orgId: v.id("orgs"), sessionToken: v.string() },
   handler: async (ctx, args) => {
-    await requireOrgAccess(ctx, args.orgId, args.sessionToken, [...writers]);
+    await requireOrgAccess(ctx, args.orgId, args.sessionToken, [
+      ...RECORD_EDITOR_ROLES,
+    ]);
   },
 });
 export const record = internalMutation({
@@ -35,7 +41,7 @@ export const record = internalMutation({
       ctx,
       args.orgId,
       args.sessionToken,
-      [...writers],
+      [...RECORD_EDITOR_ROLES],
     );
     if (
       !/^[a-f0-9-]{32,64}$/i.test(args.requestId) ||
@@ -70,12 +76,15 @@ export const record = internalMutation({
     const staged = await ctx.db
       .query("invoiceFiles")
       .withIndex("by_user_unattached", (q) =>
-        q.eq("uploadedBy", user._id).eq("invoiceId", undefined),
+        q
+          .eq("uploadedBy", user._id)
+          .eq("invoiceId", undefined)
+          .eq("receivableId", undefined),
       )
       .take(21);
     if (staged.length >= 20)
       throw new Error(
-        "Finish saving your earlier uploaded bills before adding more documents.",
+        "Finish saving your earlier uploads before adding more documents.",
       );
     const fileId = await ctx.db.insert("invoiceFiles", {
       orgId: args.orgId,
@@ -117,6 +126,7 @@ export async function attachInvoiceFiles(
     if (
       !file ||
       file.orgId !== invoice.orgId ||
+      file.receivableId !== undefined ||
       (file.invoiceId && file.invoiceId !== invoiceId) ||
       (!file.invoiceId &&
         (file.uploadedBy !== userId || (file.expiresAt ?? 0) <= Date.now()))
@@ -163,7 +173,9 @@ export const list = query({
   handler: async (ctx, args) => {
     const invoice = await ctx.db.get(args.invoiceId);
     if (!invoice) return [];
-    await requireOrgAccess(ctx, invoice.orgId, args.sessionToken, [...readers]);
+    await requireOrgAccess(ctx, invoice.orgId, args.sessionToken, [
+      ...ORG_READER_ROLES,
+    ]);
     const rows = await ctx.db
       .query("invoiceFiles")
       .withIndex("by_invoice", (q) => q.eq("invoiceId", invoice._id))
@@ -187,10 +199,11 @@ export const downloadAccess = internalQuery({
       ctx,
       file.orgId,
       args.sessionToken,
-      [...readers],
+      [...ORG_READER_ROLES],
     );
     if (
       !file.invoiceId &&
+      !file.receivableId &&
       (file.uploadedBy !== user._id || (file.expiresAt ?? 0) <= Date.now())
     )
       throw new Error("Source document unavailable");
@@ -206,10 +219,12 @@ export const discard = internalMutation({
       ctx,
       file.orgId,
       args.sessionToken,
-      [...writers],
+      [...RECORD_EDITOR_ROLES],
     );
-    if (file.uploadedBy !== user._id || file.invoiceId)
-      throw new Error("Saved source documents are retained with the bill.");
+    if (file.uploadedBy !== user._id || file.invoiceId || file.receivableId)
+      throw new Error(
+        "Saved documents are retained with their invoice or bill.",
+      );
     await ctx.storage.delete(file.storageId);
     await ctx.db.delete(file._id);
   },
@@ -224,10 +239,143 @@ export const prune = internalMutation({
       )
       .take(20);
     for (const f of expired)
-      if (!f.invoiceId) {
+      if (!f.invoiceId && !f.receivableId) {
         await ctx.storage.delete(f.storageId);
         await ctx.db.delete(f._id);
       }
     return expired.length;
+  },
+});
+
+const receivableIdentity = {
+  invoiceId: v.id("receivables"),
+  sessionToken: v.string(),
+};
+export const forReceivable = query({
+  args: receivableIdentity,
+  handler: async (ctx, args) => {
+    const invoice = await ctx.db.get(args.invoiceId);
+    if (!invoice) throw new Error("Invoice not found.");
+    await requireOrgAccess(ctx, invoice.orgId, args.sessionToken, [
+      ...ORG_READER_ROLES,
+    ]);
+    const files = await ctx.db
+      .query("invoiceFiles")
+      .withIndex("by_receivable", (q) => q.eq("receivableId", invoice._id))
+      .take(MAX_INVOICE_FILES);
+    return files.map((f) => ({
+      id: f._id,
+      name: f.name,
+      size: f.size,
+      sha256: f.sha256,
+      sharedWithCustomer: f.sharedWithCustomer === true,
+    }));
+  },
+});
+export const attachToReceivable = mutation({
+  args: { ...receivableIdentity, fileId: v.id("invoiceFiles") },
+  handler: async (ctx, args) => {
+    const invoice = await ctx.db.get(args.invoiceId);
+    if (!invoice) throw new Error("Invoice not found.");
+    const { user } = await requireOrgAccess(
+      ctx,
+      invoice.orgId,
+      args.sessionToken,
+      [...RECORD_EDITOR_ROLES],
+    );
+    if (invoice.state === "void")
+      throw new Error("Documents cannot be added to a voided invoice.");
+    const file = await ctx.db.get(args.fileId);
+    if (
+      !file ||
+      file.orgId !== invoice.orgId ||
+      file.invoiceId ||
+      (file.receivableId && file.receivableId !== invoice._id) ||
+      (!file.receivableId &&
+        (file.uploadedBy !== user._id || (file.expiresAt ?? 0) <= Date.now()))
+    )
+      throw new Error(
+        "This document is unavailable for this invoice. Choose the file again.",
+      );
+    if (file.receivableId === invoice._id) return;
+    const files = await ctx.db
+      .query("invoiceFiles")
+      .withIndex("by_receivable", (q) => q.eq("receivableId", invoice._id))
+      .take(MAX_INVOICE_FILES);
+    if (files.length >= MAX_INVOICE_FILES)
+      throw new Error("An invoice can have up to five documents.");
+    await ctx.db.patch(file._id, {
+      receivableId: invoice._id,
+      sharedWithCustomer: false,
+      expiresAt: undefined,
+    });
+    await appendAudit(ctx, {
+      orgId: invoice.orgId,
+      actorUserId: user._id,
+      action: "receivable.document_attached",
+      objectType: "receivable",
+      objectId: invoice._id,
+      metadata: { fileId: file._id, sha256: file.sha256 },
+      timestamp: Date.now(),
+    });
+  },
+});
+export const shareReceivableFile = mutation({
+  args: {
+    fileId: v.id("invoiceFiles"),
+    sessionToken: v.string(),
+    shared: v.boolean(),
+  },
+  handler: async (ctx, args) => {
+    const file = await ctx.db.get(args.fileId);
+    const invoice = file?.receivableId
+      ? await ctx.db.get(file.receivableId)
+      : null;
+    if (!file || !invoice || file.invoiceId || invoice.orgId !== file.orgId)
+      throw new Error("Invoice document not found.");
+    const { user } = await requireOrgAccess(
+      ctx,
+      invoice.orgId,
+      args.sessionToken,
+      [...RECORD_EDITOR_ROLES],
+    );
+    if (args.shared && invoice.state === "void")
+      throw new Error("A voided invoice cannot share new documents.");
+    if ((file.sharedWithCustomer ?? false) === args.shared) return;
+    await ctx.db.patch(file._id, { sharedWithCustomer: args.shared });
+    await appendAudit(ctx, {
+      orgId: invoice.orgId,
+      actorUserId: user._id,
+      action: args.shared
+        ? "receivable.document_shared"
+        : "receivable.document_unshared",
+      objectType: "receivable",
+      objectId: invoice._id,
+      metadata: { fileId: file._id, sha256: file.sha256 },
+      timestamp: Date.now(),
+    });
+  },
+});
+export const sharedDownloadAccess = internalQuery({
+  args: { fileId: v.id("invoiceFiles"), publicToken: v.string() },
+  handler: async (ctx, args) => {
+    if (!/^[a-f0-9]{64}$/.test(args.publicToken))
+      throw new Error("Document unavailable.");
+    const invoice = await ctx.db
+      .query("receivables")
+      .withIndex("by_public", (q) => q.eq("publicToken", args.publicToken))
+      .unique();
+    const file = await ctx.db.get(args.fileId);
+    if (
+      !invoice ||
+      invoice.state === "draft" ||
+      !file ||
+      file.invoiceId ||
+      file.receivableId !== invoice._id ||
+      file.orgId !== invoice.orgId ||
+      !file.sharedWithCustomer
+    )
+      throw new Error("Document unavailable.");
+    return file;
   },
 });

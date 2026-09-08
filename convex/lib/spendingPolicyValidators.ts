@@ -20,6 +20,7 @@ export const policyFeeValidator = v.object({
   amount: v.string(),
 });
 export const policyExecutionValidator = v.object({
+  service: v.optional(v.literal('circle')),
   attemptId: v.string(),
   actorUserId: v.id("users"),
   startedAt: v.number(),

@@ -1,3 +1,4 @@
+import { ORG_READER_ROLES, RECORD_EDITOR_ROLES } from '../shared/roles';
 import { environmentValidator } from "./lib/activityEnvironment";
 import { v } from "convex/values";
 import {
@@ -14,14 +15,16 @@ import { amountToBaseUnits, formatBaseUnits } from "./lib/validation";
 import { receivableAmounts, receivableStatus } from "../shared/receivables";
 import { internal } from "./_generated/api";
 import { assertSameSettlement, validateSettlementBlock } from './lib/settlementBlock';
-const readers = ["admin", "approver", "initiator", "clerk", "viewer"] as const;
-const writers = ["admin", "approver", "initiator", "clerk"] as const;
+import { supportsCircleFees } from '../shared/circleExecution';
+import { withReceivableRefunds } from './lib/receivableAdjustments';
+
+
 const scope = { orgId: v.id("orgs"), sessionToken: v.string() };
 const identity = { invoiceId: v.id("receivables"), sessionToken: v.string() };
 export const configuration = query({
   args: scope,
   handler: async (ctx, args) => {
-    await requireOrgAccess(ctx, args.orgId, args.sessionToken, [...readers]);
+    await requireOrgAccess(ctx, args.orgId, args.sessionToken, [...ORG_READER_ROLES]);
     const safes = await ctx.db
       .query("safes")
       .withIndex("by_org", (q) => q.eq("orgId", args.orgId))
@@ -33,15 +36,12 @@ export const configuration = query({
           .map((s) => s.chainId!),
       ),
     ].map((chainId) => {
-      const testnet = [11155111, 84532].includes(chainId);
-      const configured = /^0x[\da-fA-F]{40}$/.test(
-        process.env[`AR_FACTORY_${chainId}`] ?? "",
-      );
+      const testnet = [11155111, 84532, 421614].includes(chainId);
       return {
         chainId,
         canIssue:
-          configured && (testnet || process.env.AR_MAINNET_ENABLED === "true"),
-        collectionFeeMode: "wallet" as const,
+          supportsCircleFees(chainId) && (testnet || process.env.AR_MAINNET_ENABLED === "true"),
+        collectionFeeMode: "stablecoin" as const,
       };
     });
   },
@@ -70,7 +70,7 @@ export const create = mutation({
       ctx,
       args.orgId,
       args.sessionToken,
-      [...writers],
+      [...RECORD_EDITOR_ROLES],
     );
     const editing = args.invoiceId ? await ctx.db.get(args.invoiceId) : null;
     if (
@@ -189,15 +189,16 @@ export const create = mutation({
 export const list = query({
   args: { ...scope, environment: v.optional(environmentValidator) },
   handler: async (ctx, args) => {
-    await requireOrgAccess(ctx, args.orgId, args.sessionToken, [...readers]);
+    await requireOrgAccess(ctx, args.orgId, args.sessionToken, [...ORG_READER_ROLES]);
     const invoices = await ctx.db
       .query("receivables")
       .withIndex("by_org", (q) => q.eq("orgId", args.orgId))
       .filter(q => args.environment === "test" ? q.or(q.eq(q.field("chainId"), 11155111), q.eq(q.field("chainId"), 84532)) : args.environment === "production" ? q.or(...[1, 137, 8453, 42161].map(id => q.eq(q.field("chainId"), id))) : args.environment === "unclassified" ? q.and(...[1, 137, 8453, 42161, 11155111, 84532].map(id => q.neq(q.field("chainId"), id))) : true)
       .order("desc")
       .take(201);
+    const visible=await Promise.all(invoices.slice(0,200).map(i=>withReceivableRefunds(ctx,i)));
     return {
-      items: invoices.slice(0, 200).map((i) => ({
+      items: visible.map((i) => ({
         ...i,
         status: receivableStatus(i),
         amounts: receivableAmounts(i),
@@ -211,8 +212,8 @@ export const get = query({
   handler: async (ctx, args) => {
     const i = await ctx.db.get(args.invoiceId);
     if (!i) throw new Error("Invoice not found.");
-    await requireOrgAccess(ctx, i.orgId, args.sessionToken, [...readers]);
-    return i;
+    await requireOrgAccess(ctx, i.orgId, args.sessionToken, [...ORG_READER_ROLES]);
+    return withReceivableRefunds(ctx,i);
   },
 });
 export const forOperation = query({
@@ -220,7 +221,7 @@ export const forOperation = query({
   handler: async (ctx, args) => {
     const i = await ctx.db.get(args.invoiceId);
     if (!i) throw new Error("Invoice not found.");
-    await requireOrgAccess(ctx, i.orgId, args.sessionToken, [...writers]);
+    await requireOrgAccess(ctx, i.orgId, args.sessionToken, [...RECORD_EDITOR_ROLES]);
     return i;
   },
 });
@@ -229,7 +230,7 @@ export const receipts = query({
   handler: async (ctx, args) => {
     const i = await ctx.db.get(args.invoiceId);
     if (!i) throw new Error("Invoice not found.");
-    await requireOrgAccess(ctx, i.orgId, args.sessionToken, [...readers]);
+    await requireOrgAccess(ctx, i.orgId, args.sessionToken, [...ORG_READER_ROLES]);
     return ctx.db
       .query("receivableEvents")
       .withIndex("by_invoice", (q) => q.eq("invoiceId", i._id))
@@ -247,6 +248,9 @@ export const publicInvoice = query({
       .unique();
     if (!i || i.state === "draft") return null;
     const org = await ctx.db.get(i.orgId);
+    const adjusted=await withReceivableRefunds(ctx,i);
+    const credits=await ctx.db.query("receivableCreditNotes").withIndex("by_invoice",q=>q.eq("invoiceId",i._id)).order("desc").take(100);
+    const files = await ctx.db.query("invoiceFiles").withIndex("by_receivable", q=>q.eq("receivableId", i._id)).take(5);
     // Explicit shareable projection: no customer email, private notes, org IDs or sessions.
     return {
       number: i.number,
@@ -260,11 +264,13 @@ export const publicInvoice = query({
       chainId: i.chainId,
       amount: i.amount,
       receivingAddress: i.receivingAddress,
-      status: receivableStatus(i),
-      amounts: receivableAmounts(i),
+      status: receivableStatus(adjusted),
+      amounts: receivableAmounts(adjusted),
+      credits: credits.map(c=>({number:c.number,amount:formatBaseUnits(BigInt(c.amountRaw),i.token),reason:c.reason,issuedAt:c.issuedAt})),
       voided: i.state === "void",
       lastCheckedAt: i.lastCheckedAt,
       syncDelayed: !!i.syncError,
+      documents: files.filter(f=>f.sharedWithCustomer && !f.invoiceId && f.orgId === i.orgId).map(f=>({id:f._id, name:f.name, size:f.size})),
     };
   },
 });
@@ -274,12 +280,13 @@ export const voidInvoice = mutation({
     const i = await ctx.db.get(args.invoiceId);
     if (!i) throw new Error("Invoice not found.");
     const { user } = await requireOrgAccess(ctx, i.orgId, args.sessionToken, [
-      ...writers,
+      ...RECORD_EDITOR_ROLES,
     ]);
     if (BigInt(i.received) > 0n)
       throw new Error(
         "This invoice has payments. Resolve the payment before voiding; refunds are separate.",
       );
+    if(BigInt(i.credited ?? "0") > 0n)throw new Error("This invoice has issued credit notes. Keep those records together and credit any remaining amount instead of voiding it.");
     await ctx.db.patch(i._id, {
       state: "void",
       voidedAt: Date.now(),
@@ -314,7 +321,7 @@ export const publish = internalMutation({
     const i = await ctx.db.get(args.invoiceId);
     if (!i) throw new Error("Invoice not found.");
     const { user } = await requireOrgAccess(ctx, i.orgId, args.sessionToken, [
-      ...writers,
+      ...RECORD_EDITOR_ROLES,
     ]);
     if (i.state === "issued") return i.publicToken!;
     if (

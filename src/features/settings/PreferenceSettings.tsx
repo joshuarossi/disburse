@@ -1,7 +1,6 @@
-import { LanguageSwitcher } from '@/components/ui/LanguageSwitcher';
-import { ThemeSwitcher } from '@/components/ui/ThemeSwitcher';
-import { SlidersHorizontal } from 'lucide-react';
-import type { useSettingsController } from './useSettingsController';
+import { ThemeSwitcher } from "@/components/ui/ThemeSwitcher";
+import { SlidersHorizontal } from "lucide-react";
+import type { useSettingsController } from "./useSettingsController";
 export function PreferenceSettings({
   controller,
 }: {
@@ -17,27 +16,25 @@ export function PreferenceSettings({
           </div>
           <div className="min-w-0">
             <h2 className="text-base sm:text-lg font-semibold text-white">
-              {t('settings.preferences.title')}
+              {t("settings.preferences.title")}
             </h2>
             <p className="text-xs sm:text-sm text-slate-400">
-              {t('settings.preferences.subtitle')}
+              {t("settings.preferences.subtitle")}
             </p>
           </div>
         </div>
 
         <div className="space-y-4">
           <div className="flex items-center justify-between gap-4">
-            <label className="text-sm font-medium text-slate-300 shrink-0">
-              {t('settings.language.selectLanguage')}
-            </label>
-            <div className="w-56 rounded-lg border border-white/10 bg-navy-800/50 p-1">
-              <LanguageSwitcher variant="secondary" size="default" />
-            </div>
+            <span className="text-sm font-medium text-slate-300 shrink-0">
+              Workspace language
+            </span>
+            <span className="text-sm">English</span>
           </div>
 
           <div className="flex items-center justify-between gap-4">
             <label className="text-sm font-medium text-slate-300 shrink-0">
-              {t('settings.appearance.selectTheme')}
+              {t("settings.appearance.selectTheme")}
             </label>
             <div className="w-56 rounded-lg border border-white/10 bg-navy-800/50 p-1">
               <ThemeSwitcher variant="secondary" size="default" />

@@ -236,14 +236,18 @@ export default function Disbursements() {
           <EmptyState
             icon={ListChecks}
             title={
-              search || view !== "all"
-                ? "No payments in this view"
-                : "Your first payment starts here"
+              result.hasMore
+                ? "No matching payments on this page"
+                : search || view !== "all"
+                  ? "No payments in this view"
+                  : "Your first payment starts here"
             }
             description={
-              search || view !== "all"
-                ? "Try another filter or search term."
-                : "Pay one person or a whole team using saved recipients. Review the amounts and choose when to pay."
+              result.hasMore
+                ? "Continue to the next page to check more history, or narrow your filters."
+                : search || view !== "all"
+                  ? "Try another filter or search term."
+                  : "Pay one person or a whole team using saved recipients. Review the amounts and choose when to pay."
             }
             action={
               canManage && (
@@ -259,23 +263,36 @@ export default function Disbursements() {
           />
         ) : (
           <div className="workspace-table-wrap">
-            <table className="workspace-table">
-              <thead>
-                <tr>
-                  <th>Payment</th>
-                  <th>Pay date</th>
-                  <th>Account</th>
-                  <th className="numeric">Amount</th>
-                  <th>Status</th>
-                  <th>
+            <table
+              className="workspace-table workspace-table-responsive"
+              role="table"
+            >
+              <thead role="rowgroup">
+                <tr role="row">
+                  <th role="columnheader" scope="col">
+                    Payment
+                  </th>
+                  <th role="columnheader" scope="col">
+                    Pay date
+                  </th>
+                  <th role="columnheader" scope="col">
+                    Account
+                  </th>
+                  <th role="columnheader" scope="col" className="numeric">
+                    Amount
+                  </th>
+                  <th role="columnheader" scope="col">
+                    Status
+                  </th>
+                  <th role="columnheader" scope="col">
                     <span className="sr-only">Review payment</span>
                   </th>
                 </tr>
               </thead>
-              <tbody>
+              <tbody role="rowgroup">
                 {result.items.map((p) => (
-                  <tr key={p._id}>
-                    <td>
+                  <tr role="row" key={p._id}>
+                    <td role="cell" data-primary>
                       <button
                         className="workspace-table-primary text-left"
                         onClick={() => setParam("focus", p._id)}
@@ -293,7 +310,7 @@ export default function Disbursements() {
                         {p.recurringPaymentId ? " · Recurring" : ""}
                       </span>
                     </td>
-                    <td>
+                    <td role="cell" data-label="Pay date">
                       {formatDate(p.scheduledAt, {
                         month: "short",
                         day: "numeric",
@@ -301,13 +318,17 @@ export default function Disbursements() {
                         timeZone: "UTC",
                       })}
                     </td>
-                    <td>
-                      {p.account?.name ?? (p.chainId ? getChainName(p.chainId) + " account" : "Original account")}
+                    <td role="cell" data-label="Account">
+                      {p.account?.name ??
+                        (p.chainId
+                          ? getChainName(p.chainId) + " account"
+                          : "Original account")}
                       <span className="workspace-table-secondary">
-                        {getChainName(p.chainId ?? 0)}{p.account?.archived ? " · Archived" : ""}
+                        {getChainName(p.chainId ?? 0)}
+                        {p.account?.archived ? " · Archived" : ""}
                       </span>
                     </td>
-                    <td className="numeric">
+                    <td role="cell" data-label="Amount" className="numeric">
                       <strong>
                         {formatMoney(
                           p.totalAmount ?? p.amount ?? "0",
@@ -319,10 +340,10 @@ export default function Disbursements() {
                         {p.token}
                       </span>
                     </td>
-                    <td>
+                    <td role="cell" data-label="Status">
                       <StatusBadge {...paymentStatus(p)} />
                     </td>
-                    <td>
+                    <td role="cell" data-actions>
                       <button
                         className="workspace-action-link"
                         aria-label={`Review ${title(p)}`}
@@ -340,7 +361,8 @@ export default function Disbursements() {
         )}
         <div className="workspace-table-footer">
           <span>
-            {result?.totalCount ?? 0} payments · Page {cursorHistory.length}
+            {result?.items.length ?? 0} payments on this page · Page{" "}
+            {cursorHistory.length}
           </span>
           <div className="flex gap-2">
             <button
@@ -388,4 +410,4 @@ export default function Disbursements() {
     </>
   );
 }
-import { paymentStatus } from '../../shared/paymentQueue';
+import { paymentStatus } from "../../shared/paymentQueue";

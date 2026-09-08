@@ -1,62 +1,35 @@
-# Managed payment execution
+# Customer-paid execution and historical relay recovery
 
-Disburse uses Gelato Turbo Relayer through `@gelatocloud/gasless` 0.0.12. Gelato manages network submission and gas. Disburse does not run an operator wallet, store an operator private key, or allocate network transaction nonces.
+Updated September 7, 2026. **The application-funded Gelato Turbo transport is disabled in code.** It rejects before creating a client or making a network request, even when old credentials remain configured. Configuring a Gas Tank, collector or fee reimbursement cannot enable it. Customers must pay the external execution service directly in stablecoins; Disburse cannot incur its gas or usage bill.
 
-The deprecated Safe Relay Kit and `call-with-sync-fee` submission paths have been removed. Existing legacy task-status lookup remains solely for historical records. Old signed SyncFee proposals cannot be converted without new owner approval.
+The deprecated SyncFee path has not been restored. Historical signed transactions, allowance reservations and relay jobs remain available for settlement recovery. No stored signature is translated into a new execution protocol.
 
-## Payment and fee authorization
+## Replacement status
 
-A configured, fixed service fee is displayed separately from recipient amounts before the wallet prompt. The customer approves the exact currency, amount and collector. That ERC-20 transfer is included in the same Safe MultiSend as the recipients. Safe gas refund fields are zero, preventing an additional Safe refund. The fee is charged only if the atomic payment succeeds. Changing fee currency never changes recipient currency.
+Circle Paymaster plus Candide's public bundler has completed three Base Sepolia operations with USDC fees taken from the customer's Safe: deployment plus a payment, a deliberately failed payment, and a successful payment after the failure. Both the Safe and its signing wallet held zero native ETH. No provider account, API key or Disburse funding was supplied. This establishes protocol execution, not full application integration or production capacity.
 
-The collector must match the managed Gelato project's live capabilities. Unsupported chains, unsupported fee tokens, missing credentials and an empty Gas Tank block submission. Provider availability is checked before the wallet prompt and again before creating a relay job. Production fee amounts are business configuration, not a claim to reimburse exact gas at execution time. Gelato bills the project's Gas Tank; fee collection does not imply automatic Gas Tank replenishment.
+`shared/circleExecution.ts`, `circleTransport.ts` and `circleSettlement.ts` implement bounded operation encoding, submission error handling and exact receipt interpretation. The reproducible testnet runner is `scripts/qa-customer-fees.mjs`. The Safe application approval, scheduling, delegated spending, account-control, receivable collection and checkout flows still need the replacement integration. Circle's fee is USDC; it must never replace a beneficiary's chosen payment currency.
 
-Fee collection is a separate provider capability from network relaying. Gelato documents aggregation on Ethereum, Base and Ink; testnet capability must be verified for the connected project. The app does not infer support from a network appearing in its token list. [Turbo quick start](https://docs.gelato.cloud/gasless-with-relay/gelato-turbo-relayer/quick-start), [fee aggregation](https://docs.gelato.cloud/paymaster-&-bundler/features/fee-aggregation).
+Original MetaMask-only onboarding uses a separately implemented Biconomy permit flow. Its Base Sepolia service accepts the quote but rejects submission during token-slot detection. That live failure remains open. A prefunded counterfactual Safe test does not close original onboarding.
 
-## Server configuration
+See [provider findings](GELATO_V2_SETUP.md) and the [receipt and failure evidence](CUSTOMER_PAID_SERVICES_QA_2026-09-07.md).
 
-Store credentials only in Convex environment variables, never `VITE_` variables or browser storage:
+## Historical execution records
 
-- `GELATO_API_KEY`: production managed project.
-- `GELATO_TESTNET_API_KEY`: isolated test project; testnet requests never use the production credential.
-- `GELATO_<chainId>_FEE_COLLECTOR`: project collector returned by Gelato capabilities.
-- `GELATO_<chainId>_FEE_USDC` / `GELATO_<chainId>_FEE_USDT`: approved fixed fee in whole-token decimal units.
+The previous Turbo flow saved the exact Safe transaction, recipient transfers and a separate fixed collector transfer. Its fee was atomic with payment success, but Turbo billed a project Gas Tank. That financial arrangement fails the current requirements. It is documented here only to interpret existing authorizations and tests.
 
-The provider project must have a Gas Tank balance and fee collection enabled. Finance-team members do not configure provider accounts or hold native gas. Provider billing remains an application operating cost, like database hosting.
+Historical jobs retain their original submission claim, calldata, provider identity and start block. A lost submission response never permits another economic payment. Recovery checks canonical chain evidence independently of provider status. Provider-status failure does not erase an execution or release an allowance reservation.
 
-## Durable execution
+The least-recently-checked job rotation prevents an unresolved first page from starving later records. Failures before submission remain distinguishable from ambiguous submissions. The UI offers settlement checks for the original record and preserves signed approvals. A confirmed Safe `ExecutionFailure` is a failed payment; a receipt with no matching result remains unresolved.
 
-1. Verify canonical Safe identity, exact recipients and fee, recomputed transaction hash, current owners, threshold and nonce.
-2. Recheck subscription, screening, active creator permissions, creator limits and scheduled version in an atomic database mutation. Fee amounts count toward app spending limits. Members restricted to one currency must also pay their fee in that currency.
-   Scheduled preflight retries every 30 seconds for a bounded hour while waiting for approvals, earlier account transactions or provider availability; cancellation and changed schedule versions invalidate these retries.
-3. Save the exact Safe execution calldata in `relayJobs` and enqueue a backend worker.
-4. Claim the provider submission once before the external request. Both SDK and HTTP submission retries are disabled.
-5. Persist Gelato's request ID. A minute cron polls provider status; successful provider responses still require independent receipt verification and at least two confirmations.
-6. If the request response is lost, inspect the original Safe hash for settlement. Never blindly send a second provider request. After the bounded recovery window, retain an exception and show the payment as needing investigation. The scoped exception query exposes no signed calldata or credentials.
+## Delegated spending
 
-This deliberately preserves an ambiguous result for investigation rather than declaring failure or creating a duplicate payment. Payment details provides a Check settlement action that preserves the original submission identity and never re-enables submission. Exceptions also appear in Needs review. Automated notifications remain separate work.
+Saved AllowanceModule authorizations retain their exact recipients, fee terms, nonces and global reservations. Revocation followed by regrant can revive an old authorization because the module preserves its nonce. Deleting a database reservation would therefore be unsafe. Recovery must finish or invalidate the original on-chain authorization before another payment can reuse its nonce.
 
-## Evidence and outstanding acceptance
+An allowance delegate is not a Safe owner. A Circle owner-operation test does not establish delegated compatibility. Replacement execution must retain contract-enforced limits and cannot promote a delegate to an owner or rely only on app roles.
 
-September 5, 2026: typecheck, lint, 397 unit/integration tests and 130 browser checks passed. Tests include exact fee binding, full recipient settlement, fee-budget enforcement, duplicate claims, provider-ID immutability, interrupted responses, credential redaction and wallet-button gating. Build passed with existing large wallet-bundle warnings.
+## Fee and failure behavior
 
-No Gelato credentials were configured in the development environment when inspected. Therefore no live Turbo Relay payment or unattended scheduled settlement has been claimed. The earlier funded Sepolia owner/delegate receipts exercise Safe and the database, not this new provider integration.
+The replacement must distinguish a quoted estimate, an authorized limit and an actual receipt charge. Circle charges USDC for a mined failed operation too. UI copy saying a fee is charged only when a payment succeeds applies to the historical atomic collector transfer and must not be reused for Circle. Pending submission, invalid signatures, expiry, insufficient fee balance, failed execution, refunds and RPC outages require separate outcomes.
 
-Before enabling a network: verify project capabilities and billing, make a small test payment, check the full recipient and fee-collector deltas, then execute a scheduled payment with the browser closed. Exercise cancellation, missing signatures, insufficient fee balance, provider rejection and lost responses. Public launch readiness still depends on this evidence and the other items in LAUNCH_READINESS.md.
-
-Desktop light and mobile dark fee-review screenshots were inspected. The pass fixed totals wrapping mid-decimal on mobile and replaced the horizontally scrolling recipient review with cards showing complete amounts. Managed execution now covers owner-approved payments and delegated single and batch payments. The delegated browser flow discloses the number of signatures and signs recipient and fee authorizations; it no longer broadcasts a wallet-paid native-gas transaction. All authorizations execute through published MultiSendCallOnly, reserve their allowance nonces atomically and require exact recipient/fee receipt evidence. Provider interruptions are reconciled using the saved allowance event and starting block.
-
-## Delegated stablecoin fees
-
-The browser obtains a reviewed stablecoin fee and signs one allowance authorization per recipient, then one for the fee transfer to the managed collector. No native-gas wallet transaction is requested. If both use the same token, their nonces are consecutive and the available allowance must cover their combined amount. Different fee tokens require their own sufficient allowance. All recipient and fee nonces are reserved globally in one database mutation, preventing another draft from consuming the fee authorization.
-
-The backend simulates the atomic batch before claiming it and queues the existing managed relay worker. A failed fee transfer reverts the recipient transfer too. Receipt verification requires every module event and every exact ERC-20 transfer; a provider success response alone cannot mark the payment paid. The legacy receipt-linking path also understands these batches.
-
-Coding scope: provider configuration and deployment are separate operational tasks, not reasons to leave the implementation unfinished. The automated acceptance covers the provider boundary with controlled responses; no live provider settlement is asserted by these tests.
-
-## Recovery behavior
-
-The cron selects the least recently checked jobs within each status and rotates selected entries before scheduling work. This prevents the first 20 unresolved jobs from starving later payments. Provider status failures do not stop independent Safe proposal or allowance-event lookup.
-
-Failures before the durable submission claim retain a prepared job for automatic retry. If preparation exhausts its retries, the stored exception records that no submission occurred. Resume payment accepts only that state, rechecks subscription, screening and spending policies, and atomically restores one prepared job. Once submission was claimed, only settlement checking is permitted. Both actions are audited. The Payments attention view exposes failed payments and uncertain submissions without exposing signed calldata.
-
-Latest checks: 397 unit/integration tests and 130 browser checks passed, along with typecheck, lint and production build. These do not assert live provider settlement.
+Tests that mock the retired provider preserve historical recovery coverage. They are not evidence that the replacement works in the app. No production activation is implied by a green build or by the live testnet protocol receipts.

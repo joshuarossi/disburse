@@ -224,7 +224,7 @@
         },
         "schedules": {
           "title": "Schedule and repeat payments",
-          "body": "Choose a future pay date and complete approvals beforehand. The payment service submits eligible scheduled payments when due. Recurring instructions prepare a new draft for each cycle; each draft needs fresh review and authorization. Review paused instructions when recipient details or permissions change. Cancelling an instruction does not invalidate a proposal already signed in Safe."
+          "body": "Choose a future pay date and complete approvals beforehand. When configured, the payment service submits eligible scheduled payments when due. Recurring instructions prepare a new draft for each cycle; each draft needs fresh review and authorization. Review paused instructions when recipient details or permissions change. Cancelling an instruction does not invalidate a proposal already signed in Safe."
         },
         "fees": {
           "title": "Understand amounts and fees",
@@ -232,11 +232,11 @@
         },
         "recovery": {
           "title": "Resolve a payment needing attention",
-          "body": "Open Payments and choose Needs attention. Check settlement verifies the original submission without sending it again. Resume payment is available only when no submission was attempted. Avoid preparing a replacement while the original outcome is uncertain. Receipt linking can reconcile an existing delegated payment even when new payments are blocked."
+          "body": "Open Payments and choose Needs attention. Check settlement verifies the original submission without sending it again. Resume only when the app confirms it can retry the original authorization. Avoid preparing a replacement while the original outcome is uncertain. Receipt linking can reconcile an existing delegated payment even when new payments are blocked."
         },
         "billing": {
           "title": "Trial, renewal and access",
-          "body": "The trial lasts 30 days. Paid subscriptions cover 30 days at a time and do not renew automatically. After expiry, you can view and export records, prepare drafts and cancel instructions; new payment submissions require renewal. Renew in Settings, under Plan & billing. If checkout was interrupted, verify the saved receipt before paying again."
+          "body": "The trial includes 30 days of Pro. After it ends, Free features apply: you can continue managing your funds and sending payments, paying your own fees. Paid subscriptions cover 30 days and do not renew automatically. Renew in Settings, under Plan & billing. If checkout was interrupted, verify the saved receipt before paying again. Your funds stay in your Safe."
         },
         "reports": {
           "title": "Reconcile your records",
@@ -321,6 +321,7 @@
       "subtitle": "Connect your wallet to get started",
       "connectWallet": "Connect Wallet",
       "wrongNetwork": "Wrong network",
+      "signInCancelled": "Sign-in cancelled. Select Try again when you are ready.",
       "signingIn": "Signing you in...",
       "terms": "By connecting, you agree to our",
       "termsOfService": "Terms of Service",
@@ -776,7 +777,7 @@
       "unlimited": "Unlimited",
       "trialDaysLeft": "{{days}} days left in trial",
       "activeDaysRemaining": "Active - {{days}} days remaining",
-      "expired": "Expired - Please renew",
+      "expired": "Paid access ended · Free access continues",
       "popular": "Popular",
       "current": "Current",
       "subscribe": "Subscribe",
@@ -815,9 +816,9 @@
         "alreadyPaid": "I've Already Paid (Enter TX Hash)",
         "confirming": "Confirm transaction in your wallet...",
         "waiting": "Waiting for confirmation...",
-        "dontClose": "Please don't close this window",
+        "dontClose": "You can return to this payment to check its original status.",
         "pending": "Transaction pending",
-        "retry": "Retry Payment",
+        "retry": "Review original payment",
         "enterHash": "Enter the transaction hash of your payment to verify.",
         "txHash": "Transaction Hash",
         "txHashPlaceholder": "0x...",
@@ -827,7 +828,7 @@
         "viewTransaction": "View Transaction",
         "done": "Done"
       },
-      "info": "Pay with stablecoins (USDC, USDT) on Ethereum Sepolia. All plans include a 30-day money-back guarantee.",
+      "info": "The subscription licenses the Disburse tool. You pay network and provider fees separately in the payment review.",
       "usageTitle": "Workspace usage",
       "memberSeats": "Team seats",
       "savedRecipients": "Saved recipients",
@@ -838,7 +839,7 @@
       "archivedCount": "Includes {{count}} archived records",
       "accountsIncluded": "Business and test accounts included",
       "usageUnavailable": "Usage could not be counted. Refresh to try again; your plan and renewal remain available.",
-      "trialEnd": "Trial access ends {{date}}. Choose a plan to continue sending payments.",
+      "trialEnd": "Trial access ends {{date}}. Core money management and payments continue on Free.",
       "paidEnd": "Paid access ends {{date}}. This date includes any unused paid time.",
       "expiryPolicy": "Core money management and payments remain available when a trial or paid term ends. Tier limits apply to seats and saved recipients. Your accounts and funds stay under your control.",
       "included": "All tiers currently include individual and batch payments, scheduling, approvals and accounting exports. Network and provider fees are shown separately before approval and paid by you.",

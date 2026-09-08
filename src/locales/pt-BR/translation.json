@@ -61,89 +61,89 @@
       "tryForFree": "Experimentar grátis"
     },
     "hero": {
-      "badge": "Não custodial e com Safe",
-      "title": "Gestão de Tesouraria para",
-      "titleHighlight": "Equipes Web3",
-      "subtitle": "Simplifique os desembolsos de stablecoins com segurança de nível empresarial. Programe pagamentos, execute transações sem gas e mantenha trilhas de auditoria completas—tudo sem nunca abrir mão do controle das suas chaves.",
+      "badge": "Pagamentos da empresa, sob seu controle",
+      "title": "Pague sua equipe.",
+      "titleHighlight": "Mantenha o controle.",
+      "subtitle": "Importe seus beneficiários, prepare pagamentos de folha e a fornecedores e reúna aprovações e registros em um só lugar. As stablecoins cuidam da liquidação. Sua equipe mantém o controle dos recursos.",
       "tryForFree": "Experimentar grátis",
       "learnMore": "Saber mais",
-      "trustIndicators": "Alimentado por segurança líder da indústria"
+      "trustIndicators": "Liquidação com Safe e stablecoins"
     },
     "features": {
       "title": "Recursos",
       "subtitle": "Tudo que você precisa para gerenciar operações de tesouraria",
-      "description": "Construído para equipes de finanças que precisam de conformidade, automação e controle sobre a tesouraria.",
+      "description": "Um lugar familiar para preparar, aprovar e conciliar os pagamentos da empresa.",
       "nonCustodial": {
-        "title": "Não Custodial",
-        "description": "Suas chaves, seus fundos. Nunca temos acesso às suas chaves privadas ou ativos."
+        "title": "Seus recursos continuam sendo seus",
+        "description": "Sua organização controla a conta e as chaves de assinatura. A Disburse não mantém a custódia dos seus recursos."
       },
       "safePowered": {
-        "title": "Com Safe",
-        "description": "Construído sobre Gnosis Safe, a carteira de contrato inteligente mais confiável em Web3."
+        "title": "Aprovações compartilhadas",
+        "description": "Os proprietários da conta revisam e assinam os pagamentos na Disburse. Defina quantas assinaturas sua conta exige."
       },
       "sanctionsScreening": {
-        "title": "Verificação de Sanções",
-        "description": "A verificação OFAC/SDN protege contra entidades sancionadas. Níveis de aplicação configuráveis garantem conformidade mantendo a flexibilidade do fluxo de trabalho."
+        "title": "Verificação de beneficiários",
+        "description": "Revise possíveis correspondências com listas de sanções antes de aprovar. Escolha se devem gerar um aviso ou bloquear pagamentos; a verificação não substitui seu processo de conformidade."
       },
       "auditTrail": {
-        "title": "Trilha de Auditoria",
-        "description": "Histórico completo de transações com registros imutáveis na blockchain para conformidade."
+        "title": "Histórico de pagamentos",
+        "description": "Acompanhe a preparação, as aprovações e a liquidação verificada, com registros que sua equipe pode exportar."
       },
       "scheduledPayments": {
-        "title": "Pagamentos Agendados",
-        "description": "Agende, reagende e cancele desembolsos com antecedência com aprovações claras e visibilidade."
+        "title": "Pague na data certa",
+        "description": "Defina uma data de pagamento e reúna as aprovações com antecedência. As instruções recorrentes preparam um novo rascunho a cada ciclo."
       },
       "gaslessTransactions": {
-        "title": "Transações Sem Gas",
-        "description": "Pague as taxas de rede com stablecoins para que os operadores não precisem de tokens nativos."
+        "title": "Taxas no mesmo processo",
+        "description": "Revise separadamente a taxa de pagamento em stablecoins antes de assinar. A execução gerenciada está disponível nas redes compatíveis."
       },
       "batchTransactions": {
-        "title": "Transações em Lote",
-        "description": "Envie pagamentos para múltiplos destinatários em uma única transação. Reduza os custos de gas e agilize desembolsos estilo folha de pagamento."
+        "title": "Uma pessoa ou toda a equipe",
+        "description": "Selecione os beneficiários salvos uma única vez. Pagamentos compatíveis seguem juntos; moedas e redes diferentes ficam em lotes separados."
       },
       "bulkImport": {
-        "title": "Importação em Massa",
-        "description": "Envie beneficiários via CSV com validação, campos obrigatórios e verificação de duplicados."
+        "title": "Traga sua lista de beneficiários",
+        "description": "Importe um CSV ou uma planilha exportada, mapeie as colunas e revise duplicatas e dados de pagamento ausentes antes de salvar."
       },
       "beneficiaryTags": {
-        "title": "Tags de Beneficiários",
-        "description": "Crie coortes com tags e execute desembolsos recorrentes em segundos."
+        "title": "Grupos de beneficiários reutilizáveis",
+        "description": "Agrupe funcionários, prestadores de serviço e fornecedores para começar o próximo pagamento com as pessoas certas."
       },
       "reporting": {
-        "title": "Relatórios e Exportações",
-        "description": "Gere relatórios prontos para finanças e exporte registros para conciliação."
+        "title": "Concilie e exporte",
+        "description": "Revise entradas, pagamentos e taxas por moeda. Exporte valores exatos e referências das transações."
       },
       "stablecoinNative": {
-        "title": "Nativo de Stablecoins",
-        "description": "Suporte de primeira classe para USDC e USDT com mais tokens em breve."
+        "title": "Instruções de pagamento salvas",
+        "description": "Mantenha a moeda, a rede e o endereço solicitados por cada beneficiário no cadastro. Sem copiar e colar a cada pagamento."
       },
       "roleBasedAccess": {
-        "title": "Acesso Baseado em Funções",
-        "description": "Permissões granulares para sua equipe. Administradores, aprovadores, iniciadores e mais."
+        "title": "Funções da equipe e limites de gastos",
+        "description": "Separe a preparação da aprovação. Conceda aos membros elegíveis um limite na conta para pagamentos delegados."
       },
       "simpleBilling": {
         "title": "Cobrança Simples",
         "description": "Pague pela plataforma em stablecoins. Não são necessários cartões de crédito ou contas bancárias."
       },
       "section1": {
-        "badge": "Segurança e Conformidade",
-        "title": "Segurança de nível empresarial,",
-        "titleHighlight": "integrada"
+        "badge": "Controles da equipe",
+        "title": "Responsabilidades claras.",
+        "titleHighlight": "Controle compartilhado."
       },
       "section2": {
-        "title": "Operações poderosas,",
-        "titleHighlight": "simplificadas",
-        "description": "Automatize pagamentos, reduza custos de gas e execute desembolsos em alto volume com confiança."
+        "title": "Um processo de pagamento",
+        "titleHighlight": "que sua equipe pode seguir",
+        "description": "Prepare pagamentos a prestadores e fornecedores, revise os dados e acompanhe cada pagamento até a liquidação."
       },
       "section3": {
-        "title": "Tudo que você precisa",
-        "description": "Construído para equipes de finanças que exigem clareza e controle"
+        "title": "Menos preparação. Registros mais claros.",
+        "description": "Reúna instruções dos beneficiários, histórico de pagamentos e exportações."
       },
       "badges": {
-        "compliance": "Conformidade",
-        "efficient": "Eficiente",
+        "compliance": "Verificação",
+        "efficient": "Eficiência",
         "automation": "Automação",
-        "gasless": "Sem gas"
+        "gasless": "Taxas em stablecoins"
       }
     },
     "howItWorks": {
@@ -203,12 +203,44 @@
       "subtitle": "Guias de configuração, conexões de carteira e fluxos de pagamento.",
       "sections": {
         "gettingStarted": {
-          "title": "Primeiros passos",
-          "body": "Conecte seu Safe, adicione beneficiários e execute um desembolso de teste em minutos."
+          "title": "Conecte sua conta",
+          "body": "Entre com uma carteira da sua organização. A carteira pede a assinatura de uma mensagem de acesso; entrar não envia nenhum pagamento. Em Configurações, vincule sua conta Safe existente. Os proprietários e o número mínimo de assinaturas controlam os pagamentos. Nunca compartilhe uma frase de recuperação ou chave privada com a equipe ou o suporte."
+        },
+        "recipients": {
+          "title": "Importe destinatários e instruções de pagamento",
+          "body": "Abra Destinatários e selecione Importar. Cole ou envie um arquivo CSV e associe as colunas de nome, e-mail, endereço, moeda e rede. Revise duplicatas e dados incompletos antes de salvar. É possível importar registros sem endereço, mas cada destinatário precisa de instruções completas antes de preparar um pagamento. Em geral, esses dados precisam ser adicionados separadamente às exportações de folha de pagamento."
         },
         "workflows": {
-          "title": "Pagamentos e relatórios",
-          "body": "Agende, agrupe e aprove desembolsos com exportações prontas para finanças."
+          "title": "Prepare um pagamento ou um lote",
+          "body": "Selecione Novo pagamento e escolha destinatários salvos. Informe o valor exato que cada pessoa deve receber. As instruções salvas determinam a moeda, a rede e o endereço. Moedas ou redes diferentes geram lotes separados, cada um com sua própria aprovação e liquidação. Salvar um rascunho não movimenta fundos."
+        },
+        "bills": {
+          "title": "Pague uma fatura de fornecedor",
+          "body": "Registre o fornecedor, o número da fatura, o valor e o vencimento em Contas a pagar. Prepare o pagamento a partir da fatura para manter os registros vinculados. A fatura só é marcada como paga após a verificação da liquidação do pagamento associado."
+        },
+        "approvals": {
+          "title": "Revise e aprove",
+          "body": "Abra o pagamento para revisar destinatários, valores, conta de origem e a taxa separada. Os proprietários assinam nas próprias carteiras. O Disburse mostra as aprovações necessárias e as verifica antes do envio. Um membro autorizado pode usar um limite de gastos concedido; um lote delegado solicita uma assinatura por destinatário e outra para a taxa, quando aplicável."
+        },
+        "schedules": {
+          "title": "Agende e repita pagamentos",
+          "body": "Escolha uma data futura e conclua as aprovações antes dela. Quando configurado, o serviço de pagamentos envia os pagamentos agendados elegíveis no vencimento. As instruções recorrentes geram um novo rascunho a cada ciclo; cada rascunho exige nova revisão e autorização. Revise instruções pausadas quando dados ou permissões mudarem. Cancelar uma instrução não invalida uma proposta já assinada no Safe."
+        },
+        "fees": {
+          "title": "Entenda os valores e as taxas",
+          "body": "Os destinatários recebem os valores informados. A taxa revisada é adicionada separadamente ao débito da conta e conta para os limites de gastos. Uma taxa em outra moeda exige saldo e, para pagamentos delegados, um limite nessa moeda. Nos fluxos compatíveis com taxas gerenciadas, o membro não precisa enviar uma transação pagando gás nativo. O cliente paga as próprias taxas."
+        },
+        "recovery": {
+          "title": "Resolva um pagamento que precisa de atenção",
+          "body": "Em Pagamentos, abra Precisa de atenção. Verificar liquidação confere o envio original sem repeti-lo. Retome apenas quando o aplicativo confirmar que pode tentar novamente a autorização original. Não prepare um substituto enquanto o resultado for incerto. Vincular um comprovante permite conciliar um pagamento delegado existente mesmo quando não é possível preparar novos pagamentos."
+        },
+        "billing": {
+          "title": "Teste, renovação e acesso",
+          "body": "O teste oferece 30 dias de Pro. Ao terminar, passam a valer os recursos do plano gratuito: você pode continuar gerenciando seus fundos e enviando pagamentos, pagando as próprias taxas. As assinaturas pagas cobrem 30 dias e não são renovadas automaticamente. Renove em Configurações, em Plano e cobrança. Se o pagamento da assinatura foi interrompido, verifique o comprovante salvo antes de pagar novamente. Os fundos permanecem no seu Safe."
+        },
+        "reports": {
+          "title": "Concilie seus registros",
+          "body": "Relatórios mostra entradas, pagamentos enviados, taxas e variação líquida separadamente para cada moeda. Aplique os filtros antes de exportar e confira o escopo indicado. As exportações de pagamentos incluem totais por destinatário e taxas; as referências das transações permitem conferir os registros com a liquidação."
         }
       }
     },
@@ -289,6 +321,7 @@
       "subtitle": "Conecte sua carteira para começar",
       "connectWallet": "Conectar Carteira",
       "wrongNetwork": "Rede incorreta",
+      "signInCancelled": "Login cancelado. Selecione Tentar novamente quando quiser continuar.",
       "signingIn": "Entrando...",
       "terms": "Ao conectar, você concorda com nossos",
       "termsOfService": "Termos de Serviço",
@@ -464,7 +497,9 @@
         "importError": "Falha ao importar beneficiários. Por favor, tente novamente."
       },
       "success": "{{count}} {{count, plural, one {beneficiário} other {beneficiários}}} adicionados com sucesso"
-    }
+    },
+    "preferredChain": "Rede de pagamento preferida",
+    "preferredToken": "Moeda solicitada"
   },
   "disbursements": {
     "title": "Desembolsos",
@@ -663,7 +698,12 @@
       "safeAddressDescription": "Digite o endereço do seu Gnosis Safe existente na rede de teste Sepolia",
       "linkSafe": "Vincular Safe",
       "validating": "Validando...",
-      "network": "Sepolia"
+      "network": "Sepolia",
+      "depositAddress": "Endereço para receber recursos",
+      "addChain": "Adicionar rede",
+      "linkAnotherChain": "Vincular outra rede",
+      "chain": "Rede",
+      "linkedChains": "Redes vinculadas"
     },
     "relay": {
       "title": "Execucao sem gas",
@@ -737,7 +777,7 @@
       "unlimited": "Ilimitado",
       "trialDaysLeft": "{{days}} dias restantes de teste",
       "activeDaysRemaining": "Ativo - {{days}} dias restantes",
-      "expired": "Expirado - Por favor renove",
+      "expired": "O acesso pago terminou · O acesso Free continua",
       "popular": "Popular",
       "current": "Atual",
       "subscribe": "Assinar",
@@ -776,9 +816,9 @@
         "alreadyPaid": "Já Paguei (Digite o Hash da TX)",
         "confirming": "Confirme a transação na sua carteira...",
         "waiting": "Aguardando confirmação...",
-        "dontClose": "Por favor não feche esta janela",
+        "dontClose": "Você pode voltar a este pagamento para consultar o status original.",
         "pending": "Transação pendente",
-        "retry": "Tentar Pagamento Novamente",
+        "retry": "Revisar o pagamento original",
         "enterHash": "Digite o hash da transação do seu pagamento para verificar.",
         "txHash": "Hash da Transação",
         "txHashPlaceholder": "0x...",
@@ -788,7 +828,7 @@
         "viewTransaction": "Ver Transação",
         "done": "Concluído"
       },
-      "info": "Pague com stablecoins (USDC, USDT) na Ethereum Sepolia. Todos os planos incluem uma garantia de devolução do dinheiro de 30 dias.",
+      "info": "A assinatura licencia o uso da Disburse. Você paga as taxas de rede e de provedores separadamente na revisão do pagamento.",
       "usageTitle": "Uso do espaço de trabalho",
       "memberSeats": "Vagas da equipe",
       "savedRecipients": "Destinatários salvos",
@@ -799,7 +839,7 @@
       "archivedCount": "Inclui {{count}} registros arquivados",
       "accountsIncluded": "Inclui contas comerciais e de teste",
       "usageUnavailable": "Não foi possível calcular o uso. Atualize para tentar novamente; o plano e a renovação continuam disponíveis.",
-      "trialEnd": "O período de teste termina em {{date}}. Escolha um plano para continuar enviando pagamentos.",
+      "trialEnd": "O período de teste termina em {{date}}. A gestão básica de recursos e os pagamentos continuam no Free.",
       "paidEnd": "O acesso pago termina em {{date}}. Esta data inclui o tempo pago não utilizado.",
       "expiryPolicy": "A gestão de fundos e os pagamentos continuam disponíveis quando o teste ou período pago termina. Os limites do plano se aplicam a membros e destinatários salvos. Suas contas e fundos permanecem sob seu controle.",
       "included": "Todos os planos incluem pagamentos individuais e em lote, agendamento, aprovações e exportações contábeis. Você paga as taxas de rede e dos provedores, apresentadas separadamente antes da aprovação.",
@@ -909,5 +949,12 @@
     "rerun": "Reexecutar triagem",
     "rerunning": "Reexecutando...",
     "runScreening": "Executar triagem para este beneficiário"
+  },
+  "chains": {
+    "ethereum": "Ethereum",
+    "polygon": "Polygon",
+    "base": "Base",
+    "arbitrum": "Arbitrum",
+    "sepolia": "Sepolia"
   }
 }

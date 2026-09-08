@@ -1,3 +1,4 @@
+import { ORG_READER_ROLES } from '../shared/roles';
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import { internal } from "./_generated/api";
@@ -13,7 +14,7 @@ import {
 import { validateSavedPayoutInstructions } from "../shared/payoutInstructions";
 import { assertPaymentMayProceed } from "./lib/disbursementPolicy";
 
-const readers = ["admin", "approver", "initiator", "clerk", "viewer"] as const;
+
 
 export const assertPayable = query({
   args: { disbursementId: v.id("disbursements"), sessionToken: v.string() },
@@ -39,7 +40,7 @@ export const get = query({
       ctx,
       recipient.orgId,
       args.sessionToken,
-      [...readers],
+      [...ORG_READER_ROLES],
     );
     const changes = await ctx.db
       .query("recipientChanges")

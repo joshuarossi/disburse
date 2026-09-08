@@ -21,6 +21,9 @@ import {
   PAYMENT_TOKEN_BY_CHAIN,
 } from "./lib/billingConfiguration";
 import { teamSeats } from "./lib/teamSeats";
+import { encodeEventTopics } from "viem";
+import { CIRCLE_ENTRY_POINT } from "../shared/circleExecution";
+import { circleUserOperationEvent } from "../shared/circleSettlement";
 
 // Plan types
 export type PlanType = "trial" | "starter" | "team" | "pro";
@@ -132,6 +135,7 @@ export const assertBillingAdmin = internalQuery({
 export const recordVerifiedPayment = internalMutation({
   args: {
     checkoutId: v.optional(v.id("billingCheckouts")),
+    transferId: v.optional(v.string()),
     orgId: v.id("orgs"),
     txHash: v.string(),
     chainId: v.number(),
@@ -140,8 +144,9 @@ export const recordVerifiedPayment = internalMutation({
     amountRaw: v.string(),
   },
   handler: async (ctx, args) => {
-    // Idempotency / double-spend guard: a txHash funds exactly one period
-    const existing = await ctx.db
+    // A bundle can include several companies' payments. Each verified transfer
+    // funds one checkout; legacy receipts reserve their entire transaction.
+    const existing = args.transferId ? await ctx.db.query('billingPayments').withIndex('by_transfer', q => q.eq('chainId', args.chainId).eq('transferId', args.transferId)).unique() : await ctx.db
       .query("billingPayments")
       .withIndex("by_tx", (q) => q.eq("txHash", args.txHash.toLowerCase()))
       .first();
@@ -150,13 +155,19 @@ export const recordVerifiedPayment = internalMutation({
         existing.orgId === args.orgId &&
         existing.plan === args.plan &&
         existing.chainId === args.chainId &&
-        (!args.checkoutId || existing.checkoutId === args.checkoutId)
+        (!args.checkoutId || existing.checkoutId === args.checkoutId) &&
+        existing.tokenAddress.toLowerCase() === args.tokenAddress.toLowerCase() && existing.amountRaw === args.amountRaw
       )
         return { verified: true };
       throw new Error("Payment transaction has already been used");
     }
 
     const now = Date.now();
+    if (args.transferId) {
+      if (!args.checkoutId || !new RegExp(`^${args.txHash.toLowerCase()}:[0-9]+$`).test(args.transferId)) throw new Error('Invalid subscription transfer identity');
+      const receipts = await ctx.db.query('billingPayments').withIndex('by_tx', q => q.eq('txHash', args.txHash.toLowerCase())).take(1001);
+      if (receipts.length > 1000 || receipts.some(row => !row.transferId)) throw new Error('Payment transaction has already been used');
+    }
     if (args.checkoutId) {
       const checkout = await ctx.db.get(args.checkoutId);
       if (
@@ -172,6 +183,9 @@ export const recordVerifiedPayment = internalMutation({
         !["requested", "submitted"].includes(checkout.status)
       )
         throw new Error("Verified payment does not match this checkout");
+      if (checkout.safeId && !args.transferId) throw new Error('An account subscription requires its exact verified transfer.');
+      const other = await ctx.db.query('billingPayments').withIndex('by_checkout', q => q.eq('checkoutId', checkout._id)).unique();
+      if (other) throw new Error('This checkout already has a verified payment.');
       await ctx.db.patch(checkout._id, {
         status: "submitted",
         txHash: args.txHash.toLowerCase(),
@@ -217,7 +231,7 @@ export const verifySubscriptionPayment = action({
     }
     const treasury = getTreasuryAddress();
 
-    const { amountRaw } = await verifyBillingReceipt({
+    const { amountRaw, receipt } = await verifyBillingReceipt({
       chainId,
       tokenAddress,
       treasury,
@@ -232,6 +246,13 @@ export const verifySubscriptionPayment = action({
       ],
     });
 
+    // The legacy verifier reserves an entire transaction hash. Letting it
+    // reserve an ERC-4337 bundle could consume another checkout's transfer
+    // before the operation-scoped reconciler applies it.
+    const operationTopic = encodeEventTopics({ abi: [circleUserOperationEvent] })[0];
+    if (receipt.logs.some(log => log.address.toLowerCase() === CIRCLE_ENTRY_POINT.toLowerCase() && log.topics[0] === operationTopic)) {
+      throw new Error("This account payment belongs to its saved subscription checkout. Check that checkout to finish activation.");
+    }
     await ctx.runMutation(internal.billing.recordVerifiedPayment, {
       orgId: args.orgId,
       txHash: args.txHash.toLowerCase(),
@@ -248,7 +269,7 @@ export const verifySubscriptionPayment = action({
 // Subscribe to a plan — requires a server-verified on-chain payment.
 async function redeemVerifiedPayment(
   ctx: MutationCtx,
-  args: { orgId: Id<"orgs">; plan: "starter" | "team" | "pro"; txHash: string },
+  args: { orgId: Id<"orgs">; plan: "starter" | "team" | "pro"; txHash: string; checkoutId?: Id<'billingCheckouts'> },
   actorUserId: Id<"users">,
 ) {
   const now = Date.now();
@@ -267,7 +288,7 @@ async function redeemVerifiedPayment(
   }
 
   // C-03: activation requires a previously verified on-chain payment
-  const payment = await ctx.db
+  const payment = args.checkoutId ? await ctx.db.query('billingPayments').withIndex('by_checkout', q => q.eq('checkoutId', args.checkoutId)).unique() : await ctx.db
     .query("billingPayments")
     .withIndex("by_tx", (q) => q.eq("txHash", args.txHash.toLowerCase()))
     .first();
@@ -282,6 +303,7 @@ async function redeemVerifiedPayment(
       "Verified payment does not match this organization or plan",
     );
   }
+  if (payment.txHash.toLowerCase() !== args.txHash.toLowerCase()) throw new Error('The receipt does not match this subscription.');
 
   if (payment.redeemedAt !== undefined) {
     await finishBillingCheckout(ctx, payment);
@@ -335,6 +357,7 @@ async function redeemVerifiedPayment(
       txHash: args.txHash,
       paidThroughAt,
       price: PLAN_LIMITS[args.plan].price,
+      transferId: payment.transferId,
       serverVerified: true,
       replacedGrant: billing.licenseGrant?.kind,
     },
@@ -374,13 +397,13 @@ export const redeemCheckout = internalMutation({
       throw new Error("Checkout has no verified payment");
     const payment = await ctx.db
       .query("billingPayments")
-      .withIndex("by_tx", (q) => q.eq("txHash", checkout.txHash!))
+      .withIndex("by_checkout", (q) => q.eq("checkoutId", checkout._id))
       .unique();
     if (payment?.checkoutId !== checkout._id)
       throw new Error("Checkout payment has not been verified");
     return redeemVerifiedPayment(
       ctx,
-      { orgId: checkout.orgId, plan: checkout.plan, txHash: checkout.txHash },
+      { orgId: checkout.orgId, plan: checkout.plan, txHash: checkout.txHash, checkoutId: checkout._id },
       checkout.createdBy,
     );
   },

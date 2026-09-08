@@ -1,8 +1,17 @@
+import { ORG_READER_ROLES } from '../shared/roles';
 import { queueReportSource } from './lib/reportIndex';
 import { v, type Infer } from "convex/values";
-import { query, internalMutation, type MutationCtx } from "./_generated/server";
+import { query, internalQuery, internalMutation, type MutationCtx } from "./_generated/server";
 import { internal } from "./_generated/api";
 import { requireOrgAccess } from "./lib/rbac";
+
+export const authorizeSync = internalQuery({
+  args: { orgId: v.id("orgs"), sessionToken: v.string(), force: v.boolean() },
+  handler: async (ctx, args) => {
+    await requireOrgAccess(ctx, args.orgId, args.sessionToken,
+      args.force ? ["admin", "approver", "initiator", "clerk"] : ["admin", "approver", "initiator", "clerk", "viewer"]);
+  },
+});
 import { environmentValidator } from "./lib/activityEnvironment";
 import { chainEnvironment } from "../shared/assets";
 import { outgoingTransferFields, outgoingTransferValidator, storeOutgoingTransfer, matchOutgoingTransaction } from './lib/outgoingTransfers';
@@ -16,13 +25,7 @@ import {
   validateDepositCursor,
 } from "./lib/depositSync";
 
-const readRoles = [
-  "admin",
-  "approver",
-  "initiator",
-  "clerk",
-  "viewer",
-] as const;
+
 const depositFields = {
   orgId: v.id("orgs"),
   safeId: v.id("safes"),
@@ -392,7 +395,7 @@ export const statusForOrg = query({
     environment: v.optional(environmentValidator),
   },
   handler: async (ctx, args) => {
-    await requireOrgAccess(ctx, args.orgId, args.sessionToken, [...readRoles]);
+    await requireOrgAccess(ctx, args.orgId, args.sessionToken, [...ORG_READER_ROLES]);
     const states = await ctx.db
       .query("depositSyncs")
       .withIndex("by_org", (q) => q.eq("orgId", args.orgId))
@@ -436,7 +439,7 @@ export const listRecent = query({
     limit: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
-    await requireOrgAccess(ctx, args.orgId, args.sessionToken, [...readRoles]);
+    await requireOrgAccess(ctx, args.orgId, args.sessionToken, [...ORG_READER_ROLES]);
     const deposits = await ctx.db
       .query("deposits")
       .withIndex("by_org_time", (q) => q.eq("orgId", args.orgId))

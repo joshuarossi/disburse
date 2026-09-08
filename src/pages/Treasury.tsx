@@ -26,6 +26,9 @@ import {
 } from "@/components/workspace/WorkspacePrimitives";
 import { Dialog } from "@/components/ui/Dialog";
 import { getChainName, getSafeAppUrl, getTokensForChain } from "@/lib/chains";
+import { AccountTransfers } from "@/features/treasury/AccountTransfers";
+import { Conversions } from "@/features/treasury/Conversions";
+import { Earn } from "@/features/treasury/Earn";
 
 export default function Treasury() {
   const { environment } = useActivityEnvironment();
@@ -113,6 +116,7 @@ export default function Treasury() {
             <AccountFundingCheck
               key={safe._id}
               safeId={safe._id}
+              accountName={safe.name ?? `${getChainName(safe.chainId)} account`}
               chainId={safe.chainId}
               payments={[]}
               className="workspace-panel p-6"
@@ -154,6 +158,9 @@ export default function Treasury() {
           ))}
         </div>
       )}
+      {orgId && allSafes && <AccountTransfers orgId={orgId as Id<"orgs">} accounts={allSafes} />}
+      {orgId && allSafes && <Conversions key={`conversions-${environment}`} orgId={orgId as Id<"orgs">} accounts={allSafes} />}
+      {orgId && allSafes && <Earn key={environment} orgId={orgId as Id<"orgs">} accounts={allSafes} />}
       <section className="workspace-panel mt-6">
         <div className="workspace-panel-heading">
           <div>

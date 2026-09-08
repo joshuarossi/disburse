@@ -161,3 +161,8 @@ Two-owner live backend acceptance passed: one signature was rejected, two were v
 The deprecated SyncFee submission path has been replaced with managed Gelato Turbo Relayer, durable submission records and explicit owner-approved stablecoin fees. Live provider acceptance remains open because the development Gelato project is not connected. See MANAGED_RELAY.md.
 
 Acceptance at this milestone: `bun run check` passed 374 tests/43 files plus typecheck/lint; `bun run test:e2e` passed 116 Chromium checks. `scripts/qa-safe-identity.mjs` passed against the development backend, verifying supported account identity, removed-owner handling and consumed-nonce readiness. Development functions were synchronized; production was not deployed.
+
+
+## September 8 continuation
+
+The [complete built-app finance cycle](FINANCE_CYCLE_ACCEPTANCE.md) now covers repeated employee import, bill preparation, two parent-owner approvals, declined signature/send recovery, exact testnet settlement and balanced accounting export. The [current launch report](LAUNCH_READINESS.md) supersedes historical open-status rows and test counts above. Current source checks pass 1,192 tests across 120 files; all 410 browser stories pass. Fixture coverage remains distinct from actual provider receipts and external-ledger acceptance.

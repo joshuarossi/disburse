@@ -2,6 +2,7 @@ import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
 import path from 'path';
+import { releaseConfigurationErrors } from './scripts/check-release-config.mjs';
 
 export default defineConfig(({ command, mode }) => {
   // QA is a local serve-only sandbox. Production builds always use real auth and services.
@@ -18,6 +19,13 @@ export default defineConfig(({ command, mode }) => {
       'import.meta.env.VITE_CONVEX_SITE_URL': JSON.stringify('https://invoice-storage.example.invalid'),
     } : undefined,
     plugins: [
+      command === 'build' && {
+        name: 'validate-release-environment',
+        configResolved(config) {
+          const errors = releaseConfigurationErrors({ ...process.env, ...config.env });
+          if (errors.length) throw new Error(errors.join('\n'));
+        },
+      },
       qa && {
         name: 'isolated-visual-qa',
         enforce: 'pre' as const,
@@ -32,6 +40,11 @@ export default defineConfig(({ command, mode }) => {
           if (/\/src\/lib\/session(?:\.ts)?$/.test(source))
             return path.join(root, 'session.ts');
           if (source === 'convex/react') return path.join(root, 'convex.tsx');
+          if (source === '@/lib/services/circleApproval' || /\/src\/lib\/services\/circleApproval(?:\.ts)?$/.test(source)) return path.join(root, 'circle.ts');
+          if (source === '@/lib/services/metamaskSetup' || /\/src\/lib\/services\/metamaskSetup(?:\.ts)?$/.test(source)) return path.join(root, 'metamaskSetup.ts');
+          if (source === '@/lib/services/metamaskCalls' || /\/src\/lib\/services\/metamaskCalls(?:\.ts)?$/.test(source)) return path.join(root, 'metamaskCalls.ts');
+          if (source === '@/lib/services/customerExecution' || /\/src\/lib\/services\/customerExecution(?:\.ts)?$/.test(source)) return path.join(root, 'customerExecution.ts');
+          if (source === '@/lib/safeCreation' || /\/src\/lib\/safeCreation(?:\.ts)?$/.test(source)) return path.join(root, 'safeCreation.ts');
           if (
             source === '@/lib/safeAllowance' ||
             /\/src\/lib\/safeAllowance(?:\.ts)?$/.test(source)

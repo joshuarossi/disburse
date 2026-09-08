@@ -34,11 +34,11 @@ export function getChainClient(chainId: number, options: { historical?: boolean 
     // Explicit customer endpoints stay authoritative. Base's public default
     // rate-limits normal identity checks, so local/default operation has a second reader.
     transport:
-      !configured && chainId === base.id
+      !configured && (chainId === base.id || chainId === baseSepolia.id)
         ? fallback(
             [
               primary,
-              http("https://base-rpc.publicnode.com", {
+              http(chainId === baseSepolia.id ? "https://base-sepolia-rpc.publicnode.com" : "https://base-rpc.publicnode.com", {
                 timeout: 15_000,
                 retryCount: 0,
                 batch: true,

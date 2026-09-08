@@ -342,7 +342,7 @@ test("current plan can renew and unconfigured checkout cannot send funds", async
   await expect(dialog).toContainText("checkout is unavailable");
   await expect(
     dialog.getByRole("button", { name: "Pay with Connected Wallet" }),
-  ).toBeDisabled();
+  ).toHaveCount(0);
 });
 
 test("expired subscription returns to Free without blocking core payments", async ({ page }) => {
@@ -356,15 +356,18 @@ test("expired subscription returns to Free without blocking core payments", asyn
   await expect(page.getByText("Core money management and payments remain available", { exact: false })).toBeVisible();
 });
 
-test('managed payment fees require review without changing recipient amounts', async ({ page }) => {
+test('execution fees require review without changing the approved recipient amounts', async ({ page }) => {
+  await page.addInitScript(() => sessionStorage.setItem('qa:scenario', 'circle-success'));
   await page.goto('/org/demo/disbursements?focus=p1');
   const dialog = page.getByRole('dialog');
-  const approve = dialog.getByRole('button', { name: 'Review in wallet' });
+  const recipients = await dialog.getByRole('table').innerText();
+  await dialog.getByRole('button', { name: 'Review execution fee', exact: true }).click();
+  const approve = dialog.getByRole('button', { name: 'Approve fee limit', exact: true });
   await expect(approve).toBeDisabled();
-  await dialog.getByRole('checkbox', { name: /I approve a 0.05 USDC payment fee/ }).check();
+  await dialog.getByRole('checkbox', { name: /I approve up to 0.5 USDC/ }).check();
   await expect(approve).toBeEnabled();
-  await expect(dialog.getByText(/28,450/).first()).toBeVisible();
-  await dialog.getByRole('checkbox', { name: /I approve a 0.05 USDC payment fee/ }).uncheck();
+  expect(await dialog.getByRole('table').innerText()).toBe(recipients);
+  await dialog.getByRole('checkbox', { name: /I approve up to 0.5 USDC/ }).uncheck();
   await expect(approve).toBeDisabled();
 });
 

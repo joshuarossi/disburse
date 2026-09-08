@@ -5,6 +5,7 @@ import schema from '../schema';
 import {
   createFullOrgSetup,
   createTestBeneficiary,
+  createTestDisbursement,
   createTestMembership,
   createTestUser,
   signIn,
@@ -50,6 +51,24 @@ async function setup() {
 }
 
 describe('member payment delegation', () => {
+  it('counts the planned month across creation and delegation indexes without double counting', async () => {
+    const { t, ids, args, initiator } = await setup();
+    const now = new Date(), start = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1);
+    const nextMonth = Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1);
+    await t.run(async ctx => {
+      for (const [amount, createdAt, scheduledAt, delegatedBy] of [
+        ['25', start + 1, undefined, initiator.userId],
+        ['25', start - 1, start + 1, initiator.userId],
+        ['1000', start - 1, undefined, undefined],
+        ['1000', start + 1, nextMonth + 1, undefined],
+      ] as const) {
+        const id = await createTestDisbursement(ctx, ids.orgId, ids.safeId, ids.beneficiaryId, initiator.userId, { amount });
+        await ctx.db.patch(id, { createdAt, scheduledAt, delegatedBy });
+      }
+    });
+    await expect(t.mutation(api.disbursements.create, args)).resolves.toHaveProperty('disbursementId');
+    await expect(t.mutation(api.disbursements.create, { ...args, amount: '0.000001' })).rejects.toThrow('monthly allowance');
+  });
   it('prevents a member from increasing their own allowance', async () => {
     const { t, ids, initiator } = await setup();
     await expect(

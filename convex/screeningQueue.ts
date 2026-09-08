@@ -36,6 +36,7 @@ export const orgPage = internalMutation({
         orgId: args.orgId,
         cursor: page.continueCursor,
       });
+    await ctx.scheduler.runAfter(0, internal.screeningQueue.due, {});
   },
 });
 export const allPage = internalMutation({
@@ -57,6 +58,7 @@ export const allPage = internalMutation({
         datasetId: args.datasetId,
         cursor: page.continueCursor,
       });
+    await ctx.scheduler.runAfter(0, internal.screeningQueue.due, {});
   },
 });
 export const due = internalMutation({
@@ -65,9 +67,9 @@ export const due = internalMutation({
     if (!(await sourceRecord(ctx))?.activeDatasetId) return;
     const recipients = await ctx.db
       .query("beneficiaries")
-      .withIndex("by_active_screening_due", (q) => q.eq("isActive", true))
+      .withIndex("by_active_screening_due", (q) => q.eq("isActive", true).lte("nextScreeningAt", Date.now()))
       .order("asc")
-      .take(20);
+      .take(100);
     for (const recipient of recipients)
       if ((recipient.nextScreeningAt ?? 0) <= Date.now()) {
         await ctx.db.patch(recipient._id, {
@@ -78,5 +80,9 @@ export const due = internalMutation({
           orgId: recipient.orgId,
         });
       }
+    // Drain the backlog continuously; the minute cron also recovers interruptions.
+    // Marking each page claimed before scheduling keeps concurrent drains disjoint.
+    if (recipients.length === 100)
+      await ctx.scheduler.runAfter(1000, internal.screeningQueue.due, {});
   },
 });

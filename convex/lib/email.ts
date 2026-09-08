@@ -12,24 +12,19 @@ export type EmailPayload = {
   subject: string;
   text: string;
   html: string;
+  invitationUrl?: string;
 };
 function key(value = process.env.EMAIL_OUTBOX_KEY) {
   if (!value || !/^[a-f0-9]{64}$/i.test(value))
     throw new Error(
-      "Email delivery is not available yet. No invitation was sent.",
+      "Private invitation links are temporarily unavailable. Your team details are saved.",
     );
   return Buffer.from(value, "hex");
 }
 const keyId = (k: Buffer) =>
   createHash("sha256").update(k).digest("hex").slice(0, 16);
-export function emailConfig() {
-  const apiKey = process.env.RESEND_API_KEY,
-    from = process.env.EMAIL_FROM;
+export function invitationConfig() {
   key();
-  if (!apiKey || !from || /[\r\n]/.test(from))
-    throw new Error(
-      "Email delivery is not available yet. No invitation was sent.",
-    );
   const url = new URL(process.env.PUBLIC_APP_URL ?? "invalid:");
   if (
     url.username ||
@@ -44,9 +39,9 @@ export function emailConfig() {
       ))
   )
     throw new Error(
-      "Email delivery needs a valid application address. No invitation was sent.",
+      "Invitation links need a valid application address. No invitation was created.",
     );
-  return { apiKey, from, origin: url.origin };
+  return { origin: url.origin };
 }
 export function sealEmail(payload: EmailPayload, context: string) {
   const secret = key(),
@@ -108,31 +103,9 @@ export class EmailDeliveryError extends Error {
     super(message);
   }
 }
-export async function sendEmail(payload: EmailPayload, idempotencyKey: string) {
-  const { apiKey } = emailConfig();
-  const response = await fetch("https://api.resend.com/emails", {
-    method: "POST",
-    redirect: "error",
-    signal: AbortSignal.timeout(20_000),
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-      "Idempotency-Key": idempotencyKey,
-    },
-    body: JSON.stringify(payload),
-  });
-  if (!response.ok)
-    throw new EmailDeliveryError(
-      `The email service refused the message (HTTP ${response.status}).`,
-      response.status === 429 ||
-        response.status === 409 ||
-        response.status >= 500,
-    );
-  const body = (await response.json()) as { id?: string };
-  if (!body.id || body.id.length > 200)
-    throw new EmailDeliveryError(
-      "The email service response could not be confirmed.",
-      true,
-    );
-  return body.id;
+export async function sendEmail(payload: EmailPayload, idempotencyKey: string): Promise<string> {
+  void payload; void idempotencyKey;
+  // Historical workers must not activate application-funded delivery when old
+  // provider credentials remain configured. New invitations use private links.
+  throw new EmailDeliveryError('Email delivery is unavailable. Create a private invitation link and share it with your teammate.', false);
 }

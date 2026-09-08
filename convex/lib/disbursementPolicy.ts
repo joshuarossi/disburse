@@ -1,4 +1,4 @@
-import type { Doc } from "../_generated/dataModel";
+import type { Doc, Id } from "../_generated/dataModel";
 import type { QueryCtx } from "../_generated/server";
 import { assertRecipientVersions } from "./recipientReview";
 import { checkRecipientScreening } from "./screeningPolicy";
@@ -36,9 +36,16 @@ export function assertFutureSchedule(timestamp: number, now: number): void {
 export async function assertPaymentMayProceed(
   ctx: Pick<QueryCtx, "db">,
   payment: Doc<"disbursements">,
+  scheduleId?: Id<"paymentSchedules">,
 ) {
+  if (payment.paymentScheduleId && payment.paymentScheduleId !== scheduleId)
+    throw new Error(
+      "This payment has a scheduled authorization. Cancel or reconcile that authorization before changing its instructions.",
+    );
   if (payment.cancellationId)
-    throw new Error('A cancellation is pending for this payment. Complete or reconcile it before making another submission.');
+    throw new Error(
+      "A cancellation is pending for this payment. Complete or reconcile it before making another submission.",
+    );
   await assertRecipientVersions(ctx, payment);
   const org = await ctx.db.get(payment.orgId);
   if (org?.screeningEnforcement !== "block") return;

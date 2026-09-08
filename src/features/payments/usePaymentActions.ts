@@ -1,4 +1,4 @@
-import { walletDeclined } from '@/lib/walletErrors';
+import { walletDeclined, walletErrorMessage } from '@/lib/walletErrors';
 import { screeningReviewKey } from '../../../shared/screeningReview';
 import { walletSendDeclined } from '../../../shared/paymentQueue';
 import { useRef, useState } from 'react';
@@ -8,6 +8,7 @@ import type { Doc, Id } from '../../../convex/_generated/dataModel';
 import { convex } from '@/lib/convex';
 import { useSessionToken } from '@/lib/session';
 import { RELAY_FEATURE_ENABLED, resolveRelaySettings } from '@/lib/relayConfig';
+import { supportsCircleFees } from '../../../shared/circleExecution';
 
 
 type Operation = 'propose' | 'execute' | 'approve' | 'resumeProposal';
@@ -24,7 +25,7 @@ export function usePaymentActions(safes: Doc<'safes'>[] | undefined, org: Doc<'o
   const run = async (id: Id<'disbursements'>, operation: Operation, acknowledgedScreening = '', reviewedFeeIdentity = '', selectedPath?: string[]) => {
     if (!sessionToken || !address || lock.current) return;
     lock.current = true; setBusy(true); setError(''); setMessage('');
-    let savedHash: string | undefined, claimed = false;
+    let savedHash: string | undefined, claimed = false, confirmingWallet = false;
     const identity = { disbursementId: id, sessionToken };
     try {
       const payment = await convex.query(api.disbursements.getWithRecipients, identity);
@@ -35,7 +36,11 @@ export function usePaymentActions(safes: Doc<'safes'>[] | undefined, org: Doc<'o
       const screening = await convex.query(api.screeningQueries.checkDisbursementRecipients, identity);
       if (screening.flagged.length && screening.enforcement === 'block') throw new Error('One or more recipients need screening review. Resolve their screening results before continuing.');
       if (screening.flagged.length && screening.enforcement === 'warn' && acknowledgedScreening !== screeningReviewKey(screening.flagged)) throw new Error('Review and acknowledge the current screening warnings before continuing.');
-      if (chainId !== payment.chainId) await switchChainAsync({ chainId: payment.chainId });
+      if (chainId !== payment.chainId) {
+        confirmingWallet = true;
+        await switchChainAsync({ chainId: payment.chainId });
+        confirmingWallet = false;
+      }
       if (payment.safeTxHash && payment.approvalMethod !== 'workspace') await convex.action(api.accountApprovals.recoverOriginal, identity);
       const saveApproval = async () => {
         const request = await convex.action(api.accountApprovals.forSigning, identity);
@@ -48,7 +53,9 @@ export function usePaymentActions(safes: Doc<'safes'>[] | undefined, org: Doc<'o
         const path = selectedPath ?? paths[0].path;
         if (!paths.some(p => p.path.join(':') === path.join(':'))) throw new Error('Your approval path changed. Review the account requirements again.');
         const { signAccountApproval } = await import('@/lib/accountApproval');
+        confirmingWallet = true;
         const signature = await signAccountApproval(payment.chainId!, address, request.proposal, path);
+        confirmingWallet = false;
         const hash = await convex.action(api.accountApprovals.save, { ...identity, proposal: request.proposal, path, signature });
         setApprovalRequest(null);
         return hash;
@@ -61,7 +68,7 @@ export function usePaymentActions(safes: Doc<'safes'>[] | undefined, org: Doc<'o
         } else {
           if (!['draft', 'pending'].includes(payment.status) || payment.safeTxHash) throw new Error('This payment already has a proposal. Resume the original payment.');
           await convex.mutation(api.disbursements.updateStatus, { ...identity, status: 'pending' });
-          fee = RELAY_FEATURE_ENABLED ? await convex.mutation(api.relayQuotes.accept, { ...identity, reviewedIdentity: reviewedFeeIdentity }) : undefined;
+          fee = RELAY_FEATURE_ENABLED && !supportsCircleFees(payment.chainId) ? await convex.mutation(api.relayQuotes.accept, { ...identity, reviewedIdentity: reviewedFeeIdentity }) : undefined;
           if (fee) await convex.action(api.relayExecutor.checkFee, { ...identity, reviewedIdentity: reviewedFeeIdentity });
           const result = await saveApproval();
           if (!result) return;
@@ -84,6 +91,7 @@ export function usePaymentActions(safes: Doc<'safes'>[] | undefined, org: Doc<'o
         if (payment.executionFee) {
           await convex.action(api.relayExecutor.submit, identity);
         } else {
+          if (supportsCircleFees(payment.chainId) && !payment.nativeExecution) throw new Error('Review the USDC execution fee in this payment before sending.');
           const transaction = await convex.action(api.accountApprovals.execution, identity);
           const attempt = await convex.action(api.nativePayments.start, { ...identity, safeTxHash: payment.safeTxHash });
           claimed = true;
@@ -101,8 +109,11 @@ export function usePaymentActions(safes: Doc<'safes'>[] | undefined, org: Doc<'o
         setMessage('Payment submitted. Settlement will be verified before it is marked paid.');
       }
     } catch (e) {
-      const detail = e instanceof Error ? e.message : 'Could not complete this action';
-      setError(savedHash ? `Your signed proposal is saved. Use Resume preparation to continue with the same transaction. ${detail}` : claimed ? `We saved the original payment and will check its settlement. Use Check settlement to refresh its status. ${detail}` : detail);
+      if (confirmingWallet && walletDeclined(e)) {
+        setMessage('Wallet confirmation cancelled. Your payment details are saved. Try again when you are ready.');
+      } else {
+        setError(savedHash ? 'Your signed proposal is saved. Use Resume preparation to continue with the same transaction.' : claimed ? 'We saved the original payment and will check its settlement. Use Check settlement to refresh its status.' : walletErrorMessage(e, 'Could not complete this action. Check your wallet connection and try again.'));
+      }
     } finally { lock.current = false; setBusy(false); }
   };
   return { run, busy, error, message, approvalRequest, dismissApproval: () => setApprovalRequest(null), clear: () => { setError(''); setMessage(''); } };

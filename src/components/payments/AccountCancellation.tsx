@@ -1,3 +1,5 @@
+import { supportsCircleFees } from '../../../shared/circleExecution';
+import { userErrorMessage } from '@/lib/userErrors';
 import { useState } from "react";
 import { useAction, useMutation, useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
@@ -37,7 +39,7 @@ export function AccountCancellation({
     recheck = useMutation(api.accountCancellationData.recheck);
   const recoverOriginal = useAction(api.accountApprovals.recoverOriginal);
   const [open, setOpen] = useState(initiallyOpen),
-    [method, setMethod] = useState(
+    [legacyMethod, setMethod] = useState(
       RELAY_FEATURE_ENABLED ? "managed" : "wallet",
     ),
     [feeToken, setFeeToken] = useState("USDC");
@@ -45,6 +47,8 @@ export function AccountCancellation({
     [busy, setBusy] = useState(false),
     [error, setError] = useState("");
   const [retrying, setRetrying] = useState(false);
+  const circle = !!info && supportsCircleFees(info.chainId);
+  const method = circle ? 'circle' : legacyMethod;
   const preparing = !info?.cancellation || retrying;
   const feeQuote = useQuery(
     api.spendingPolicyData.fee,
@@ -57,7 +61,7 @@ export function AccountCancellation({
       ? feeQuote?.fee
         ? feeIdentity(feeQuote.fee)
         : null
-      : "wallet";
+      : method;
   const reviewed = reviewKey !== null && reviewedFee === reviewKey;
   const setReviewed = (value: boolean) =>
     setReviewedFee(value ? reviewKey : null);
@@ -80,7 +84,7 @@ export function AccountCancellation({
       setRetrying(false);
     } catch (e) {
       setError(
-        e instanceof Error ? e.message : "Could not request cancellation",
+        userErrorMessage(e, "Could not request cancellation"),
       );
     } finally {
       setBusy(false);
@@ -97,11 +101,12 @@ export function AccountCancellation({
         Cancel policy request
       </Button>
     ) : null;
+  const useCircle = circle && !!c && !c.executionFee && (!c.execution || c.execution.service === 'circle');
   const identity = c ? { cancellationId: c._id, sessionToken } : null;
   return (
     <section
       aria-label="Account cancellation"
-      className="space-y-4 rounded-lg border border-[var(--ws-border)] p-4"
+      className={policyChangeId ? 'space-y-4 border-t border-[var(--ws-border)] pt-4' : 'space-y-4 rounded-lg border border-[var(--ws-border)] p-4'}
     >
       <div>
         <h3 className="font-semibold">
@@ -134,6 +139,7 @@ export function AccountCancellation({
       {preparing && info.canRequest && (
         <>
           <div className="space-y-3">
+            {circle ? <p className="text-sm text-[var(--ws-muted)]">Your company account pays the cancellation fee in USDC. Review the exact limit after account approval. Recipients receive no payment from a cancellation.</p> : <>
             <label className="block">
               <span className="finance-label">Cancellation fee</span>
               <select
@@ -189,6 +195,7 @@ export function AccountCancellation({
                 cancellation. No payment is sent to the original recipients.
               </p>
             )}
+            </>}
           </div>
           <label className="flex items-start gap-2 text-sm">
             <input
@@ -252,7 +259,7 @@ export function AccountCancellation({
           <p className="text-sm text-[var(--ws-muted)]">
             {c.executionFee
               ? `Cancellation fee: ${formatMoney(c.executionFee.amount, c.executionFee.token, true)} ${c.executionFee.token} from this account.`
-              : "Network fee paid from the signing wallet when cancellation is completed."}
+              : useCircle ? 'The company account pays the reviewed cancellation fee in USDC.' : "Network fee paid from the signing wallet when cancellation is completed."}
           </p>
           <AccountChangeApproval
             key={c._id}
@@ -262,6 +269,7 @@ export function AccountCancellation({
             chainId={c.chainId}
             updatedAt={c.updatedAt}
             managed={!!c.executionFee}
+            feeSource={useCircle ? { cancellationId: c._id } : undefined}
             walletRejectedAt={c.execution?.walletRejectedAt}
             txHash={c.execution?.txHash}
             canApprove={info.canApprove}

@@ -1,3 +1,8 @@
+import type { ObjectType } from 'convex/values';
+import type { MutationCtx } from './_generated/server';
+import { assertCircleReservation } from './lib/circleSource';
+import { accountChangeProgress } from './lib/accountChangeLifecycle';
+import { ORG_READER_ROLES } from '../shared/roles';
 import { v } from "convex/values";
 import {
   internalMutation,
@@ -33,13 +38,7 @@ type Source = {
   disbursementId?: Id<"disbursements">;
   policyChangeId?: Id<"spendingPolicyChanges">;
 };
-const readRoles = [
-  "admin",
-  "approver",
-  "initiator",
-  "clerk",
-  "viewer",
-] as const;
+
 async function readOriginal(ctx: QueryCtx, args: Source) {
   if (Number(!!args.disbursementId) + Number(!!args.policyChangeId) !== 1)
     throw new Error("Choose one original account transaction");
@@ -85,7 +84,7 @@ function canCancel(
       "Check the original submission before requesting a cancellation",
     );
 }
-async function assertCurrent(ctx: QueryCtx, c: Doc<"accountCancellations">) {
+export async function assertCurrent(ctx: QueryCtx, c: Doc<"accountCancellations">) {
   const original = await ctx.db.get(c.originalProposalId);
   if (!original) throw new Error("Original signed evidence is missing");
   const { target } = await readOriginal(ctx, original);
@@ -101,7 +100,7 @@ export const source = internalQuery({
       ctx,
       original.safe.orgId,
       args.sessionToken,
-      [...readRoles],
+      [...ORG_READER_ROLES],
     );
     const existing = original.original
       ? await ctx.db
@@ -131,7 +130,7 @@ export const get = query({
       ctx,
       safe.orgId,
       args.sessionToken,
-      [...readRoles],
+      [...ORG_READER_ROLES],
     );
     const record = original
       ? await ctx.db
@@ -149,6 +148,7 @@ export const get = query({
             execution: record.execution
               ? {
                   attemptId: record.execution.attemptId,
+                  service: record.execution.service,
                   phase: record.execution.phase,
                   walletRejectedAt: record.execution.walletRejectedAt,
                   txHash: record.execution.txHash,
@@ -182,7 +182,7 @@ export const context = internalQuery({
           ctx,
           cancellation.orgId,
           args.sessionToken,
-          args.write ? ["admin", "approver"] : [...readRoles],
+          args.write ? ["admin", "approver"] : [...ORG_READER_ROLES],
         )
       : undefined;
     const originalProposal = await ctx.db.get(cancellation.originalProposalId);
@@ -408,15 +408,15 @@ export const sign = internalMutation({
     });
   },
 });
-export const reserve = internalMutation({
-  args: {
+const reserveArgs = {
     ...cancellationIdentity,
     safeTxHash: v.string(),
     to: v.string(),
     data: v.string(),
     attemptId: v.string(),
-  },
-  handler: async (ctx, args) => {
+    circleExecutionId: v.optional(v.id('circleExecutions')),
+  };
+export async function reserveCancellationExecution(ctx: MutationCtx, args: ObjectType<typeof reserveArgs>) {
     const c = await ctx.db.get(args.cancellationId);
     if (
       !c ||
@@ -432,6 +432,7 @@ export const reserve = internalMutation({
       throw new Error(
         "Check the original cancellation submission before trying again",
       );
+    await assertCircleReservation(ctx, c.safeId, args.circleExecutionId);
     const { user } = await requireOrgAccess(ctx, c.orgId, args.sessionToken, [
       "admin",
       "approver",
@@ -453,6 +454,7 @@ export const reserve = internalMutation({
       status: "processing",
       checks: 0,
       execution: {
+        ...(args.circleExecutionId ? { service: 'circle' as const } : {}),
         attemptId: args.attemptId,
         actorUserId: user._id,
         startedAt: Date.now(),
@@ -485,8 +487,8 @@ export const reserve = internalMutation({
         { cancellationId: c._id },
       );
     return args.attemptId;
-  },
-});
+}
+export const reserve = internalMutation({ args: reserveArgs, handler: reserveCancellationExecution });
 export const walletResult = mutation({
   args: {
     ...cancellationIdentity,
@@ -598,22 +600,8 @@ export const checkpoint = internalMutation({
       throw new Error("Cancellation settlement evidence is required");
     if (args.settlement) validateSettlementBlock(args.settlement);
     const e = c.execution;
-    if (
-      (e?.txHash &&
-        args.txHash &&
-        e.txHash.toLowerCase() !== args.txHash.toLowerCase()) ||
-      (e?.providerId && args.providerId && e.providerId !== args.providerId)
-    )
-      throw new Error(
-        "The original cancellation submission cannot be replaced",
-      );
-    if (args.txHash) assertValidTxHash(args.txHash);
-    const searchFromBlock =
-      args.searchFromBlock &&
-      BigInt(args.searchFromBlock) > BigInt(c.searchFromBlock)
-        ? args.searchFromBlock
-        : c.searchFromBlock;
-    const checks = (c.checks ?? 0) + 1;
+    const progress = accountChangeProgress({ txHash: e?.txHash, providerId: e?.providerId, searchFromBlock: c.searchFromBlock, checks: c.checks ?? 0 }, args);
+    const { checks, searchFromBlock } = progress;
     await ctx.db.patch(c._id, {
       status: args.outcome ?? c.status,
       checks,
@@ -622,11 +610,8 @@ export const checkpoint = internalMutation({
       execution: e
         ? {
             ...e,
-            txHash: e.txHash ?? args.txHash,
-            providerId: e.providerId ?? args.providerId,
+            ...progress,
             phase: e.phase === "prepared" ? "prepared" : "submitted",
-            searchFromBlock,
-            checks,
           }
         : undefined,
       txHash: args.outcome ? args.txHash : c.txHash,

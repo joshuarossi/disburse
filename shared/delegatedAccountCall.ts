@@ -39,6 +39,7 @@ export function delegatedAccountCall(intent: DelegatedIntent, token: string) {
     });
   if (!fee && !intent.additionalTransfers?.length)
     return {
+      operation: 0 as const,
       to: intent.module as Address,
       data: transferData(
         intent.tokenAddress,
@@ -73,6 +74,7 @@ export function delegatedAccountCall(intent: DelegatedIntent, token: string) {
     ]);
   };
   return {
+    operation: intent.signature === "0x" ? (1 as const) : (0 as const),
     to: to as Address,
     data: encodeFunctionData({
       abi: parseAbi(["function multiSend(bytes transactions)"]),

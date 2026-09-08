@@ -1,6 +1,29 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { releaseConfigurationErrors } from './check-release-config.mjs';
+import { releaseConfigurationErrors, loadReleaseEnvironment } from './check-release-config.mjs';
+import { mkdtempSync, writeFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+
+test('validates the effective Vite production environment, including local overrides and process precedence', () => {
+  const root = mkdtempSync(join(tmpdir(), 'disburse-release-test-'));
+  const name = 'VITE_RELEASE_TEST_VALUE';
+  const original = process.env[name];
+  try {
+    delete process.env[name];
+    writeFileSync(join(root, '.env'), `${name}=base\n`);
+    writeFileSync(join(root, '.env.production'), `${name}=production\nVITE_GELATO_API_KEY=private-test-value\n`);
+    writeFileSync(join(root, '.env.production.local'), `${name}=local-production\n`);
+    const effective = loadReleaseEnvironment(root);
+    assert.equal(effective[name], 'local-production');
+    assert.ok(releaseConfigurationErrors(effective).some(error => error.includes('VITE_GELATO_API_KEY')));
+    process.env[name] = 'host-override';
+    assert.equal(loadReleaseEnvironment(root)[name], 'host-override');
+  } finally {
+    if (original === undefined) delete process.env[name]; else process.env[name] = original;
+    rmSync(root, { recursive: true, force: true });
+  }
+});
 
 const configured = {
   VITE_CONVEX_URL: 'https://release-check.convex.cloud',

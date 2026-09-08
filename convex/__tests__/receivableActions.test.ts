@@ -184,7 +184,7 @@ describe("receivable chain verification", () => {
     );
     expect(provider.sendTransaction).not.toHaveBeenCalled();
     expect(await s.t.query(api.receivables.configuration, { orgId: s.ids.orgId, sessionToken: s.args.sessionToken }))
-      .toEqual([expect.objectContaining({ chainId: 11155111, collectionFeeMode: "wallet" })]);
+      .toEqual([expect.objectContaining({ chainId: 11155111, canIssue: false, collectionFeeMode: "stablecoin" })]);
   });
   it("uses finalized production blocks and bounds each scan to 2,000 blocks", async () => {
     const s = await setup(1);

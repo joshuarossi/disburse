@@ -37,10 +37,11 @@ test('missing usage leaves renewal available and does not show a made-up zero', 
   await expect(page.getByRole('region', { name: 'Workspace usage' })).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Renew for 30 days' })).toBeEnabled();
 });
-test('Portuguese pricing preserves the USD amount and 30-day period', async ({ page }) => {
+test('English workspace pricing preserves the USD amount and public-language preference', async ({ page }) => {
   await page.addInitScript(() => localStorage.setItem('i18nextLng', 'pt-BR'));
   await page.goto('/org/demo/settings?tab=billing');
-  await expect(page.getByText('US$ 50 / 30 dias', { exact: true })).toBeVisible();
-  await expect(page.getByRole('region', { name: 'Uso do espaço de trabalho' })).toContainText('4 de 5 em uso');
+  await expect(page.getByText('$50 / 30 days', { exact: true })).toBeVisible();
+  await expect(page.getByRole('region', { name: 'Workspace usage' })).toContainText('4 of 5 used');
   await expect(page.getByText('R$ 50/mês', { exact: true })).toHaveCount(0);
+  expect(await page.evaluate(() => localStorage.getItem('i18nextLng'))).toBe('pt-BR');
 });

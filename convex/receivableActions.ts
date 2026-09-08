@@ -3,10 +3,8 @@ import { readSettlementBlock } from './lib/settlementBlock';
 import { randomBytes } from "node:crypto";
 import { v } from "convex/values";
 import {
-  erc20Abi,
   parseAbiItem,
   type Address,
-  type Hex,
 } from "viem";
 import { action, internalAction, type ActionCtx } from "./_generated/server";
 import { api, internal } from "./_generated/api";
@@ -17,7 +15,7 @@ import {
   forwarderFactory,
   invoiceSalt,
   invoiceAddress,
-  sweepCall,
+  RECEIVING_FACTORY_ADDRESS,
 } from "../shared/receivableAddress";
 const transfer = parseAbiItem(
   "event Transfer(address indexed from, address indexed to, uint256 value)",
@@ -35,7 +33,7 @@ export const issue = action({
       throw new Error(
         "Receiving invoices on production networks is not enabled yet. Choose a test account.",
       );
-    const factory = process.env[`AR_FACTORY_${i.chainId}`] ?? "";
+    const factory = process.env[`AR_FACTORY_${i.chainId}`] ?? RECEIVING_FACTORY_ADDRESS;
     const client = await verifyFactory(i.chainId, factory);
     const block = await client.getBlockNumber();
     await assertSafeIdentity(client, i.treasury as Address, i.chainId, block);
@@ -74,43 +72,6 @@ export const refresh = action({
   handler: async (ctx, args): Promise<void> => {
     await ctx.runQuery(api.receivables.get, args);
     await scanInvoice(ctx, args.invoiceId);
-  },
-});
-export const nativeSweep = action({
-  args: identity,
-  handler: async (
-    ctx,
-    args,
-  ): Promise<{ to: Address; data: Hex; chainId: number }> => {
-    const i = await ctx.runQuery(api.receivables.forOperation, args);
-    if (!i.factory || !i.salt || !i.receivingAddress)
-      throw new Error("Issue this invoice first.");
-    const client = await verifyFactory(i.chainId, i.factory);
-    if (
-      invoiceAddress(
-        i.factory as Address,
-        i.treasury as Address,
-        i.salt as Hex,
-      ).toLowerCase() !== i.receivingAddress
-    )
-      throw new Error("Receiving address changed.");
-    const balance = await client.readContract({
-      address: i.tokenAddress as Address,
-      abi: erc20Abi,
-      functionName: "balanceOf",
-      args: [i.receivingAddress as Address],
-    });
-    if (balance === 0n)
-      throw new Error("There are no funds waiting at this invoice address.");
-    return {
-      ...sweepCall({
-        factory: i.factory,
-        treasury: i.treasury,
-        salt: i.salt,
-        tokenAddress: i.tokenAddress,
-      }),
-      chainId: i.chainId,
-    };
   },
 });
 async function scanInvoice(ctx: ActionCtx, invoiceId: Id<"receivables">) {

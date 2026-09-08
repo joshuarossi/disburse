@@ -1,91 +1,19 @@
-import { useAction } from "convex/react";
-import { usePublicClient, useSendTransaction, useSwitchChain } from "wagmi";
-import { api } from "../../../convex/_generated/api";
-import type { Doc } from "../../../convex/_generated/dataModel";
-import { useSessionToken } from "@/lib/session";
-import { Notice } from "@/components/workspace/WorkspacePrimitives";
+import type { Doc } from '../../../convex/_generated/dataModel';
+import { supportsCircleFees } from '../../../shared/circleExecution';
+import { CustomerPaidExecution } from '@/features/payments/CustomerPaidExecution';
+import { Notice } from '@/components/workspace/WorkspacePrimitives';
 
-export function InvoiceCollection({
-  invoice,
-  canManage,
-  busy,
-  run,
-}: {
-  invoice: Doc<"receivables">;
-  canManage: boolean;
-  busy: boolean;
-  run: (work: () => Promise<unknown>, success: string) => Promise<void>;
+export function InvoiceCollection({ invoice, canManage, busy, onBusyChange }: {
+  invoice: Doc<'receivables'>; canManage: boolean; busy: boolean; onBusyChange: (busy: boolean) => void;
 }) {
-  const sessionToken = useSessionToken();
-  const args = sessionToken ? { invoiceId: invoice._id, sessionToken } : null;
-  const nativeSweep = useAction(api.receivableActions.nativeSweep);
-  const refresh = useAction(api.receivableActions.refresh);
-  const { switchChainAsync } = useSwitchChain(),
-    { sendTransactionAsync } = useSendTransaction();
-  const client = usePublicClient({ chainId: invoice.chainId });
+  if (!invoice.receivingAddress) return null;
   const awaiting = BigInt(invoice.received) > BigInt(invoice.forwarded);
-  if (!awaiting && !invoice.sweepState) return null;
-  return (
-    <section
-      aria-label="Invoice collection"
-      className="space-y-3 rounded-lg border border-slate-400/20 p-4"
-    >
-      <h3 className="font-semibold">Collect into your account</h3>
-      <p className="workspace-description">
-        You pay the collection network fee with your connected wallet. The full
-        invoice payment moves into your company account. Disburse does not cover
-        network or provider fees, including on a free plan.
-      </p>
-      {invoice.sweepError && <Notice>{invoice.sweepError}</Notice>}
-      {invoice.sweepState && (
-        <Notice tone="info">
-          An earlier service request is still unresolved. No new service request
-          will be sent. Wallet collection may incur another gas charge if that
-          earlier request also executes.
-        </Notice>
-      )}
-      {canManage && awaiting && (
-        <button
-          className="workspace-button"
-          disabled={busy || !args}
-          onClick={() =>
-            run(async () => {
-              const call = await nativeSweep(args!);
-              await switchChainAsync({ chainId: call.chainId });
-              const hash = await sendTransactionAsync(call);
-              if (!client)
-                throw new Error(
-                  `Collection submitted. Check payments for confirmation. Transaction: ${hash}`,
-                );
-              try {
-                const receipt = await client.waitForTransactionReceipt({
-                  hash,
-                  confirmations: 2,
-                });
-                if (receipt.status !== "success")
-                  throw new Error(
-                    `Collection reverted. Check payments before trying again. Transaction: ${hash}`,
-                  );
-              } catch (error) {
-                if (
-                  error instanceof Error &&
-                  error.message.startsWith("Collection reverted.")
-                )
-                  throw error;
-                throw new Error(
-                  `Collection confirmation is pending. Check payments before trying again. Transaction: ${hash}`,
-                );
-              }
-              await refresh(args!);
-            }, "Collection transaction confirmed.")
-          }
-        >
-          Collect with wallet
-        </button>
-      )}
-      <p className="workspace-description">
-        Review the network fee in your wallet before confirming.
-      </p>
-    </section>
-  );
+  if (!supportsCircleFees(invoice.chainId)) return awaiting ? <Notice>Collection with fees in USDC is not available on this network yet. Your invoice funds remain at the receiving address.</Notice> : null;
+  return <section aria-label="Invoice collection" className="space-y-3">
+    <p className="workspace-description">The first collection also activates this invoice's receiving address. Your company account needs USDC to pay the quoted fee. Its current owners approve collection.</p>
+    {invoice.sweepError && <Notice>{invoice.sweepError}</Notice>}
+    {invoice.sweepState && <Notice tone="info">An earlier collection service request is unresolved. Check that request before approving another collection.</Notice>}
+    <CustomerPaidExecution source={{ receivableId: invoice._id }} ready={awaiting && !invoice.sweepState} blocked={!canManage || busy || !!invoice.sweepState}
+      memberName={wallet => wallet} onBusyChange={onBusyChange} compact />
+  </section>;
 }

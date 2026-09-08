@@ -2,6 +2,36 @@ import { expect, test } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
 const path = `/pay/${"a".repeat(64)}`;
 
+test("an unavailable invoice connection offers recovery without payment instructions", async ({
+  page,
+}) => {
+  await page.addInitScript(() => {
+    if (sessionStorage.getItem("qa:offline-initialized")) return;
+    sessionStorage.setItem("qa:offline-initialized", "true");
+    sessionStorage.setItem("qa:scenario", "ar-public-offline");
+  });
+  await page.clock.install();
+  await page.goto(path);
+  await expect(
+    page.getByRole("heading", { name: "Loading invoice", exact: true }),
+  ).toBeVisible();
+  await page.clock.fastForward(10_100);
+  await expect(
+    page.getByRole("heading", { name: "Invoice taking longer to load" }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Reload invoice" }),
+  ).toBeVisible();
+  await expect(page.getByRole("button", { name: "Copy address" })).toHaveCount(
+    0,
+  );
+  await page.evaluate(() => sessionStorage.removeItem("qa:scenario"));
+  await page.getByRole("button", { name: "Reload invoice" }).click();
+  await expect(
+    page.getByRole("heading", { name: "Northstar Studio", exact: true }),
+  ).toBeVisible();
+});
+
 test("invoice editor calculates the total and presents collection costs before issuance", async ({
   page,
 }) => {

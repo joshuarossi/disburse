@@ -1,3 +1,4 @@
+import { userErrorMessage } from '@/lib/userErrors';
 import { useState, type FormEvent } from "react";
 import { useMutation, useQuery } from "convex/react";
 import { Link } from "react-router-dom";
@@ -93,7 +94,7 @@ export function BillEditor({
         });
       onClose();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Could not save bill");
+      setError(userErrorMessage(e, "Could not save bill"));
     } finally {
       setBusy(false);
     }

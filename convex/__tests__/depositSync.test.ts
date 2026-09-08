@@ -5,11 +5,11 @@ import schema from '../schema';
 import { api, internal } from '../_generated/api';
 import { CHAIN_TOKENS } from '../../shared/chains';
 import { parseDeposit, validateDepositCursor, depositScanUrl } from '../lib/depositSync';
-import { createFullOrgSetup, signIn, TEST_WALLETS } from './factories';
+import { createFullOrgSetup, createTestMembership, signIn, TEST_WALLETS } from './factories';
 
 const txHash = `0x${'a1'.repeat(32)}`;
 beforeEach(() => { vi.useFakeTimers(); });
-afterEach(() => { vi.clearAllTimers(); vi.useRealTimers(); vi.unstubAllGlobals(); });
+afterEach(() => { vi.clearAllTimers(); vi.useRealTimers(); vi.unstubAllGlobals(); vi.unstubAllEnvs(); });
 async function setup() {
   const t = convexTest(schema);
   const ids = await t.run(ctx => createFullOrgSetup(ctx, { walletAddress: TEST_WALLETS.admin }));
@@ -20,6 +20,18 @@ async function setup() {
   const fields = { orgId: ids.orgId, safeId: ids.safeId, chainId: 11155111, safeAddress: ids.safeAddress, tokenAddress: CHAIN_TOKENS[11155111].USDC.address, tokenSymbol: 'USDC', decimals: 6, amountRaw: '1', amount: '0.000001', timestamp: Date.now() - 86400_000, txHash, transferId: `e${txHash.slice(2)}1`, fromAddress: TEST_WALLETS.approver, toAddress: ids.safeAddress, source: 'safe_tx_service' as const };
   return { t, ids, sync, fields, scope: { orgId: ids.orgId, sessionToken } };
 }
+
+it('lets viewers read sync status but denies forced syncs before scheduling work', async () => {
+  const { t, ids, scope } = await setup();
+  const viewer = await signIn(t, 'viewer');
+  await t.run(ctx => createTestMembership(ctx, ids.orgId, viewer.userId, { role: 'viewer' }));
+  const args = { ...scope, sessionToken: viewer.sessionToken };
+  await expect(t.query(api.depositsData.statusForOrg, args)).resolves.toHaveLength(1);
+  const before = await t.run(ctx => ctx.db.system.query('_scheduled_functions').collect());
+  await expect(t.action(api.deposits.syncForOrg, { ...args, force: true })).rejects.toThrow(/role|permission|access/i);
+  expect(await t.run(ctx => ctx.db.system.query('_scheduled_functions').collect())).toHaveLength(before.length);
+  await expect(t.action(api.deposits.syncForOrg, args)).resolves.toBeDefined();
+});
 
 it('keeps separate transfers in one transaction and the same Safe linked to another organization', async () => {
   const { t, ids, fields } = await setup();
@@ -117,6 +129,35 @@ it('retains its page after an outage and exposes a retry without a false success
   await t.action(api.deposits.syncForOrg, { ...scope, force: true });
   await t.action(internal.deposits.process, { syncId: sync._id });
   expect((await t.query(api.depositsData.statusForOrg, scope))[0]).toMatchObject({ error: null, historyReconciled: true, syncing: false });
+});
+
+it('refuses a paid history configuration before requesting the provider and retains existing records', async () => {
+  const { t, sync, fields, scope } = await setup();
+  await t.mutation(internal.depositsData.upsertDeposit, fields);
+  vi.stubEnv('SAFE_TX_SERVICE_API_KEY', 'test-placeholder');
+  vi.stubEnv('SAFE_TX_SERVICE_PLAN', 'growth');
+  vi.stubGlobal('fetch', vi.fn());
+  await t.action(internal.deposits.process, { syncId: sync._id });
+  expect(fetch).not.toHaveBeenCalled();
+  expect(await t.run(ctx => ctx.db.query('deposits').collect())).toHaveLength(1);
+  expect((await t.run(ctx => ctx.db.get(sync._id)))?.scan?.cursor).toBe(sync.scan!.cursor);
+  expect((await t.query(api.depositsData.statusForOrg, scope))[0]).toMatchObject({ historyReconciled: false, syncing: false });
+});
+
+it('holds the saved scan after a free-plan quota response without trying a billed fallback', async () => {
+  const { t, sync, fields } = await setup();
+  await t.mutation(internal.depositsData.upsertDeposit, fields);
+  vi.stubEnv('SAFE_TX_SERVICE_API_KEY', 'test-placeholder');
+  vi.stubEnv('SAFE_TX_SERVICE_PLAN', 'builder');
+  vi.stubGlobal('fetch', vi.fn(async () => new Response('', { status: 429, headers: { 'Retry-After': '7200' } })));
+  await t.action(internal.deposits.process, { syncId: sync._id });
+  expect(fetch).toHaveBeenCalledTimes(1);
+  expect(fetch).toHaveBeenCalledWith(sync.scan!.cursor, expect.objectContaining({ headers: { Authorization: 'Bearer test-placeholder' } }));
+  const saved = await t.run(ctx => ctx.db.get(sync._id));
+  expect(saved?.scan?.cursor).toBe(sync.scan!.cursor);
+  expect(saved?.nextAttemptAt).toBe(Date.now() + 7200_000);
+  expect(saved?.completedThrough).toBeUndefined();
+  expect(await t.run(ctx => ctx.db.query('deposits').collect())).toHaveLength(1);
 });
 
 it('rejects cross-account pages atomically and does not expose sync state outside the organization', async () => {

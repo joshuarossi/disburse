@@ -1,9 +1,9 @@
+import { useState } from "react";
+import { AccountSubscriptionPayment } from "./AccountSubscriptionPayment";
 import { Dialog } from "@/components/ui/Dialog";
 import { Button } from "@/components/ui/button";
 import {
-  Loader2,
   AlertCircle,
-  Copy,
   ExternalLink,
   CheckCircle,
 } from "lucide-react";
@@ -30,16 +30,13 @@ export function BillingPaymentDialog({
     setPaymentStep,
     billingError,
     txHash,
-    isSending,
-    isConfirming,
     handleClosePayment,
-    handlePayWithWallet,
     handleConfirmPayment,
-    copyToClipboard,
     paymentConfig,
     isVerifying,
     billing,
   } = controller;
+  const [accountBusy, setAccountBusy] = useState(false);
   return (
     <>
       {showPaymentModal && (
@@ -49,7 +46,7 @@ export function BillingPaymentDialog({
               ? "Payment successful"
               : `Subscribe to ${PLANS[selectedPlan].name}`
           }
-          onClose={handleClosePayment}
+          onClose={() => { if (!accountBusy) handleClosePayment(); }}
         >
           <div className="p-6">
             <p className="workspace-description mb-5">
@@ -87,61 +84,10 @@ export function BillingPaymentDialog({
                   </div>
                 </div>
 
-                <p className="workspace-description">
-                  {paymentConfig?.network ?? "Network not configured"} · USDC
-                  only. Pay from your connected administrator wallet or a linked
-                  funding account.
-                </p>
-                <div className="rounded-lg border border-white/10 bg-navy-800/50 p-4">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm text-slate-400">
-                      Subscription payment address
-                    </span>
-                    <button
-                      disabled={!paymentConfig}
-                      onClick={() =>
-                        copyToClipboard(paymentConfig?.treasury ?? "")
-                      }
-                      aria-label="Copy billing address"
-                      className="text-accent-400 hover:text-accent-300"
-                    >
-                      <Copy className="h-4 w-4" />
-                    </button>
-                  </div>
-                  <p className="mt-1 font-mono text-sm text-white break-all">
-                    {paymentConfig?.treasury ?? "Not configured"}
-                  </p>
-                </div>
+                {!hasPendingBilling && <AccountSubscriptionPayment controller={controller} onBusyChange={setAccountBusy} />}
+                {!checkout?.safeId && <Button variant="secondary" className="w-full" onClick={() => setPaymentStep("confirm")} disabled={!paymentConfig}>Verify an existing payment</Button>}
 
-                {hasPendingBilling && (
-                  <p role="status" className="workspace-description">
-                    An earlier wallet request needs verification. Check its
-                    receipt before making another payment.
-                  </p>
-                )}
-                <div className="pt-4 space-y-3">
-                  <Button
-                    className="w-full"
-                    onClick={handlePayWithWallet}
-                    disabled={
-                      !paymentConfig ||
-                      hasPendingBilling ||
-                      !!txHash ||
-                      !canSendCheckout
-                    }
-                  >
-                    Pay with connected wallet
-                  </Button>
-                  <Button
-                    variant="secondary"
-                    className="w-full"
-                    onClick={() => setPaymentStep("confirm")}
-                    disabled={!paymentConfig}
-                  >
-                    Verify an existing payment
-                  </Button>
-                </div>
-                {checkout?.status === "prepared" && (
+                {checkout?.status === "prepared" && !checkout.safeId && (
                   <div className="space-y-2">
                     <p className="workspace-description">
                       This checkout is saved for your team.{" "}
@@ -157,33 +103,6 @@ export function BillingPaymentDialog({
                       Discard unsubmitted checkout
                     </Button>
                   </div>
-                )}
-              </div>
-            )}
-
-            {paymentStep === "pay" && (
-              <div className="space-y-4 text-center">
-                {isSending || isConfirming ? (
-                  <>
-                    <Loader2 className="mx-auto h-12 w-12 animate-spin text-accent-400" />
-                    <p className="text-white">
-                      {isSending
-                        ? "Confirm transaction in your wallet..."
-                        : "Waiting for confirmation..."}
-                    </p>
-                    <p className="text-sm text-slate-400">
-                      Your payment request is saved. You can return to Plan &
-                      billing to verify its receipt.
-                    </p>
-                  </>
-                ) : (
-                  <>
-                    <AlertCircle className="mx-auto h-12 w-12 text-yellow-400" />
-                    <p className="text-white">Transaction pending</p>
-                    <Button onClick={() => setPaymentStep("confirm")}>
-                      Verify payment receipt
-                    </Button>
-                  </>
                 )}
               </div>
             )}

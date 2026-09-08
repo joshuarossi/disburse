@@ -1,0 +1,85 @@
+{
+  "compiler": "solc 0.8.30 / optimizer 200 / Shanghai",
+  "scope": "Local execution gas. Excludes Safe/ERC-4337/paymaster overhead, L1 data charges and live provider prices.",
+  "batchHarnessDeploymentGas": "161399",
+  "variants": [
+    {
+      "name": "immutable",
+      "factoryDeploymentGas": "579774",
+      "sizes": [
+        {
+          "count": 1,
+          "separate": {
+            "first": "342403",
+            "repeat": "46950"
+          },
+          "grouped": {
+            "first": "346815",
+            "repeat": "51362"
+          }
+        },
+        {
+          "count": 5,
+          "separate": {
+            "first": "1712015",
+            "repeat": "234750"
+          },
+          "grouped": {
+            "first": "1594215",
+            "repeat": "123960"
+          }
+        },
+        {
+          "count": 20,
+          "separate": {
+            "first": "6848060",
+            "repeat": "939000"
+          },
+          "grouped": {
+            "first": "6271965",
+            "repeat": "411924"
+          }
+        }
+      ]
+    },
+    {
+      "name": "clone prototype",
+      "factoryDeploymentGas": "677969",
+      "sizes": [
+        {
+          "count": 1,
+          "separate": {
+            "first": "116794",
+            "repeat": "46536"
+          },
+          "grouped": {
+            "first": "121206",
+            "repeat": "50948"
+          }
+        },
+        {
+          "count": 5,
+          "separate": {
+            "first": "583970",
+            "repeat": "232680"
+          },
+          "grouped": {
+            "first": "456170",
+            "repeat": "114304"
+          }
+        },
+        {
+          "count": 20,
+          "separate": {
+            "first": "2335880",
+            "repeat": "930720"
+          },
+          "grouped": {
+            "first": "1712285",
+            "repeat": "367300"
+          }
+        }
+      ]
+    }
+  ]
+}

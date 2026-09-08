@@ -1,4 +1,5 @@
 import { chainEnvironment, configuredTokenAddress } from "../shared/assets";
+import { CHAIN_NAMES } from "../shared/chains";
 import { environmentValidator } from "./lib/activityEnvironment";
 import { v } from "convex/values";
 import { query } from "./_generated/server";
@@ -22,29 +23,107 @@ export const overview = query({
       "clerk",
       "viewer",
     ]);
-    const [payments, recipients, bills, safes] = await Promise.all([
-      ctx.db
-        .query("disbursements")
-        .withIndex("by_org", (q) => q.eq("orgId", args.orgId))
-        .order("desc")
-        .take(5001),
-      ctx.db
-        .query("beneficiaries")
-        .withIndex("by_org", (q) => q.eq("orgId", args.orgId))
-        .collect(),
-      ctx.db
-        .query("invoices")
-        .withIndex("by_org", (q) => q.eq("orgId", args.orgId))
-        .collect(),
-      ctx.db
-        .query("safes")
-        .withIndex("by_org", (q) => q.eq("orgId", args.orgId))
-        .collect(),
-    ]);
     const environment = args.environment ?? "production";
-    const scoped = payments
-      .slice(0, 5000)
-      .filter((p) => chainEnvironment(p.chainId) === environment);
+    const chains = Object.keys(CHAIN_NAMES)
+      .map(Number)
+      .filter((id) => chainEnvironment(id) === environment);
+    const statuses = [
+      "draft",
+      "pending",
+      "proposed",
+      "scheduled",
+      "relaying",
+      "failed",
+    ] as const;
+    const bucketLimit = 200;
+    // Closed history must never push an old unpaid item out of the overview.
+    // Each status/network bucket is independently bounded and reports truncation.
+    const [paymentBuckets, recentBuckets, recipientPage, billPage, safePage] =
+      await Promise.all([
+        Promise.all(
+          statuses.flatMap((status) =>
+            chains.length
+              ? chains.map((chainId) =>
+                  ctx.db
+                    .query("disbursements")
+                    .withIndex("by_org_status_chain", (q) =>
+                      q
+                        .eq("orgId", args.orgId)
+                        .eq("status", status)
+                        .eq("chainId", chainId),
+                    )
+                    .order("desc")
+                    .take(bucketLimit + 1),
+                )
+              : [
+                  ctx.db
+                    .query("disbursements")
+                    .withIndex("by_org_status", (q) =>
+                      q.eq("orgId", args.orgId).eq("status", status),
+                    )
+                    .order("desc")
+                    .take(bucketLimit + 1),
+                ],
+          ),
+        ),
+        Promise.all(
+          chains.length
+            ? chains.map((chainId) =>
+                ctx.db
+                  .query("disbursements")
+                  .withIndex("by_org_chain", (q) =>
+                    q.eq("orgId", args.orgId).eq("chainId", chainId),
+                  )
+                  .order("desc")
+                  .take(6),
+              )
+            : [
+                ctx.db
+                  .query("disbursements")
+                  .withIndex("by_org", (q) => q.eq("orgId", args.orgId))
+                  .order("desc")
+                  .take(100),
+              ],
+        ),
+        ctx.db
+          .query("beneficiaries")
+          .withIndex("by_org_active", (q) =>
+            q.eq("orgId", args.orgId).eq("isActive", true),
+          )
+          .take(1001),
+        ctx.db
+          .query("invoices")
+          .withIndex("by_org", (q) => q.eq("orgId", args.orgId))
+          .take(1001),
+        ctx.db
+          .query("safes")
+          .withIndex("by_org", (q) => q.eq("orgId", args.orgId))
+          .take(101),
+      ]);
+    const recipients = recipientPage.slice(0, 1000),
+      bills = billPage.slice(0, 1000),
+      safes = safePage.slice(0, 100);
+    const limitedHistory =
+      paymentBuckets.some((rows) => rows.length > bucketLimit) ||
+      recipientPage.length > 1000 ||
+      billPage.length > 1000 ||
+      safePage.length > 100 ||
+      (environment === "unclassified" && recentBuckets[0]?.length === 100);
+    const scoped = paymentBuckets
+      .flatMap((rows) => rows.slice(0, bucketLimit))
+      .filter((p) => chainEnvironment(p.chainId) === environment)
+      .sort(
+        (a, b) =>
+          b._creationTime - a._creationTime || b._id.localeCompare(a._id),
+      );
+    const recent = recentBuckets
+      .flat()
+      .filter((p) => chainEnvironment(p.chainId) === environment)
+      .sort(
+        (a, b) =>
+          b._creationTime - a._creationTime || b._id.localeCompare(a._id),
+      )
+      .slice(0, 6);
     const now = Date.now();
     const unpaid = [];
     for (const bill of bills) {
@@ -83,7 +162,7 @@ export const overview = query({
       string,
       { safeId: string; token: string; units: bigint }
     >();
-    let plansIncomplete = payments.length > 5000;
+    let plansIncomplete = limitedHistory;
     let unquotedFees = false;
     for (const payment of scoped) {
       if (["executed", "cancelled"].includes(payment.status)) continue;
@@ -132,12 +211,10 @@ export const overview = query({
         (r) => r.isActive && recipientPayoutIssue(r),
       ).length,
       exceptions: await Promise.all(
-        exceptions
-          .slice(0, 5)
-          .map(async (p) => ({
-            ...(await decorate(p)),
-            exceptionReason: paymentException(p, now)!,
-          })),
+        exceptions.slice(0, 5).map(async (p) => ({
+          ...(await decorate(p)),
+          exceptionReason: paymentException(p, now)!,
+        })),
       ),
       drafts: await Promise.all(drafts.slice(0, 4).map(decorate)),
       plannedDebits: [...totals.values()].map((d) => ({
@@ -159,9 +236,9 @@ export const overview = query({
       ).length,
       review: await Promise.all(review.slice(0, 5).map(decorate)),
       upcoming: await Promise.all(scheduled.slice(0, 4).map(decorate)),
-      recent: await Promise.all(scoped.slice(0, 6).map(decorate)),
+      recent: await Promise.all(recent.map(decorate)),
       bills: unpaid.sort((a, b) => a.dueDate - b.dueDate).slice(0, 4),
-      limitedHistory: payments.length > 5000,
+      limitedHistory,
     };
   },
 });

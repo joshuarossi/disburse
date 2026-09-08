@@ -1,3 +1,4 @@
+import { userErrorMessage } from '@/lib/userErrors';
 import { useState, type FormEvent } from "react";
 import { useMutation, useQuery } from "convex/react";
 import { Plus, Trash2 } from "lucide-react";
@@ -54,7 +55,7 @@ export function RecurringEditor({
       onClose();
     } catch (e) {
       setError(
-        e instanceof Error ? e.message : "Could not save recurring payment",
+        userErrorMessage(e, "Could not save recurring payment"),
       );
     } finally {
       setBusy(false);

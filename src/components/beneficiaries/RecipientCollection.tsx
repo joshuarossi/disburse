@@ -1,3 +1,4 @@
+import { userErrorMessage } from '@/lib/userErrors';
 import { useState } from "react";
 import { useAction, useMutation, useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
@@ -51,9 +52,7 @@ export function RecipientCollection({
       await task();
     } catch (e) {
       setError(
-        e instanceof Error
-          ? e.message
-          : "Could not update this payment detail request.",
+        userErrorMessage(e, "Could not update this payment detail request."),
       );
     } finally {
       setBusy(false);

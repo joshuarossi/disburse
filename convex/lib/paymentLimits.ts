@@ -43,13 +43,13 @@ export async function assertMemberPaymentPolicy(
   const date = new Date(payAt);
   const start = Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), 1);
   const end = Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + 1, 1);
-  const created = await ctx.db
-    .query('disbursements')
-    .withIndex('by_org_creator', (q) =>
-      q.eq('orgId', orgId).eq('createdBy', userId),
-    )
-    .collect();
-  const delegated = await ctx.db.query('disbursements').withIndex('by_org_delegate', q => q.eq('orgId', orgId).eq('delegatedBy', userId)).collect();
+  const [createdNow, createdScheduled, delegatedNow, delegatedScheduled] = await Promise.all([
+    ctx.db.query('disbursements').withIndex('by_creator_created', q => q.eq('orgId', orgId).eq('createdBy', userId).gte('createdAt', start).lt('createdAt', end)).collect(),
+    ctx.db.query('disbursements').withIndex('by_creator_scheduled', q => q.eq('orgId', orgId).eq('createdBy', userId).gte('scheduledAt', start).lt('scheduledAt', end)).collect(),
+    ctx.db.query('disbursements').withIndex('by_delegate_created', q => q.eq('orgId', orgId).eq('delegatedBy', userId).gte('createdAt', start).lt('createdAt', end)).collect(),
+    ctx.db.query('disbursements').withIndex('by_delegate_scheduled', q => q.eq('orgId', orgId).eq('delegatedBy', userId).gte('scheduledAt', start).lt('scheduledAt', end)).collect(),
+  ]);
+  const created = [...createdNow, ...createdScheduled], delegated = [...delegatedNow, ...delegatedScheduled];
   const payments = [...new Map([...created, ...delegated].map(p => [p._id, p])).values()];
   const reserved = payments.reduce((sum, payment) => {
     const when = payment.scheduledAt ?? payment.createdAt;

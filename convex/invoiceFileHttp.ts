@@ -8,7 +8,8 @@ import {
 } from "../shared/invoiceSource";
 
 // No cookies or credentials are accepted; every operation verifies the supplied
-// SIWE bearer session and current organization membership, including downloads.
+// SIWE bearer session and current organization membership. Public downloads
+// require an issued invoice link and that document's explicit sharing flag.
 const headers = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
@@ -99,7 +100,7 @@ export const upload = httpAction(async (ctx, request) => {
     return Response.json(
       {
         error:
-          "The document could not be saved. Check your sign-in, file type and 10 MB limit, then retry. No bill was created by this upload.",
+          "The document could not be saved. Check your sign-in, file type and 10 MB limit, then retry. This upload does not create an invoice or bill.",
       },
       { status: 400, headers },
     );
@@ -107,12 +108,18 @@ export const upload = httpAction(async (ctx, request) => {
 });
 export const download = httpAction(async (ctx, request) => {
   try {
-    const file = await ctx.runQuery(internal.invoiceFiles.downloadAccess, {
-      fileId: new URL(request.url).searchParams.get(
-        "fileId",
-      ) as Id<"invoiceFiles">,
-      sessionToken: auth(request),
-    });
+    const params = new URL(request.url).searchParams;
+    const fileId = params.get("fileId") as Id<"invoiceFiles">;
+    const publicToken = params.get("publicToken");
+    const file = publicToken
+      ? await ctx.runQuery(internal.invoiceFiles.sharedDownloadAccess, {
+          fileId,
+          publicToken,
+        })
+      : await ctx.runQuery(internal.invoiceFiles.downloadAccess, {
+          fileId,
+          sessionToken: auth(request),
+        });
     const blob = await ctx.storage.get(file.storageId);
     if (!blob) throw new Error("Source document unavailable");
     return new Response(blob, {

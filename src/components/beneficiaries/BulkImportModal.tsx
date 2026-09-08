@@ -1,3 +1,4 @@
+import { userErrorMessage } from '@/lib/userErrors';
 import { Dialog } from "@/components/ui/Dialog";
 import { Fragment, useState, useCallback, useMemo, useRef } from "react";
 import { useSessionToken } from "@/lib/session";
@@ -266,9 +267,7 @@ export function BulkImportModal({
       } catch (error) {
         console.error("Failed to parse CSV:", error);
         setImportError(
-          error instanceof Error
-            ? error.message
-            : t("beneficiaries.bulkImport.errors.parseError"),
+          userErrorMessage(error, t("beneficiaries.bulkImport.errors.parseError")),
         );
       } finally {
         setParsing(false);
@@ -346,9 +345,7 @@ export function BulkImportModal({
       setSaved({ ...result, skipped: validatedRows.length - chosen.length });
     } catch (e) {
       setImportError(
-        e instanceof Error
-          ? e.message
-          : "Could not import the selected changes. Review the preview and try again.",
+        userErrorMessage(e, "Could not import the selected changes. Review the preview and try again."),
       );
     } finally {
       setIsImporting(false);

@@ -1,3 +1,4 @@
+import { userErrorMessage } from '@/lib/userErrors';
 import { useState } from 'react';
 import { useMutation } from 'convex/react';
 import type { FunctionReturnType } from 'convex/server';
@@ -31,7 +32,7 @@ export function AccountingSettings({ orgId, config, onClose }: {
         e.preventDefault(); if (!sessionToken || busy) return; setBusy(true); setError(''); setSuccess('');
         try { await save({ orgId, sessionToken, currency, bookName: name, closedThrough: closed || undefined,
           expectedVersion: config.profile?.version ?? 0, reopenReason: reopening ? reason : undefined }); setSuccess('Accounting settings saved.'); }
-        catch (e) { setError(e instanceof Error ? e.message : 'Could not save accounting settings'); } finally { setBusy(false); }
+        catch (e) { setError(userErrorMessage(e, 'Could not save accounting settings')); } finally { setBusy(false); }
       }}>
         <label className="block"><span className="finance-label">Book name</span><input className="finance-field" value={name} onChange={e => setName(e.target.value)} maxLength={100} placeholder="e.g. Northstar · QuickBooks" required /></label>
         <div className="grid gap-4 sm:grid-cols-2">
@@ -68,7 +69,7 @@ export function AccountingSettings({ orgId, config, onClose }: {
                 return { externalId, name, kind: kind as AccountKind, active: enabled.toLowerCase() === 'true' };
               });
               setRows(preview); setImportVersion(config.profile!.version);
-            } catch (e) { setError(e instanceof Error ? e.message : 'Could not read the chart'); }
+            } catch (e) { setError(userErrorMessage(e, 'Could not read the chart')); }
           }} /></label>
         {rows.length > 0 && <>
           <div className="max-h-72 overflow-auto rounded-xl border border-white/10"><table className="finance-table">
@@ -80,7 +81,7 @@ export function AccountingSettings({ orgId, config, onClose }: {
             if (!sessionToken || busy) return; setBusy(true); setError('');
             try { const result = await importAccounts({ orgId, sessionToken, expectedVersion: importVersion, accounts: rows });
               setRows([]); setSuccess(`Chart saved. ${result.changed} account mappings changed.`); }
-            catch (e) { setError(e instanceof Error ? e.message : 'Could not import the chart'); } finally { setBusy(false); }
+            catch (e) { setError(userErrorMessage(e, 'Could not import the chart')); } finally { setBusy(false); }
           }}>Import {rows.length} reviewed accounts</button>
         </>}
       </section>}

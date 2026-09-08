@@ -3,7 +3,7 @@ import { getChainClient } from "./safeVerification";
 import { forwarderFactory } from "../../shared/receivableAddress";
 
 export function invoiceTestnet(chainId: number) {
-  return [11155111, 84532].includes(chainId);
+  return [11155111, 84532, 421614].includes(chainId);
 }
 
 export async function verifyInvoiceFactory(chainId: number, factory: string) {

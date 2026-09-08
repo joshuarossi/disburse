@@ -61,89 +61,89 @@
       "tryForFree": "Probar gratis"
     },
     "hero": {
-      "badge": "No custodial y con Safe",
-      "title": "Gestión de tesorería para",
-      "titleHighlight": "Equipos Web3",
-      "subtitle": "Optimiza los desembolsos de stablecoins con seguridad de nivel empresarial. Programa pagos, ejecuta transacciones sin gas y mantén registros de auditoría completos, todo sin renunciar al control de tus claves.",
+      "badge": "Pagos de empresa, bajo tu control",
+      "title": "Paga a tu equipo.",
+      "titleHighlight": "Mantén el control.",
+      "subtitle": "Importa tus beneficiarios, prepara pagos de nómina y a proveedores, y reúne aprobaciones y registros en un solo lugar. Las stablecoins se encargan de la liquidación. Tu equipo mantiene el control de los fondos.",
       "tryForFree": "Probar gratis",
       "learnMore": "Saber más",
-      "trustIndicators": "Impulsado por seguridad líder en la industria"
+      "trustIndicators": "Liquidación con Safe y stablecoins"
     },
     "features": {
       "title": "Características",
       "subtitle": "Todo lo que necesitas para gestionar operaciones de tesorería",
-      "description": "Construido para equipos de finanzas que necesitan cumplimiento, automatización y control sobre su tesorería.",
+      "description": "Un lugar familiar para preparar, aprobar y conciliar los pagos de tu empresa.",
       "nonCustodial": {
-        "title": "No Custodial",
-        "description": "Tus claves, tus fondos. Nunca tenemos acceso a tus claves privadas o activos."
+        "title": "Tus fondos siguen siendo tuyos",
+        "description": "Tu organización controla su cuenta y sus claves de firma. Disburse no custodia tus fondos."
       },
       "safePowered": {
-        "title": "Con Safe",
-        "description": "Construido sobre Gnosis Safe, la billetera de contrato inteligente más confiable en Web3."
+        "title": "Aprobaciones compartidas",
+        "description": "Los propietarios de la cuenta revisan y firman los pagos en Disburse. Define cuántas firmas requiere tu cuenta."
       },
       "sanctionsScreening": {
-        "title": "Verificación de Sanciones",
-        "description": "La verificación OFAC/SDN protege contra entidades sancionadas. Los niveles de aplicación configurables garantizan el cumplimiento mientras mantienen la flexibilidad del flujo de trabajo."
+        "title": "Revisión de beneficiarios",
+        "description": "Revisa posibles coincidencias con listas de sanciones antes de aprobar. Elige si deben generar una advertencia o bloquear pagos; esta revisión no sustituye tu proceso de cumplimiento."
       },
       "auditTrail": {
-        "title": "Registro de Auditoría",
-        "description": "Historial completo de transacciones con registros inmutables en la cadena para cumplimiento."
+        "title": "Historial de pagos",
+        "description": "Sigue la preparación, las aprobaciones y la liquidación verificada, con registros que tu equipo puede exportar."
       },
       "scheduledPayments": {
-        "title": "Pagos Programados",
-        "description": "Programa, reprograma y cancela desembolsos con anticipación con aprobaciones claras y visibilidad."
+        "title": "Paga cuando lo necesites",
+        "description": "Define una fecha de pago y reúne las aprobaciones con anticipación. Las instrucciones recurrentes preparan un nuevo borrador en cada ciclo."
       },
       "gaslessTransactions": {
-        "title": "Transacciones Sin Gas",
-        "description": "Paga las tarifas de red con stablecoins para que los operadores no necesiten tokens nativos."
+        "title": "Comisiones en el mismo proceso",
+        "description": "Revisa por separado la comisión de pago en stablecoins antes de firmar. La ejecución gestionada está disponible en las redes compatibles."
       },
       "batchTransactions": {
-        "title": "Transacciones por Lotes",
-        "description": "Envía pagos a múltiples destinatarios en una sola transacción. Reduce los costos de gas y agiliza los desembolsos estilo nómina."
+        "title": "Una persona o todo un equipo",
+        "description": "Selecciona tus beneficiarios guardados una sola vez. Los pagos compatibles se agrupan; las distintas monedas y redes se mantienen en lotes separados."
       },
       "bulkImport": {
-        "title": "Importación Masiva",
-        "description": "Carga beneficiarios por CSV con validación, campos requeridos y verificación de duplicados."
+        "title": "Trae tu lista de beneficiarios",
+        "description": "Importa un CSV o una hoja de cálculo exportada, asigna sus columnas y revisa los duplicados y los datos de pago que falten antes de guardar."
       },
       "beneficiaryTags": {
-        "title": "Etiquetas de Beneficiarios",
-        "description": "Crea cohortes etiquetadas y lanza desembolsos repetidos en segundos."
+        "title": "Grupos de beneficiarios reutilizables",
+        "description": "Agrupa empleados, contratistas y proveedores para que el próximo pago comience con las personas correctas."
       },
       "reporting": {
-        "title": "Informes y Exportaciones",
-        "description": "Genera informes listos para finanzas y exporta registros para conciliación."
+        "title": "Concilia y exporta",
+        "description": "Revisa los fondos recibidos, los pagos y las comisiones por moneda. Exporta importes exactos y referencias de transacciones."
       },
       "stablecoinNative": {
-        "title": "Nativo de Stablecoins",
-        "description": "Soporte de primera clase para USDC y USDT con más tokens próximamente."
+        "title": "Instrucciones de pago guardadas",
+        "description": "Conserva la moneda, la red y la dirección solicitadas por cada beneficiario en su registro. Sin copiar y pegar en cada pago."
       },
       "roleBasedAccess": {
-        "title": "Acceso Basado en Roles",
-        "description": "Permisos granulares para tu equipo. Administradores, aprobadores, iniciadores y más."
+        "title": "Roles y límites de gasto",
+        "description": "Separa la preparación de la aprobación. Asigna a los miembros elegibles un límite en la cuenta para realizar pagos delegados."
       },
       "simpleBilling": {
         "title": "Facturación Simple",
         "description": "Paga la plataforma con stablecoins. No se necesitan tarjetas de crédito ni cuentas bancarias."
       },
       "section1": {
-        "badge": "Seguridad y Cumplimiento",
-        "title": "Seguridad de nivel empresarial,",
-        "titleHighlight": "integrada"
+        "badge": "Controles del equipo",
+        "title": "Responsabilidades claras.",
+        "titleHighlight": "Control compartido."
       },
       "section2": {
-        "title": "Operaciones poderosas,",
-        "titleHighlight": "simplificadas",
-        "description": "Automatiza pagos, reduce el costo de gas y ejecuta desembolsos de alto volumen con confianza."
+        "title": "Un proceso de pago",
+        "titleHighlight": "que tu equipo puede seguir",
+        "description": "Prepara pagos a contratistas y proveedores, revisa sus datos y sigue cada pago hasta su liquidación."
       },
       "section3": {
-        "title": "Todo lo que necesitas",
-        "description": "Construido para equipos de finanzas que exigen claridad y control"
+        "title": "Menos preparación. Registros más claros.",
+        "description": "Reúne las instrucciones de los beneficiarios, el historial de pagos y las exportaciones."
       },
       "badges": {
-        "compliance": "Cumplimiento",
-        "efficient": "Eficiente",
+        "compliance": "Revisión",
+        "efficient": "Eficiencia",
         "automation": "Automatización",
-        "gasless": "Sin gas"
+        "gasless": "Comisiones en stablecoins"
       }
     },
     "howItWorks": {
@@ -203,12 +203,44 @@
       "subtitle": "Guías de configuración, conexiones de billetera y flujos de pagos.",
       "sections": {
         "gettingStarted": {
-          "title": "Primeros pasos",
-          "body": "Conecta tu Safe, agrega beneficiarios y ejecuta un desembolso de prueba en minutos."
+          "title": "Conecta tu cuenta",
+          "body": "Inicia sesión con una cartera de tu organización. La cartera te pide firmar un mensaje de acceso; iniciar sesión no envía ningún pago. En Configuración, vincula tu cuenta Safe existente. Los propietarios y el umbral de firmas controlan los pagos. Nunca compartas una frase de recuperación ni una clave privada con tu equipo o con soporte."
+        },
+        "recipients": {
+          "title": "Importa destinatarios e instrucciones de pago",
+          "body": "Abre Destinatarios y selecciona Importar. Pega o sube un archivo CSV y asigna las columnas de nombre, correo, dirección, moneda y red. Revisa los duplicados y los datos incompletos antes de guardar. Puedes importar registros sin dirección, pero cada destinatario necesita instrucciones completas para preparar un pago. Normalmente hay que añadir estos datos por separado a las exportaciones de nómina."
         },
         "workflows": {
-          "title": "Pagos e informes",
-          "body": "Programa, agrupa y aprueba desembolsos con exportaciones listas para finanzas."
+          "title": "Prepara un pago o un lote",
+          "body": "Selecciona Nuevo pago y elige destinatarios guardados. Introduce el importe exacto que debe recibir cada persona. Sus instrucciones guardadas determinan la moneda, la red y la dirección. Las monedas o redes diferentes generan lotes separados, cada uno con su propia aprobación y liquidación. Guardar un borrador no mueve fondos."
+        },
+        "bills": {
+          "title": "Paga una factura de proveedor",
+          "body": "Registra el proveedor, el número de factura, el importe y el vencimiento en Facturas por pagar. Prepara el pago desde la factura para mantener los registros vinculados. La factura se marca como pagada solo cuando se verifica la liquidación del pago asociado."
+        },
+        "approvals": {
+          "title": "Revisa y aprueba",
+          "body": "Abre el pago para revisar los destinatarios, los importes, la cuenta de origen y la comisión por separado. Los propietarios firman con sus carteras. Disburse muestra las aprobaciones necesarias y las verifica antes del envío. Un miembro autorizado puede usar un límite de gasto concedido; un lote delegado solicita una firma por destinatario y otra para la comisión, si corresponde."
+        },
+        "schedules": {
+          "title": "Programa y repite pagos",
+          "body": "Elige una fecha futura y completa las aprobaciones antes de esa fecha. Si el servicio de pagos está configurado, envía los pagos programados aptos cuando vencen. Las instrucciones recurrentes generan un borrador nuevo en cada ciclo; cada borrador requiere revisión y autorización nuevas. Revisa las instrucciones pausadas cuando cambien los datos o permisos. Cancelar una instrucción no invalida una propuesta ya firmada en Safe."
+        },
+        "fees": {
+          "title": "Comprende los importes y las comisiones",
+          "body": "Los destinatarios reciben los importes introducidos. La comisión revisada se añade por separado al débito de la cuenta y cuenta para los límites de gasto. Si la comisión usa otra moneda, hace falta saldo y, para pagos delegados, un límite en esa moneda. En los flujos compatibles con comisiones gestionadas, el miembro no necesita enviar una transacción pagando gas nativo. El cliente cubre sus propias comisiones."
+        },
+        "recovery": {
+          "title": "Resuelve un pago que necesita atención",
+          "body": "En Pagos, abre Necesita atención. Comprobar liquidación verifica el envío original sin repetirlo. Reanuda solo cuando la aplicación confirme que puede volver a intentar la autorización original. No prepares un reemplazo mientras el resultado sea incierto. Vincular un comprobante permite conciliar un pago delegado existente aunque no se puedan preparar pagos nuevos."
+        },
+        "billing": {
+          "title": "Prueba, renovación y acceso",
+          "body": "La prueba ofrece 30 días de Pro. Al finalizar, se aplican las funciones del plan gratuito: puedes seguir gestionando tus fondos y enviando pagos, y pagas tus propias comisiones. Las suscripciones de pago cubren 30 días y no se renuevan automáticamente. Renueva en Configuración, en Plan y facturación. Si el pago de la suscripción se interrumpió, verifica el comprobante guardado antes de pagar de nuevo. Los fondos permanecen en tu Safe."
+        },
+        "reports": {
+          "title": "Concilia tus registros",
+          "body": "Informes muestra entradas, pagos salientes, comisiones y cambio neto por separado para cada moneda. Aplica los filtros antes de exportar y revisa el alcance indicado. Las exportaciones de pagos incluyen los totales por destinatario y las comisiones; las referencias de las transacciones permiten cotejar los registros con su liquidación."
         }
       }
     },
@@ -289,6 +321,7 @@
       "subtitle": "Conecta tu billetera para comenzar",
       "connectWallet": "Conectar billetera",
       "wrongNetwork": "Red incorrecta",
+      "signInCancelled": "Inicio de sesión cancelado. Selecciona Intentar de nuevo cuando quieras continuar.",
       "signingIn": "Iniciando sesión...",
       "terms": "Al conectar, aceptas nuestros",
       "termsOfService": "Términos de Servicio",
@@ -464,7 +497,9 @@
         "importError": "Error al importar beneficiarios. Por favor intenta de nuevo."
       },
       "success": "{{count}} {{count, plural, one {beneficiario} other {beneficiarios}}} agregados exitosamente"
-    }
+    },
+    "preferredChain": "Red de pago preferida",
+    "preferredToken": "Moneda solicitada"
   },
   "disbursements": {
     "title": "Desembolsos",
@@ -663,7 +698,12 @@
       "safeAddressDescription": "Ingresa la dirección de tu Gnosis Safe existente en la red de prueba Sepolia",
       "linkSafe": "Vincular Safe",
       "validating": "Validando...",
-      "network": "Sepolia"
+      "network": "Sepolia",
+      "depositAddress": "Dirección para recibir fondos",
+      "addChain": "Añadir red",
+      "linkAnotherChain": "Vincular otra red",
+      "chain": "Red",
+      "linkedChains": "Redes vinculadas"
     },
     "relay": {
       "title": "Ejecución sin gas",
@@ -737,7 +777,7 @@
       "unlimited": "Ilimitado",
       "trialDaysLeft": "{{days}} días restantes de prueba",
       "activeDaysRemaining": "Activo - {{days}} días restantes",
-      "expired": "Expirado - Por favor renueva",
+      "expired": "El acceso de pago terminó · El acceso Free continúa",
       "popular": "Popular",
       "current": "Actual",
       "subscribe": "Suscribirse",
@@ -776,9 +816,9 @@
         "alreadyPaid": "Ya Pagué (Ingresar Hash de TX)",
         "confirming": "Confirma la transacción en tu billetera...",
         "waiting": "Esperando confirmación...",
-        "dontClose": "Por favor no cierres esta ventana",
+        "dontClose": "Puedes volver a este pago para consultar su estado original.",
         "pending": "Transacción pendiente",
-        "retry": "Reintentar Pago",
+        "retry": "Revisar el pago original",
         "enterHash": "Ingresa el hash de transacción de tu pago para verificar.",
         "txHash": "Hash de Transacción",
         "txHashPlaceholder": "0x...",
@@ -788,7 +828,7 @@
         "viewTransaction": "Ver Transacción",
         "done": "Hecho"
       },
-      "info": "Paga con stablecoins (USDC, USDT) en Ethereum Sepolia. Todos los planes incluyen una garantía de devolución de dinero de 30 días.",
+      "info": "La suscripción te da una licencia de uso de Disburse. Pagas las comisiones de red y de proveedores por separado al revisar el pago.",
       "usageTitle": "Uso del espacio de trabajo",
       "memberSeats": "Plazas del equipo",
       "savedRecipients": "Destinatarios guardados",
@@ -799,7 +839,7 @@
       "archivedCount": "Incluye {{count}} registros archivados",
       "accountsIncluded": "Incluye cuentas comerciales y de prueba",
       "usageUnavailable": "No se pudo calcular el uso. Actualiza para volver a intentarlo; el plan y la renovación siguen disponibles.",
-      "trialEnd": "La prueba termina el {{date}}. Elige un plan para seguir enviando pagos.",
+      "trialEnd": "La prueba termina el {{date}}. La gestión básica de fondos y los pagos continúan en Free.",
       "paidEnd": "El acceso pagado termina el {{date}}. Esta fecha incluye el tiempo pagado no utilizado.",
       "expiryPolicy": "La gestión de fondos y los pagos siguen disponibles al finalizar la prueba o el período pagado. Los límites del plan se aplican a miembros y destinatarios guardados. Tus cuentas y fondos permanecen bajo tu control.",
       "included": "Todos los planes incluyen pagos individuales y por lotes, programación, aprobaciones y exportaciones contables. Tú pagas las comisiones de red y de los proveedores, que se muestran por separado antes de aprobar.",
@@ -909,5 +949,12 @@
     "rerun": "Reejecutar verificación",
     "rerunning": "Reejecutando...",
     "runScreening": "Ejecutar verificación para este beneficiario"
+  },
+  "chains": {
+    "ethereum": "Ethereum",
+    "polygon": "Polygon",
+    "base": "Base",
+    "arbitrum": "Arbitrum",
+    "sepolia": "Sepolia"
   }
 }

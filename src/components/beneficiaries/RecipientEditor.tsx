@@ -1,3 +1,4 @@
+import { userErrorMessage } from '@/lib/userErrors';
 import { useState, type FormEvent } from "react";
 import { useMutation } from "convex/react";
 import { api } from "../../../convex/_generated/api";
@@ -92,7 +93,7 @@ export function RecipientEditor({
         });
       onClose();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Could not save recipient");
+      setError(userErrorMessage(e, "Could not save recipient"));
     } finally {
       setBusy(false);
     }

@@ -1,3 +1,4 @@
+import { ORG_READER_ROLES, SCREENING_REVIEWER_ROLES } from '../shared/roles';
 import { v } from "convex/values";
 import { internalQuery, query } from "./_generated/server";
 import { Id } from "./_generated/dataModel";
@@ -8,7 +9,7 @@ import {
   screeningIssue,
 } from "../shared/screeningEvidence";
 import { checkRecipientScreening } from "./lib/screeningPolicy";
-const readers = ["admin", "approver", "initiator", "clerk", "viewer"] as const;
+
 export const verifyBeneficiaryAccess = internalQuery({
   args: {
     beneficiaryId: v.id("beneficiaries"),
@@ -44,7 +45,7 @@ export const getScreeningResult = query({
       ctx,
       recipient.orgId,
       args.sessionToken,
-      [...readers],
+      [...ORG_READER_ROLES],
     );
     const result = await ctx.db
       .query("screeningResults")
@@ -103,7 +104,7 @@ export const getScreeningResult = query({
       input: run?.input,
       dataset,
       canReview:
-        ["admin", "approver"].includes(membership.role) &&
+        SCREENING_REVIEWER_ROLES.includes(membership.role) &&
         !screeningIssue(
           recipient,
           { ...result, status: "clear" },
@@ -130,7 +131,7 @@ export const listScreeningResults = query({
     statusFilter: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    await requireOrgAccess(ctx, args.orgId, args.sessionToken, [...readers]);
+    await requireOrgAccess(ctx, args.orgId, args.sessionToken, [...ORG_READER_ROLES]);
     const results = await ctx.db
       .query("screeningResults")
       .withIndex("by_org", (q) => q.eq("orgId", args.orgId))
@@ -147,7 +148,7 @@ export const listScreeningResults = query({
 export const getScreeningEnforcement = query({
   args: { orgId: v.id("orgs"), sessionToken: v.string() },
   handler: async (ctx, args) => {
-    await requireOrgAccess(ctx, args.orgId, args.sessionToken, [...readers]);
+    await requireOrgAccess(ctx, args.orgId, args.sessionToken, [...ORG_READER_ROLES]);
     return (await ctx.db.get(args.orgId))?.screeningEnforcement ?? "off";
   },
 });
@@ -158,7 +159,7 @@ export const checkBeneficiaries = query({
     beneficiaryIds: v.array(v.id("beneficiaries")),
   },
   handler: async (ctx, args) => {
-    await requireOrgAccess(ctx, args.orgId, args.sessionToken, [...readers]);
+    await requireOrgAccess(ctx, args.orgId, args.sessionToken, [...ORG_READER_ROLES]);
     return checkRecipientScreening(ctx, args.orgId, args.beneficiaryIds);
   },
 });
@@ -167,7 +168,7 @@ export const checkDisbursementRecipients = query({
   handler: async (ctx, args) => {
     const payment = await ctx.db.get(args.disbursementId);
     if (!payment) throw new Error("Payment not found.");
-    await requireOrgAccess(ctx, payment.orgId, args.sessionToken, [...readers]);
+    await requireOrgAccess(ctx, payment.orgId, args.sessionToken, [...ORG_READER_ROLES]);
     const recipients =
       payment.type === "batch"
         ? await ctx.db

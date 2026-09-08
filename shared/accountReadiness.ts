@@ -24,7 +24,12 @@ export type AccountReadiness = {
   approvalPaths?: string[][];
   allApprovalsAvailable?: boolean;
   native: { symbol: string; payerAddress: string; balance: string | null };
-  managed: { fee: ExecutionFee | null; error: string | null };
+  managed: {
+    fee: ExecutionFee | null;
+    error: string | null;
+    service?: "circle";
+    ready?: boolean;
+  };
 };
 
 export function assessAccount(
@@ -45,12 +50,13 @@ export function assessPayments(
   now = Date.now(),
 ) {
   const issues: string[] = [];
+  const circle = readiness.managed.service === "circle";
   const totals = new Map<string, bigint>();
   for (const payment of payments) {
     for (const debit of paymentDebits(
       payment.token,
       payment.amount,
-      managed ? (readiness.managed.fee ?? undefined) : undefined,
+      managed && !circle ? (readiness.managed.fee ?? undefined) : undefined,
     )) {
       totals.set(
         debit.token,
@@ -94,12 +100,32 @@ export function assessPayments(
         `Add ${debit.shortfall} ${debit.token} to this account before sending.`,
       );
   }
-  if (managed && !readiness.managed.fee)
+  if (circle) {
+    if (!readiness.managed.ready)
+      issues.push(
+        readiness.managed.error ??
+          "Refresh the account’s USDC fee setup before sending.",
+      );
+    const balance = readiness.assets.find((a) => a.token === "USDC")?.balance;
+    if (balance == null) {
+      if (!debits.some((d) => d.token === "USDC" && d.available === null))
+        issues.push("The USDC fee balance could not be checked.");
+    } else if (
+      (balance === "0" ? 0n : amountToBaseUnits(balance, "USDC")) <=
+      (totals.get("USDC") ?? 0n)
+    ) {
+      issues.push(
+        "Keep additional USDC in this account for execution fees. Review the exact fee limit before sending.",
+      );
+    }
+  }
+  if (!circle && managed && !readiness.managed.fee)
     issues.push(
       readiness.managed.error ??
         "Stablecoin payment fees are unavailable for this account.",
     );
   if (
+    !circle &&
     !managed &&
     (readiness.native.balance === null || readiness.native.balance === "0")
   )
@@ -108,7 +134,11 @@ export function assessPayments(
     );
   if (
     readiness.threshold &&
-    !(readiness.allApprovalsAvailable ?? readiness.owners.filter((o) => o.canApproveInApp).length >= readiness.threshold)
+    !(
+      readiness.allApprovalsAvailable ??
+      readiness.owners.filter((o) => o.canApproveInApp).length >=
+        readiness.threshold
+    )
   )
     issues.push(
       "Not enough account owners have payment access in this workspace to collect all approvals here.",

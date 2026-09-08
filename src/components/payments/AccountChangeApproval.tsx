@@ -1,14 +1,16 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useAccount, useSwitchChain } from "wagmi";
 import {
   signAccountApproval,
   sendApprovedAccountPayment,
 } from "@/lib/accountApproval";
-import { walletDeclined } from "@/lib/walletErrors";
+import { walletDeclined, walletErrorMessage } from "@/lib/walletErrors";
 import { ApprovalPathReview } from "@/features/payments/ApprovalPathReview";
 import { Button } from "@/components/ui/button";
 import type { AccountApprovalView } from "../../../shared/accountApprovalView";
+import type { CircleSource } from '../../../convex/lib/circleSource';
+import { CustomerPaidExecution } from '@/features/payments/CustomerPaidExecution';
 
 type Prepared = {
   to: string;
@@ -37,6 +39,7 @@ export function AccountChangeApproval({
   execute,
   walletResult,
   recheck,
+  feeSource,
 }: {
   subject: "policy" | "cancellation";
   chainId: number;
@@ -64,6 +67,7 @@ export function AccountChangeApproval({
     rejected?: boolean;
   }) => Promise<unknown>;
   recheck: () => Promise<unknown>;
+  feeSource?: CircleSource;
 }) {
   const { address, chainId: connectedChain } = useAccount();
   const { switchChainAsync } = useSwitchChain();
@@ -90,18 +94,25 @@ export function AccountChangeApproval({
   const [pathRequest, setPathRequest] = useState<AccountApprovalView | null>(
     null,
   );
+  const confirmingWallet = useRef(false);
   const prepareWallet = async () => {
     if (!address) throw new Error("Connect your approver wallet");
-    if (connectedChain !== chainId) await switchChainAsync({ chainId });
+    if (connectedChain !== chainId) {
+      confirmingWallet.current = true;
+      await switchChainAsync({ chainId });
+      confirmingWallet.current = false;
+    }
   };
   const sign = async (request: AccountApprovalView, path: string[]) => {
     await prepareWallet();
+    confirmingWallet.current = true;
     const signature = await signAccountApproval(
       chainId,
       address!,
       request.proposal,
       path,
     );
+    confirmingWallet.current = false;
     await approve({ safeTxHash: request.proposal.safeTxHash, path, signature });
     setPathRequest(null);
     setMessage(`Your ${subject} approval is saved.`);
@@ -145,6 +156,7 @@ export function AccountChangeApproval({
         }
         await sign(fresh, available[0].path);
       } else {
+        if (feeSource) throw new Error('Review and approve the USDC execution fee below');
         await prepareWallet();
         const prepared = await execute();
         if (!prepared.managed) {
@@ -161,9 +173,10 @@ export function AccountChangeApproval({
                 attemptId: prepared.attemptId,
                 rejected: true,
               });
-              throw new Error(
+              setMessage(
                 `Wallet approval declined. Your ${subject} and account approvals are saved. You can retry this original request.`,
               );
+              return;
             }
             throw new Error(
               `The wallet response was interrupted. Check the original ${subject} submission before trying again.`,
@@ -176,14 +189,11 @@ export function AccountChangeApproval({
         );
       }
     } catch (e) {
-      setError(
-        walletDeclined(e)
-          ? "Wallet approval declined. No approval was added."
-          : e instanceof Error
-            ? e.message
-            : `Could not update this ${subject}`,
-      );
+      const fallback = `Could not update this ${subject}. Check its status before trying again.`;
+      if (confirmingWallet.current && walletDeclined(e)) setMessage(walletErrorMessage(e, ''));
+      else setError(walletDeclined(e) ? fallback : walletErrorMessage(e, fallback));
     } finally {
+      confirmingWallet.current = false;
       setBusy(false);
     }
   };
@@ -193,7 +203,7 @@ export function AccountChangeApproval({
   return (
     <div className="space-y-3">
       {error && (
-        <p role="alert" className="text-sm text-red-400">
+        <p role="alert" className="min-w-0 break-words text-sm text-red-400">
           {error}
         </p>
       )}
@@ -253,7 +263,7 @@ export function AccountChangeApproval({
                   An earlier payment or account change must complete first.
                 </p>
               )}
-              {canApprove && !approvals.data.blockedReason && (
+              {canApprove && !approvals.data.blockedReason && (!feeSource || approvals.data.paths.some(p => !p.approved)) && (
                 <>
                   <label className="flex items-start gap-2 text-sm">
                     <input
@@ -290,7 +300,7 @@ export function AccountChangeApproval({
                               : `Approve ${subject}`}
                           </Button>
                         )}
-                      <Button
+                      {!feeSource && <Button
                         size="sm"
                         disabled={busy || !reviewed || !approvals.data.ready}
                         onClick={() => void act("apply")}
@@ -302,7 +312,7 @@ export function AccountChangeApproval({
                             : subject === "policy"
                               ? "Apply policy"
                               : "Complete cancellation"}
-                      </Button>
+                      </Button>}
                     </div>
                   )}
                 </>
@@ -310,7 +320,9 @@ export function AccountChangeApproval({
             </>
           )
         ))}
-      {(status === "processing" ||
+      {feeSource && <CustomerPaidExecution compact source={feeSource} ready={status === 'pending' && !!approvals.data?.ready}
+        blocked={busy || !canApprove || !!approvals.data?.blockedReason} memberName={name} onBusyChange={setBusy} />}
+      {!feeSource && (status === "processing" ||
         (subject === "cancellation" && status === "pending")) &&
         canCheck && (
           <Button

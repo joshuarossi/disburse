@@ -1,3 +1,4 @@
+import { ORG_READER_ROLES } from '../shared/roles';
 import { v } from 'convex/values';
 import { erc20Abi, parseUnits, type Address } from 'viem';
 import { action, internalMutation, internalQuery, query, type QueryCtx } from './_generated/server';
@@ -11,8 +12,8 @@ import { CHAIN_TOKENS, type SupportedChainId } from '../shared/chains';
 import { chainEnvironment } from '../shared/assets';
 import { appendAudit } from './audit';
 
-const readers: Array<'admin' | 'approver' | 'initiator' | 'clerk' | 'viewer'> = ['admin', 'approver', 'initiator', 'clerk', 'viewer'];
-const reviewers: typeof readers = ['admin', 'approver', 'clerk'];
+
+const reviewers: typeof ORG_READER_ROLES = ['admin', 'approver', 'clerk'];
 async function historicalRead<T>(read: () => Promise<T>, checkpoint = 'network'): Promise<T> {
   try { return await read(); }
   catch (error) {
@@ -119,6 +120,6 @@ export const check = action({ args: request, handler: async (ctx, args): Promise
     reportRevision: source.revision, historyThrough: source.historyThrough, status: difference === 0n && !unresolvedCount ? 'matched' : 'needs_review' });
 } });
 export const list = query({ args: { orgId: v.id('orgs'), sessionToken: v.string(), environment: v.union(v.literal('production'), v.literal('test')) }, handler: async (ctx, args) => {
-  await requireOrgAccess(ctx, args.orgId, args.sessionToken, readers);
+  await requireOrgAccess(ctx, args.orgId, args.sessionToken, ORG_READER_ROLES);
   return ctx.db.query('accountBalanceChecks').withIndex('by_org_environment', q => q.eq('orgId', args.orgId).eq('environment', args.environment)).order('desc').take(20);
 } });

@@ -1,4 +1,6 @@
 import solc from "solc";
+import { fileURLToPath } from "node:url";
+import { resolve } from "node:path";
 import { readFileSync, writeFileSync } from "node:fs";
 export function compile(extraSources = {}) {
   const input = {
@@ -31,7 +33,11 @@ export function compile(extraSources = {}) {
     throw new Error(errors.map((e) => e.formattedMessage).join("\n"));
   return output.contracts;
 }
-if (process.argv.includes("--write")) {
+if (
+  process.argv[1] &&
+  resolve(process.argv[1]) === fileURLToPath(import.meta.url) &&
+  process.argv.includes("--write")
+) {
   const contracts = compile()["InvoiceForwarder.sol"];
   const out = Object.fromEntries(
     Object.entries(contracts).map(([name, c]) => [

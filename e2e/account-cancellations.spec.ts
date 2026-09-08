@@ -35,11 +35,10 @@ test('a signed payment cancellation reviews its own fee without changing the ori
   const dialog = page.getByRole('dialog');
   await dialog.getByRole('button', { name: 'Cancel payment', exact: true }).click();
   const cancellation = dialog.getByRole('region', { name: 'Account cancellation' });
-  await expect(cancellation).toContainText('0.05 USDC');
-  await cancellation.getByRole('combobox', { name: 'Fee currency' }).selectOption('USDT');
-  await expect(cancellation).toContainText('0.05 USDT');
-  await cancellation.getByRole('combobox', { name: 'Cancellation fee' }).selectOption('wallet');
-  await expect(cancellation).toContainText('No payment is sent to the original recipients');
+  await expect(cancellation).toContainText('company account pays the cancellation fee in USDC');
+  await expect(cancellation).toContainText('Review the exact limit after account approval');
+  await expect(cancellation.getByRole('combobox', { name: 'Fee currency' })).toHaveCount(0);
+  await expect(cancellation.getByRole('combobox', { name: 'Cancellation fee' })).toHaveCount(0);
   await cancellation.getByRole('checkbox').check();
   await cancellation.getByRole('button', { name: 'Request cancellation approval' }).click();
   await expect(cancellation.getByRole('alert')).toContainText('read-only');

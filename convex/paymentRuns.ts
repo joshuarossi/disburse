@@ -1,4 +1,8 @@
-import { resolveFundingAccount, recurringFundingId } from "./lib/fundingAccount";
+import { PAYMENT_OPERATOR_ROLES } from "../shared/roles";
+import {
+  resolveFundingAccount,
+  recurringFundingId,
+} from "./lib/fundingAccount";
 import { configuredTokenAddress } from "../shared/assets";
 import {
   CHAIN_NAMES,
@@ -26,7 +30,10 @@ import { appendAudit } from "./audit";
 import { nextPayDate, PREPARATION_LEAD_MS } from "../shared/recurrence";
 import { assertPayoutInstructions } from "../shared/payoutInstructions";
 import { assertApprovedRecipient } from "../shared/recipientAssurance";
-import { notifyPausedSchedule, resolveScheduleReminder } from './lib/scheduleNotifications';
+import {
+  notifyPausedSchedule,
+  resolveScheduleReminder,
+} from "./lib/scheduleNotifications";
 
 const recipientValidator = v.object({
   beneficiaryId: v.id("beneficiaries"),
@@ -42,7 +49,6 @@ const cadenceValidator = v.union(
   v.literal("biweekly"),
   v.literal("monthly"),
 );
-const writers = ["admin", "approver", "initiator"] as const;
 
 type RunInput = {
   orgId: Id<"orgs">;
@@ -231,7 +237,7 @@ export const create = mutation({
       ctx,
       args.orgId,
       args.sessionToken,
-      [...writers],
+      [...PAYMENT_OPERATOR_ROLES],
     );
     return createRunWithSeries(ctx, args, user._id);
   },
@@ -261,7 +267,7 @@ export const createGrouped = mutation({
       ctx,
       args.orgId,
       args.sessionToken,
-      [...writers],
+      [...PAYMENT_OPERATOR_ROLES],
     );
     if (!args.name.trim() || args.name.trim().length > 120)
       throw new Error("Give this pay run a name of 1 to 120 characters");
@@ -274,11 +280,19 @@ export const createGrouped = mutation({
       throw new Error("Each recipient can appear only once");
     const groups = new Map<
       string,
-      { chainId: number; safeId: Id<"safes">; token: string; recipients: RunInput["recipients"] }
+      {
+        chainId: number;
+        safeId: Id<"safes">;
+        token: string;
+        recipients: RunInput["recipients"];
+      }
     >();
     for (const recipient of args.recipients) {
       const token = recipient.token.toUpperCase();
-      const safe = await resolveFundingAccount(ctx, { ...recipient, orgId: args.orgId });
+      const safe = await resolveFundingAccount(ctx, {
+        ...recipient,
+        orgId: args.orgId,
+      });
       const key = `${safe._id}:${token}`;
       const group = groups.get(key) ?? {
         chainId: recipient.chainId,
@@ -371,7 +385,9 @@ export const listRecurring = query({
             ...series,
             nextDraftAt: series.nextPayDate - PREPARATION_LEAD_MS,
             ownerName: owner?.name ?? "Schedule creator",
-            coordinatorActive: owner?.status === 'active' && writers.some(role => role === owner.role),
+            coordinatorActive:
+              owner?.status === "active" &&
+              PAYMENT_OPERATOR_ROLES.some((role) => role === owner.role),
             latestPayment:
               latest?.orgId === args.orgId
                 ? {
@@ -410,7 +426,7 @@ export const setRecurringStatus = mutation({
       ctx,
       series.orgId,
       args.sessionToken,
-      [...writers],
+      [...PAYMENT_OPERATOR_ROLES],
     );
     if (series.status === args.status) return;
     const now = Date.now();
@@ -421,7 +437,11 @@ export const setRecurringStatus = mutation({
     const version = series.version + 1;
     if (args.status === "active") {
       const safeId = await recurringFundingId(ctx, series);
-      const checked = await validateRecipients(ctx, { ...series, safeId, payDate: nextDate });
+      const checked = await validateRecipients(ctx, {
+        ...series,
+        safeId,
+        payDate: nextDate,
+      });
       await ctx.db.patch(series._id, { safeId: checked.safe._id });
       await ctx.scheduler.runAt(
         Math.max(now, nextDate - PREPARATION_LEAD_MS),
@@ -472,7 +492,7 @@ export const prepareNext = internalMutation({
     if (
       !membership ||
       membership.status !== "active" ||
-      !writers.some((role) => role === membership.role)
+      !PAYMENT_OPERATOR_ROLES.some((role) => role === membership.role)
     )
       reason =
         "The schedule owner no longer has permission to create payments.";
@@ -577,7 +597,7 @@ export const updateRecurring = mutation({
       ctx,
       series.orgId,
       args.sessionToken,
-      [...writers],
+      [...PAYMENT_OPERATOR_ROLES],
     );
     assertFutureSchedule(args.nextPayDate, Date.now());
     const fields = {
@@ -663,14 +683,16 @@ export const updateDraft = mutation({
       ctx,
       payment.orgId,
       args.sessionToken,
-      [...writers],
+      [...PAYMENT_OPERATOR_ROLES],
     );
     if (
       payment.status !== "draft" ||
+      payment.paymentScheduleId ||
       payment.safeTxHash ||
       payment.type !== "batch"
     )
       throw new Error("Only an unsigned batch draft can be edited");
+    if(payment.refundInvoiceId)throw new Error("This payment is a reserved customer refund. Cancel it and prepare a replacement from the invoice to change its details.");
     const linkedBill = await ctx.db
       .query("invoices")
       .withIndex("by_payment", (q) => q.eq("disbursementId", payment._id))
@@ -687,7 +709,9 @@ export const updateDraft = mutation({
       );
     const validated = await validateRecipients(ctx, {
       ...args,
-      safeId: args.safeId ?? (args.chainId === payment.chainId ? payment.safeId : undefined),
+      safeId:
+        args.safeId ??
+        (args.chainId === payment.chainId ? payment.safeId : undefined),
       orgId: payment.orgId,
     });
     await assertMemberPaymentPolicy(

@@ -22,7 +22,7 @@ import {
   Notice,
 } from "@/components/workspace/WorkspacePrimitives";
 import { roles, type TeamMember } from "./memberTypes";
-import { useActivityEnvironment } from '@/features/workspace/ActivityEnvironment';
+import { useActivityEnvironment } from "@/features/workspace/ActivityEnvironment";
 
 const canPay = (member: TeamMember) =>
   member.status === "active" &&
@@ -60,7 +60,9 @@ export function MemberAccess({
   const [accountId, setAccountId] = useState("");
   const activeAccounts = accounts?.filter((s) => s.isActive !== false);
   const account =
-    activeAccounts?.find((s) => s._id === accountId) ?? activeAccounts?.find(s => chainEnvironment(s.chainId) === environment) ?? activeAccounts?.[0];
+    activeAccounts?.find((s) => s._id === accountId) ??
+    activeAccounts?.find((s) => chainEnvironment(s.chainId) === environment) ??
+    activeAccounts?.[0];
   const paymentRights = member ? canPay(member) : false;
   const policy = member?.paymentPolicy;
   const limit = (value: string | undefined) =>
@@ -211,7 +213,8 @@ export function MemberAccess({
                     >
                       {activeAccounts.map((s) => (
                         <option key={s._id} value={s._id}>
-                          {accountName(s)}{s.name ? ` · ${getChainName(s.chainId)}` : ""} ·{" "}
+                          {accountName(s)}
+                          {s.name ? ` · ${getChainName(s.chainId)}` : ""} ·{" "}
                           {environmentLabel(s.chainId)}
                         </option>
                       ))}
@@ -221,6 +224,13 @@ export function MemberAccess({
                     key={`${account._id}:${member.walletAddress}`}
                     account={account}
                     member={member}
+                    assignedAccounts={
+                      accounts?.filter(
+                        (s) =>
+                          s.assignedUserId === member.userId &&
+                          s.chainId === account.chainId,
+                      ) ?? []
+                    }
                   />
                 </>
               )}
@@ -241,9 +251,11 @@ export function MemberAccess({
 function AccountAuthority({
   account,
   member,
+  assignedAccounts,
 }: {
   account: FundingAccount;
   member: TeamMember;
+  assignedAccounts: FundingAccount[];
 }) {
   const readiness = useAccountReadiness(account._id);
   const data = readiness.data;
@@ -325,6 +337,7 @@ function AccountAuthority({
                 account={account}
                 member={member}
                 module={module}
+                assignedAccounts={assignedAccounts}
               />
             ))
           )}
@@ -344,25 +357,32 @@ function MemberGrants({
   account,
   member,
   module,
+  assignedAccounts,
 }: {
   account: FundingAccount;
   member: TeamMember;
   module: AllowanceDeployment;
+  assignedAccounts: FundingAccount[];
 }) {
+  const [selectedDelegate, setDelegate] = useState("");
+  const delegate =
+    selectedDelegate ||
+    (!module.legacy && assignedAccounts[0]?.safeAddress) ||
+    member.walletAddress;
   const snapshot = useQuery({
     queryKey: [
       "member-allowances",
       account.chainId,
       account.safeAddress,
       module.address,
-      member.walletAddress,
+      delegate,
     ],
     queryFn: () =>
       readAllowanceSnapshot(
         account.chainId,
         account.safeAddress,
         module.address,
-        member.walletAddress,
+        delegate,
       ),
     staleTime: 20_000,
     refetchInterval: 30_000,
@@ -370,7 +390,7 @@ function MemberGrants({
   });
   const tokens = Object.values(getTokensForChain(account.chainId));
   const registered = snapshot.data?.delegates.some(
-    (d) => d.toLowerCase() === member.walletAddress.toLowerCase(),
+    (d) => d.toLowerCase() === delegate.toLowerCase(),
   );
   return (
     <section
@@ -394,6 +414,25 @@ function MemberGrants({
           <span>Refresh</span>
         </button>
       </div>
+      {!!assignedAccounts.length && (
+        <label className="block">
+          <span className="finance-label">Spending identity</span>
+          <select
+            className="finance-field"
+            value={delegate}
+            onChange={(e) => setDelegate(e.target.value)}
+          >
+            {assignedAccounts.map((s) => (
+              <option key={s._id} value={s.safeAddress}>
+                {accountName(s)}
+              </option>
+            ))}
+            <option value={member.walletAddress}>
+              Signing wallet · earlier grants
+            </option>
+          </select>
+        </label>
+      )}
       {snapshot.isPending ? (
         <p role="status" className="text-sm text-slate-400">
           Checking this member's spending grants…

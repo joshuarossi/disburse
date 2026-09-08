@@ -12,14 +12,19 @@ const rpc = vi.hoisted(() => ({
   getBalance: vi.fn(),
   getCode: vi.fn(),
   identity: vi.fn(),
+  customerFees: vi.fn(),
 }));
 vi.mock("../lib/safeVerification", () => ({ getChainClient: () => rpc }));
 vi.mock("../lib/safeIdentity", () => ({
   assertSafeIdentity: (...args: unknown[]) => rpc.identity(...args),
 }));
+vi.mock("../lib/customerPaidAccount", () => ({
+  assertCustomerPaidAccount: (...args: unknown[]) => rpc.customerFees(...args),
+}));
 beforeEach(() => {
   vi.clearAllMocks();
   rpc.identity.mockResolvedValue(undefined);
+  rpc.customerFees.mockResolvedValue(undefined);
   rpc.getBlockNumber.mockResolvedValue(123n);
   rpc.getCode.mockResolvedValue(undefined);
   rpc.getBalance.mockResolvedValue(1000000000000000n);
@@ -181,4 +186,58 @@ it("identifies stale checks, missing native test gas and insufficient team appro
   expect(check.issues).toContain(
     "Not enough account owners have payment access in this workspace to collect all approvals here.",
   );
+});
+
+it("uses the verified Circle setup with zero native gas and no retired-relay quote", async () => {
+  const { t, args, ids } = await setup();
+  await t.run((ctx) => ctx.db.patch(ids.safeId, { chainId: 84532 }));
+  rpc.getBalance.mockResolvedValue(0n);
+  const account = await t.action(api.accountReadiness.get, args);
+  expect(account.managed).toEqual({
+    service: "circle",
+    fee: null,
+    error: null,
+    ready: true,
+  });
+  expect(rpc.customerFees).toHaveBeenCalledWith(
+    rpc,
+    account.safeAddress,
+    84532,
+    123n,
+  );
+  for (const managed of [true, false]) {
+    const result = assessAccount(account, "USDC", "1", managed);
+    expect(result.issues.some((i) => /ETH|unavailable|fee setup/.test(i))).toBe(
+      false,
+    );
+    expect(result.debits).toEqual([
+      { token: "USDC", amount: "1", available: "100.000001", shortfall: null },
+    ]);
+  }
+});
+it("preserves unknown fee setup and requires spare USDC even when paying another currency", async () => {
+  const { t, args, ids } = await setup();
+  await t.run((ctx) => ctx.db.patch(ids.safeId, { chainId: 84532 }));
+  rpc.customerFees.mockRejectedValue(new Error("RPC timeout"));
+  const account = await t.action(api.accountReadiness.get, args);
+  expect(account.error).toBeNull();
+  expect(account.assets[0].balance).not.toBeNull();
+  expect(assessAccount(account, "USDC", "1", true).issues.join(" ")).toContain(
+    "USDC fee setup could not be verified",
+  );
+  account.managed.ready = true;
+  account.managed.error = null;
+  account.assets.push({
+    token: "USDT",
+    address: TEST_WALLETS.viewer,
+    balance: "100",
+  });
+  account.assets.find((a) => a.token === "USDC")!.balance = "0";
+  expect(
+    assessAccount(account, "USDT", "100", true).issues.join(" "),
+  ).toContain("additional USDC");
+  account.assets.find((a) => a.token === "USDC")!.balance = "100";
+  expect(
+    assessAccount(account, "USDC", "100", true).issues.join(" "),
+  ).toContain("additional USDC");
 });

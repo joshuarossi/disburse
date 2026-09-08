@@ -13,6 +13,7 @@ import { verifySafeOwnership } from "./lib/safeVerification";
 import { assertValidAddress } from "./lib/validation";
 import { requireOrgAccess } from "./lib/rbac";
 import { recurringFundingId } from "./lib/fundingAccount";
+import { assertCircleReservation } from './lib/circleSource';
 
 const linkArgs = {
   orgId: v.id("orgs"),
@@ -217,6 +218,10 @@ export const unlink = mutation({
       ["admin"],
     );
 
+    await assertCircleReservation(ctx, safe._id);
+    const feeSetup = await ctx.db.query('accountFeeSetups').withIndex('by_account_open', q =>
+      q.eq('accountKey', `${safe.chainId}:${safe.safeAddress.toLowerCase()}`).eq('open', true)).first();
+    if (feeSetup) throw new Error('Complete or reconcile this account’s fee setup before disconnecting it.');
     const payments = await ctx.db
       .query("disbursements")
       .withIndex("by_safe", (q) => q.eq("safeId", safe._id))

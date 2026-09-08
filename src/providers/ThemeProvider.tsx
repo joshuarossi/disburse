@@ -8,17 +8,17 @@ interface ThemeProviderProps {
   children: ReactNode;
 }
 
+function storeTheme(theme: Theme) {
+  try { localStorage.setItem('theme', theme); }
+  catch { /* Appearance still works in this tab when browser storage is blocked. */ }
+}
+
 export function ThemeProvider({ children }: ThemeProviderProps) {
   const [theme, setThemeState] = useState<Theme>(() => {
-    // Initialize from localStorage or system preference
-    const stored = localStorage.getItem('theme') as Theme | null;
-    if (stored === 'dark' || stored === 'light') {
-      return stored;
-    }
-    // Check system preference
-    if (window.matchMedia('(prefers-color-scheme: light)').matches) {
-      return 'light';
-    }
+    try {
+      const stored = localStorage.getItem('theme');
+      if (stored === 'dark' || stored === 'light') return stored;
+    } catch { /* Keep the page usable without persistent preferences. */ }
     return 'light'; // Finance workspace defaults to a light reading surface
   });
 
@@ -34,7 +34,7 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
   useEffect(() => {
     if (session?.preferredTheme) {
       setThemeState(session.preferredTheme);
-      localStorage.setItem('theme', session.preferredTheme);
+      storeTheme(session.preferredTheme);
     }
   }, [session?.preferredTheme]);
 
@@ -42,7 +42,7 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
   useEffect(() => {
     const root = document.documentElement;
     root.setAttribute('data-theme', theme);
-    localStorage.setItem('theme', theme);
+    storeTheme(theme);
   }, [theme]);
 
   const setTheme = async (newTheme: Theme) => {
