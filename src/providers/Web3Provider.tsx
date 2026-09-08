@@ -40,13 +40,13 @@ function RainbowKitThemeProvider({ children }: { children: ReactNode }) {
     <RainbowKitProvider
       theme={theme === 'dark' 
         ? darkTheme({
-            accentColor: '#14b8a6',
-            accentColorForeground: '#0a0f1a',
+            accentColor: '#8dafff',
+            accentColorForeground: '#191f2a',
             borderRadius: 'medium',
             fontStack: 'system',
           })
         : lightTheme({
-            accentColor: '#14b8a6',
+            accentColor: '#3567dc',
             accentColorForeground: '#ffffff',
             borderRadius: 'medium',
             fontStack: 'system',

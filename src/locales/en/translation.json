@@ -318,8 +318,8 @@
   "auth": {
     "login": {
       "title": "Welcome to Disburse",
-      "subtitle": "Connect your wallet to get started",
-      "connectWallet": "Connect Wallet",
+      "subtitle": "Sign in to your finance workspace with your wallet. The signature proves it is you. It does not move funds or cost a network fee.",
+      "connectWallet": "Sign in with a wallet",
       "wrongNetwork": "Wrong network",
       "signInCancelled": "Sign-in cancelled. Select Try again when you are ready.",
       "signingIn": "Signing you in...",
@@ -327,7 +327,7 @@
       "termsOfService": "Terms of Service",
       "and": "and",
       "privacyPolicy": "Privacy Policy",
-      "newToWeb3": "New to Web3?",
+      "newToWeb3": "Setting up access for your team?",
       "learnWallet": "Learn how to set up a wallet",
       "backToHome": "Back to home"
     },

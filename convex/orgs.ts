@@ -60,6 +60,7 @@ export const create = mutation({
     const orgId = await ctx.db.insert('orgs', {
       name: args.name,
       createdBy: user._id,
+      screeningEnforcement: "warn",
       relayFeeTokenSymbol: DEFAULT_RELAY_FEE_TOKEN_SYMBOL,
       relayFeeMode: DEFAULT_RELAY_FEE_MODE,
       createdAt: now,

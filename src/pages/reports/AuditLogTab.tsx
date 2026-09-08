@@ -149,8 +149,8 @@ export function AuditLogTab({ orgId, address }: AuditLogTabProps) {
           className={cn(
             "flex items-center gap-2 rounded-lg border px-4 py-2 text-sm font-medium transition-colors",
             activeFilterCount > 0
-              ? "border-accent-500/50 bg-accent-500/10 text-accent-400"
-              : "border-white/10 text-slate-400 hover:bg-navy-800 hover:text-white",
+              ? "border-[var(--ws-accent)]/50 bg-[var(--ws-accent-soft)] text-[var(--ws-accent)]"
+              : "border-[var(--ws-border)] text-[var(--ws-muted)] hover:bg-[var(--ws-subtle)] hover:text-[var(--ws-text)]",
           )}
         >
           <Filter className="h-4 w-4" />
@@ -165,7 +165,7 @@ export function AuditLogTab({ orgId, address }: AuditLogTabProps) {
         {activeFilterCount > 0 && (
           <button
             onClick={clearFilters}
-            className="flex items-center gap-1 text-sm text-slate-400 hover:text-white"
+            className="flex items-center gap-1 text-sm text-[var(--ws-muted)] hover:text-[var(--ws-text)]"
           >
             <X className="h-4 w-4" />
             {t("common.clearAll")}
@@ -187,11 +187,11 @@ export function AuditLogTab({ orgId, address }: AuditLogTabProps) {
 
       {/* Filter Panel */}
       {showFilters && (
-        <div className="rounded-xl border border-white/10 bg-navy-900/50 p-4">
+        <div className="rounded-xl border border-[var(--ws-border)] bg-[var(--ws-surface)] p-4">
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {/* Date Range */}
             <div className="space-y-2">
-              <label className="text-sm font-medium text-slate-300">
+              <label className="text-sm font-medium text-[var(--ws-text)]">
                 {t("reports.filters.dateRange")}
               </label>
               <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
@@ -200,9 +200,9 @@ export function AuditLogTab({ orgId, address }: AuditLogTabProps) {
                   aria-label="Start date"
                   value={dateFrom}
                   onChange={(e) => setDateFrom(e.target.value)}
-                  className="flex-1 rounded-lg border border-white/10 bg-navy-800 px-3 py-2 text-sm text-white"
+                  className="flex-1 rounded-lg border border-[var(--ws-border)] bg-[var(--ws-subtle)] px-3 py-2 text-sm text-[var(--ws-text)]"
                 />
-                <span className="text-slate-500">
+                <span className="text-[var(--ws-muted)]">
                   {t("disbursements.filters.to")}
                 </span>
                 <input
@@ -210,21 +210,21 @@ export function AuditLogTab({ orgId, address }: AuditLogTabProps) {
                   aria-label="End date"
                   value={dateTo}
                   onChange={(e) => setDateTo(e.target.value)}
-                  className="flex-1 rounded-lg border border-white/10 bg-navy-800 px-3 py-2 text-sm text-white"
+                  className="flex-1 rounded-lg border border-[var(--ws-border)] bg-[var(--ws-subtle)] px-3 py-2 text-sm text-[var(--ws-text)]"
                 />
               </div>
             </div>
 
             {/* User */}
             <div className="space-y-2">
-              <label className="text-sm font-medium text-slate-300">
+              <label className="text-sm font-medium text-[var(--ws-text)]">
                 {t("reports.filters.user")}
               </label>
               <select
                 aria-label={t("reports.filters.user")}
                 value={userFilter}
                 onChange={(e) => setUserFilter(e.target.value)}
-                className="w-full rounded-lg border border-white/10 bg-navy-800 px-3 py-2 text-sm text-white"
+                className="w-full rounded-lg border border-[var(--ws-border)] bg-[var(--ws-subtle)] px-3 py-2 text-sm text-[var(--ws-text)]"
               >
                 <option value="">{t("reports.filters.allUsers")}</option>
                 {members?.map((m) => {
@@ -240,13 +240,13 @@ export function AuditLogTab({ orgId, address }: AuditLogTabProps) {
 
             {/* Action Type */}
             <div className="space-y-2 sm:col-span-2 lg:col-span-1">
-              <label className="text-sm font-medium text-slate-300">
+              <label className="text-sm font-medium text-[var(--ws-text)]">
                 {t("reports.filters.actionType")}
               </label>
               <div className="space-y-2">
                 {ACTION_CATEGORIES.map((cat) => (
                   <div key={cat.category}>
-                    <p className="text-xs text-slate-500 mb-1">
+                    <p className="text-xs text-[var(--ws-muted)] mb-1">
                       {cat.category}
                     </p>
                     <div className="flex flex-wrap gap-1">
@@ -257,8 +257,8 @@ export function AuditLogTab({ orgId, address }: AuditLogTabProps) {
                           className={cn(
                             "rounded-full px-2 py-0.5 text-xs font-medium transition-colors",
                             actionFilter.includes(action)
-                              ? "bg-accent-500/20 text-accent-400"
-                              : "bg-navy-800 text-slate-400 hover:text-white",
+                              ? "bg-accent-500/20 text-[var(--ws-accent)]"
+                              : "bg-[var(--ws-subtle)] text-[var(--ws-muted)] hover:text-[var(--ws-text)]",
                           )}
                         >
                           {action.split(".")[1]}
@@ -279,55 +279,55 @@ export function AuditLogTab({ orgId, address }: AuditLogTabProps) {
           <Loader2 className="h-8 w-8 animate-spin text-accent-500" />
         </div>
       ) : !reportData?.length ? (
-        <div className="rounded-xl border border-dashed border-white/20 bg-navy-900/30 p-12 text-center">
-          <ClipboardList className="mx-auto h-12 w-12 text-slate-600" />
-          <h3 className="mt-4 text-lg font-medium text-white">
+        <div className="rounded-xl border border-dashed border-[var(--ws-border)] bg-[var(--ws-surface)]/30 p-12 text-center">
+          <ClipboardList className="mx-auto h-12 w-12 text-[var(--ws-muted)]" />
+          <h3 className="mt-4 text-lg font-medium text-[var(--ws-text)]">
             {t("reports.empty.audit.title")}
           </h3>
-          <p className="mt-2 text-slate-400">
+          <p className="mt-2 text-[var(--ws-muted)]">
             {t("reports.empty.audit.description")}
           </p>
         </div>
       ) : (
         <>
           {/* Desktop Table */}
-          <div className="hidden lg:block overflow-hidden rounded-xl border border-white/10">
-            <table className="w-full">
-              <thead className="bg-navy-900/50">
+          <div className="hidden lg:block overflow-hidden rounded-xl border border-[var(--ws-border)] bg-[var(--ws-surface)]">
+            <table className="finance-table">
+              <thead className="bg-[var(--ws-surface)]">
                 <tr>
-                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-400">
+                  <th className="px-4 py-3 text-left text-xs font-medium text-[var(--ws-muted)]">
                     {t("reports.table.timestamp")}
                   </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-400">
+                  <th className="px-4 py-3 text-left text-xs font-medium text-[var(--ws-muted)]">
                     {t("reports.table.user")}
                   </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-400">
+                  <th className="px-4 py-3 text-left text-xs font-medium text-[var(--ws-muted)]">
                     {t("reports.table.action")}
                   </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-400">
+                  <th className="px-4 py-3 text-left text-xs font-medium text-[var(--ws-muted)]">
                     {t("reports.table.details")}
                   </th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-white/5">
+              <tbody className="divide-y divide-[var(--ws-border)]">
                 {reportData.map((item) => (
-                  <tr key={item._id} className="hover:bg-navy-800/50">
-                    <td className="whitespace-nowrap px-4 py-3 text-sm text-white">
+                  <tr key={item._id} className="hover:bg-[var(--ws-subtle)]">
+                    <td className="whitespace-nowrap px-4 py-3 text-sm text-[var(--ws-text)]">
                       {new Date(item.timestamp).toLocaleString()}
                     </td>
                     <td className="px-4 py-3 text-sm">
-                      <p className="font-mono text-xs text-slate-300">
+                      <p className="font-mono text-xs text-[var(--ws-text)]">
                         {item.actor?.walletAddress
                           ? `${item.actor.walletAddress.slice(0, 6)}...${item.actor.walletAddress.slice(-4)}`
                           : "System"}
                       </p>
                     </td>
                     <td className="whitespace-nowrap px-4 py-3">
-                      <span className="inline-flex items-center rounded-full bg-navy-800 px-2.5 py-0.5 text-xs font-medium text-slate-300">
+                      <span className="inline-flex items-center rounded-full bg-[var(--ws-subtle)] px-2.5 py-0.5 text-xs font-medium text-[var(--ws-text)]">
                         {formatAction(item.action)}
                       </span>
                     </td>
-                    <td className="max-w-[300px] truncate px-4 py-3 text-sm text-slate-400">
+                    <td className="max-w-[300px] truncate px-4 py-3 text-sm text-[var(--ws-muted)]">
                       {formatDetails(item)}
                     </td>
                   </tr>
@@ -341,19 +341,19 @@ export function AuditLogTab({ orgId, address }: AuditLogTabProps) {
             {reportData.map((item) => (
               <div
                 key={item._id}
-                className="rounded-xl border border-white/10 bg-navy-900/50 p-4"
+                className="rounded-xl border border-[var(--ws-border)] bg-[var(--ws-surface)] p-4"
               >
                 <div className="flex items-start justify-between">
                   <div>
-                    <span className="inline-flex items-center rounded-full bg-navy-800 px-2.5 py-0.5 text-xs font-medium text-slate-300">
+                    <span className="inline-flex items-center rounded-full bg-[var(--ws-subtle)] px-2.5 py-0.5 text-xs font-medium text-[var(--ws-text)]">
                       {formatAction(item.action)}
                     </span>
-                    <p className="mt-2 text-sm text-slate-400">
+                    <p className="mt-2 text-sm text-[var(--ws-muted)]">
                       {formatDetails(item)}
                     </p>
                   </div>
                 </div>
-                <div className="mt-3 flex items-center justify-between text-xs text-slate-500">
+                <div className="mt-3 flex items-center justify-between text-xs text-[var(--ws-muted)]">
                   <span className="font-mono">
                     {item.actor?.walletAddress
                       ? `${item.actor.walletAddress.slice(0, 6)}...${item.actor.walletAddress.slice(-4)}`
@@ -366,8 +366,8 @@ export function AuditLogTab({ orgId, address }: AuditLogTabProps) {
           </div>
 
           {/* Summary */}
-          <div className="rounded-xl border border-white/10 bg-navy-900/50 p-4">
-            <p className="text-sm text-slate-400">
+          <div className="rounded-xl border border-[var(--ws-border)] bg-[var(--ws-surface)] p-4">
+            <p className="text-sm text-[var(--ws-muted)]">
               {t("reports.summary.events", { count: reportData.length })}
             </p>
           </div>

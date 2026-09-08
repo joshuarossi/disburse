@@ -481,6 +481,10 @@ export function readQueryFixture(reference: any, args: any) {
                 i === 0 ? { ...r, pendingPayoutChangeId: "change1" } : r,
               )
             : recipients;
+      if (scenario === "payroll-review-50") value = Array.from({ length: 50 }, (_, index) => ({
+        ...recipients[0], _id: `payroll${index}`, name: `Payroll recipient ${String(index + 1).padStart(2, "0")}`,
+        walletAddress: `0x${(index + 1).toString(16).padStart(40, "0")}`,
+      }));
       if (scenario === "draft-archived-recipient") value = recipients.slice(1);
       break;
     case "recipientReviews:get": {

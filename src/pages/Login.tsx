@@ -134,24 +134,19 @@ export default function Login() {
   }, [isConnected, address, existingToken, session, isSigningIn, handleSignIn]);
 
   return (
-    <div className="workspace workspace-entry flex min-h-screen flex-col items-center justify-center bg-navy-950 px-6 py-12">
-      {/* Background */}
-      <div className="absolute inset-0 -z-10">
-        <div className="absolute left-1/2 top-1/2 h-[500px] w-[500px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-accent-500/10 blur-[120px]" />
-      </div>
-
+    <div className="workspace workspace-entry flex min-h-screen flex-col items-center justify-center bg-[var(--ws-bg)] px-6 py-12">
       <div className="w-full max-w-sm">
         {/* Back link */}
         <Link
           to="/"
-          className="mb-8 inline-flex items-center gap-2 text-sm text-slate-400 transition-colors hover:text-white"
+          className="mb-8 inline-flex items-center gap-2 text-sm text-[var(--ws-muted)] transition-colors hover:text-[var(--ws-text)]"
         >
           <ArrowLeft className="h-4 w-4" />
           {t('auth.login.backToHome')}
         </Link>
 
         {/* Card */}
-        <div className="rounded-2xl border border-white/10 bg-navy-900/50 p-8">
+        <div className="rounded-2xl border border-[var(--ws-border)] bg-[var(--ws-surface)] p-8">
           {/* Logo */}
           <div className="mb-8 flex justify-center">
             <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-accent-500 to-accent-400">
@@ -171,10 +166,10 @@ export default function Login() {
             </div>
           </div>
 
-          <h1 className="mb-2 text-center text-2xl font-bold text-white">
+          <h1 className="mb-2 text-center text-2xl font-bold text-[var(--ws-text)]">
             {t('auth.login.title')}
           </h1>
-          <p className="mb-8 text-center text-slate-400">
+          <p className="mb-8 text-center text-[var(--ws-muted)]">
             {t('auth.login.subtitle')}
           </p>
 
@@ -237,7 +232,7 @@ export default function Login() {
                           >
                             {account.displayName}
                           </Button>
-                          <p className="text-center text-sm text-slate-400">
+                          <p className="text-center text-sm text-[var(--ws-muted)]">
                             {isSigningIn ? t('auth.login.signingIn') : null}
                           </p>
                         </div>
@@ -260,22 +255,22 @@ export default function Login() {
             </div>
           )}
 
-          <p className="mt-6 text-center text-xs text-slate-500">
+          <p className="mt-6 text-center text-xs text-[var(--ws-muted)]">
             {t('auth.login.terms')}{' '}
-            <Link to="/terms" className="text-accent-400 hover:underline">
+            <Link to="/terms" className="text-[var(--ws-accent)] underline underline-offset-2">
               {t('auth.login.termsOfService')}
             </Link>{' '}
             {t('auth.login.and')}{' '}
-            <Link to="/privacy" className="text-accent-400 hover:underline">
+            <Link to="/privacy" className="text-[var(--ws-accent)] underline underline-offset-2">
               {t('auth.login.privacyPolicy')}
             </Link>
           </p>
         </div>
 
         {/* Info */}
-        <p className="mt-8 text-center text-sm text-slate-500">
+        <p className="mt-8 text-center text-sm text-[var(--ws-muted)]">
           {t('auth.login.newToWeb3')}{' '}
-          <Link to="/docs" className="text-accent-400 hover:underline">
+          <Link to="/docs" className="text-[var(--ws-accent)] underline underline-offset-2">
             {t('auth.login.learnWallet')}
           </Link>
         </p>

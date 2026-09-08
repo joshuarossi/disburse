@@ -476,6 +476,7 @@ export function PaymentBatchForm({
               <Button
                 variant="secondary"
                 size="sm"
+                disabled={!filtered.length}
                 onClick={() =>
                   setAmounts((prev) => ({
                     ...prev,
@@ -485,7 +486,7 @@ export function PaymentBatchForm({
                   }))
                 }
               >
-                Select shown
+                Select all {filtered.length} matching recipients
               </Button>
             </div>
             <div className="max-h-64 overflow-y-auto rounded-lg border border-white/10">
@@ -828,7 +829,10 @@ export function PaymentBatchForm({
                 </p>
               </div>
             </div>
-            <div className="max-h-64 overflow-y-auto">
+            <p className="mb-3 text-sm text-[var(--ws-muted)]">
+              Review all {selected.length} recipients below, including each payout address and amount.
+            </p>
+            <div>
               <ul
                 aria-label="Recipient payout review"
                 className="divide-y divide-white/10 sm:hidden"
@@ -916,7 +920,9 @@ export function PaymentBatchForm({
             Total before fees
           </p>
           <p className="font-semibold tabular-nums">
-            {instructionErrors.length
+            {selected.length === 0
+              ? "Select recipients to see a total"
+              : instructionErrors.length
               ? "Resolve payout instructions"
               : useSavedInstructions && paymentGroups.length
                 ? paymentGroups

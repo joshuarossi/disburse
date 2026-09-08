@@ -20,6 +20,8 @@ Current checks pass 1,192 unit/backend tests across 120 files, typecheck, lint, 
 
 Live evidence and scope: [customer-paid services](CUSTOMER_PAID_SERVICES_QA_2026-09-07.md), [delegated payments](DELEGATED_PAYMENTS.md), [receivables](ACCOUNTS_RECEIVABLE.md), [account transfers](ACCOUNT_TRANSFERS.md), [lending](LENDING.md), [conversions](CONVERSIONS.md), [receiving costs](RECEIVING_COSTS.md), [operations rehearsal](OPERATIONS_REHEARSAL.md), [complete finance cycle](FINANCE_CYCLE_ACCEPTANCE.md).
 
+The [September 8 pilot review](PILOT_READINESS_REVIEW_2026-09-08.md) records the UX feedback assessment and the five-team, two-cycle acceptance plan. Its UI changes do not close the external gates below.
+
 ## Remaining implementation and acceptance
 
 The active work list is [TODOS.md](../TODOS.md). The complete two-parent-owner finance cycle now passes through exact Sepolia settlement and a balanced journal/evidence export. The first-release finance workspace is consistently English; landing, pricing and help retain translated language preferences. Eleven actual built workspace routes pass desktop/light and mobile/dark review (22 views); mobile amounts/actions, screen-reader headings, account-name loading, zero-balance summaries and duplicate/singular labels were corrected. No requirement is marked complete solely because its fixtures pass.
@@ -32,7 +34,8 @@ The active work list is [TODOS.md](../TODOS.md). The complete two-parent-owner f
 | External books | Import the generated journals into a real customer ledger, reconcile existing obligations without duplicating them and complete an accountant-led close. |
 | Operations | Review the final production target/schema, connect existing monitoring to alerts and assign incident ownership. Database restore cannot rewind a chain transaction or invalidate an authorization. |
 | Live subscription upgrade | Verify the Pro receipt and prorated remaining-term credit with sufficient test USDC. Activation, renewal, expiry and replay behavior already have coverage. |
-| Customer validation | Observe repeat use, preparation time, approval delays, reconciliation effort and support cost with actual finance teams. No demand or willingness-to-pay claim is established by tests. |
+| Business terms | Approve refund policy, invoice/tax-receipt requirements and the production billing address before public checkout. |
+| Customer validation | Complete two payment cycles with each of five teams already using stablecoins. Observe repeat use, preparation time, approval delays, reconciliation effort and support cost with actual finance teams. No demand or willingness-to-pay claim is established by tests. |
 
 ## Product and pricing judgment
 

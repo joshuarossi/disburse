@@ -36,7 +36,7 @@ export function ReportProgress({ orgId, data, page, previous, next }: {
     {data?.rangeError && <div className="workspace-notice" data-tone="error" role="alert">{data.rangeError}</div>}
     {data && (page > 1 || data.isDone === false) && <nav className="flex flex-wrap items-center gap-3" aria-label="Report pages">
       <button type="button" className="workspace-button" disabled={page === 1} onClick={previous}>Previous page</button>
-      <span className="text-sm text-slate-400">Page {page}{!data.items.length ? ' · no matches on this page' : ''}</span>
+      <span className="text-sm text-[var(--ws-muted)]">Page {page}{!data.items.length ? ' · no matches on this page' : ''}</span>
       <button type="button" className="workspace-button" disabled={data.isDone !== false || !data.continueCursor} onClick={() => next(data.continueCursor!)}>Next page</button>
     </nav>}
   </>;

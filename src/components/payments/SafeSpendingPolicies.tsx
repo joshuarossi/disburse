@@ -449,15 +449,26 @@ export function SafeSpendingPolicies({
             </p>
           </div>
         )}
-        <p className="text-xs leading-5 text-slate-500">
-          Allowances permit transfers to any address. They do not enforce
-          Disburse recipient lists, per-payment limits, or app roles. Removing a
-          team member does not revoke a grant. Owners retain full account
-          authority. Check every module version and other installed modules in
-          the account when offboarding someone. Payments with one or more
-          recipients can use an allowance inside Disburse when it covers every
-          payment and the reviewed fee.
-        </p>
+        <section className="rounded-lg border border-[var(--ws-border)] bg-[var(--ws-subtle)] p-4 text-sm" aria-label="Delegated spending limits">
+          <h3 className="font-semibold">A delegate can pay any address within their allowance</h3>
+          <p className="mt-2 text-[var(--ws-muted)]">
+            Disburse recipient lists, per-payment limits and app roles do not
+            restrict transfers made outside Disburse. Use owner approvals for
+            each payment if your team needs those checks every time.
+          </p>
+          <details className="mt-3">
+            <summary className="cursor-pointer font-medium">Revoking access and checking permissions</summary>
+            <p className="mt-2 text-[var(--ws-muted)]">
+              Removing a team member does not revoke their allowance. Revoke
+              their grants and review every installed module and version in the
+              account when offboarding them. Account owners retain full control.
+            </p>
+            <p className="mt-2 text-[var(--ws-muted)]">
+              Inside Disburse, an allowance must cover every recipient payment
+              and the reviewed fee before a batch can proceed.
+            </p>
+          </details>
+        </section>
       </div>
       {editing && safe && module && (
         <Dialog

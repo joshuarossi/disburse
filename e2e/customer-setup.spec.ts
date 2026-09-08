@@ -18,11 +18,11 @@ async function start(page: Page, scenario: string, twoOwners = false) {
     await page.getByRole('button', { name: 'Add', exact: true }).click();
     await page.getByRole('button', { name: 'Continue', exact: true }).click();
   } else await page.getByRole('button', { name: 'Skip for now', exact: true }).click();
-  await page.getByRole('button', { name: /No, create one/ }).click();
-  await page.getByLabel('Chain', { exact: true }).selectOption('8453');
+  await page.getByRole('button', { name: /Create a company account/ }).click();
+  await page.getByLabel('Payment network', { exact: true }).selectOption('8453');
   if (twoOwners) {
     await page.getByRole('checkbox', { name: /Jordan Lee/ }).check();
-    await page.getByLabel('Approval threshold', { exact: true }).selectOption('2');
+    await page.getByLabel('Approvals required', { exact: true }).selectOption('2');
   }
   await page.getByLabel('Deposit into company account (USDC)').fill('10');
   await page.getByRole('button', { name: 'Review setup', exact: true }).click();
@@ -64,7 +64,7 @@ for (const [scenario, message] of [['insufficient', 'wallet needs enough USDC'],
 test('lost wallet response survives reload without submitting another batch', async ({ page }) => {
   await start(page, 'unknown'); await confirm(page);
   await expect(page.getByRole('alert')).toContainText('original setup request is saved');
-  await page.reload(); await page.getByRole('button', { name: /No, create one/ }).click();
+  await page.reload(); await page.getByRole('button', { name: /Create a company account/ }).click();
   await expect(page.getByRole('button', { name: 'Check setup status', exact: true })).toBeEnabled();
   await expect(page.getByRole('button', { name: 'Confirm setup in MetaMask', exact: true })).toHaveCount(0);
   await page.getByRole('button', { name: 'Check setup status', exact: true }).click();
@@ -100,7 +100,7 @@ for (const scenario of ['claim-response-lost', 'decline-save-failed']) {
   test(`${scenario}: restores the original deposit after reload without another wallet request`, async ({ page }) => {
     await start(page, scenario); await confirm(page);
     await expect(page.getByRole('alert')).toBeVisible();
-    await page.reload(); await page.getByRole('button', { name: /No, create one/ }).click();
+    await page.reload(); await page.getByRole('button', { name: /Create a company account/ }).click();
     await expect(page.getByRole('button', { name: 'Restore saved setup', exact: true })).toBeEnabled();
     await page.getByRole('button', { name: 'Restore saved setup', exact: true }).click();
     await expect(page.getByRole('status')).toContainText('No new wallet request was submitted');
@@ -114,7 +114,7 @@ test('a lost completion response restores the connected account instead of offer
   await start(page, 'complete-response-lost'); await confirm(page);
   await page.getByRole('button', { name: 'Check setup status', exact: true }).click();
   await expect(page.getByRole('alert')).toBeVisible();
-  await page.reload(); await page.getByRole('button', { name: /No, create one/ }).click();
+  await page.reload(); await page.getByRole('button', { name: /Create a company account/ }).click();
   await expect(page.getByRole('button', { name: 'Open company account', exact: true })).toBeEnabled();
   await expect(page.getByRole('button', { name: 'Review setup', exact: true })).toHaveCount(0);
   await page.getByRole('button', { name: 'Open company account', exact: true }).click();
@@ -149,17 +149,17 @@ for (const scenario of ['check-outage', 'malformed-status', 'link-failed']) {
 test('reload restores the original owners, threshold and network', async ({ page }) => {
   await start(page, 'unknown', true); await confirm(page);
   await expect(page.getByRole('alert')).toContainText('original setup request is saved');
-  await page.reload(); await page.getByRole('button', { name: /No, create one/ }).click();
-  await expect(page.getByLabel('Approval threshold', { exact: true })).toHaveValue('2');
+  await page.reload(); await page.getByRole('button', { name: /Create a company account/ }).click();
+  await expect(page.getByLabel('Approvals required', { exact: true })).toHaveValue('2');
   await expect(page.getByRole('checkbox', { name: /0x777777.*7777/ })).toBeChecked();
   await expect(page.getByRole('checkbox', { name: /0x777777.*7777/ })).toBeDisabled();
-  await expect(page.getByLabel('Approval threshold', { exact: true })).toBeDisabled();
-  await expect(page.getByLabel('Chain', { exact: true })).toHaveValue('8453');
+  await expect(page.getByLabel('Approvals required', { exact: true })).toBeDisabled();
+  await expect(page.getByLabel('Payment network', { exact: true })).toHaveValue('8453');
   expect(await page.evaluate(() => sessionStorage.getItem('qa:submissions'))).toBe('1');
 });
 test('testnets never open an unsupported MetaMask fee request', async ({ page }) => {
   await start(page, 'declined'); await page.getByRole('button', { name: 'Edit setup', exact: true }).click();
-  await page.getByLabel('Chain', { exact: true }).selectOption('84532');
+  await page.getByLabel('Payment network', { exact: true }).selectOption('84532');
   await expect(page.getByRole('status')).toContainText('not available on testnets');
   await expect(page.getByRole('button', { name: 'Review setup', exact: true })).toBeDisabled(); await noSubmission(page);
 });
@@ -169,7 +169,7 @@ test('another administrator sees the original owner and cannot submit that walle
     sessionStorage.setItem('qa:walletSetup', JSON.stringify({ _id: 'wallet-setup1', orgId: 'demo', payer: '0x2222222222222222222222222222222222222222', owners: ['0x2222222222222222222222222222222222222222'], threshold: 1, chainId: 8453, deposit: '10000000', stage: 'prepared', open: true, batchId: '0x' + 'ab'.repeat(32) }));
   });
   await page.goto('/onboarding?org=demo');
-  await page.getByRole('button', { name: /No, create one/ }).click();
+  await page.getByRole('button', { name: /Create a company account/ }).click();
   await expect(page.getByText('0x222222...2222', { exact: true })).toBeVisible();
   await expect(page.getByText('(setup owner)', { exact: true })).toBeVisible();
   await expect(page.getByRole('status')).toContainText('Reconnect the wallet');

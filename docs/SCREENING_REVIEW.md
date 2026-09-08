@@ -2,6 +2,8 @@
 
 Updated September 6, 2026. The customer controls its funds and authorizes payments. Disburse supplies checks, evidence and review controls inside the finance workflow. This can be useful as an integrated service whether Disburse maintains the source data or contracts with another provider.
 
+New workspaces and workspaces without a saved screening setting default to Warn. Explicit Off or Block choices are preserved. Warn shows missing, stale or flagged evidence for review; it does not block payments.
+
 ## Implemented screening
 
 The direct OFAC adapter checks recipient names, aliases and published digital-currency identifiers against a versioned SDN snapshot. It does not establish address ownership, identify every sanctioned address, apply beneficial-ownership rules, or analyze transaction exposure. Payout verification remains a separate control. A poisoned address can have no sanctions match.

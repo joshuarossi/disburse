@@ -1,4 +1,5 @@
 import { userErrorMessage } from '@/lib/userErrors';
+import { Counterparty } from "./Counterparty";
 import { AssetDetails } from "./AssetDetails";
 import { useActivityEnvironment } from "@/features/workspace/ActivityEnvironment";
 import {
@@ -77,7 +78,7 @@ export function TransactionsTab({ orgId, address }: TransactionsTabProps) {
   }, [environment]);
 
   const STATUS_OPTIONS = [
-    { value: "executed", label: t("status.executed") },
+    { value: "executed", label: "Paid" },
     {
       value: "received",
       label: t("status.received", { defaultValue: "Received" }),
@@ -342,17 +343,17 @@ export function TransactionsTab({ orgId, address }: TransactionsTabProps) {
           </span>
         </div>
       )}
-      <p className="text-sm text-slate-400">Amounts are recorded currency units. This activity report does not apply a book valuation.</p>
-      {!!syncStates?.length && <details className="rounded-xl border border-white/10 px-4 py-3 text-sm">
+      <p className="text-sm text-[var(--ws-muted)]">Amounts are recorded currency units. This activity report does not apply a book valuation.</p>
+      {!!syncStates?.length && <details className="rounded-xl border border-[var(--ws-border)] px-4 py-3 text-sm">
         <summary className="cursor-pointer font-medium">History coverage</summary>
-        <p className="mt-3 text-slate-400">Activity includes transfers indexed for your accounts. Check coverage before matching a period to your books.</p>
+        <p className="mt-3 text-[var(--ws-muted)]">Activity includes transfers indexed for your accounts. Check coverage before matching a period to your books.</p>
         <ul className="mt-3 space-y-2">
           {syncStates.map(s => <li key={s.safeId} className="flex flex-wrap justify-between gap-x-4 gap-y-1">
             <strong>{getChainName(s.chainId)}</strong>
             <span>{s.includesOutgoing && s.completedThrough ? `Incoming and outgoing history checked through ${new Date(s.completedThrough).toISOString().replace('T', ' ').slice(0, 19)} UTC` : 'Complete account history is awaiting refresh'}</span>
           </li>)}
         </ul>
-        <p className="mt-3 text-slate-400">These are recorded movements. Opening and closing balances still need to be reconciled.</p>
+        <p className="mt-3 text-[var(--ws-muted)]">These are recorded movements. Opening and closing balances still need to be reconciled.</p>
       </details>}
       {/* Filters Bar */}
       <div className="flex flex-wrap items-center gap-3">
@@ -373,7 +374,7 @@ export function TransactionsTab({ orgId, address }: TransactionsTabProps) {
         {activeFilterCount > 0 && (
           <button
             onClick={clearFilters}
-            className="flex items-center gap-1 text-sm text-slate-400 hover:text-white"
+            className="flex items-center gap-1 text-sm text-[var(--ws-muted)] hover:text-[var(--ws-text)]"
           >
             <X className="h-4 w-4" />
             {t("common.clearAll")}
@@ -402,11 +403,11 @@ export function TransactionsTab({ orgId, address }: TransactionsTabProps) {
 
       {/* Filter Panel */}
       {showFilters && (
-        <div className="rounded-xl border border-white/10 bg-navy-900/50 p-4">
+        <div className="rounded-xl border border-[var(--ws-border)] bg-[var(--ws-surface)] p-4">
           <div className="grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-4">
             {/* Date Range - spans 2 columns on larger screens to accommodate two inputs */}
             <div className="space-y-2 md:col-span-2 lg:col-span-2">
-              <label className="text-sm font-medium text-slate-300">
+              <label className="text-sm font-medium text-[var(--ws-text)]">
                 {t("reports.filters.dateRange")}
               </label>
               <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
@@ -415,9 +416,9 @@ export function TransactionsTab({ orgId, address }: TransactionsTabProps) {
                   aria-label="Start date"
                   value={dateFrom}
                   onChange={(e) => setDateFrom(e.target.value)}
-                  className="flex-1 rounded-lg border border-white/10 bg-navy-800 px-3 py-2 text-sm text-white"
+                  className="flex-1 rounded-lg border border-[var(--ws-border)] bg-[var(--ws-subtle)] px-3 py-2 text-sm text-[var(--ws-text)]"
                 />
-                <span className="text-slate-500 whitespace-nowrap">
+                <span className="text-[var(--ws-muted)] whitespace-nowrap">
                   {t("disbursements.filters.to")}
                 </span>
                 <input
@@ -425,14 +426,14 @@ export function TransactionsTab({ orgId, address }: TransactionsTabProps) {
                   aria-label="End date"
                   value={dateTo}
                   onChange={(e) => setDateTo(e.target.value)}
-                  className="flex-1 rounded-lg border border-white/10 bg-navy-800 px-3 py-2 text-sm text-white"
+                  className="flex-1 rounded-lg border border-[var(--ws-border)] bg-[var(--ws-subtle)] px-3 py-2 text-sm text-[var(--ws-text)]"
                 />
               </div>
             </div>
 
             {/* Status */}
             <div className="space-y-2">
-              <label className="text-sm font-medium text-slate-300">
+              <label className="text-sm font-medium text-[var(--ws-text)]">
                 {t("reports.filters.status")}
               </label>
               <div className="flex flex-wrap gap-2">
@@ -451,7 +452,7 @@ export function TransactionsTab({ orgId, address }: TransactionsTabProps) {
 
             {/* Token */}
             <div className="space-y-2">
-              <label className="text-sm font-medium text-slate-300">
+              <label className="text-sm font-medium text-[var(--ws-text)]">
                 {t("reports.filters.token")}
               </label>
               <div className="flex flex-wrap gap-2">
@@ -471,7 +472,7 @@ export function TransactionsTab({ orgId, address }: TransactionsTabProps) {
             {/* Chain */}
             <div className="space-y-2">
               <label
-                className="block text-sm font-medium text-slate-300"
+                className="block text-sm font-medium text-[var(--ws-text)]"
                 htmlFor="report-other-asset"
               >
                 Other received assets
@@ -505,24 +506,24 @@ export function TransactionsTab({ orgId, address }: TransactionsTabProps) {
                   </option>
                 ))}
               </select>
-              {(reportData?.assetsTruncated || assetSearch) && <label className="block text-xs text-slate-400">Find another asset by full contract
+              {(reportData?.assetsTruncated || assetSearch) && <label className="block text-xs text-[var(--ws-muted)]">Find another asset by full contract
                 <input className="finance-field w-full mt-1" value={assetSearch} placeholder="0x…" onChange={e => setAssetSearch(e.target.value.trim())} />
                 {reportData?.assetsTruncated && <span>Showing the first 100 received assets. Search to find another contract.</span>}
               </label>}
               {otherAsset && (
-                <p className="break-all text-xs leading-5 text-slate-400">
+                <p className="break-all text-xs leading-5 text-[var(--ws-muted)]">
                   {otherAssets.find((asset) => asset.assetId === otherAsset)
                     ?.tokenAddress ?? otherAsset}
                 </p>
               )}
-              <p className="text-xs leading-5 text-slate-400">
+              <p className="text-xs leading-5 text-[var(--ws-muted)]">
                 Currency filters use supported assets. Other received assets can
                 be inspected here and are excluded from totals.
               </p>
             </div>
 
             <div className="space-y-2">
-              <label className="text-sm font-medium text-slate-300">
+              <label className="text-sm font-medium text-[var(--ws-text)]">
                 {t("reports.filters.chain")}
               </label>
               <select
@@ -533,7 +534,7 @@ export function TransactionsTab({ orgId, address }: TransactionsTabProps) {
                     e.target.value === "" ? "" : Number(e.target.value),
                   )
                 }
-                className="w-full rounded-lg border border-white/10 bg-navy-800 px-3 py-2 text-sm text-white"
+                className="w-full rounded-lg border border-[var(--ws-border)] bg-[var(--ws-subtle)] px-3 py-2 text-sm text-[var(--ws-text)]"
               >
                 <option value="">{t("common.all")}</option>
                 {CHAINS_LIST.filter(
@@ -548,14 +549,14 @@ export function TransactionsTab({ orgId, address }: TransactionsTabProps) {
 
             {/* Beneficiary */}
             <div className="space-y-2">
-              <label className="text-sm font-medium text-slate-300">
+              <label className="text-sm font-medium text-[var(--ws-text)]">
                 {t("reports.filters.beneficiary")}
               </label>
               <select
                 aria-label={t("reports.filters.beneficiary")}
                 value={beneficiaryFilter}
                 onChange={(e) => setBeneficiaryFilter(e.target.value)}
-                className="w-full rounded-lg border border-white/10 bg-navy-800 px-3 py-2 text-sm text-white"
+                className="w-full rounded-lg border border-[var(--ws-border)] bg-[var(--ws-subtle)] px-3 py-2 text-sm text-[var(--ws-text)]"
               >
                 <option value="">
                   {t("reports.filters.allBeneficiaries")}
@@ -578,79 +579,71 @@ export function TransactionsTab({ orgId, address }: TransactionsTabProps) {
           <Loader2 className="h-8 w-8 animate-spin text-accent-500" />
         </div>
       ) : !reportData?.items?.length ? (
-        <div className="rounded-xl border border-dashed border-white/20 bg-navy-900/30 p-12 text-center">
-          <FileText className="mx-auto h-12 w-12 text-slate-600" />
-          <h3 className="mt-4 text-lg font-medium text-white">
+        <div className="rounded-xl border border-dashed border-[var(--ws-border)] bg-[var(--ws-surface)]/30 p-12 text-center">
+          <FileText className="mx-auto h-12 w-12 text-[var(--ws-muted)]" />
+          <h3 className="mt-4 text-lg font-medium text-[var(--ws-text)]">
             {reportData?.isDone === false ? "No matches on this page" : t("reports.empty.transactions.title")}
           </h3>
-          <p className="mt-2 text-slate-400">
+          <p className="mt-2 text-[var(--ws-muted)]">
             {reportData?.isDone === false ? "Continue to the next page to check more history, or adjust the filters." : t("reports.empty.transactions.description")}
           </p>
         </div>
       ) : (
         <>
           {/* Desktop Table */}
-          <div className="hidden lg:block overflow-hidden rounded-xl border border-white/10">
-            <table className="w-full">
-              <thead className="bg-navy-900/50">
+          <div className="hidden lg:block overflow-x-auto rounded-xl border border-[var(--ws-border)] bg-[var(--ws-surface)]">
+            <table className="finance-table">
+              <thead className="bg-[var(--ws-surface)]">
                 <tr>
-                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-400">
+                  <th className="px-4 py-3 text-left text-xs font-medium text-[var(--ws-muted)]">
                     {t("reports.table.date")} (UTC)
                   </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-400">
+                  <th className="px-4 py-3 text-left text-xs font-medium text-[var(--ws-muted)]">
                     {t("reports.table.direction", {
                       defaultValue: "Direction",
                     })}
                   </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-400">
+                  <th className="px-4 py-3 text-left text-xs font-medium text-[var(--ws-muted)]">
                     {t("reports.table.counterparty", {
                       defaultValue: "Counterparty",
                     })}
                   </th>
-                  <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-slate-400">
+                  <th className="px-4 py-3 text-right text-xs font-medium text-[var(--ws-muted)]">
                     {t("reports.table.amount")}
                   </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-400">
+                  <th className="px-4 py-3 text-left text-xs font-medium text-[var(--ws-muted)]">
                     {t("reports.table.token")}
                   </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-400">
+                  <th className="px-4 py-3 text-left text-xs font-medium text-[var(--ws-muted)]">
                     {t("reports.table.chain")}
                   </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-400">
+                  <th className="px-4 py-3 text-left text-xs font-medium text-[var(--ws-muted)]">
                     {t("reports.table.status")}
                   </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-400">
+                  <th className="px-4 py-3 text-left text-xs font-medium text-[var(--ws-muted)]">
                     {t("reports.table.memo")}
                   </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-400">
+                  <th className="px-4 py-3 text-left text-xs font-medium text-[var(--ws-muted)]">
                     {t("reports.table.tx")}
                   </th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-white/5">
+              <tbody className="divide-y divide-[var(--ws-border)]">
                 {reportData.items.map((item) => (
-                  <tr key={item.rowId} className="hover:bg-navy-800/50">
-                    <td className="whitespace-nowrap px-4 py-3 text-sm text-white">
+                  <tr key={item.rowId} className="hover:bg-[var(--ws-subtle)]">
+                    <td className="whitespace-nowrap px-4 py-3 text-sm text-[var(--ws-text)]">
                       {new Date(item.createdAt).toLocaleDateString(undefined, { timeZone: 'UTC' })}
                     </td>
                     <td className="whitespace-nowrap px-4 py-3 text-sm">
                       <DirectionBadge direction={item.direction} />
                     </td>
-                    <td className="px-4 py-3 text-sm text-white">
-                      <div>
-                        <p className="text-white">{item.beneficiaryName}</p>
-                        {item.beneficiaryWallet && (
-                          <p className="text-xs text-slate-500 font-mono">
-                            {item.beneficiaryWallet.slice(0, 6)}...
-                            {item.beneficiaryWallet.slice(-4)}
-                          </p>
-                        )}
-                      </div>
+                    <td className="px-4 py-3 text-sm text-[var(--ws-text)]">
+                      <Counterparty name={item.beneficiaryName} address={item.beneficiaryWallet} />
                     </td>
-                    <td className="whitespace-nowrap px-4 py-3 text-right text-sm font-medium text-white">
+                    <td className="whitespace-nowrap px-4 py-3 text-right text-sm font-medium text-[var(--ws-text)]">
                       {formatAssetAmount(item.amount, item.token, false)}
                     </td>
-                    <td className="whitespace-nowrap px-4 py-3 text-sm text-slate-300">
+                    <td className="whitespace-nowrap px-4 py-3 text-sm text-[var(--ws-text)]">
                       {item.token}
                       {!item.includedInTotals && (
                         <>
@@ -664,14 +657,14 @@ export function TransactionsTab({ orgId, address }: TransactionsTabProps) {
                         </>
                       )}
                     </td>
-                    <td className="whitespace-nowrap px-4 py-3 text-sm text-slate-400">
+                    <td className="whitespace-nowrap px-4 py-3 text-sm text-[var(--ws-muted)]">
                       {item.chainId != null ? getChainName(item.chainId) : "—"}
                     </td>
                     <td className="whitespace-nowrap px-4 py-3">
                       <StatusBadge status={item.status} />
                     </td>
                     <td
-                      className="max-w-[200px] truncate px-4 py-3 text-sm text-slate-400"
+                      className="max-w-[200px] truncate px-4 py-3 text-sm text-[var(--ws-muted)]"
                       title={item.memo || ""}
                     >
                       {item.memo || "-"}
@@ -687,13 +680,13 @@ export function TransactionsTab({ orgId, address }: TransactionsTabProps) {
                           }
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="flex items-center gap-1 text-accent-400 hover:text-accent-300"
+                          className="flex items-center gap-1 text-[var(--ws-accent)] hover:text-[var(--ws-accent)]"
                         >
                           {t("reports.table.view")}
                           <ArrowUpRight className="h-3 w-3" />
                         </a>
                       ) : (
-                        <span className="text-slate-600">-</span>
+                        <span className="text-[var(--ws-muted)]">-</span>
                       )}
                     </td>
                   </tr>
@@ -707,20 +700,12 @@ export function TransactionsTab({ orgId, address }: TransactionsTabProps) {
             {reportData.items.map((item) => (
               <div
                 key={item.rowId}
-                className="rounded-xl border border-white/10 bg-navy-900/50 p-4"
+                className="rounded-xl border border-[var(--ws-border)] bg-[var(--ws-surface)] p-4"
               >
                 <div className="flex items-start justify-between">
                   <div>
-                    <p className="font-medium text-white">
-                      {item.beneficiaryName}
-                    </p>
-                    {item.beneficiaryWallet && (
-                      <p className="text-xs text-slate-500 font-mono">
-                        {item.beneficiaryWallet.slice(0, 6)}...
-                        {item.beneficiaryWallet.slice(-4)}
-                      </p>
-                    )}
-                    <p className="text-sm text-slate-400">
+                    <Counterparty name={item.beneficiaryName} address={item.beneficiaryWallet} />
+                    <p className="text-sm text-[var(--ws-muted)]">
                       {new Date(item.createdAt).toLocaleDateString(undefined, { timeZone: 'UTC' })} UTC
                     </p>
                   </div>
@@ -730,7 +715,7 @@ export function TransactionsTab({ orgId, address }: TransactionsTabProps) {
                   </div>
                 </div>
                 <div className="mt-3 flex items-center justify-between">
-                  <div className="text-lg font-bold text-white">
+                  <div className="text-lg font-bold text-[var(--ws-text)]">
                     {formatAssetAmount(item.amount, item.token, false)} {item.token}
                     {!item.includedInTotals && (
                       <>
@@ -759,7 +744,7 @@ export function TransactionsTab({ orgId, address }: TransactionsTabProps) {
                         }
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="flex items-center gap-1 text-sm text-accent-400"
+                        className="flex items-center gap-1 text-sm text-[var(--ws-accent)]"
                       >
                         {t("reports.table.view")}
                         <ArrowUpRight className="h-3 w-3" />
@@ -767,21 +752,21 @@ export function TransactionsTab({ orgId, address }: TransactionsTabProps) {
                     )}
                 </div>
                 {item.memo && (
-                  <p className="mt-2 text-sm text-slate-400">{item.memo}</p>
+                  <p className="mt-2 text-sm text-[var(--ws-muted)]">{item.memo}</p>
                 )}
               </div>
             ))}
           </div>
 
           {/* Summary */}
-          <div className="rounded-xl border border-white/10 bg-navy-900/50 p-4">
+          <div className="rounded-xl border border-[var(--ws-border)] bg-[var(--ws-surface)] p-4">
             <div className="flex flex-wrap items-center gap-4 text-sm">
-              <span className="text-slate-400">
+              <span className="text-[var(--ws-muted)]">
                 {t("reports.summary.showing", {
                   count: reportData.items.length,
                 })}
               </span>
-              <span className="text-slate-600">|</span>
+              <span className="text-[var(--ws-muted)]">|</span>
               <strong className="w-full">{reportData.indexing ? 'Totals are still being prepared' : 'Totals for all matching activity'}</strong>
               {!reportData.indexing && reportData.totals.map((total) => (
                 <div

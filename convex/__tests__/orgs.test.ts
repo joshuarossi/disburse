@@ -31,6 +31,7 @@ describe("Orgs", () => {
         const org = await ctx.db.get(result.orgId as any) as Doc<"orgs"> | null;
         expect(org).not.toBeNull();
         expect(org?.name).toBe("Test Organization");
+        expect(org?.screeningEnforcement).toBe("warn");
 
         // Check membership
         const memberships = await ctx.db

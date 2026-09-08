@@ -1,3 +1,4 @@
+import { Counterparty } from "./Counterparty";
 import { userErrorMessage } from '@/lib/userErrors';
 import { useActivityEnvironment } from "@/features/workspace/ActivityEnvironment";
 import { chainEnvironment } from "../../../shared/assets";
@@ -197,7 +198,7 @@ export function SpendingTab({ orgId, address }: SpendingTabProps) {
       <ReportProgress orgId={orgId} data={reportData} page={pages.page} previous={pages.previous} next={pages.next} />
       {exportError && <div className="workspace-notice" role="alert" data-tone="error">{exportError}</div>}
       {exportCount !== null && <div className="workspace-notice" role="status"><span>Preparing export · {exportCount} recipients and currencies</span><button className="workspace-button" onClick={() => exportController.current?.abort()}>Cancel export</button></div>}
-      <p className="text-sm text-slate-400">Each recipient’s total covers the selected dates. Sorting applies to this page.</p>
+      <p className="text-sm text-[var(--ws-muted)]">Each recipient’s total covers the selected dates. Sorting applies to this page.</p>
       {/* Filters Bar */}
       <div className="flex flex-wrap items-center gap-3">
         <button
@@ -206,7 +207,7 @@ export function SpendingTab({ orgId, address }: SpendingTabProps) {
             "flex items-center gap-2 rounded-lg border px-4 py-2 text-sm font-medium transition-colors",
             activeFilterCount > 0
               ? "workspace-filter-active"
-              : "border-white/10 text-slate-400 hover:bg-navy-800 hover:text-white",
+              : "border-[var(--ws-border)] text-[var(--ws-muted)] hover:bg-[var(--ws-subtle)] hover:text-[var(--ws-text)]",
           )}
         >
           <Filter className="h-4 w-4" />
@@ -221,7 +222,7 @@ export function SpendingTab({ orgId, address }: SpendingTabProps) {
         {activeFilterCount > 0 && (
           <button
             onClick={clearFilters}
-            className="flex items-center gap-1 text-sm text-slate-400 hover:text-white"
+            className="flex items-center gap-1 text-sm text-[var(--ws-muted)] hover:text-[var(--ws-text)]"
           >
             <X className="h-4 w-4" />
             {t("common.clearAll")}
@@ -243,11 +244,11 @@ export function SpendingTab({ orgId, address }: SpendingTabProps) {
 
       {/* Filter Panel */}
       {showFilters && (
-        <div className="rounded-xl border border-white/10 bg-navy-900/50 p-4">
+        <div className="rounded-xl border border-[var(--ws-border)] bg-[var(--ws-surface)] p-4">
           <div className="grid gap-4 sm:grid-cols-2">
             {/* Date Range */}
             <div className="space-y-2">
-              <label className="text-sm font-medium text-slate-300">
+              <label className="text-sm font-medium text-[var(--ws-text)]">
                 {t("reports.filters.dateRange")}
               </label>
               <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
@@ -256,9 +257,9 @@ export function SpendingTab({ orgId, address }: SpendingTabProps) {
                   aria-label="Start date"
                   value={dateFrom}
                   onChange={(e) => setDateFrom(e.target.value)}
-                  className="flex-1 rounded-lg border border-white/10 bg-navy-800 px-3 py-2 text-sm text-white"
+                  className="flex-1 rounded-lg border border-[var(--ws-border)] bg-[var(--ws-subtle)] px-3 py-2 text-sm text-[var(--ws-text)]"
                 />
-                <span className="text-slate-500">
+                <span className="text-[var(--ws-muted)]">
                   {t("disbursements.filters.to")}
                 </span>
                 <input
@@ -266,21 +267,21 @@ export function SpendingTab({ orgId, address }: SpendingTabProps) {
                   aria-label="End date"
                   value={dateTo}
                   onChange={(e) => setDateTo(e.target.value)}
-                  className="flex-1 rounded-lg border border-white/10 bg-navy-800 px-3 py-2 text-sm text-white"
+                  className="flex-1 rounded-lg border border-[var(--ws-border)] bg-[var(--ws-subtle)] px-3 py-2 text-sm text-[var(--ws-text)]"
                 />
               </div>
             </div>
 
             {/* Type */}
             <div className="space-y-2">
-              <label className="text-sm font-medium text-slate-300">
+              <label className="text-sm font-medium text-[var(--ws-text)]">
                 {t("reports.filters.type")}
               </label>
               <select
                 aria-label={t("reports.filters.type")}
                 value={typeFilter}
                 onChange={(e) => setTypeFilter(e.target.value)}
-                className="w-full rounded-lg border border-white/10 bg-navy-800 px-3 py-2 text-sm text-white"
+                className="w-full rounded-lg border border-[var(--ws-border)] bg-[var(--ws-subtle)] px-3 py-2 text-sm text-[var(--ws-text)]"
               >
                 {TYPE_OPTIONS.map((opt) => (
                   <option key={opt.value} value={opt.value}>
@@ -292,7 +293,7 @@ export function SpendingTab({ orgId, address }: SpendingTabProps) {
 
             {/* Chain */}
             <div className="space-y-2">
-              <label className="text-sm font-medium text-slate-300">
+              <label className="text-sm font-medium text-[var(--ws-text)]">
                 {t("reports.filters.chain")}
               </label>
               <select
@@ -303,7 +304,7 @@ export function SpendingTab({ orgId, address }: SpendingTabProps) {
                     e.target.value === "" ? "" : Number(e.target.value),
                   )
                 }
-                className="w-full rounded-lg border border-white/10 bg-navy-800 px-3 py-2 text-sm text-white"
+                className="w-full rounded-lg border border-[var(--ws-border)] bg-[var(--ws-subtle)] px-3 py-2 text-sm text-[var(--ws-text)]"
               >
                 <option value="">{t("common.all")}</option>
                 {CHAINS_LIST.filter(
@@ -325,24 +326,24 @@ export function SpendingTab({ orgId, address }: SpendingTabProps) {
           <Loader2 className="h-8 w-8 animate-spin text-accent-500" />
         </div>
       ) : !sortedData.length ? (
-        <div className="rounded-xl border border-dashed border-white/20 bg-navy-900/30 p-12 text-center">
-          <Users className="mx-auto h-12 w-12 text-slate-600" />
-          <h3 className="mt-4 text-lg font-medium text-white">
+        <div className="rounded-xl border border-dashed border-[var(--ws-border)] bg-[var(--ws-surface)]/30 p-12 text-center">
+          <Users className="mx-auto h-12 w-12 text-[var(--ws-muted)]" />
+          <h3 className="mt-4 text-lg font-medium text-[var(--ws-text)]">
             {reportData?.isDone === false ? "No matches on this page" : t("reports.empty.spending.title")}
           </h3>
-          <p className="mt-2 text-slate-400">
+          <p className="mt-2 text-[var(--ws-muted)]">
             {reportData?.isDone === false ? "Continue to the next page or adjust the filters." : t("reports.empty.spending.description")}
           </p>
         </div>
       ) : (
         <>
           {/* Desktop Table */}
-          <div className="hidden lg:block overflow-hidden rounded-xl border border-white/10">
-            <table className="w-full">
-              <thead className="bg-navy-900/50">
+          <div className="hidden lg:block overflow-hidden rounded-xl border border-[var(--ws-border)] bg-[var(--ws-surface)]">
+            <table className="finance-table">
+              <thead className="bg-[var(--ws-surface)]">
                 <tr>
                   <th
-                    className="cursor-pointer px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-400 hover:text-white"
+                    className="cursor-pointer px-4 py-3 text-left text-xs font-medium text-[var(--ws-muted)] hover:text-[var(--ws-text)]"
                     onClick={() => handleSort("name")}
                   >
                     <span className="flex items-center gap-1">
@@ -350,11 +351,11 @@ export function SpendingTab({ orgId, address }: SpendingTabProps) {
                       <SortIcon field="name" />
                     </span>
                   </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-400">
+                  <th className="px-4 py-3 text-left text-xs font-medium text-[var(--ws-muted)]">
                     {t("reports.table.type")}
                   </th>
                   <th
-                    className="cursor-pointer px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-slate-400 hover:text-white"
+                    className="cursor-pointer px-4 py-3 text-right text-xs font-medium text-[var(--ws-muted)] hover:text-[var(--ws-text)]"
                     onClick={() => handleSort("transactionCount")}
                   >
                     <span className="flex items-center justify-end gap-1">
@@ -363,7 +364,7 @@ export function SpendingTab({ orgId, address }: SpendingTabProps) {
                     </span>
                   </th>
                   <th
-                    className="cursor-pointer px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-slate-400 hover:text-white"
+                    className="cursor-pointer px-4 py-3 text-right text-xs font-medium text-[var(--ws-muted)] hover:text-[var(--ws-text)]"
                     onClick={() => handleSort("totalPaid")}
                   >
                     <span className="flex items-center justify-end gap-1">
@@ -373,18 +374,12 @@ export function SpendingTab({ orgId, address }: SpendingTabProps) {
                   </th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-white/5">
+              <tbody className="divide-y divide-[var(--ws-border)]">
                 {sortedData.map((item) => (
-                  <tr key={item.rowId} className="hover:bg-navy-800/50">
+                  <tr key={item.rowId} className="hover:bg-[var(--ws-subtle)]">
                     <td className="px-4 py-3">
                       <div>
-                        <p className="font-medium text-white">
-                          {item.beneficiaryName}
-                        </p>
-                        <p className="text-xs text-slate-500 font-mono">
-                          {item.beneficiaryWallet.slice(0, 6)}...
-                          {item.beneficiaryWallet.slice(-4)}
-                        </p>
+                        <Counterparty name={item.beneficiaryName} address={item.beneficiaryWallet} />
                       </div>
                     </td>
                     <td className="whitespace-nowrap px-4 py-3 text-sm">
@@ -401,12 +396,12 @@ export function SpendingTab({ orgId, address }: SpendingTabProps) {
                           : t("beneficiaries.business")}
                       </span>
                     </td>
-                    <td className="whitespace-nowrap px-4 py-3 text-right text-sm text-slate-300">
+                    <td className="whitespace-nowrap px-4 py-3 text-right text-sm text-[var(--ws-text)]">
                       {item.transactionCount}
                     </td>
-                    <td className="whitespace-nowrap px-4 py-3 text-right text-sm font-medium text-white">
+                    <td className="whitespace-nowrap px-4 py-3 text-right text-sm font-medium text-[var(--ws-text)]">
                       {item.totalPaidDisplay}
-                      <span className="block text-xs font-normal text-slate-400">
+                      <span className="block text-xs font-normal text-[var(--ws-muted)]">
                         {item.network}
                       </span>
                     </td>
@@ -421,17 +416,11 @@ export function SpendingTab({ orgId, address }: SpendingTabProps) {
             {sortedData.map((item) => (
               <div
                 key={item.rowId}
-                className="rounded-xl border border-white/10 bg-navy-900/50 p-4"
+                className="rounded-xl border border-[var(--ws-border)] bg-[var(--ws-surface)] p-4"
               >
                 <div className="flex items-start justify-between">
                   <div>
-                    <p className="font-medium text-white">
-                      {item.beneficiaryName}
-                    </p>
-                    <p className="text-xs text-slate-500 font-mono">
-                      {item.beneficiaryWallet.slice(0, 6)}...
-                      {item.beneficiaryWallet.slice(-4)}
-                    </p>
+                    <Counterparty name={item.beneficiaryName} address={item.beneficiaryWallet} />
                   </div>
                   <span
                     className={cn(
@@ -447,13 +436,13 @@ export function SpendingTab({ orgId, address }: SpendingTabProps) {
                   </span>
                 </div>
                 <div className="mt-3 flex items-center justify-between">
-                  <span className="text-sm text-slate-400">
+                  <span className="text-sm text-[var(--ws-muted)]">
                     {item.transactionCount}{" "}
                     {t("reports.table.transactions").toLowerCase()}
                   </span>
-                  <span className="text-lg font-bold text-white">
+                  <span className="text-lg font-bold text-[var(--ws-text)]">
                     {item.totalPaidDisplay}
-                    <span className="block text-xs font-normal text-slate-400">
+                    <span className="block text-xs font-normal text-[var(--ws-muted)]">
                       {item.network}
                     </span>
                   </span>
@@ -463,8 +452,8 @@ export function SpendingTab({ orgId, address }: SpendingTabProps) {
           </div>
 
           {/* Summary */}
-          <div className="rounded-xl border border-white/10 bg-navy-900/50 p-4">
-            <p className="text-sm text-slate-400">
+          <div className="rounded-xl border border-[var(--ws-border)] bg-[var(--ws-surface)] p-4">
+            <p className="text-sm text-[var(--ws-muted)]">
               {t("reports.summary.beneficiaries", {
                 count: new Set(sortedData.map((item) => item.beneficiaryId))
                   .size,

@@ -181,7 +181,7 @@ export function ScreeningSource({ isAdmin }: { isAdmin: boolean }) {
               void run("policy", async () => {
                 await update({
                   ...(args as Exclude<typeof args, "skip">),
-                  enforcement: org?.screeningEnforcement ?? "off",
+                  enforcement: org?.screeningEnforcement ?? "warn",
                   maximumAgeHours: Number(e.target.value),
                 });
                 return "Screening freshness limit saved.";

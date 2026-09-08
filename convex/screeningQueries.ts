@@ -149,7 +149,7 @@ export const getScreeningEnforcement = query({
   args: { orgId: v.id("orgs"), sessionToken: v.string() },
   handler: async (ctx, args) => {
     await requireOrgAccess(ctx, args.orgId, args.sessionToken, [...ORG_READER_ROLES]);
-    return (await ctx.db.get(args.orgId))?.screeningEnforcement ?? "off";
+    return (await ctx.db.get(args.orgId))?.screeningEnforcement ?? "warn";
   },
 });
 export const checkBeneficiaries = query({

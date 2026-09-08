@@ -173,7 +173,7 @@ export function OverviewScreen({
           value={model.reviewedRecipients}
           detail={
             model.recipientsNeedReview
-              ? `${model.recipientsNeedReview} need details or review`
+              ? `${model.recipientsNeedReview} ${model.recipientsNeedReview === 1 ? "needs" : "need"} details or review`
               : "Payout details approved; funding checked per payment"
           }
           href={`${prefix}/beneficiaries`}
