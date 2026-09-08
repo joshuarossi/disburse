@@ -62,7 +62,7 @@ export function accountingFixture(name: string, args: any, scenario: string | nu
     case 'accounting:listExports': return page(args.environment === 'test' ? [] : [batch]);
     case 'accounting:exportDetails': return { batch, entries: [{ ...entry, state: 'exported', exportId: 'export1' }] };
     case 'reports:getTransactionReport': return { items: [{ ...identifyAsset(8453, fact.tokenAddress, 'USDC'),
-      rowId: 'activity1', sourceId: 'payment1', createdAt: fact.settledAt, kind: treasury ? 'deposit' : 'payment', status: 'executed', direction: fact.direction,
+      rowId: 'activity1', sourceId: 'payment1', accountName: fact.accountName, createdAt: fact.settledAt, kind: treasury ? 'deposit' : 'payment', status: 'executed', direction: fact.direction,
       safeId: 'safe1', accountAddress: fact.accountAddress, beneficiaryName: fact.label, beneficiaryWallet: wallet, amount: fact.amount,
       includedInTotals: true }], totals: [], assets: [], isDone: true, continueCursor: '', indexVersion: 1, indexing: false, indexErrors: [], rangeError: '' };
   }

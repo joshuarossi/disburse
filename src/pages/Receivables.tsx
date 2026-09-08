@@ -1,8 +1,8 @@
-import { useReceivingService } from '@/features/receivables/useReceivingService';
-import { userErrorMessage } from '@/lib/userErrors';
-import { ReceivableDocuments } from '@/features/receivables/ReceivableDocuments';
-import { ReceivableFollowUp } from '@/features/receivables/ReceivableFollowUp';
-import { ReceivableCredits } from '@/features/receivables/ReceivableCredits';
+import { useReceivingService } from "@/features/receivables/useReceivingService";
+import { userErrorMessage } from "@/lib/userErrors";
+import { ReceivableDocuments } from "@/features/receivables/ReceivableDocuments";
+import { ReceivableFollowUp } from "@/features/receivables/ReceivableFollowUp";
+import { ReceivableCredits } from "@/features/receivables/ReceivableCredits";
 import { useActivityEnvironment } from "@/features/workspace/ActivityEnvironment";
 import { chainEnvironment } from "../../shared/assets";
 import { useState } from "react";
@@ -15,7 +15,7 @@ import { useSessionToken } from "@/lib/session";
 import { Dialog } from "@/components/ui/Dialog";
 import { InvoiceItems } from "@/components/invoices/InvoiceItems";
 import { InvoiceCollection } from "@/features/receivables/InvoiceCollection";
-import { ReceivingSetup } from '@/features/receivables/ReceivingSetup';
+import { ReceivingSetup } from "@/features/receivables/ReceivingSetup";
 import {
   PageHeader,
   Notice,
@@ -67,8 +67,12 @@ function InvoiceEditor({
   const [busy, setBusy] = useState(false),
     [error, setError] = useState("");
   const safe = safes.find((s) => s._id === safeId);
-  const supportedCurrencies = Object.values(getTokensForChain(safe?.chainId ?? 0));
-  const currencyAvailable = supportedCurrencies.some(t => t.symbol === currency);
+  const supportedCurrencies = Object.values(
+    getTokensForChain(safe?.chainId ?? 0),
+  );
+  const currencyAvailable = supportedCurrencies.some(
+    (t) => t.symbol === currency,
+  );
   const configurations = useQuery(
     api.receivables.configuration,
     token ? { orgId, sessionToken: token } : "skip",
@@ -94,8 +98,18 @@ function InvoiceEditor({
         onSubmit={async (e) => {
           e.preventDefault();
           if (!token || busy || !safeId) return;
-          if (!safe) { setError("Choose an active receiving account before saving this draft."); return; }
-          if (!currencyAvailable) { setError("Choose an account that supports the invoice currency, or explicitly update the currency agreed with your customer."); return; }
+          if (!safe) {
+            setError(
+              "Choose an active receiving account before saving this draft.",
+            );
+            return;
+          }
+          if (!currencyAvailable) {
+            setError(
+              "Choose an account that supports the invoice currency, or explicitly update the currency agreed with your customer.",
+            );
+            return;
+          }
           setBusy(true);
           setError("");
           try {
@@ -114,9 +128,7 @@ function InvoiceEditor({
             });
             onClose();
           } catch (e) {
-            setError(
-              userErrorMessage(e, "Could not save invoice."),
-            );
+            setError(userErrorMessage(e, "Could not save invoice."));
           } finally {
             setBusy(false);
           }
@@ -127,7 +139,12 @@ function InvoiceEditor({
           link.
         </p>
         {error && <Notice>{error}</Notice>}
-        {safeId && !safe && <Notice tone="info">The saved receiving account is archived or unavailable. Choose an active account to continue. Your invoice details are kept.</Notice>}
+        {safeId && !safe && (
+          <Notice tone="info">
+            The saved receiving account is archived or unavailable. Choose an
+            active account to continue. Your invoice details are kept.
+          </Notice>
+        )}
         {!safes.length && (
           <Notice tone="info">
             Connect a business account before creating an invoice.{" "}
@@ -188,7 +205,13 @@ function InvoiceEditor({
                   setSafe(e.target.value as Id<"safes">);
                 }}
               >
-                {!safe && <option value={safeId} disabled>{safeId ? "Saved account unavailable. Choose an account" : "Choose a receiving account"}</option>}
+                {!safe && (
+                  <option value={safeId} disabled>
+                    {safeId
+                      ? "Saved account unavailable. Choose an account"
+                      : "Choose a receiving account"}
+                  </option>
+                )}
                 {safes.map((s) => (
                   <option key={s._id} value={s._id}>
                     {getChainName(s.chainId!)} · {s.safeAddress.slice(-6)}
@@ -203,12 +226,14 @@ function InvoiceEditor({
                 value={currency}
                 onChange={(e) => setCurrency(e.target.value)}
               >
-                {!currencyAvailable && <option value={currency} disabled>{currency} · choose a compatible account or currency</option>}
-                {supportedCurrencies.map(
-                  (t) => (
-                    <option key={t.symbol}>{t.symbol}</option>
-                  ),
+                {!currencyAvailable && (
+                  <option value={currency} disabled>
+                    {currency} · choose a compatible account or currency
+                  </option>
                 )}
+                {supportedCurrencies.map((t) => (
+                  <option key={t.symbol}>{t.symbol}</option>
+                ))}
               </select>
             </label>
           </div>
@@ -364,10 +389,15 @@ function InvoiceDetails({
   const configuration = configurations?.find(
     (c) => c.chainId === invoice.chainId,
   );
-  const receivingService = useReceivingService(invoice.safeId, invoice.state === 'draft' && !!configuration?.canIssue);
+  const receivingService = useReceivingService(
+    invoice.safeId,
+    invoice.state === "draft" && !!configuration?.canIssue,
+  );
   const [busy, setBusy] = useState(false),
     [message, setMessage] = useState(""),
-    [messageTone, setMessageTone] = useState<"error" | "success" | "info">("success"),
+    [messageTone, setMessageTone] = useState<"error" | "success" | "info">(
+      "success",
+    ),
     [voiding, setVoiding] = useState(false);
   const run = async (work: () => Promise<unknown>, success: string) => {
     if (busy || !args) return;
@@ -376,13 +406,24 @@ function InvoiceDetails({
     setMessageTone("success");
     try {
       const result = await work();
-      if (result && typeof result === "object" && "tone" in result && result.tone === "info") setMessageTone("info");
-      setMessage(result && typeof result === "object" && "message" in result && typeof result.message === "string" ? userErrorMessage({ message: result.message }, success) : success);
+      if (
+        result &&
+        typeof result === "object" &&
+        "tone" in result &&
+        result.tone === "info"
+      )
+        setMessageTone("info");
+      setMessage(
+        result &&
+          typeof result === "object" &&
+          "message" in result &&
+          typeof result.message === "string"
+          ? userErrorMessage({ message: result.message }, success)
+          : success,
+      );
     } catch (e) {
       setMessageTone("error");
-      setMessage(
-        userErrorMessage(e, "Could not complete the action."),
-      );
+      setMessage(userErrorMessage(e, "Could not complete the action."));
     } finally {
       setBusy(false);
     }
@@ -409,7 +450,13 @@ function InvoiceDetails({
           {formatMoney(invoice.amount, invoice.token, true)}{" "}
           <span className="text-base">{invoice.token}</span>
         </p>
-        {BigInt(invoice.credited ?? "0") > 0n && <p className="workspace-description">Original total shown above · credits {amounts.credited} {invoice.token} · adjusted total {amounts.adjustedTotal} {invoice.token}.</p>}
+        {BigInt(invoice.credited ?? "0") > 0n && (
+          <p className="workspace-description">
+            Original total shown above · credits {amounts.credited}{" "}
+            {invoice.token} · adjusted total {amounts.adjustedTotal}{" "}
+            {invoice.token}.
+          </p>
+        )}
         <p className="workspace-description">
           Receiving account: {getChainName(invoice.chainId)} ·{" "}
           {invoice.treasury.slice(0, 8)}…{invoice.treasury.slice(-6)}
@@ -445,7 +492,15 @@ function InvoiceDetails({
                 keep editing this draft.
               </Notice>
             )}
-            {configuration?.canIssue && <ReceivingSetup safeId={invoice.safeId} state={receivingService} canManage={canManage} busy={busy} onBusyChange={setBusy} />}
+            {configuration?.canIssue && (
+              <ReceivingSetup
+                safeId={invoice.safeId}
+                state={receivingService}
+                canManage={canManage}
+                busy={busy}
+                onBusyChange={setBusy}
+              />
+            )}
             <div className="flex flex-wrap gap-2">
               {canManage && (
                 <>
@@ -458,7 +513,11 @@ function InvoiceDetails({
                   </button>
                   <button
                     className="workspace-button workspace-button-primary"
-                    disabled={busy || !configuration?.canIssue || !receivingService.data?.ready}
+                    disabled={
+                      busy ||
+                      !configuration?.canIssue ||
+                      !receivingService.data?.ready
+                    }
                     onClick={() =>
                       run(() => issue(args!), "Payment link created.")
                     }
@@ -543,7 +602,12 @@ function InvoiceDetails({
                 Check payments
               </button>
             </div>
-            <InvoiceCollection invoice={invoice} canManage={canManage} busy={busy} onBusyChange={setBusy} />
+            <InvoiceCollection
+              invoice={invoice}
+              canManage={canManage}
+              busy={busy}
+              onBusyChange={setBusy}
+            />
             {!!events?.length && (
               <section>
                 <h3 className="font-semibold mb-3">Confirmed activity</h3>
@@ -563,7 +627,9 @@ function InvoiceDetails({
                             invoice.token,
                             true,
                           )}{" "}
-                          {invoice.token} · {e.settledAt ? 'Settled' : 'Recorded'} {formatDate(e.settledAt ?? e.recordedAt)}
+                          {invoice.token} ·{" "}
+                          {e.settledAt ? "Settled" : "Recorded"}{" "}
+                          {formatDate(e.settledAt ?? e.recordedAt)}
                         </span>
                       </span>
                       <a
@@ -581,38 +647,45 @@ function InvoiceDetails({
             )}
           </>
         )}
-        <ReceivableFollowUp key={`${invoice._id}:${invoice.followUpAt ?? ''}`} invoice={invoice} canManage={canManage} />
+        <ReceivableFollowUp
+          key={`${invoice._id}:${invoice.followUpAt ?? ""}`}
+          invoice={invoice}
+          canManage={canManage}
+        />
         <ReceivableCredits invoice={invoice} />
-        {canManage && invoice.state !== "void" && invoice.received === "0" && !invoice.credited && (
-          <div className="border-t border-slate-400/20 pt-4">
-            {voiding ? (
-              <>
-                <p className="workspace-description">
-                  {invoice.receivingAddress
-                    ? "The invoice will stay in your records. Its address cannot be revoked; late payments will still be tracked and can be collected."
-                    : "This draft will stay in your records as voided. No payment address has been issued."}
-                </p>
+        {canManage &&
+          invoice.state !== "void" &&
+          invoice.received === "0" &&
+          !invoice.credited && (
+            <div className="border-t border-slate-400/20 pt-4">
+              {voiding ? (
+                <>
+                  <p className="workspace-description">
+                    {invoice.receivingAddress
+                      ? "The invoice will stay in your records. Its address cannot be revoked; late payments will still be tracked and can be collected."
+                      : "This draft will stay in your records as voided. No payment address has been issued."}
+                  </p>
+                  <button
+                    className="workspace-button"
+                    disabled={busy}
+                    onClick={() =>
+                      run(() => voidInvoice(args!), "Invoice voided.")
+                    }
+                  >
+                    Confirm void
+                  </button>
+                </>
+              ) : (
                 <button
                   className="workspace-button"
                   disabled={busy}
-                  onClick={() =>
-                    run(() => voidInvoice(args!), "Invoice voided.")
-                  }
+                  onClick={() => setVoiding(true)}
                 >
-                  Confirm void
+                  Void invoice
                 </button>
-              </>
-            ) : (
-              <button
-                className="workspace-button"
-                disabled={busy}
-                onClick={() => setVoiding(true)}
-              >
-                Void invoice
-              </button>
-            )}
-          </div>
-        )}
+              )}
+            </div>
+          )}
         {busy && <p role="status">Working…</p>}
         {message && <Notice tone={messageTone}>{message}</Notice>}
       </div>
@@ -628,10 +701,15 @@ export default function Receivables() {
     orgId && sessionToken
       ? { orgId: orgId as Id<"orgs">, sessionToken }
       : "skip";
-  const result = useQuery(api.receivables.list, args === "skip" ? args : { ...args, environment }),
+  const result = useQuery(
+      api.receivables.list,
+      args === "skip" ? args : { ...args, environment },
+    ),
     allSafes = useQuery(api.safes.getForOrg, args),
     members = useQuery(api.orgs.listMembers, args);
-  const safes = allSafes?.filter(safe => chainEnvironment(safe.chainId) === environment);
+  const safes = allSafes?.filter(
+    (safe) => chainEnvironment(safe.chainId) === environment,
+  );
   const role = members?.find(
     (m) =>
       m?.walletAddress.toLowerCase() === address?.toLowerCase() &&
@@ -642,12 +720,18 @@ export default function Receivables() {
   const [editor, setEditor] = useState<Doc<"receivables"> | "new" | null>(null),
     [focus, setFocus] = useState<string | null>(null),
     [search, setSearch] = useState("");
-  const [followUpsOnly,setFollowUpsOnly]=useState(false);
+  const [followUpsOnly, setFollowUpsOnly] = useState(false);
   const selected = result?.items.find((i) => i._id === focus),
-    visible = result?.items.filter((i) =>
-      `${i.number} ${i.customerName}`
-        .toLowerCase()
-        .includes(search.toLowerCase()) && (!followUpsOnly || i.state === "issued" && i.amounts.remaining !== "0" && !!i.followUpAt && i.followUpAt <= Date.now()),
+    visible = result?.items.filter(
+      (i) =>
+        `${i.number} ${i.customerName}`
+          .toLowerCase()
+          .includes(search.toLowerCase()) &&
+        (!followUpsOnly ||
+          (i.state === "issued" &&
+            i.amounts.remaining !== "0" &&
+            !!i.followUpAt &&
+            i.followUpAt <= Date.now())),
     );
   return (
     <>
@@ -664,7 +748,8 @@ export default function Receivables() {
                     generateFilename(`receivables_${environment}`),
                     result.items.map((i) => ({
                       number: i.number,
-                      environment, token_contract: i.tokenAddress,
+                      environment,
+                      token_contract: i.tokenAddress,
                       customer: i.customerName,
                       network: getChainName(i.chainId),
                       currency: i.token,
@@ -679,12 +764,16 @@ export default function Receivables() {
                       address: i.receivingAddress ?? "",
                     })),
                     [
-                      "number", "environment", "token_contract",
+                      "number",
+                      "environment",
+                      "token_contract",
                       "customer",
                       "network",
                       "currency",
                       "amount",
-                      "credited", "adjusted_total", "refunded",
+                      "credited",
+                      "adjusted_total",
+                      "refunded",
                       "received",
                       "remaining",
                       "awaiting_forwarding",
@@ -720,7 +809,14 @@ export default function Receivables() {
               onChange={(e) => setSearch(e.target.value)}
             />
           </label>
-          <label className="mt-3 flex items-center gap-2 text-sm"><input type="checkbox" checked={followUpsOnly} onChange={e=>setFollowUpsOnly(e.target.checked)}/>Follow-ups due</label>
+          <label className="mt-3 flex items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              checked={followUpsOnly}
+              onChange={(e) => setFollowUpsOnly(e.target.checked)}
+            />
+            Follow-ups due
+          </label>
         </div>
         {!result ? (
           <LoadingRows />
@@ -738,20 +834,33 @@ export default function Receivables() {
           />
         ) : (
           <div className="overflow-x-auto">
-            <table className="workspace-table">
-              <thead>
-                <tr>
-                  <th>Invoice & customer</th>
-                  <th>Due</th>
-                  <th>Amount</th>
-                  <th>Status</th>
-                  <th>Collection</th>
+            <table
+              className="workspace-table workspace-table-responsive"
+              role="table"
+            >
+              <thead role="rowgroup">
+                <tr role="row">
+                  <th role="columnheader" scope="col">
+                    Invoice & customer
+                  </th>
+                  <th role="columnheader" scope="col">
+                    Due
+                  </th>
+                  <th role="columnheader" scope="col">
+                    Amount
+                  </th>
+                  <th role="columnheader" scope="col">
+                    Status
+                  </th>
+                  <th role="columnheader" scope="col">
+                    Collection
+                  </th>
                 </tr>
               </thead>
-              <tbody>
+              <tbody role="rowgroup">
                 {visible.map((i) => (
-                  <tr key={i._id}>
-                    <td>
+                  <tr role="row" key={i._id}>
+                    <td role="cell" data-primary>
                       <button
                         className="workspace-action-link"
                         onClick={() => setFocus(i._id)}
@@ -762,17 +871,29 @@ export default function Receivables() {
                         {i.customerName}
                       </span>
                     </td>
-                    <td>{formatDate(i.dueDate)}{i.followUpAt && i.state === "issued" && i.amounts.remaining !== "0" && <span className="workspace-table-secondary">{i.followUpAt <= Date.now() ? "Follow-up due" : "Follow up"} {formatDate(i.followUpAt)}</span>}</td>
-                    <td>
+                    <td role="cell" data-label="Due date">
+                      {formatDate(i.dueDate)}
+                      {i.followUpAt &&
+                        i.state === "issued" &&
+                        i.amounts.remaining !== "0" && (
+                          <span className="workspace-table-secondary">
+                            {i.followUpAt <= Date.now()
+                              ? "Follow-up due"
+                              : "Follow up"}{" "}
+                            {formatDate(i.followUpAt)}
+                          </span>
+                        )}
+                    </td>
+                    <td role="cell" data-label="Amount">
                       <strong>{formatMoney(i.amount, i.token, true)}</strong>
                       <span className="workspace-table-secondary">
                         {i.token} · {getChainName(i.chainId)}
                       </span>
                     </td>
-                    <td>
+                    <td role="cell" data-label="Status">
                       <span className="workspace-status">{i.status}</span>
                     </td>
-                    <td>
+                    <td role="cell" data-label="Collection">
                       {i.state === "draft"
                         ? "Not issued"
                         : BigInt(i.received) > BigInt(i.forwarded)

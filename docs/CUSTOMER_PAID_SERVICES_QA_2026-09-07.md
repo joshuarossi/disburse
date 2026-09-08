@@ -145,3 +145,35 @@ The [delegated-payment report](DELEGATED_PAYMENTS.md) records live account creat
 The code checks passed 1,071 tests in 107 files, plus TypeScript and ESLint. The complete browser run passed 343 stories; the restored policy regression and all 12 other payout stories then passed. Ten new delegated stories cover assigned-account control, missing accounts, allowance and balance failures, unsigned discard, signed cancellation, signature rejection, reload, uncertain submission and exact settlement. Light desktop and dark phone views were inspected; accessibility and overflow checks passed. The production build passed with the existing wallet/SDK chunk-size warnings.
 
 The real browser runner uses the built application and authenticated backend, with host-held test keys and an EIP-1193 adapter that accepts only the saved typed-data digest. It never permits native-gas sends. This establishes built-app behavior and testnet settlement, not MetaMask mobile/extension compatibility or independent security review.
+
+
+## September 8: accepted submission with a lost provider response
+
+A real Base Sepolia owner payment now covers a controlled transport interruption after provider acceptance. The development QA runner used the application's saved approval and fee request, checked current owner signatures, nonce, expiry and provider simulation, and claimed the original operation through the normal internal mutation. Its host-side transport made one submission and deliberately threw after observing acceptance of the expected hash. No production test hook or provider endpoint override was introduced.
+
+The runner then signed out. Read-only `--status --background-only` observations did not invoke a reconciliation action. The existing background queues found and confirmed the original operation and payment, including the separate fee. The first observation saw principal reconciliation before the fee record caught up; the later observation showed both confirmed.
+
+| Evidence | Verified result |
+| --- | --- |
+| Receipt | [Base Sepolia transaction](https://sepolia.basescan.org/tx/0xae8e949f82f48ba47369d6da0cc0eb1b91d7e948d8b989a8ef5b3c3728f7c87d) |
+| Block | 46,555,126 |
+| Original UserOperation | `0xe4e2f61e246472096b62be8b64b4d000c6a1b1371ffabb970dd9796eee5af76d` |
+| Recipient | Exactly 0.10 USDC / 100,000 raw units, one principal transfer |
+| Fee | 0.015708 USDC / 15,708 raw units |
+| Company balance change | −0.115708 USDC at the receipt block |
+| Native balances | Zero for the signing wallet and company Safe at settlement |
+| Submissions | One provider POST; no replacement transaction or resubmission |
+
+The initial test cap was below the account's existing 2 USDC fee-permit ceiling. The unsigned original quote was retained and its existing ceiling explicitly reviewed before signing; actual retained gas was 0.015708 USDC. A QA CLI parsing error also stopped immediately after claim and before any POST. Recovery used that same claimed request only after the durable journal proved no submission had been attempted. The helper now accepts an empty successful mutation reply and refuses that recovery once a POST was attempted.
+
+This demonstrates actual settlement after a deliberately lost response. It does not claim that Candide had an outage, or establish behavior under every production outage. Production transport error, malformed-response, changed-nonce, reorg and expiry paths also retain their automated coverage.
+
+To reproduce with new authorized test funds, use a unique run name and review the fee ceiling:
+
+```sh
+bun scripts/qa-circle-payment.mjs --run=<unique-name> --prepare --max-fee-raw=2000000
+bun scripts/qa-circle-payment.mjs --run=<unique-name> --execute --withhold-provider-response
+bun scripts/qa-circle-payment.mjs --run=<unique-name> --status --background-only
+```
+
+Never execute the recorded September 8 run again. `--resume-claimed-request --withhold-provider-response` is restricted to this QA failure mode: the server already claimed the same hash, the host journal has not recorded any POST, and current signatures/nonce/expiry/simulation still pass. It cannot retry an unknown submission. All operation records and signatures remain in ignored private QA storage.

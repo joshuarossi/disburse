@@ -27,7 +27,6 @@ import {
 } from "lucide-react";
 import { useTheme } from "@/lib/theme";
 import { Dialog } from "@/components/ui/Dialog";
-import { LanguageSwitcher } from "@/components/ui/LanguageSwitcher";
 import { ThemeSwitcher } from "@/components/ui/ThemeSwitcher";
 import { PaymentReminders, ReminderBoundary } from '@/features/payments/PaymentReminders';
 import type { Id } from '../../../convex/_generated/dataModel';
@@ -272,7 +271,7 @@ export function WorkspaceShell({
             </div>
             <div>
               <p className="finance-label">Language</p>
-              <LanguageSwitcher />
+              <p className="text-sm text-[var(--ws-muted)]">English</p>
             </div>
             {onSignOut && (
               <button className="workspace-button" onClick={onSignOut}>

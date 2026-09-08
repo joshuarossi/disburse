@@ -1,4 +1,5 @@
 import { Link } from "react-router-dom";
+import { useState } from "react";
 import {
   ArrowRight,
   ArrowUpRight,
@@ -81,6 +82,17 @@ export function OverviewScreen({
   }>;
 }) {
   const needSetup = !model.accountCount || !model.recipientCount;
+  const [showEmptyBalances, setShowEmptyBalances] = useState(false);
+  const zero = (amount: string) => /^0(?:\.0+)?$/.test(amount);
+  const activeBalances = balances.filter(
+    (balance) =>
+      model.plansIncomplete ||
+      balance.amount === null ||
+      !zero(balance.amount) ||
+      !zero(balance.planned),
+  );
+  const visibleBalances = showEmptyBalances ? balances : activeBalances;
+  const hiddenBalanceCount = balances.length - activeBalances.length;
   return (
     <>
       <PageHeader
@@ -448,11 +460,13 @@ export function OverviewScreen({
                 <ArrowUpRight size={15} />
               </Link>
             </div>
-            {balances.length ? (
-              balances.map((balance, i) => (
+            {visibleBalances.length ? (
+              visibleBalances.map((balance, i) => (
                 <div
                   className="border-b border-white/10 p-5 last:border-0"
                   key={`${balance.label}-${balance.token}-${i}`}
+                  role="group"
+                  aria-label={`${balance.label} · ${balance.token}`}
                 >
                   <div className="mb-3 flex items-center gap-2">
                     <Wallet size={15} />
@@ -510,21 +524,38 @@ export function OverviewScreen({
             ) : (
               <div className="p-5">
                 <p className="workspace-description">
-                  Connect an account to see the funds available for payments.
+                  {balances.length
+                    ? "Your accounts have no funds or planned payments yet."
+                    : "Connect an account to see the funds available for payments."}
                 </p>
                 <Link
                   to={`${prefix}/treasury`}
                   className="workspace-action-link mt-4"
                 >
-                  Set up funding
+                  {balances.length ? "Add funds" : "Set up funding"}
                   <ArrowRight size={13} />
                 </Link>
+              </div>
+            )}
+            {hiddenBalanceCount > 0 && (
+              <div className="border-t border-white/10 px-5 py-3">
+                <button
+                  className="workspace-action-link"
+                  aria-expanded={showEmptyBalances}
+                  onClick={() => setShowEmptyBalances((value) => !value)}
+                >
+                  {showEmptyBalances
+                    ? "Hide empty balances"
+                    : `Show ${hiddenBalanceCount} empty balance${hiddenBalanceCount === 1 ? "" : "s"}`}
+                </button>
               </div>
             )}
             <div className="workspace-table-footer">
               <span>
                 Plan includes unpaid drafts and confirmed fees.
-                {model.unquotedFees ? " Some fees are not quoted yet." : ""}{" "}
+                {model.unquotedFees
+                  ? " Some fees are not quoted yet."
+                  : ""}{" "}
                 Funds are not reserved.
               </span>
               <Link className="workspace-action-link" to={`${prefix}/treasury`}>
@@ -614,9 +645,10 @@ export function OverviewScreen({
       </div>
       {model.limitedHistory && (
         <p className="workspace-description mt-5">
-          This overview is a partial summary of up to 5,000 payments, 1,000 recipients,
-          1,000 bills and 100 accounts. Open the corresponding lists or Reports for
-          the full records. Available-to-spend estimates are withheld.
+          This overview is a partial summary of up to 5,000 payments, 1,000
+          recipients, 1,000 bills and 100 accounts. Open the corresponding lists
+          or Reports for the full records. Available-to-spend estimates are
+          withheld.
         </p>
       )}
     </>

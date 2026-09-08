@@ -686,6 +686,7 @@ export function PaymentBatchForm({
                 <AccountFundingCheck
                   key={account._id}
                   safeId={account._id}
+                  accountName={account.name ?? `${getChainName(account.chainId)} account`}
                   chainId={account.chainId}
                   payments={account.payments}
                 />
@@ -885,6 +886,7 @@ export function PaymentBatchForm({
                 <AccountFundingCheck
                   key={account._id}
                   safeId={account._id}
+                  accountName={account.name ?? `${getChainName(account.chainId)} account`}
                   chainId={account.chainId}
                   payments={account.payments}
                 />

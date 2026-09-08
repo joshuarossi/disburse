@@ -11,6 +11,11 @@ interface I18nProviderProps {
 
 export function I18nProvider({ children }: I18nProviderProps) {
   const { i18n } = useTranslation();
+  const language = i18n.resolvedLanguage ?? 'en';
+
+  useEffect(() => {
+    document.documentElement.lang = language;
+  }, [language]);
 
   const token = useSessionToken();
   const session = useQuery(

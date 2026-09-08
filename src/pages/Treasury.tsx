@@ -116,6 +116,7 @@ export default function Treasury() {
             <AccountFundingCheck
               key={safe._id}
               safeId={safe._id}
+              accountName={safe.name ?? `${getChainName(safe.chainId)} account`}
               chainId={safe.chainId}
               payments={[]}
               className="workspace-panel p-6"

@@ -13,12 +13,14 @@ export function AccountFundingCheck({
   payments,
   children,
   className,
+  accountName,
 }: {
   safeId: Id<"safes">;
   chainId: number;
   payments: Array<{ token: string; amount: string | null }>;
   children?: ReactNode;
   className?: string;
+  accountName?: string;
 }) {
   const check = useAccountReadiness(safeId);
   const account = check.data;
@@ -39,7 +41,7 @@ export function AccountFundingCheck({
       <div className="flex items-start justify-between gap-3">
         <div>
           <h3 className="font-semibold">
-            {account?.name ?? getChainName(chainId)}
+            {account?.name ?? accountName ?? getChainName(chainId)}
           </h3>
           <p className="mt-1 text-xs text-slate-400">
             Funding account · {getChainName(chainId)}

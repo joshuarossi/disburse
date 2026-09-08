@@ -28,6 +28,18 @@ async function setup(count = 1) {
 }
 
 describe('bounded, recoverable finance report index', () => {
+  it('keeps current account names and archived labels alongside immutable movement amounts', async () => {
+    const { t, ids, args } = await setup();
+    await t.run(ctx => ctx.db.patch(ids.safeId, { name: 'Payroll', chainId: 11155111 }));
+    await refreshReportIndex(t, ids.orgId);
+    const first = await t.query(api.reports.getTransactionReport, args);
+    expect(first.items[0]).toMatchObject({ accountName: 'Payroll', amountRaw: '1' });
+    await t.run(ctx => ctx.db.patch(ids.safeId, { name: 'Prior payroll', isActive: false }));
+    const updated = await t.query(api.reports.getTransactionReport, args);
+    expect(updated.items[0]).toMatchObject({ accountName: 'Prior payroll (archived)', amountRaw: '1', sourceId: first.items[0].sourceId, txHash: first.items[0].txHash });
+    expect(updated.indexVersion).toBe(first.indexVersion);
+  });
+
   it('paginates equal timestamps without duplicates and calculates full-range totals independently of the page', async () => {
     const { t, ids, args } = await setup(251);
     await refreshReportIndex(t, ids.orgId);

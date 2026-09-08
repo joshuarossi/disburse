@@ -1,4 +1,4 @@
-import { userErrorMessage } from '@/lib/userErrors';
+import { userErrorMessage } from "@/lib/userErrors";
 import { scheduleDateTime } from "@/lib/formatMoney";
 import { useActivityEnvironment } from "@/features/workspace/ActivityEnvironment";
 import { chainEnvironment } from "../../shared/assets";
@@ -11,9 +11,7 @@ import type { Doc, Id } from "../../convex/_generated/dataModel";
 import { useSessionToken } from "@/lib/session";
 import { PaymentBatchForm } from "@/components/payments/PaymentBatchForm";
 import { RecurringEditor } from "@/features/payments/RecurringEditor";
-import {
-  ScheduleDetails,
-} from "@/features/payments/ScheduleDetails";
+import { ScheduleDetails } from "@/features/payments/ScheduleDetails";
 import { Dialog } from "@/components/ui/Dialog";
 import { formatDate, formatMoney } from "@/lib/formatMoney";
 import {
@@ -173,21 +171,36 @@ export default function PaymentBatches() {
           />
         ) : (
           <div className="workspace-table-wrap">
-            <table className="workspace-table">
-              <thead>
-                <tr>
-                  <th>Schedule</th>
-                  <th>Frequency</th>
-                  <th>Next draft & pay date</th>
-                  <th className="numeric">Per payment</th>
-                  <th>Status</th>
-                  <th>Latest payment & actions</th>
+            <table
+              className="workspace-table workspace-table-responsive"
+              role="table"
+            >
+              <thead role="rowgroup">
+                <tr role="row">
+                  <th role="columnheader" scope="col">
+                    Schedule
+                  </th>
+                  <th role="columnheader" scope="col">
+                    Frequency
+                  </th>
+                  <th role="columnheader" scope="col">
+                    Next draft & pay date
+                  </th>
+                  <th role="columnheader" scope="col" className="numeric">
+                    Per payment
+                  </th>
+                  <th role="columnheader" scope="col">
+                    Status
+                  </th>
+                  <th role="columnheader" scope="col">
+                    Latest payment & actions
+                  </th>
                 </tr>
               </thead>
-              <tbody>
+              <tbody role="rowgroup">
                 {series.map((r) => (
-                  <tr key={r._id}>
-                    <td>
+                  <tr role="row" key={r._id}>
+                    <td role="cell" data-primary>
                       <button
                         className="workspace-action-link font-semibold text-left"
                         aria-label={`Review schedule ${r.name}`}
@@ -205,8 +218,10 @@ export default function PaymentBatches() {
                         </p>
                       )}
                     </td>
-                    <td>{frequency[r.cadence]}</td>
-                    <td>
+                    <td role="cell" data-label="Frequency">
+                      {frequency[r.cadence]}
+                    </td>
+                    <td role="cell" data-label="Next draft & pay date">
                       <strong>{formatDate(r.nextDraftAt)}</strong>
                       <span className="workspace-table-secondary">
                         {r.status === "paused" ? "Paused · " : ""}Pay{" "}
@@ -216,7 +231,11 @@ export default function PaymentBatches() {
                         Approve by {scheduleDateTime(r.nextPayDate)}
                       </span>
                     </td>
-                    <td className="numeric">
+                    <td
+                      role="cell"
+                      data-label="Per payment"
+                      className="numeric"
+                    >
                       <strong>
                         {formatMoney(r.totalAmount, r.token, true)}
                       </strong>
@@ -224,10 +243,10 @@ export default function PaymentBatches() {
                         {r.token}
                       </span>
                     </td>
-                    <td>
+                    <td role="cell" data-label="Status">
                       <StatusBadge status={r.status} />
                     </td>
-                    <td>
+                    <td role="cell" data-actions>
                       {r.latestPayment && (
                         <div className="mb-3">
                           <Link

@@ -72,9 +72,14 @@ export const getTransactionReport = query({
       && (!args.status?.length || args.status.includes(row.status))
       && (!args.token?.length || (row.recognized && args.token.includes(row.token)))
       && (!args.assetIds?.length || args.assetIds.includes(row.assetId)));
+    const accounts = new Map(await Promise.all([...new Set(matches.map(row => row.safeId))].map(async id => [id, await ctx.db.get(id)] as const)));
     const items = await Promise.all(matches.map(async row => {
       const b = row.beneficiaryId ? await ctx.db.get(row.beneficiaryId) : null;
-      return { ...row, _id: row.sourceId, beneficiaryName: `${row.beneficiaryName}${b?.orgId === args.orgId && !b.isActive ? ' (archived)' : ''}` };
+      const account = accounts.get(row.safeId);
+      const knownAccount = account?.orgId === args.orgId && account.chainId === row.chainId && account.safeAddress.toLowerCase() === row.accountAddress.toLowerCase();
+      return { ...row, _id: row.sourceId,
+        accountName: knownAccount ? `${account.name || 'Account'}${account.isActive === false ? ' (archived)' : ''}` : 'Account',
+        beneficiaryName: `${row.beneficiaryName}${b?.orgId === args.orgId && !b.isActive ? ' (archived)' : ''}` };
     }));
     const catalog = environment === 'unclassified'
       ? args.assetSearch

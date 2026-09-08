@@ -16,7 +16,7 @@ export function AccountingExport({ exportId, canReview, onClose }: { exportId: I
   const [busy, setBusy] = useState(false), [error, setError] = useState('');
   return <Dialog title="Journal export" onClose={onClose}><div className="space-y-5 p-5 sm:p-6">
     {!data ? <LoadingRows /> : <>
-      <p className="text-sm">{data.entries.length} journals · {data.batch.currency} · {data.batch.environment === 'test' ? 'Test activity' : 'Business activity'}</p>
+      <p className="text-sm">{data.entries.length} journal{data.entries.length === 1 ? '' : 's'} · {data.batch.currency} · {data.batch.environment === 'test' ? 'Test activity' : 'Business activity'}</p>
       <p className="text-sm text-slate-400">Import once into your accounting system, then confirm below. Downloads retain the original journal numbers and reviewed account names.</p>
       <div className="flex flex-wrap gap-3">
         <button className="workspace-button workspace-button-primary" onClick={() => exportToCsv(`disburse_journals_${exportId}`,

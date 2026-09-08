@@ -1,4 +1,4 @@
-import { userErrorMessage } from '@/lib/userErrors';
+import { userErrorMessage } from "@/lib/userErrors";
 import { useActivityEnvironment } from "@/features/workspace/ActivityEnvironment";
 import { chainEnvironment } from "../../shared/assets";
 import { useState } from "react";
@@ -83,11 +83,14 @@ export default function Invoices() {
     safes?.filter(
       (s) =>
         chainEnvironment(s.chainId) === environment &&
-        (!paymentToken || getTokenSymbolsForChain(s.chainId).includes(paymentToken)),
+        (!paymentToken ||
+          getTokenSymbolsForChain(s.chainId).includes(paymentToken)),
     ) ?? [];
   const fundingAccount = accountId
-    ? availableSafes.find(s => s._id === accountId)
-    : availableSafes.length === 1 ? availableSafes[0] : undefined;
+    ? availableSafes.find((s) => s._id === accountId)
+    : availableSafes.length === 1
+      ? availableSafes[0]
+      : undefined;
   const chainId = fundingAccount?.chainId;
   const sameToken = selectedInvoices.every((i) => i.token === paymentToken);
   const total =
@@ -213,7 +216,7 @@ export default function Invoices() {
                 ? "$0.00"
                 : "…"
           }
-          detail={`${unpaid.length} unpaid bill${unpaid.length === 1 ? '' : 's'}`}
+          detail={`${unpaid.length} unpaid bill${unpaid.length === 1 ? "" : "s"}`}
         />
         <Metric
           label="Overdue"
@@ -266,7 +269,8 @@ export default function Invoices() {
         {selectedInvoices.length > 0 && (
           <div className="workspace-toolbar !bg-accent-500/5">
             <p className="text-xs">
-              {selectedInvoices.length} bills selected{" "}
+              {selectedInvoices.length} bill
+              {selectedInvoices.length === 1 ? "" : "s"} selected{" "}
               {total
                 ? `· ${formatMoney(total, paymentToken, true)}`
                 : "· Choose one currency per batch"}
@@ -305,24 +309,17 @@ export default function Invoices() {
                   : `No ${tabs[tab].toLowerCase()} bills`
             }
             description="Add a vendor invoice, choose a pay date, and follow its progress through approval and settlement."
-            action={
-              canRecord && (
-                <button
-                  className="workspace-button"
-                  onClick={() => setEditor("new")}
-                >
-                  <Plus size={14} />
-                  Add a bill
-                </button>
-              )
-            }
           />
         ) : (
           <div className="workspace-table-wrap">
-            <table className="workspace-table">
-              <thead>
-                <tr>
-                  <th>
+            <table
+              className="workspace-table workspace-table-responsive"
+              role="table"
+            >
+              <thead role="rowgroup">
+                <tr role="row">
+                  <th role="columnheader" scope="col">
+                    <span className="md:sr-only">Select all bills</span>
                     {canPay && ["unpaid", "overdue"].includes(tab) && (
                       <input
                         type="checkbox"
@@ -345,19 +342,27 @@ export default function Invoices() {
                       />
                     )}
                   </th>
-                  <th>Vendor & invoice</th>
-                  <th>Due date</th>
-                  <th className="numeric">Amount</th>
-                  <th>Status</th>
-                  <th>
+                  <th role="columnheader" scope="col">
+                    Vendor & invoice
+                  </th>
+                  <th role="columnheader" scope="col">
+                    Due date
+                  </th>
+                  <th role="columnheader" scope="col" className="numeric">
+                    Amount
+                  </th>
+                  <th role="columnheader" scope="col">
+                    Status
+                  </th>
+                  <th role="columnheader" scope="col">
                     <span className="sr-only">Details</span>
                   </th>
                 </tr>
               </thead>
-              <tbody>
+              <tbody role="rowgroup">
                 {visible.map((i) => (
-                  <tr key={i._id}>
-                    <td>
+                  <tr role="row" key={i._id}>
+                    <td role="cell" data-selection>
                       {canPay && i.status === "unpaid" && (
                         <input
                           type="checkbox"
@@ -373,7 +378,7 @@ export default function Invoices() {
                         />
                       )}
                     </td>
-                    <td>
+                    <td role="cell" data-primary>
                       <div className="workspace-person">
                         <span className="workspace-avatar">
                           {i.vendorName.slice(0, 2).toUpperCase()}
@@ -393,14 +398,16 @@ export default function Invoices() {
                         </span>
                       </div>
                     </td>
-                    <td>{formatDate(i.dueDate)}</td>
-                    <td className="numeric">
+                    <td role="cell" data-label="Due date">
+                      {formatDate(i.dueDate)}
+                    </td>
+                    <td role="cell" data-label="Amount" className="numeric">
                       <strong>{formatMoney(i.amount, i.token, true)}</strong>
                       <span className="workspace-table-secondary">
                         {i.token}
                       </span>
                     </td>
-                    <td>
+                    <td role="cell" data-label="Status">
                       <StatusBadge
                         status={
                           i.status === "unpaid" && isBillOverdue(i.dueDate)
@@ -409,7 +416,7 @@ export default function Invoices() {
                         }
                       />
                     </td>
-                    <td>
+                    <td role="cell" data-actions>
                       <button
                         className="workspace-action-link"
                         onClick={() => setParams({ view: tab, focus: i._id })}
@@ -425,7 +432,10 @@ export default function Invoices() {
           </div>
         )}
         <div className="workspace-table-footer">
-          <span>{visible?.length ?? 0} bill{visible?.length === 1 ? '' : 's'} in this view</span>
+          <span>
+            {visible?.length ?? 0} bill{visible?.length === 1 ? "" : "s"} in
+            this view
+          </span>
           <span>Each paid bill links to a verified payment</span>
         </div>
       </section>
@@ -461,7 +471,12 @@ export default function Invoices() {
               {focus.description || "No description added."}
             </p>
             <InvoiceAttachments invoiceId={focus._id} />
-            {focus.sourceReviewedAt && <p className="text-xs text-slate-400">Bill details reviewed against the source {formatDate(focus.sourceReviewedAt)}.</p>}
+            {focus.sourceReviewedAt && (
+              <p className="text-xs text-slate-400">
+                Bill details reviewed against the source{" "}
+                {formatDate(focus.sourceReviewedAt)}.
+              </p>
+            )}
             {focus.disbursementId && (
               <Link
                 className="workspace-action-link"
@@ -527,9 +542,7 @@ export default function Invoices() {
                   setVoiding(null);
                   setParams({ view: "void" });
                 } catch (e) {
-                  setError(
-                    userErrorMessage(e, "Could not void bill"),
-                  );
+                  setError(userErrorMessage(e, "Could not void bill"));
                   setVoiding(null);
                 } finally {
                   setBusy(false);
@@ -551,14 +564,17 @@ export default function Invoices() {
           <div className="space-y-5 p-6">
             {error && <Notice>{error}</Notice>}
             <p className="text-3xl font-semibold tabular-nums">
-              {total ? formatMoney(total, paymentToken, true) : "Select one currency"}{" "}
+              {total
+                ? formatMoney(total, paymentToken, true)
+                : "Select one currency"}{" "}
               <span className="text-sm font-normal text-slate-400">
                 {paymentToken}
               </span>
             </p>
             <p className="workspace-description">
-              {selectedInvoices.length} bill{selectedInvoices.length === 1 ? '' : 's'}. Invoices for the same vendor are
-              combined into one transfer.
+              {selectedInvoices.length} bill
+              {selectedInvoices.length === 1 ? "" : "s"}. Invoices for the same
+              vendor are combined into one transfer.
             </p>
             <div className="max-h-48 overflow-auto">
               {selectedInvoices.map((i) => (
@@ -584,7 +600,8 @@ export default function Invoices() {
                   </option>
                   {availableSafes.map((s) => (
                     <option key={s._id} value={s._id}>
-                      {s.name ?? "Account"} · {getChainName(s.chainId)} · {s.safeAddress.slice(-6)}
+                      {s.name ?? "Account"} · {getChainName(s.chainId)} ·{" "}
+                      {s.safeAddress.slice(-6)}
                     </option>
                   ))}
                 </select>
@@ -649,4 +666,4 @@ export default function Invoices() {
   );
 }
 import { isBillOverdue } from "../../shared/dueDate";
-import { InvoiceAttachments } from '@/features/payments/InvoiceSource';
+import { InvoiceAttachments } from "@/features/payments/InvoiceSource";

@@ -2,7 +2,7 @@
 
 Updated September 8, 2026 for `2.0.0-rc.1`. Cloudflare Pages hosts the React app; Convex provides the API, database, file storage and scheduled jobs. The PR remains a release candidate. Mainnet enablement requires the acceptance listed below.
 
-Current local checks pass 1,187 unit/backend tests, frontend/Convex typecheck, lint and the release build. All 395 browser stories pass, including the separate Circle USDC fee review. Receiving-contract and release-configuration tests also pass. These browser stories use fixtures; the built-app testnet evidence below uses actual customer-funded receipts.
+Current local checks pass 1,192 unit/backend tests across 120 files, frontend/Convex typecheck, lint and the release build. All 410 browser stories pass, including the separate Circle USDC fee review. Receiving-contract and release-configuration tests also pass. These browser stories use fixtures; the built-app testnet evidence below uses actual customer-funded receipts.
 
 The previous committed build passed GitHub CI and Cloudflare Pages. Its deployed sign-in page was opened and verified in Chromium. A full development snapshot was restored into an isolated schema-only backend: 96,275 records across 62 nonempty tables and one stored file matched exactly. See [operations rehearsal](OPERATIONS_REHEARSAL.md). Production has not been modified by this rehearsal. Keys, sessions, authorizations and private journals stay outside source control.
 

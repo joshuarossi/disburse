@@ -1,4 +1,4 @@
-import { userErrorMessage } from '@/lib/userErrors';
+import { userErrorMessage } from "@/lib/userErrors";
 import { useState } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
 import { useMutation, useQuery } from "convex/react";
@@ -310,10 +310,14 @@ export default function Beneficiaries() {
           />
         ) : (
           <div className="workspace-table-wrap">
-            <table className="workspace-table">
-              <thead>
-                <tr>
-                  <th>
+            <table
+              className="workspace-table workspace-table-responsive"
+              role="table"
+            >
+              <thead role="rowgroup">
+                <tr role="row">
+                  <th role="columnheader" scope="col">
+                    <span className="md:sr-only">Select all recipients</span>
                     <input
                       type="checkbox"
                       aria-label="Select all visible recipients"
@@ -337,19 +341,27 @@ export default function Beneficiaries() {
                       }
                     />
                   </th>
-                  <th>Recipient</th>
-                  <th>Type</th>
-                  <th>Groups</th>
-                  <th>Payment details</th>
-                  <th>
+                  <th role="columnheader" scope="col">
+                    Recipient
+                  </th>
+                  <th role="columnheader" scope="col">
+                    Type
+                  </th>
+                  <th role="columnheader" scope="col">
+                    Groups
+                  </th>
+                  <th role="columnheader" scope="col">
+                    Payment details
+                  </th>
+                  <th role="columnheader" scope="col">
                     <span className="sr-only">Actions</span>
                   </th>
                 </tr>
               </thead>
-              <tbody>
+              <tbody role="rowgroup">
                 {visible.map((r) => (
-                  <tr key={r._id}>
-                    <td>
+                  <tr role="row" key={r._id}>
+                    <td role="cell" data-selection>
                       <input
                         type="checkbox"
                         aria-label={`Select ${r.name}`}
@@ -357,7 +369,7 @@ export default function Beneficiaries() {
                         onChange={() => toggle(r._id)}
                       />
                     </td>
-                    <td>
+                    <td role="cell" data-primary>
                       <div className="workspace-person">
                         <span className="workspace-avatar">
                           {r.name
@@ -379,8 +391,10 @@ export default function Beneficiaries() {
                         </span>
                       </div>
                     </td>
-                    <td>{r.type === "business" ? "Business" : "Person"}</td>
-                    <td>
+                    <td role="cell" data-label="Type">
+                      {r.type === "business" ? "Business" : "Person"}
+                    </td>
+                    <td role="cell" data-label="Groups">
                       <div className="flex flex-wrap gap-1">
                         {r.tags.length ? (
                           r.tags.map((tag: string) => (
@@ -393,7 +407,7 @@ export default function Beneficiaries() {
                         )}
                       </div>
                     </td>
-                    <td>
+                    <td role="cell" data-label="Payment details">
                       <span className="workspace-status">
                         {r.detailRequestId
                           ? (r.detailRequestExpiresAt ?? 0) > Date.now()
@@ -403,7 +417,7 @@ export default function Beneficiaries() {
                             "Payout details approved")}
                       </span>
                     </td>
-                    <td>
+                    <td role="cell" data-actions>
                       <div className="flex items-center justify-end gap-3">
                         {r.isActive &&
                           (r.walletAddress || r.pendingPayoutChangeId) && (

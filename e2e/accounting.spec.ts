@@ -192,3 +192,25 @@ test('balance checks retain period evidence and offer a retry after an unavailab
   await page.getByRole('button', { name: 'Check period balances', exact: true }).focus();
   await page.screenshot({ path: '.local/qa/accounting-balances-mobile.png', fullPage: true });
 });
+
+test('mobile accounting keeps review and export controls inside the viewport', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 980 });
+  await openAccounting(page);
+  for (const [section, listName, action] of [
+    ['Account activity', 'Account activity', 'Review with books'],
+    ['Invoice receipts', 'Invoice receipts', 'Review with books'],
+    ['Journals', 'Reviewed journals', 'Review movement'],
+  ]) {
+    await page.getByRole('button', { name: section, exact: true }).click();
+    const list = page.getByRole('list', { name: listName, exact: true });
+    const button = list.getByRole('button', { name: action, exact: true });
+    await expect(button).toBeVisible();
+    const bounds = await button.boundingBox();
+    expect(bounds!.x).toBeGreaterThanOrEqual(0);
+    expect(bounds!.x + bounds!.width).toBeLessThanOrEqual(390);
+    await button.click();
+    await expect(page.getByRole('dialog', { name: 'Reconcile with your books' })).toBeVisible();
+    await page.getByRole('button', { name: 'Close dialog', exact: true }).click();
+  }
+  await expect(page.getByRole('checkbox', { name: 'Export DSB-1', exact: true })).toBeVisible();
+});

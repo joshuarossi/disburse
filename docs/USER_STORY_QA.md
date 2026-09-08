@@ -164,3 +164,8 @@ Transaction: `0xb843b021f4866b265b869dc3280785c0ea5391922e71b4fe08c1f1bb5b288016
 Verified Safe service proposal, backend intent/current owner signature checks, two receipt confirmations, exact 0.010001 USDC recipient balance increase, payment status executed, linked invoice paid, and matching accounting row/transaction hash. Gas used: 84,470. Native fee: 0.00017337543024627 Sepolia ETH. A repeat check recognized the executed payment and did not resubmit.
 
 This is real SDK-signed native-fee settlement through the development backend. It does not establish browser-extension signing or managed stablecoin-fee relay acceptance. Production relay defaults were not changed.
+
+
+## September 8 continuation
+
+The [complete built-app finance cycle](FINANCE_CYCLE_ACCEPTANCE.md) now covers repeated employee import, bill preparation, two parent-owner approvals, declined signature/send recovery, exact testnet settlement and balanced accounting export. The [current launch report](LAUNCH_READINESS.md) supersedes historical open-status rows and test counts above. Current source checks pass 1,192 tests across 120 files; all 410 browser stories pass. Fixture coverage remains distinct from actual provider receipts and external-ledger acceptance.

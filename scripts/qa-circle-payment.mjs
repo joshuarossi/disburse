@@ -2,6 +2,8 @@
 // --prepare creates a reviewed test payment. --execute sends that original
 // payment once; --status only reconciles it. No native gas or provider account.
 import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { execFileSync } from "node:child_process";
+import assert from "node:assert/strict";
 import { ConvexHttpClient } from "convex/browser";
 import { createPublicClient, erc20Abi, http } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
@@ -15,7 +17,12 @@ import {
   approvalSigningData,
   nestedSigningData,
 } from "../shared/safeSignatures.ts";
-import { circleConfiguration } from "../shared/circleExecution.ts";
+import {
+  circleConfiguration,
+  circleOperationHash,
+} from "../shared/circleExecution.ts";
+import { circleRpc, CircleServiceError } from "../shared/circleTransport.ts";
+import { verifyCircleSubmission } from "../convex/lib/circleSubmission.ts";
 import { userErrorMessage } from "../src/lib/userErrors.ts";
 const run = process.argv.find((a) => a.startsWith("--run="))?.slice(6);
 const feeLimitArg =
@@ -26,6 +33,8 @@ if (!/^[1-9][0-9]{0,6}$/.test(feeLimitArg) || BigInt(feeLimitArg) > 2_000_000n)
 if (!run || !/^[a-z0-9][a-z0-9-]{0,40}$/.test(run))
   throw new Error("Choose --run=name.");
 const cancel = process.argv.includes("--cancel");
+const withholdResponse = process.argv.includes("--withhold-provider-response");
+const backgroundOnly = process.argv.includes("--background-only");
 const receivableId = process.argv
   .find((a) => a.startsWith("--receivable="))
   ?.slice(13);
@@ -33,12 +42,24 @@ const prepare = process.argv.includes("--prepare"),
   resume = process.argv.includes("--resume-preparation"),
   execute = process.argv.includes("--execute"),
   resumeApprovals = process.argv.includes("--resume-approvals"),
+  resumeClaim = process.argv.includes("--resume-claimed-request"),
   status = process.argv.includes("--status");
 if (
-  [prepare, resume, execute, resumeApprovals, status].filter(Boolean).length !==
-  1
+  [prepare, resume, execute, resumeApprovals, resumeClaim, status].filter(
+    Boolean,
+  ).length !== 1
 )
   throw new Error("Choose preparation, execution or status checking.");
+if (withholdResponse && !execute && !resumeClaim)
+  throw new Error(
+    "Response withholding is available only for one fresh execution.",
+  );
+if (resumeClaim && (!withholdResponse || cancel))
+  throw new Error(
+    "Claim recovery only completes a withheld-response test that never reached submission.",
+  );
+if (backgroundOnly && !status)
+  throw new Error("Background-only observation requires --status.");
 if (
   !process.env.CONVEX_DEPLOYMENT?.startsWith("dev:") ||
   process.env.VITE_CONVEX_URL !== "https://fortunate-cat-122.convex.cloud"
@@ -112,6 +133,105 @@ async function balances() {
       "The test requires zero native ETH in both the signer and company account.",
     );
   return { ownerETH, safeETH, ownerUSDC, safeUSDC };
+}
+function developmentCall(name, args) {
+  assert.ok(["circlePayments:context", "circlePayments:claim"].includes(name));
+  // Keep session tokens and saved owner signatures out of command/log output.
+  const output = execFileSync(
+    "bun",
+    [
+      "x",
+      "convex",
+      "run",
+      "--deployment-name",
+      "fortunate-cat-122",
+      name,
+      JSON.stringify(args),
+    ],
+    {
+      encoding: "utf8",
+      timeout: 55_000,
+      maxBuffer: 1_048_576,
+      stdio: ["ignore", "pipe", "pipe"],
+    },
+  );
+  return output.trim() ? JSON.parse(output) : null;
+}
+async function submitWithLostResponse(identity, claimedBeforePost = false) {
+  assert.equal(saved.kind, "payment");
+  const { execution, signatures } = developmentCall(
+    "circlePayments:context",
+    identity,
+  );
+  if (claimedBeforePost) {
+    assert.equal(saved.stage, "claiming_lost_response");
+    assert.ok(!saved.postAttempted && !saved.providerAcceptedOriginalHash);
+    assert.equal(execution.stage, "submitting");
+    assert.equal(execution.userOpHash, saved.userOpHash);
+  }
+  const recorded = decodeCircleRequest(execution.record);
+  const original = claimedBeforePost
+    ? { to: recorded.safe, data: recorded.transaction.data }
+    : await client.action(api.accountApprovals.execution, {
+        disbursementId: saved.disbursementId,
+        sessionToken,
+      });
+  const request = await verifyCircleSubmission(
+    // Repeat live signature/nonce/expiry/simulation validation for the one
+    // claimed request that the durable host journal proves was never POSTed.
+    // The backend remains claimed throughout; no replacement is created.
+    claimedBeforePost ? { ...execution, stage: "ready" } : execution,
+    signatures.filter((row) => row.stage === "operation"),
+    original,
+  );
+  assert.equal(request.chainId, 84532);
+  assert.equal(request.safe.toLowerCase(), safe.toLowerCase());
+  assert.equal(request.originalHash, saved.safeTxHash);
+  assert.ok(BigInt(request.permit.amount) <= BigInt(saved.feeLimit));
+  const hash = circleOperationHash(request.chainId, request.operation);
+  if (claimedBeforePost) assert.equal(hash, saved.userOpHash);
+  else {
+    await save({ stage: "claiming_lost_response", userOpHash: hash });
+    developmentCall("circlePayments:claim", {
+      ...identity,
+      revision: execution.revision,
+      userOpHash: hash,
+    });
+  }
+  await save({ stage: "submitting", postAttempted: true });
+  const originalFetch = globalThis.fetch;
+  let submissions = 0;
+  globalThis.fetch = async (input, init) => {
+    assert.equal(String(input), "https://api.candide.dev/public/v3/84532");
+    assert.equal(JSON.parse(String(init.body)).method, "eth_sendUserOperation");
+    assert.equal(++submissions, 1, "Never repeat a provider submission");
+    const response = await originalFetch(input, init);
+    const result = await response.json();
+    assert.equal(
+      result.result,
+      hash,
+      "Observe the saved request; do not resend after an unknown response",
+    );
+    // Only this host-side test transport loses the reply. The real provider,
+    // claimed backend record and background recovery run without test hooks.
+    await save({ providerAcceptedOriginalHash: true });
+    throw new TypeError("QA transport interrupted after provider acceptance");
+  };
+  try {
+    await assert.rejects(
+      circleRpc(84532, "eth_sendUserOperation", [
+        request.operation,
+        config.entryPoint,
+      ]),
+      (error) =>
+        error instanceof CircleServiceError && error.code === "unavailable",
+    );
+    assert.equal(submissions, 1);
+    assert.equal(saved.providerAcceptedOriginalHash, true);
+    await save({ stage: "submission_response_withheld" });
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
 }
 try {
   if (
@@ -303,6 +423,13 @@ try {
         initial: saved.initial,
       }),
     );
+  } else if (resumeClaim) {
+    await balances();
+    await submitWithLostResponse(
+      { executionId: saved.executionId, sessionToken },
+      true,
+    );
+    console.log(json({ stage: saved.stage, executionId: saved.executionId }));
   } else if (execute || resumeApprovals) {
     if (saved.stage !== (resumeApprovals ? "approving" : "prepared"))
       throw new Error(
@@ -355,14 +482,18 @@ try {
       });
     }
     await save({ stage: "submitting" });
-    await client.action(api.circlePayments.submit, identity);
-    await save({ stage: "submitted" });
-    console.log(json({ stage: "submitted", executionId: saved.executionId }));
+    if (withholdResponse) await submitWithLostResponse(identity);
+    else {
+      await client.action(api.circlePayments.submit, identity);
+      await save({ stage: "submitted" });
+    }
+    console.log(json({ stage: saved.stage, executionId: saved.executionId }));
   } else {
-    await client.action(api.circlePayments.recheck, {
-      executionId: saved.executionId,
-      sessionToken,
-    });
+    if (!backgroundOnly)
+      await client.action(api.circlePayments.recheck, {
+        executionId: saved.executionId,
+        sessionToken,
+      });
     const execution = await client.query(api.circlePayments.get, {
       ...feeSource(),
       sessionToken,
