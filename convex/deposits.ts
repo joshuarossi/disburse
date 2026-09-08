@@ -1,5 +1,5 @@
 "use node";
-import { env as serverEnvironment } from "node:process";
+import { safeReadHeaders } from "./lib/safeReadService";
 import { v } from "convex/values";
 import { action, internalAction } from "./_generated/server";
 import { api, internal } from "./_generated/api";
@@ -76,11 +76,7 @@ export const process = internalAction({
           ),
         );
         const response = await fetch(cursor, {
-          headers: serverEnvironment.SAFE_TX_SERVICE_API_KEY
-            ? {
-                Authorization: `Bearer ${serverEnvironment.SAFE_TX_SERVICE_API_KEY}`,
-              }
-            : undefined,
+          headers: safeReadHeaders(state.chainId),
           signal: AbortSignal.timeout(15_000),
           redirect: "error",
         });
