@@ -1,17 +1,18 @@
-import { userErrorMessage } from '@/lib/userErrors';
-import { supportsCircleFees } from '../../../shared/circleExecution';
-import { CustomerPaidExecution } from './CustomerPaidExecution';
+import { userErrorMessage } from "@/lib/userErrors";
+import { supportsCircleFees } from "../../../shared/circleExecution";
+import { CustomerPaidExecution } from "./CustomerPaidExecution";
+import { ScheduledPayment } from "./ScheduledPayment";
 import { AccountCancellation } from "@/components/payments/AccountCancellation";
-import { PaymentRecovery } from './PaymentRecovery';
-import { paymentStatus } from '../../../shared/paymentQueue';
-import { ApprovalPathReview } from './ApprovalPathReview';
-import { paymentDebits } from '../../../shared/executionFee';
+import { PaymentRecovery } from "./PaymentRecovery";
+import { paymentStatus } from "../../../shared/paymentQueue";
+import { ApprovalPathReview } from "./ApprovalPathReview";
+import { paymentDebits } from "../../../shared/executionFee";
 import { RELAY_FEATURE_ENABLED } from "@/lib/relayConfig";
 import { DelegatedPayment } from "./DelegatedPayment";
 import { screeningReviewKey } from "../../../shared/screeningReview";
 import { PaymentBatchForm } from "@/components/payments/PaymentBatchForm";
 import { useState } from "react";
-import { Link } from 'react-router-dom';
+import { Link } from "react-router-dom";
 import { useQuery as useRemoteQuery } from "@tanstack/react-query";
 import { useAccount } from "wagmi";
 import { useAction, useMutation, useQuery } from "convex/react";
@@ -58,19 +59,55 @@ export function PaymentReview({
     api.disbursements.getWithRecipients,
     sessionToken ? { disbursementId: id, sessionToken } : "skip",
   );
-  const recovery = useQuery(api.relayJobs.paymentStatus, sessionToken ? { disbursementId: id, sessionToken } : "skip");
+  const recovery = useQuery(
+    api.relayJobs.paymentStatus,
+    sessionToken ? { disbursementId: id, sessionToken } : "skip",
+  );
   const screening = useQuery(
     api.screeningQueries.checkDisbursementRecipients,
     sessionToken ? { disbursementId: id, sessionToken } : "skip",
   );
   const [usingAllowance, setUsingAllowance] = useState(false);
-  const [allowanceFeeMode, setAllowanceFeeMode] = useState<"managed" | "wallet">(RELAY_FEATURE_ENABLED ? "managed" : "wallet");
-  const feeQuote = useQuery(api.relayQuotes.preview,
-    RELAY_FEATURE_ENABLED && (!supportsCircleFees(payment?.chainId) || usingAllowance && allowanceFeeMode === 'managed') && sessionToken ? { disbursementId: id, sessionToken } : "skip");
-  const customerPaid = supportsCircleFees(payment?.chainId) && !usingAllowance && !payment?.executionFee && !payment?.allowanceExecution && (!payment?.nativeExecution || payment.nativeExecution.service === 'circle');
-  const displayedFee = payment?.executionFee ?? ((!usingAllowance || allowanceFeeMode === "managed") && payment && ["draft", "pending"].includes(payment.status) && !payment.safeTxHash ? feeQuote?.fee : undefined);
+  const [allowanceFeeMode, setAllowanceFeeMode] = useState<
+    "managed" | "wallet"
+  >(RELAY_FEATURE_ENABLED ? "managed" : "wallet");
+  const feeQuote = useQuery(
+    api.relayQuotes.preview,
+    RELAY_FEATURE_ENABLED &&
+      (!supportsCircleFees(payment?.chainId) ||
+        (usingAllowance && allowanceFeeMode === "managed")) &&
+      sessionToken
+      ? { disbursementId: id, sessionToken }
+      : "skip",
+  );
+  const customerPaid =
+    supportsCircleFees(payment?.chainId) &&
+    !usingAllowance &&
+    !payment?.executionFee &&
+    !payment?.allowanceExecution &&
+    (!payment?.nativeExecution || payment.nativeExecution.service === "circle");
+  const automatic =
+    customerPaid &&
+    (!!payment?.paymentScheduleId ||
+      (!!payment &&
+        ["draft", "pending"].includes(payment.status) &&
+        !payment.safeTxHash &&
+        !payment.preparedProposalAt &&
+        !!payment.scheduledAt &&
+        payment.scheduledAt > Date.now()));
+  const displayedFee =
+    payment?.executionFee ??
+    ((!usingAllowance || allowanceFeeMode === "managed") &&
+    payment &&
+    ["draft", "pending"].includes(payment.status) &&
+    !payment.safeTxHash
+      ? feeQuote?.fee
+      : undefined);
   const [reviewedFee, setReviewedFee] = useState("");
-  const feeBlocked = RELAY_FEATURE_ENABLED && !customerPaid && (!feeQuote?.identity || reviewedFee !== feeQuote.identity);
+  const feeBlocked =
+    RELAY_FEATURE_ENABLED &&
+    !customerPaid &&
+    (!feeQuote?.identity || reviewedFee !== feeQuote.identity);
   const [screeningAcknowledged, setScreeningAcknowledged] = useState("");
   const reviewKey = screening ? screeningReviewKey(screening.flagged) : "";
   const screeningBlocked =
@@ -106,10 +143,16 @@ export function PaymentReview({
     retry: 1,
   });
   const currentOwner =
-    !!address && (approvals.data?.workspace ? approvals.data.workspace.paths.length > 0 : approvals.data?.owners.includes(address.toLowerCase()));
+    !!address &&
+    (approvals.data?.workspace
+      ? approvals.data.workspace.paths.length > 0
+      : approvals.data?.owners.includes(address.toLowerCase()));
   const alreadyApproved =
     !!address &&
-    (approvals.data?.workspace ? approvals.data.workspace.paths.length > 0 && approvals.data.workspace.paths.every(p => p.approved) : approvals.data?.confirmedOwners.includes(address.toLowerCase()));
+    (approvals.data?.workspace
+      ? approvals.data.workspace.paths.length > 0 &&
+        approvals.data.workspace.paths.every((p) => p.approved)
+      : approvals.data?.confirmedOwners.includes(address.toLowerCase()));
   const update = useMutation(api.disbursements.updateStatus);
   const reschedule = useMutation(api.disbursements.reschedule);
   const confirmReceipt = useAction(api.paymentExecution.confirm);
@@ -123,8 +166,9 @@ export function PaymentReview({
   const safe = safes?.find((s) => s._id === payment?.safeId);
   const approvalThreshold = approvals.data?.threshold ?? safe?.threshold;
   const approverName = (owner: string) =>
-    approvals.data?.workspace?.names.find(n => n.address === owner)?.name ||
-    members?.find(member => member?.walletAddress.toLowerCase() === owner)?.name ||
+    approvals.data?.workspace?.names.find((n) => n.address === owner)?.name ||
+    members?.find((member) => member?.walletAddress.toLowerCase() === owner)
+      ?.name ||
     `${owner.slice(0, 8)}…${owner.slice(-6)}`;
   const mutate = async (operation: () => Promise<unknown>) => {
     if (busy) return;
@@ -211,16 +255,57 @@ export function PaymentReview({
                 recipient{rows.length === 1 ? "" : "s"}
               </p>
             </div>
-            <StatusBadge {...paymentStatus(payment)} {...(recovery?.status === 'exception' ? { status: 'failed' } : {})} />
+            <StatusBadge
+              {...paymentStatus(payment)}
+              {...(recovery?.status === "exception"
+                ? { status: "failed" }
+                : {})}
+            />
           </div>
           {(error || actions.error) && (
             <Notice>{error || actions.error}</Notice>
           )}
-          {payment.status === 'failed' && payment.relayError && <Notice>{userErrorMessage(payment.relayError, 'This payment failed. Review its original receipt before preparing another payment.')}</Notice>}
-          {payment.executionFailure && canManage && <Link className="workspace-button workspace-button-primary" to={`/org/${orgId}/disbursements?new=1`} onClick={onClose}>New payment</Link>}
-          {payment.payoutReviewError && <Notice>{payment.payoutReviewError}</Notice>}
+          {payment.status === "failed" && payment.relayError && (
+            <Notice>
+              {userErrorMessage(
+                payment.relayError,
+                "This payment failed. Review its original receipt before preparing another payment.",
+              )}
+            </Notice>
+          )}
+          {payment.executionFailure && canManage && (
+            <Link
+              className="workspace-button workspace-button-primary"
+              to={`/org/${orgId}/disbursements?new=1`}
+              onClick={onClose}
+            >
+              New payment
+            </Link>
+          )}
+          {payment.payoutReviewError && (
+            <Notice>{payment.payoutReviewError}</Notice>
+          )}
           {actions.message && <Notice tone="success">{actions.message}</Notice>}
-          {actions.approvalRequest && <ApprovalPathReview key={actions.approvalRequest.paths.map(p => p.path.join(':')).join('|')} paths={actions.approvalRequest.paths} busy={actions.busy} onCancel={actions.dismissApproval} onApprove={path => { const r = actions.approvalRequest!; void actions.run(r.id, r.operation, r.acknowledgedScreening, r.reviewedFeeIdentity, path); }} />}
+          {actions.approvalRequest && (
+            <ApprovalPathReview
+              key={actions.approvalRequest.paths
+                .map((p) => p.path.join(":"))
+                .join("|")}
+              paths={actions.approvalRequest.paths}
+              busy={actions.busy}
+              onCancel={actions.dismissApproval}
+              onApprove={(path) => {
+                const r = actions.approvalRequest!;
+                void actions.run(
+                  r.id,
+                  r.operation,
+                  r.acknowledgedScreening,
+                  r.reviewedFeeIdentity,
+                  path,
+                );
+              }}
+            />
+          )}
           <dl className="workspace-detail-grid payment-review-summary rounded-lg border border-white/10 p-5">
             <div>
               <dt>Recipient total</dt>
@@ -235,13 +320,29 @@ export function PaymentReview({
                 </span>
               </dd>
             </div>
-            {displayedFee && <div>
-              <dt>Total account debit</dt>
-              <dd className="font-semibold tabular-nums">
-                {paymentDebits(payment.token, payment.totalAmount ?? payment.amount ?? '0', displayedFee ?? undefined).map(total => <span key={total.token} className="block whitespace-nowrap overflow-x-auto">{formatMoney(total.amount, total.token, true)} {total.token}</span>)}
-                <span className="workspace-table-secondary">Includes the payment fee</span>
-              </dd>
-            </div>}
+            {displayedFee && (
+              <div>
+                <dt>Total account debit</dt>
+                <dd className="font-semibold tabular-nums">
+                  {paymentDebits(
+                    payment.token,
+                    payment.totalAmount ?? payment.amount ?? "0",
+                    displayedFee ?? undefined,
+                  ).map((total) => (
+                    <span
+                      key={total.token}
+                      className="block whitespace-nowrap overflow-x-auto"
+                    >
+                      {formatMoney(total.amount, total.token, true)}{" "}
+                      {total.token}
+                    </span>
+                  ))}
+                  <span className="workspace-table-secondary">
+                    Includes the payment fee
+                  </span>
+                </dd>
+              </div>
+            )}
             <div>
               <dt>Pay date</dt>
               <dd>
@@ -262,9 +363,10 @@ export function PaymentReview({
             <div>
               <dt>Funding account</dt>
               <dd>
-                {safe?.name ?? (payment.chainId
-                  ? getChainName(payment.chainId)
-                  : "Original account")}
+                {safe?.name ??
+                  (payment.chainId
+                    ? getChainName(payment.chainId)
+                    : "Original account")}
                 {safe && (
                   <span className="workspace-table-secondary font-mono">
                     {safe.safeAddress.slice(0, 8)}…{safe.safeAddress.slice(-6)}
@@ -275,11 +377,21 @@ export function PaymentReview({
             <div>
               <dt>Approval requirements</dt>
               <dd>
-                {usingAllowance || payment.allowanceExecution ? "Member spending allowance" : approvalThreshold
-                  ? `${approvalThreshold} account approval${approvalThreshold === 1 ? "" : "s"}`
-                  : "Managed by account owners"}
+                {usingAllowance || payment.allowanceExecution
+                  ? "Member spending allowance"
+                  : automatic
+                    ? "Current account owners"
+                    : approvalThreshold
+                      ? `${approvalThreshold} account approval${approvalThreshold === 1 ? "" : "s"}`
+                      : "Managed by account owners"}
                 <span className="workspace-table-secondary">
-                  {usingAllowance || payment.allowanceExecution ? (displayedFee ? "The recipient payment and fee must fit your available allowance" : "The recipient payment must fit your available allowance") : approvals.data ? "Verified against the current account policy" : "Current owner permissions are checked before signing"}
+                  {usingAllowance || payment.allowanceExecution
+                    ? displayedFee
+                      ? "The recipient payment and fee must fit your available allowance"
+                      : "The recipient payment must fit your available allowance"
+                    : approvals.data
+                      ? "Verified against the current account policy"
+                      : "Current owner permissions are checked before signing"}
                 </span>
               </dd>
             </div>
@@ -306,7 +418,10 @@ export function PaymentReview({
                   </p>
                 ) : approvals.isError ? (
                   <p role="alert" className="mt-3 text-sm text-red-400">
-                    {userErrorMessage(approvals.error, "Could not load the account approvals. Try again shortly.")}
+                    {userErrorMessage(
+                      approvals.error,
+                      "Could not load the account approvals. Try again shortly.",
+                    )}
                   </p>
                 ) : (
                   approvals.data && (
@@ -333,13 +448,45 @@ export function PaymentReview({
                           </li>
                         ))}
                       </ul>
-                      {approvals.data.workspace?.groups.filter(g => g.path.length > 1).map(group => (
-                        <section key={group.path.join(':')} aria-label={`${approverName(group.address)} approvals`} className="mt-4 rounded-lg border border-[var(--ws-border)] p-3">
-                          <h4 className="font-medium">{approverName(group.address)}</h4>
-                          <p className="workspace-description !text-sm">{group.confirmedOwners.length} of {group.threshold} approvals received. Once complete, these count as one approval for {approverName(group.path[group.path.length - 2])}.</p>
-                          <ul className="mt-2 space-y-1 text-sm">{group.owners.map(owner => <li key={owner} className="flex justify-between gap-3"><span>{approverName(owner)}{owner === address?.toLowerCase() ? ' (you)' : ''}</span><span className="text-[var(--ws-muted)]">{group.confirmedOwners.includes(owner) ? 'Approved' : 'Awaiting approval'}</span></li>)}</ul>
-                        </section>
-                      ))}
+                      {approvals.data.workspace?.groups
+                        .filter((g) => g.path.length > 1)
+                        .map((group) => (
+                          <section
+                            key={group.path.join(":")}
+                            aria-label={`${approverName(group.address)} approvals`}
+                            className="mt-4 rounded-lg border border-[var(--ws-border)] p-3"
+                          >
+                            <h4 className="font-medium">
+                              {approverName(group.address)}
+                            </h4>
+                            <p className="workspace-description !text-sm">
+                              {group.confirmedOwners.length} of{" "}
+                              {group.threshold} approvals received. Once
+                              complete, these count as one approval for{" "}
+                              {approverName(group.path[group.path.length - 2])}.
+                            </p>
+                            <ul className="mt-2 space-y-1 text-sm">
+                              {group.owners.map((owner) => (
+                                <li
+                                  key={owner}
+                                  className="flex justify-between gap-3"
+                                >
+                                  <span>
+                                    {approverName(owner)}
+                                    {owner === address?.toLowerCase()
+                                      ? " (you)"
+                                      : ""}
+                                  </span>
+                                  <span className="text-[var(--ws-muted)]">
+                                    {group.confirmedOwners.includes(owner)
+                                      ? "Approved"
+                                      : "Awaiting approval"}
+                                  </span>
+                                </li>
+                              ))}
+                            </ul>
+                          </section>
+                        ))}
                       {approvals.data.currentNonce <
                         approvals.data.proposalNonce && (
                         <p className="mt-3 text-sm text-amber-500">
@@ -363,11 +510,18 @@ export function PaymentReview({
           <div>
             <h3 className="mb-3 text-sm font-semibold">Recipients</h3>
             <ul className="sm:hidden divide-y divide-white/10 rounded-lg border border-white/10">
-              {rows.map(row => <li key={row.id} className="p-3 space-y-2">
-                <p className="font-medium">{row.name}</p>
-                <p className="font-semibold tabular-nums whitespace-nowrap overflow-x-auto">{formatMoney(row.amount, payment.token, true)} <span className="text-xs font-normal">{payment.token}</span></p>
-                <p className="font-mono text-xs text-slate-400 break-all">{row.address}</p>
-              </li>)}
+              {rows.map((row) => (
+                <li key={row.id} className="p-3 space-y-2">
+                  <p className="font-medium">{row.name}</p>
+                  <p className="font-semibold tabular-nums whitespace-nowrap overflow-x-auto">
+                    {formatMoney(row.amount, payment.token, true)}{" "}
+                    <span className="text-xs font-normal">{payment.token}</span>
+                  </p>
+                  <p className="font-mono text-xs text-slate-400 break-all">
+                    {row.address}
+                  </p>
+                </li>
+              ))}
             </ul>
             <div className="hidden sm:block max-h-64 overflow-auto rounded-lg border border-white/10">
               <table className="workspace-table">
@@ -400,9 +554,11 @@ export function PaymentReview({
             <Notice tone="info">
               <p className="font-semibold">Screening review needed</p>
               <ul className="mt-2 space-y-2">
-                {screening.flagged.map((r) => <li key={r.beneficiaryId}>
-                  <strong>{r.beneficiaryName}</strong>: {r.reason}
-                </li>)}
+                {screening.flagged.map((r) => (
+                  <li key={r.beneficiaryId}>
+                    <strong>{r.beneficiaryName}</strong>: {r.reason}
+                  </li>
+                ))}
               </ul>
               {screening.enforcement === "block" ? (
                 <p>
@@ -428,19 +584,53 @@ export function PaymentReview({
               )}
             </Notice>
           )}
-          {RELAY_FEATURE_ENABLED && !customerPaid && !usingAllowance && ["draft", "pending"].includes(payment.status) && !payment.safeTxHash && (
-            <section className="workspace-card p-4 space-y-3">
-              <h3 className="font-semibold">Payment fee</h3>
-              {!feeQuote ? <p>Loading payment fee…</p> : feeQuote.error ? <Notice>{feeQuote.error}</Notice> : feeQuote.fee && (
-                <label className="flex items-start gap-3 text-sm">
-                  <input type="checkbox" checked={reviewedFee === feeQuote.identity} onChange={e => setReviewedFee(e.target.checked ? feeQuote.identity! : "")} />
-                  <span>I approve a {feeQuote.fee.amount} {feeQuote.fee.token} payment fee. This is added to the recipient total and paid only if the payment succeeds.</span>
-                </label>
-              )}
-            </section>
+          {RELAY_FEATURE_ENABLED &&
+            !customerPaid &&
+            !usingAllowance &&
+            ["draft", "pending"].includes(payment.status) &&
+            !payment.safeTxHash && (
+              <section className="workspace-card p-4 space-y-3">
+                <h3 className="font-semibold">Payment fee</h3>
+                {!feeQuote ? (
+                  <p>Loading payment fee…</p>
+                ) : feeQuote.error ? (
+                  <Notice>{feeQuote.error}</Notice>
+                ) : (
+                  feeQuote.fee && (
+                    <label className="flex items-start gap-3 text-sm">
+                      <input
+                        type="checkbox"
+                        checked={reviewedFee === feeQuote.identity}
+                        onChange={(e) =>
+                          setReviewedFee(
+                            e.target.checked ? feeQuote.identity! : "",
+                          )
+                        }
+                      />
+                      <span>
+                        I approve a {feeQuote.fee.amount} {feeQuote.fee.token}{" "}
+                        payment fee. This is added to the recipient total and
+                        paid only if the payment succeeds.
+                      </span>
+                    </label>
+                  )
+                )}
+              </section>
+            )}
+          {payment.preparedProposalAt &&
+            ["draft", "pending"].includes(payment.status) && (
+              <Notice tone="info">
+                Your signed proposal is saved. Resume preparation to restore it
+                to the approval queue. This reuses the same transaction and does
+                not request another signature.
+              </Notice>
+            )}
+          {payment.executionFee && payment.safeTxHash && (
+            <p className="text-sm text-[var(--ws-muted)]">
+              Approved payment fee: {payment.executionFee.amount}{" "}
+              {payment.executionFee.token}
+            </p>
           )}
-          {payment.preparedProposalAt && ['draft', 'pending'].includes(payment.status) && <Notice tone="info">Your signed proposal is saved. Resume preparation to restore it to the approval queue. This reuses the same transaction and does not request another signature.</Notice>}
-          {payment.executionFee && payment.safeTxHash && <p className="text-sm text-[var(--ws-muted)]">Approved payment fee: {payment.executionFee.amount} {payment.executionFee.token}</p>}
           {payment.status === "proposed" &&
             payment.scheduledAt &&
             payment.scheduledAt > Date.now() && (
@@ -451,6 +641,7 @@ export function PaymentReview({
               </Notice>
             )}
           {canManage &&
+            !automatic &&
             rows.length > 0 &&
             ((payment.status === "draft" && !payment.safeTxHash) ||
               (payment.status === "relaying" &&
@@ -463,26 +654,120 @@ export function PaymentReview({
                 onFeeModeChange={setAllowanceFeeMode}
               />
             )}
-          {customerPaid && canManage && payment.safeTxHash && ['proposed', 'relaying', 'executed', 'failed'].includes(payment.status) && <CustomerPaidExecution source={{ disbursementId: id }} ready={payment.status === 'proposed' && !!approvals.data?.ready} blocked={screeningBlocked || actions.busy} memberName={approverName} onBusyChange={setBusy} />}
-          {!customerPaid && <PaymentRecovery id={id} canManage={canManage} payment={payment} retryDisabled={locked || screeningBlocked} onRetryNative={payment.allowanceExecution ? undefined : () => void actions.run(id, 'execute', screeningAcknowledged)} />}
-          {payment.relayError && payment.status !== 'failed' && !recovery && !payment.nativeExecution && <Notice>{userErrorMessage(payment.relayError, 'This payment needs review. Check its original settlement before trying again.')}</Notice>}
-          {payment.status === "scheduled" && (
+          {customerPaid &&
+            canManage &&
+            payment.safeTxHash &&
+            ["proposed", "relaying", "executed", "failed"].includes(
+              payment.status,
+            ) && (
+              <CustomerPaidExecution
+                source={{ disbursementId: id }}
+                ready={payment.status === "proposed" && !!approvals.data?.ready}
+                blocked={screeningBlocked || actions.busy}
+                memberName={approverName}
+                onBusyChange={setBusy}
+              />
+            )}
+          {automatic && (
+            <ScheduledPayment
+              paymentId={id}
+              payAt={payment.scheduledAt!}
+              canManage={canManage}
+              blocked={screeningBlocked || actions.busy}
+              memberName={approverName}
+              onBusyChange={setBusy}
+            />
+          )}
+          {!customerPaid && (
+            <PaymentRecovery
+              id={id}
+              canManage={canManage}
+              payment={payment}
+              retryDisabled={locked || screeningBlocked}
+              onRetryNative={
+                payment.allowanceExecution
+                  ? undefined
+                  : () => void actions.run(id, "execute", screeningAcknowledged)
+              }
+            />
+          )}
+          {payment.relayError &&
+            !payment.paymentScheduleId &&
+            payment.status !== "failed" &&
+            !recovery &&
+            !payment.nativeExecution && (
+              <Notice>
+                {userErrorMessage(
+                  payment.relayError,
+                  "This payment needs review. Check its original settlement before trying again.",
+                )}
+              </Notice>
+            )}
+          {payment.status === "scheduled" && !payment.paymentScheduleId && (
             <Notice tone="info">
               This payment is scheduled. Complete all required owner signatures
               before its pay date. Signing now does not send it early.
             </Notice>
           )}
-          {payment.status === "relaying" && !recovery && !payment.nativeExecution && (
-            <Notice tone="info">
-              Submission is being reconciled. Do not create a replacement
-              payment while the outcome is uncertain.
-            </Notice>
-          )}
-          {payment.safeTxHash && (confirmCancel || payment.cancellationId || payment.status === 'cancelled' && !payment.cancellationConfirmedAt) && <AccountCancellation disbursementId={id} initiallyOpen memberName={wallet => members?.find(m => m?.walletAddress.toLowerCase() === wallet.toLowerCase())?.name || `${wallet.slice(0, 8)}…${wallet.slice(-6)}`} onBack={() => setConfirmCancel(false)} />}
-          {confirmCancel && !payment.safeTxHash && payment.status !== 'cancelled' && <div className="space-y-4 rounded-lg border border-[var(--ws-border)] p-4">
-            <p className="text-sm">Cancel this payment? It will leave the approval queue and release its budget reservation. No network fee applies.</p>
-            <div className="flex flex-wrap gap-2"><button className="workspace-button" disabled={locked} onClick={() => setConfirmCancel(false)}>Keep payment</button><button className="workspace-button" disabled={locked} onClick={() => void mutate(() => update({ disbursementId: id, sessionToken: sessionToken!, status: 'cancelled' }))}>Confirm cancellation</button></div>
-          </div>}
+          {payment.status === "relaying" &&
+            !recovery &&
+            !payment.nativeExecution && (
+              <Notice tone="info">
+                Submission is being reconciled. Do not create a replacement
+                payment while the outcome is uncertain.
+              </Notice>
+            )}
+          {payment.safeTxHash &&
+            (confirmCancel ||
+              payment.cancellationId ||
+              (payment.status === "cancelled" &&
+                !payment.cancellationConfirmedAt)) && (
+              <AccountCancellation
+                disbursementId={id}
+                initiallyOpen
+                memberName={(wallet) =>
+                  members?.find(
+                    (m) =>
+                      m?.walletAddress.toLowerCase() === wallet.toLowerCase(),
+                  )?.name || `${wallet.slice(0, 8)}…${wallet.slice(-6)}`
+                }
+                onBack={() => setConfirmCancel(false)}
+              />
+            )}
+          {confirmCancel &&
+            !payment.safeTxHash &&
+            payment.status !== "cancelled" && (
+              <div className="space-y-4 rounded-lg border border-[var(--ws-border)] p-4">
+                <p className="text-sm">
+                  Cancel this payment? It will leave the approval queue and
+                  release its budget reservation. No network fee applies.
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    className="workspace-button"
+                    disabled={locked}
+                    onClick={() => setConfirmCancel(false)}
+                  >
+                    Keep payment
+                  </button>
+                  <button
+                    className="workspace-button"
+                    disabled={locked}
+                    onClick={() =>
+                      void mutate(() =>
+                        update({
+                          disbursementId: id,
+                          sessionToken: sessionToken!,
+                          status: "cancelled",
+                        }),
+                      )
+                    }
+                  >
+                    Confirm cancellation
+                  </button>
+                </div>
+              </div>
+            )}
           {changingDate && (
             <div className="rounded-lg border border-white/10 p-4">
               <label>
@@ -571,105 +856,135 @@ export function PaymentReview({
                 </div>
               </details>
             )}
-          {!actions.approvalRequest && !payment.cancellationId && !payment.executionFailure && <div className="flex flex-wrap items-center justify-between gap-3 border-t border-white/10 pt-5">
-            <div>
-              {canManage &&
-                [
-                  "draft",
-                  "pending",
-                  "proposed",
-                  "scheduled",
-                  "failed",
-                ].includes(payment.status) && (
-                  <button
-                    className="workspace-button"
-                    disabled={locked}
-                    onClick={() => setConfirmCancel(true)}
-                  >
-                    Cancel payment
-                  </button>
-                )}
-            </div>
-            <div className="flex flex-wrap gap-2">
-              {canManage &&
-                payment.status === "draft" &&
-                payment.type === "batch" &&
-                payment.purpose !== "invoice" &&
-                !payment.safeTxHash && (
-                  <button
-                    className="workspace-button"
-                    disabled={locked}
-                    onClick={() => setEditing(true)}
-                  >
-                    Edit draft
-                  </button>
-                )}
-              {canManage && payment.status === "scheduled" && (
-                <button
-                  className="workspace-button"
-                  disabled={locked}
-                  onClick={() => setChangingDate((v) => !v)}
-                >
-                  <CalendarDays size={14} />
-                  Change date
-                </button>
-              )}
-              {canManage &&
-                ["proposed", "scheduled"].includes(payment.status) && (
-                  <button
-                    className="workspace-button"
-                    disabled={
-                      locked ||
-                      screeningBlocked ||
-                      !currentOwner ||
-                      alreadyApproved ||
-                      (approvals.data?.currentNonce ?? 0) >
-                        (approvals.data?.proposalNonce ?? 0)
-                    }
-                    onClick={() =>
-                      void actions.run(id, "approve", screeningAcknowledged)
-                    }
-                  >
-                    <ShieldCheck size={14} />
-                    {alreadyApproved ? "Approved by you" : "Approve"}
-                  </button>
-                )}
-              {canManage && payment.preparedProposalAt && ['draft', 'pending'].includes(payment.status) && (
-                <button className="workspace-button workspace-button-primary" disabled={locked || screeningBlocked || !safe} onClick={() => void actions.run(id, 'resumeProposal', screeningAcknowledged)}>{actions.busy ? 'Resuming…' : 'Resume preparation'}</button>
-              )}
-              {canManage && !usingAllowance &&
-                ["draft", "pending"].includes(payment.status) &&
-                !payment.safeTxHash && (
-                  <button
-                    className="workspace-button workspace-button-primary"
-                    disabled={locked || !safe || screeningBlocked || feeBlocked}
-                    onClick={() =>
-                      void actions.run(id, "propose", screeningAcknowledged, reviewedFee)
-                    }
-                  >
-                    {actions.busy ? "Preparing…" : "Review in wallet"}
-                    <ArrowUpRight size={14} />
-                  </button>
-                )}
-              {canManage && !customerPaid && payment.status === "proposed" && (
-                <button
-                  className="workspace-button workspace-button-primary"
-                  disabled={
-                    locked ||
-                    !safe ||
-                    screeningBlocked ||
-                    !approvals.data?.ready
-                  }
-                  onClick={() =>
-                    void actions.run(id, "execute", screeningAcknowledged)
-                  }
-                >
-                  {actions.busy ? "Processing…" : "Send payment"}
-                  <ArrowUpRight size={14} />
-                </button>
-              )}
-            </div>
-          </div>}
+          {!actions.approvalRequest &&
+            !payment.paymentScheduleId &&
+            !payment.cancellationId &&
+            !payment.executionFailure && (
+              <div className="flex flex-wrap items-center justify-between gap-3 border-t border-white/10 pt-5">
+                <div>
+                  {canManage &&
+                    [
+                      "draft",
+                      "pending",
+                      "proposed",
+                      "scheduled",
+                      "failed",
+                    ].includes(payment.status) && (
+                      <button
+                        className="workspace-button"
+                        disabled={locked}
+                        onClick={() => setConfirmCancel(true)}
+                      >
+                        Cancel payment
+                      </button>
+                    )}
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {canManage &&
+                    payment.status === "draft" &&
+                    payment.type === "batch" &&
+                    payment.purpose !== "invoice" &&
+                    !payment.safeTxHash && (
+                      <button
+                        className="workspace-button"
+                        disabled={locked}
+                        onClick={() => setEditing(true)}
+                      >
+                        Edit draft
+                      </button>
+                    )}
+                  {canManage && payment.status === "scheduled" && (
+                    <button
+                      className="workspace-button"
+                      disabled={locked}
+                      onClick={() => setChangingDate((v) => !v)}
+                    >
+                      <CalendarDays size={14} />
+                      Change date
+                    </button>
+                  )}
+                  {canManage &&
+                    ["proposed", "scheduled"].includes(payment.status) && (
+                      <button
+                        className="workspace-button"
+                        disabled={
+                          locked ||
+                          screeningBlocked ||
+                          !currentOwner ||
+                          alreadyApproved ||
+                          (approvals.data?.currentNonce ?? 0) >
+                            (approvals.data?.proposalNonce ?? 0)
+                        }
+                        onClick={() =>
+                          void actions.run(id, "approve", screeningAcknowledged)
+                        }
+                      >
+                        <ShieldCheck size={14} />
+                        {alreadyApproved ? "Approved by you" : "Approve"}
+                      </button>
+                    )}
+                  {canManage &&
+                    payment.preparedProposalAt &&
+                    ["draft", "pending"].includes(payment.status) && (
+                      <button
+                        className="workspace-button workspace-button-primary"
+                        disabled={locked || screeningBlocked || !safe}
+                        onClick={() =>
+                          void actions.run(
+                            id,
+                            "resumeProposal",
+                            screeningAcknowledged,
+                          )
+                        }
+                      >
+                        {actions.busy ? "Resuming…" : "Resume preparation"}
+                      </button>
+                    )}
+                  {canManage &&
+                    !usingAllowance &&
+                    !automatic &&
+                    ["draft", "pending"].includes(payment.status) &&
+                    !payment.safeTxHash && (
+                      <button
+                        className="workspace-button workspace-button-primary"
+                        disabled={
+                          locked || !safe || screeningBlocked || feeBlocked
+                        }
+                        onClick={() =>
+                          void actions.run(
+                            id,
+                            "propose",
+                            screeningAcknowledged,
+                            reviewedFee,
+                          )
+                        }
+                      >
+                        {actions.busy ? "Preparing…" : "Review in wallet"}
+                        <ArrowUpRight size={14} />
+                      </button>
+                    )}
+                  {canManage &&
+                    !customerPaid &&
+                    payment.status === "proposed" && (
+                      <button
+                        className="workspace-button workspace-button-primary"
+                        disabled={
+                          locked ||
+                          !safe ||
+                          screeningBlocked ||
+                          !approvals.data?.ready
+                        }
+                        onClick={() =>
+                          void actions.run(id, "execute", screeningAcknowledged)
+                        }
+                      >
+                        {actions.busy ? "Processing…" : "Send payment"}
+                        <ArrowUpRight size={14} />
+                      </button>
+                    )}
+                </div>
+              </div>
+            )}
         </div>
       )}
     </Dialog>

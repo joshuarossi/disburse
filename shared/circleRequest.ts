@@ -30,7 +30,7 @@ export const circlePermitTypes = {
 export type CircleRequest = {
   chainId: number;
   safe: Address;
-  transaction: { to: Address; data: Hex };
+  transaction: { to: Address; data: Hex; operation?: 0 | 1 };
   originalHash: Hex;
   directCall?: boolean;
   permit: { name: string; version: string; nonce: string; amount: string };
@@ -162,8 +162,15 @@ export function decodeCircleRequest(encoded: string): CircleRequest {
       (r.directCall !== undefined && typeof r.directCall !== "boolean") ||
       (!r.directCall &&
         r.transaction.to.toLowerCase() !== r.safe.toLowerCase()) ||
-      circleAccountCall(r.transaction.to, r.transaction.data).toLowerCase() !==
-        r.operation.callData?.toLowerCase()
+      (r.transaction.operation !== undefined &&
+        r.transaction.operation !== 0 &&
+        r.transaction.operation !== 1) ||
+      (!r.directCall && r.transaction.operation === 1) ||
+      circleAccountCall(
+        r.transaction.to,
+        r.transaction.data,
+        r.transaction.operation,
+      ).toLowerCase() !== r.operation.callData?.toLowerCase()
     )
       throw new Error();
     circleOperationSigningData(

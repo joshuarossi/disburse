@@ -30,6 +30,7 @@ import {
 } from "./accountApproval";
 import type { AccountAuthority } from "./accountAuthority";
 import { DEFAULT_CIRCLE_FEE_LIMIT } from "../../shared/circleQueue";
+import { assertCircleBatch } from "./circleBatch";
 
 const paymasterAbi = parseAbi([
   "function token() view returns(address)",
@@ -171,13 +172,14 @@ export async function circleAccountState(
 export async function prepareCircleRequest(input: {
   chainId: number;
   safe: string;
-  transaction: { to: string; data: string };
+  transaction: { to: string; data: string; operation?: 0 | 1 };
   originalHash: string;
   principalUSDC: bigint;
   directCall?: boolean;
   previousPermit?: { nonce: string; amount: string };
   nonceKey?: bigint;
   queueFeeLimit?: bigint;
+  window?: { validAfter: number; validUntil: number };
 }): Promise<CircleRequest> {
   const safe = getAddress(input.safe),
     state = await circleAccountState(input.chainId, safe, input.nonceKey);
@@ -189,10 +191,29 @@ export async function prepareCircleRequest(input: {
       "The approved transaction belongs to a different company account",
     );
   const to = getAddress(input.transaction.to);
+  await assertCircleBatch(input.chainId, input.transaction);
+  if (
+    input.window &&
+    (!input.directCall ||
+      input.window.validAfter < 0 ||
+      input.window.validUntil <= Number(state.block.timestamp) + 60 ||
+      input.window.validUntil - input.window.validAfter > 86400 ||
+      input.window.validAfter > Number(state.block.timestamp) + 90 * 86400)
+  )
+    throw new Error("Choose a payment date within the next 90 days.");
+  const validAfter = input.window?.validAfter ?? 0;
+  const validUntil =
+    input.window?.validUntil ?? Number(state.block.timestamp) + 1800;
   const request: CircleRequest = {
     chainId: input.chainId,
     safe,
-    transaction: { to, data: input.transaction.data as Hex },
+    transaction: {
+      to,
+      data: input.transaction.data as Hex,
+      ...(input.transaction.operation
+        ? { operation: input.transaction.operation }
+        : {}),
+    },
     originalHash: input.originalHash as Hex,
     ...(input.directCall ? { directCall: true } : {}),
     permit: {
@@ -201,14 +222,18 @@ export async function prepareCircleRequest(input: {
       nonce: String(state.permitNonce),
       amount: "1",
     },
-    validAfter: 0,
-    validUntil: Number(state.block.timestamp) + 1800,
+    validAfter,
+    validUntil,
     startBlock: String(state.block.number),
     safeNonce: String(state.safeNonce),
     operation: {
       sender: safe,
       nonce: state.nonce,
-      callData: circleAccountCall(to, input.transaction.data as Hex),
+      callData: circleAccountCall(
+        to,
+        input.transaction.data as Hex,
+        input.transaction.operation,
+      ),
       callGasLimit: 2_000_000n + BigInt(input.transaction.data.length) * 100n,
       verificationGasLimit: 2_000_000n,
       preVerificationGas: 300_000n,
@@ -219,8 +244,8 @@ export async function prepareCircleRequest(input: {
       paymasterPostOpGasLimit: 150_000n,
       paymasterData: "0x",
       signature: circleSignature(
-        0,
-        Number(state.block.timestamp) + 1800,
+        validAfter,
+        validUntil,
         `0x${"11".repeat(32)}${"22".repeat(32)}1b`,
       ),
     },
@@ -311,10 +336,18 @@ export async function finishCircleFeeApproval(
       collected.confirmations.slice(0, authority.nodes[0].threshold),
     ),
   );
+  // Estimate future work with an unsigned, currently valid placeholder. The
+  // owners still sign the original future window after gas limits are fixed.
+  const simulation = structuredClone(next.operation);
+  simulation.signature = circleSignature(
+    0,
+    Math.floor(Date.now() / 1000) + 1800,
+    `0x${"11".repeat(32)}${"22".repeat(32)}1b`,
+  );
   const estimate = await circleRpc(
     request.chainId,
     "eth_estimateUserOperationGas",
-    [next.operation, circleConfiguration(request.chainId).entryPoint],
+    [simulation, circleConfiguration(request.chainId).entryPoint],
   );
   next.operation = applyCircleGasEstimate(next.operation, estimate);
   const state = await circleAccountState(

@@ -9,6 +9,7 @@ import { decodeCircleRequest } from "../../../shared/circleRequest";
 import { useSessionToken } from "@/lib/session";
 import { walletDeclined, walletErrorMessage } from "@/lib/walletErrors";
 import { userErrorMessage } from "@/lib/userErrors";
+import { scheduleDateTime } from "@/lib/formatMoney";
 import { Notice } from "@/components/workspace/WorkspacePrimitives";
 
 export function CustomerPaidExecution({
@@ -18,6 +19,7 @@ export function CustomerPaidExecution({
   memberName,
   onBusyChange,
   compact = false,
+  armed = false,
 }: {
   source: CircleSource;
   ready: boolean;
@@ -25,12 +27,13 @@ export function CustomerPaidExecution({
   memberName: (wallet: string) => string;
   onBusyChange: (busy: boolean) => void;
   compact?: boolean;
+  armed?: boolean;
 }) {
   const subject = source.accountSetupId
     ? "account setup"
     : source.billingCheckoutId
       ? "subscription"
-      : source.disbursementId
+      : source.disbursementId || source.paymentScheduleId
         ? "payment"
         : source.policyChangeId
           ? "policy"
@@ -39,8 +42,9 @@ export function CustomerPaidExecution({
             : source.receivingSetupSafeId
               ? "receiving setup"
               : "cancellation";
-  const submitLabel =
-    subject === "account setup"
+  const submitLabel = source.paymentScheduleId
+    ? "Schedule payment"
+    : subject === "account setup"
       ? "Create company account"
       : subject === "subscription"
         ? "Pay subscription"
@@ -85,6 +89,7 @@ export function CustomerPaidExecution({
       }),
     enabled:
       !blocked &&
+      !armed &&
       !!sessionToken &&
       !!execution?.open &&
       ["fee", "operation", "ready"].includes(execution.stage),
@@ -148,7 +153,9 @@ export function CustomerPaidExecution({
     >
       <div>
         <h3 className="font-semibold text-[var(--ws-text)]">
-          {submitLabel} with fees in USDC
+          {source.paymentScheduleId
+            ? "Fee and approvals"
+            : `${submitLabel} with fees in USDC`}
         </h3>
         <p className="mt-1 text-sm text-[var(--ws-muted)]">
           Your company account pays the execution service directly.
@@ -193,10 +200,12 @@ export function CustomerPaidExecution({
               <>
                 <dt className="text-[var(--ws-muted)]">Approval expires</dt>
                 <dd className="text-right">
-                  {new Date(request.validUntil * 1000).toLocaleTimeString([], {
-                    hour: "2-digit",
-                    minute: "2-digit",
-                  })}
+                  {source.paymentScheduleId
+                    ? scheduleDateTime(request.validUntil * 1000)
+                    : new Date(request.validUntil * 1000).toLocaleString([], {
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })}
                 </dd>
               </>
             )}
@@ -204,8 +213,9 @@ export function CustomerPaidExecution({
           {execution.open && (
             <p className="text-sm text-[var(--ws-muted)]">
               Unused fees return to this account. A failed execution can still
-              incur a fee. Account owners approve the fee limit first, then the
-              complete execution.
+              incur a fee.
+              {!armed &&
+                " Account owners approve the fee limit first, then the complete execution."}
             </p>
           )}
           {execution.stage === "submitting" && (
@@ -234,7 +244,13 @@ export function CustomerPaidExecution({
               determines whether the {subject} completed.
             </Notice>
           )}
+          {execution.stage === "cancelled" && (
+            <Notice tone="info">
+              This execution authorization has been cancelled.
+            </Notice>
+          )}
           {execution.open &&
+            !armed &&
             ["fee", "operation", "ready"].includes(execution.stage) &&
             !expired && (
               <>
@@ -344,7 +360,9 @@ export function CustomerPaidExecution({
                       onClick={() =>
                         void run(
                           () => submit(identity!),
-                          "Execution submitted. We will verify its receipt.",
+                          source.paymentScheduleId
+                            ? "The payment is scheduled. You can close this window."
+                            : "Execution submitted. We will verify its receipt.",
                         )
                       }
                     >

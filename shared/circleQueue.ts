@@ -36,7 +36,11 @@ export type QueuedCircleRequest = {
 export function circleQueueLimit(
   open: QueuedCircleRequest[],
 ): bigint | undefined {
-  if (open.length >= MAX_OPEN_CIRCLE_REQUESTS)
+  if (
+    new Set(open.map((e) => String(e.request.operation.nonce >> 64n))).size >=
+      MAX_OPEN_CIRCLE_REQUESTS ||
+    open.length > MAX_OPEN_CIRCLE_REQUESTS * 2
+  )
     throw new Error(
       "This account has 50 open execution requests. Complete or check an earlier request before preparing another.",
     );

@@ -32,15 +32,15 @@ Cancellation preserves the form. An interrupted provider response must recover t
 
 ## Costs across the product
 
-| Feature | Software capability | External service cost, if any |
-| --- | --- | --- |
-| Safe setup | Company information, owners, approvals and account management | Customer authorizes and pays setup, deployment and initial funding costs in stablecoins during onboarding |
-| Invoice creation | Draft, number, render, share and record an invoice | Any paid creation or provisioning service is quoted and paid by the issuing customer at creation; local address prediction alone has no deployment fee |
-| Invoice collection | Track received and collected amounts and reconcile the books | Customer pays any forwarder deployment, collection and service fees in stablecoins when the corresponding service is used |
-| Payments and account changes | Prepare, approve, schedule and record instructions | Customer pays all execution and service costs in stablecoins, including grants, revocations and signed cancellations |
-| Conversion, bridging and yield | Review provider options and record positions or movements | Customer pays the selected external provider's disclosed costs in stablecoins as part of the authorized service |
-| Screening, extraction, integrations and delivery | Local processing, public-source screening, files, links and in-app updates | A paid external service requires a customer-paid route; it must not create a Disburse provider bill |
-| Software subscription | License and tier access | The subscription price goes to Disburse; the customer separately pays the execution service's cost in stablecoins |
+| Feature                                          | Software capability                                                        | External service cost, if any                                                                                                                          |
+| ------------------------------------------------ | -------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Safe setup                                       | Company information, owners, approvals and account management              | Customer authorizes and pays setup, deployment and initial funding costs in stablecoins during onboarding                                              |
+| Invoice creation                                 | Draft, number, render, share and record an invoice                         | Any paid creation or provisioning service is quoted and paid by the issuing customer at creation; local address prediction alone has no deployment fee |
+| Invoice collection                               | Track received and collected amounts and reconcile the books               | Customer pays any forwarder deployment, collection and service fees in stablecoins when the corresponding service is used                              |
+| Payments and account changes                     | Prepare, approve, schedule and record instructions                         | Customer pays all execution and service costs in stablecoins, including grants, revocations and signed cancellations                                   |
+| Conversion, bridging and yield                   | Review provider options and record positions or movements                  | Customer pays the selected external provider's disclosed costs in stablecoins as part of the authorized service                                        |
+| Screening, extraction, integrations and delivery | Local processing, public-source screening, files, links and in-app updates | A paid external service requires a customer-paid route; it must not create a Disburse provider bill                                                    |
+| Software subscription                            | License and tier access                                                    | The subscription price goes to Disburse; the customer separately pays the execution service's cost in stablecoins                                      |
 
 Quote a cost at the action that incurs it. Do not invent an invoice issuance fee when issuance only creates a database record and predicts an address. Conversely, do not silently fund a service at issuance and recover its cost at collection or through the software subscription. Later collection costs must be explained before issuing an invoice, with a fresh quote or explicit standing authorization when collection occurs.
 
@@ -48,12 +48,12 @@ Quote a cost at the action that incurs it. Do not invent an invoice issuance fee
 
 For the example of a customer holding 105 USDC and paying a 100 USDC invoice:
 
-| Item | Amount | Paid by / received by |
-| --- | --- | --- |
-| Invoice payment | 100 USDC | Customer's Safe / beneficiary |
-| Quoted execution costs | 5 USDC | Customer's Safe / execution service |
-| Total customer debit | 105 USDC | Customer's Safe |
-| Execution cost charged to Disburse | 0 | None |
+| Item                               | Amount   | Paid by / received by               |
+| ---------------------------------- | -------- | ----------------------------------- |
+| Invoice payment                    | 100 USDC | Customer's Safe / beneficiary       |
+| Quoted execution costs             | 5 USDC   | Customer's Safe / execution service |
+| Total customer debit               | 105 USDC | Customer's Safe                     |
+| Execution cost charged to Disburse | 0        | None                                |
 
 The 5 USDC is an illustrative quote. The amount left in a wallet must never determine the fee. Show the exact beneficiary amount and the complete service quote before requesting approval. If the quote sets a maximum rather than a fixed price, show that distinction and reconcile any unused amount back to the customer's balance.
 
@@ -87,6 +87,6 @@ The requirements remain broader than the completed work. The September 7 pass no
 - Onboarding persists the wallet request before prompting, restores rejected/interrupted steps and verifies the full deposit and account authority. Background recovery finds the exact deployment with the browser closed. An earlier failed receipt cannot unlock a later pending attempt.
 - App-funded Turbo and outgoing Resend submission remain disabled regardless of credentials. Invitations use private links. Existing recovery records are retained.
 
-Delegated stablecoin-fee execution, unattended schedules and the broader conversion/yield integrations remain implementation work. A direct Circle execution from the published customer-owned Nexus account succeeded on testnet, and a read-only validator check confirmed exact transaction/time-window binding. This is protocol research, not completed delegated or scheduled application acceptance.
+Owner-approved schedules now dispatch the exact saved request automatically, use independent execution sequences and support USDC-paid on-chain cancellation. Sending a later-created payment first and cancelling the other before its due date both passed live Base Sepolia acceptance. Delegated stablecoin-fee execution and the broader conversion/yield integrations remain implementation work. A direct Circle execution from the published customer-owned Nexus account succeeded on testnet, and a read-only validator check confirmed exact transaction/time-window binding. This is protocol research, not completed delegated or scheduled application acceptance.
 
 See [the implementation TODO](../TODOS.md) and [QA evidence](CUSTOMER_PAID_SERVICES_QA_2026-09-07.md). Native-gas tests, browser fixtures and a provider quote do not substitute for actual stablecoin-paid settlement.

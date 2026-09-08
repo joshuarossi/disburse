@@ -7,6 +7,7 @@ import {
   query,
 } from "./_generated/server";
 import { api, internal } from "./_generated/api";
+import { verifyCircleSubmission } from "./lib/circleSubmission";
 import { claimNative } from "./disbursements";
 import { requireOrgAccess } from "./lib/rbac";
 import { approvalPaths, readAccountAuthority } from "./lib/accountAuthority";
@@ -15,7 +16,6 @@ import {
   verifyDataSignature,
 } from "./lib/accountApproval";
 import {
-  circleAccountState,
   finishCircleFeeApproval,
   prepareCircleRequest,
 } from "./lib/circleAccountService";
@@ -64,6 +64,9 @@ import { reserveCancellationExecution } from "./accountCancellationData";
 import { circleFeeProofValidator } from "./lib/circleFeeProof";
 import { queueReportSource } from "./lib/reportIndex";
 import { hasCircleFeeProof } from "./lib/circleFeeReports";
+import { circleReceiptHint, scheduledScanStart } from "./lib/circleRecovery";
+import { settleSchedule } from "./paymentSchedules";
+import { assertScheduledTransfers } from "../shared/scheduledSettlement";
 
 const identity = { ...circleSourceArgs, sessionToken: v.string() };
 const executionIdentity = {
@@ -81,6 +84,15 @@ export const get = query({
       args,
       args.sessionToken,
     );
+    if (source.paymentScheduleId || source.scheduleCancellationId) {
+      const schedule = await ctx.db.get(
+        (source.paymentScheduleId ?? source.scheduleCancellationId)!,
+      );
+      const id = source.paymentScheduleId
+        ? schedule?.executionId
+        : schedule?.cancellationExecutionId;
+      return id ? ctx.db.get(id) : null;
+    }
     if (source.accountSetupId)
       return ctx.db
         .query("circleExecutions")
@@ -147,7 +159,10 @@ export const context = internalQuery({
       ctx,
       execution.orgId,
       args.sessionToken,
-      execution.disbursementId || execution.receivableId
+      execution.disbursementId ||
+        execution.receivableId ||
+        execution.paymentScheduleId ||
+        execution.scheduleCancellationId
         ? writers
         : ["admin", "approver"],
     );
@@ -181,10 +196,16 @@ export const previous = internalQuery({
     const queueFeeLimit = open
       ? undefined
       : circleQueueLimit(
-          queue.map((e) => ({
-            concurrentFees: e.concurrentFees,
-            request: decodeCircleRequest(e.record),
-          })),
+          queue
+            .filter(
+              (e) =>
+                !("originalExecutionId" in source) ||
+                e._id !== source.originalExecutionId,
+            )
+            .map((e) => ({
+              concurrentFees: e.concurrentFees,
+              request: decodeCircleRequest(e.record),
+            })),
         );
     const previous = await ctx.db
       .query("circleExecutions")
@@ -210,31 +231,44 @@ export const prepare = action({
     const payment = source.identity.disbursementId
       ? (source.target as import("./_generated/dataModel").Doc<"disbursements">)
       : null;
+    const original =
+      "originalRecord" in source && source.originalRecord
+        ? decodeCircleRequest(source.originalRecord)
+        : undefined;
     const record = await prepareCircleRequest({
       chainId: source.safe.chainId,
       safe: source.safe.safeAddress,
       transaction,
       originalHash: source.target.safeTxHash!,
       directCall: source.directCall,
-      nonceKey: circleNonceKey(
-        source.target.safeTxHash! as Hex,
-        crypto.randomUUID(),
-      ),
-      queueFeeLimit:
-        queueFeeLimit === undefined ? undefined : BigInt(queueFeeLimit),
+      window: "window" in source ? source.window : undefined,
+      nonceKey: original
+        ? original.operation.nonce >> 64n
+        : circleNonceKey(source.target.safeTxHash! as Hex, crypto.randomUUID()),
+      queueFeeLimit: original
+        ? BigInt(original.permit.amount)
+        : queueFeeLimit === undefined
+          ? undefined
+          : BigInt(queueFeeLimit),
       principalUSDC:
-        source.identity.billingCheckoutId && "checkout" in source
-          ? BigInt(source.checkout.amountRaw)
-          : payment?.token === "USDC"
-            ? amountToBaseUnits(
-                payment.totalAmount ?? payment.amount ?? "0",
-                "USDC",
-              )
-            : 0n,
+        "principalUSDC" in source
+          ? BigInt(source.principalUSDC)
+          : source.identity.billingCheckoutId && "checkout" in source
+            ? BigInt(source.checkout.amountRaw)
+            : payment?.token === "USDC"
+              ? amountToBaseUnits(
+                  payment.totalAmount ?? payment.amount ?? "0",
+                  "USDC",
+                )
+              : 0n,
       previousPermit: previous
         ? decodeCircleRequest(previous.record).permit
         : undefined,
     });
+    if (original && record.operation.nonce !== original.operation.nonce)
+      throw new Error(
+        "The original payment authorization already used its sequence. Check its status before cancelling.",
+      );
     return ctx.runMutation(internal.circlePayments.persist, {
       ...args,
       record: encodeCircleRequest(record),
@@ -264,7 +298,9 @@ export const persist = internalMutation({
         (request.transaction.to.toLowerCase() !==
           source.call.to.toLowerCase() ||
           request.transaction.data.toLowerCase() !==
-            source.call.data.toLowerCase()))
+            source.call.data.toLowerCase() ||
+          (request.transaction.operation ?? 0) !==
+            ("operation" in source.call ? source.call.operation : 0)))
     )
       throw new Error(
         "The execution does not match the reviewed account instruction",
@@ -279,13 +315,39 @@ export const persist = internalMutation({
         JSON.stringify(circleSourceIdentity(e)) ===
         JSON.stringify(source.identity),
     );
+    const original =
+      "originalRecord" in source && source.originalRecord
+        ? decodeCircleRequest(source.originalRecord)
+        : undefined;
+    if (
+      "window" in source &&
+      source.window &&
+      (request.validAfter !== source.window.validAfter ||
+        request.validUntil !== source.window.validUntil)
+    )
+      throw new Error("The signed payment window changed.");
+    if (
+      original &&
+      (request.operation.nonce !== original.operation.nonce ||
+        request.permit.amount !== original.permit.amount ||
+        request.validAfter !== 0)
+    )
+      throw new Error(
+        "Cancellation must invalidate the original sequence within its approved fee limit.",
+      );
     if (open) return open._id;
     assertCircleQueueCompatible(
       request,
-      queue.map((e) => ({
-        concurrentFees: e.concurrentFees,
-        request: decodeCircleRequest(e.record),
-      })),
+      queue
+        .filter(
+          (e) =>
+            !("originalExecutionId" in source) ||
+            e._id !== source.originalExecutionId,
+        )
+        .map((e) => ({
+          concurrentFees: e.concurrentFees,
+          request: decodeCircleRequest(e.record),
+        })),
     );
     const previous = await ctx.db
       .query("circleExecutions")
@@ -318,6 +380,17 @@ export const persist = internalMutation({
       scanFrom: request.startBlock,
       recoveryAt: request.validUntil * 1000 + 5000,
     });
+    if (
+      source.identity.paymentScheduleId ||
+      source.identity.scheduleCancellationId
+    )
+      await ctx.db.patch(
+        (source.identity.paymentScheduleId ??
+          source.identity.scheduleCancellationId)!,
+        source.identity.paymentScheduleId
+          ? { executionId: id }
+          : { cancellationExecutionId: id },
+      );
     await appendAudit(ctx, {
       orgId: source.target.orgId,
       actorUserId: source.user._id,
@@ -560,10 +633,30 @@ export const advanceSaved = internalMutation({
     if (
       old.originalHash !== next.originalHash ||
       old.transaction.data !== next.transaction.data ||
+      old.transaction.to !== next.transaction.to ||
+      old.transaction.operation !== next.transaction.operation ||
+      old.directCall !== next.directCall ||
+      old.chainId !== next.chainId ||
+      old.safe !== next.safe ||
+      old.validAfter !== next.validAfter ||
+      old.validUntil !== next.validUntil ||
+      old.operation.nonce !== next.operation.nonce ||
+      old.operation.callData !== next.operation.callData ||
       old.permit.amount !== next.permit.amount ||
       old.permit.nonce !== next.permit.nonce
     )
       throw new Error("The approved fee request cannot be replaced");
+    if (
+      args.stage === "ready" &&
+      JSON.stringify({ ...old.operation, signature: undefined }, (_, value) =>
+        typeof value === "bigint" ? String(value) : value,
+      ) !==
+        JSON.stringify(
+          { ...next.operation, signature: undefined },
+          (_, value) => (typeof value === "bigint" ? String(value) : value),
+        )
+    )
+      throw new Error("The signed operation cannot change after approval.");
     await ctx.db.patch(current._id, {
       record: args.record,
       stage: args.stage,
@@ -583,51 +676,20 @@ export const submit = action({
     );
     if (execution.stage !== "ready")
       throw new Error("Complete the account and fee approvals before sending");
-    const request = decodeCircleRequest(execution.record);
+    if (execution.paymentScheduleId) {
+      await ctx.runAction(api.paymentSchedules.arm, args);
+      return;
+    }
     const transaction = await verifyCircleSource(
       ctx,
       execution,
       args.sessionToken,
     );
-    // Different valid signature encodings still execute the same immutable SafeTx;
-    // verify the original signed wrapper, not a freshly assembled replacement.
-    if (
-      request.directCall
-        ? transaction.to.toLowerCase() !==
-            request.transaction.to.toLowerCase() ||
-          transaction.data.toLowerCase() !==
-            request.transaction.data.toLowerCase()
-        : transaction.to.toLowerCase() !== request.safe.toLowerCase()
-    )
-      throw new Error("The account instructions changed");
-    const authority = await readAccountAuthority(request.chainId, request.safe);
-    const collected = await assembleDataApprovals(
-      request.chainId,
-      authority,
-      circleRootSigningData(request, "operation"),
+    const request = await verifyCircleSubmission(
+      execution,
       signatures.filter((s) => s.stage === "operation"),
+      transaction,
     );
-    if (collected.confirmations.length < authority.nodes[0].threshold)
-      throw new Error("The current account owners must approve this execution");
-    const state = await circleAccountState(
-      request.chainId,
-      request.safe,
-      request.operation.nonce >> 64n,
-    );
-    if (
-      state.nonce !== request.operation.nonce ||
-      Number(state.block.timestamp) >= request.validUntil - 30 ||
-      state.allowance > BigInt(request.permit.amount)
-    )
-      throw new Error(
-        "The account or fee authorization changed. Check the original request before continuing.",
-      );
-    // Simulate the exact signed request. A provider rejection never falls back to
-    // a native transaction and never causes an automatic second submission.
-    await circleRpc(request.chainId, "eth_estimateUserOperationGas", [
-      request.operation,
-      state.config.entryPoint,
-    ]);
     const hash = circleOperationHash(request.chainId, request.operation);
     await ctx.runMutation(internal.circlePayments.claim, {
       ...args,
@@ -638,7 +700,7 @@ export const submit = action({
       const response = await circleRpc(
         request.chainId,
         "eth_sendUserOperation",
-        [request.operation, state.config.entryPoint],
+        [request.operation, CIRCLE_ENTRY_POINT],
       );
       if (response !== hash)
         throw new Error(
@@ -667,11 +729,24 @@ export const claim = internalMutation({
     if (
       circleOperationHash(request.chainId, request.operation) !==
         args.userOpHash ||
-      request.validUntil * 1000 <= Date.now()
+      request.validUntil * 1000 <= Date.now() ||
+      request.validAfter * 1000 > Date.now()
     )
       throw new Error("The signed execution changed or expired");
     await readCircleSource(ctx, execution, args.sessionToken, true);
     await assertCircleReservation(ctx, execution.safeId, execution._id);
+    if (execution.paymentScheduleId)
+      throw new Error(
+        "Use the scheduled instruction to dispatch this payment.",
+      );
+    if (execution.scheduleCancellationId) {
+      const schedule = (await ctx.db.get(execution.scheduleCancellationId))!;
+      await ctx.db.patch(schedule._id, {
+        status: "paused",
+        dispatchAt: undefined,
+        updatedAt: Date.now(),
+      });
+    }
     const claim = {
       sessionToken: args.sessionToken,
       safeTxHash: request.originalHash,
@@ -753,7 +828,7 @@ export const reconcile = internalAction({
       internal.circlePayments.internalGet,
       args,
     );
-    if (!execution) return;
+    if (!execution || execution.stage === "cancelled") return;
     if (
       !execution.open &&
       (execution.feeProof || execution.stage === "expired")
@@ -770,35 +845,73 @@ export const reconcile = internalAction({
       const head = await client.getBlockNumber();
       if (head < 2n || (await client.getChainId()) !== request.chainId)
         throw new Error("Network not available");
-      const confirmed = head - 2n,
-        fromBlock = BigInt(
-          !execution.open ? request.startBlock : execution.scanFrom,
-        ),
-        toBlock = confirmed < fromBlock + 1999n ? confirmed : fromBlock + 1999n;
+      const confirmed = head - 2n;
+      let fromBlock = BigInt(
+        !execution.open ? request.startBlock : execution.scanFrom,
+      );
+      if (
+        execution.open &&
+        execution.scanHash &&
+        fromBlock > 0n &&
+        (
+          await client.getBlock({ blockNumber: fromBlock - 1n })
+        ).hash?.toLowerCase() !== execution.scanHash.toLowerCase()
+      ) {
+        await ctx.runMutation(internal.circlePayments.checkpoint, {
+          executionId: execution._id,
+          revision: execution.revision,
+          scanFrom: execution.scanFrom,
+          nextBlock: request.startBlock,
+          error:
+            "The network reorganized recent blocks. The original payment is being checked again.",
+        });
+        return;
+      }
+      const hint = await circleReceiptHint(client, request, confirmed);
+      if (
+        execution.paymentScheduleId &&
+        fromBlock === BigInt(request.startBlock) &&
+        !hint
+      )
+        fromBlock = await scheduledScanStart(
+          client,
+          fromBlock,
+          confirmed,
+          request.validAfter,
+        );
+      const toBlock =
+        hint?.blockNumber ??
+        (confirmed < fromBlock + 1999n ? confirmed : fromBlock + 1999n);
       if (fromBlock > toBlock) return;
       const hash =
         execution.userOpHash ??
         circleOperationHash(request.chainId, request.operation);
       const checkpoint = await client.getBlock({ blockNumber: toBlock });
-      const logs = await client.getLogs({
-        address: CIRCLE_ENTRY_POINT,
-        event: circleUserOperationEvent,
-        args: { userOpHash: hash as Hex, sender: request.safe },
-        fromBlock,
-        toBlock,
-        strict: true,
-      });
+      const logs = hint
+        ? []
+        : await client.getLogs({
+            address: CIRCLE_ENTRY_POINT,
+            event: circleUserOperationEvent,
+            args: { userOpHash: hash as Hex, sender: request.safe },
+            fromBlock,
+            toBlock,
+            strict: true,
+          });
       if (
         logs.some((l) => l.removed) ||
         logs.length > 1 ||
+        !checkpoint.hash ||
+        checkpoint.number !== toBlock ||
         (await client.getBlock({ blockNumber: toBlock })).hash !==
           checkpoint.hash
       )
         throw new Error("Inconsistent chain evidence");
-      if (logs.length) {
-        const receipt = await client.getTransactionReceipt({
-          hash: logs[0].transactionHash,
-        });
+      if (hint || logs.length) {
+        const receipt =
+          hint ??
+          (await client.getTransactionReceipt({
+            hash: logs[0].transactionHash,
+          }));
         if (receipt.blockNumber > confirmed) return;
         const settlement = await readSettlementBlock(
           client,
@@ -810,6 +923,8 @@ export const reconcile = internalAction({
           request.operation,
           receipt,
         );
+        if (execution.paymentScheduleId && result.status === "confirmed")
+          assertScheduledTransfers(request, receipt.logs, result);
         const nonce = await client.readContract({
           address: request.safe,
           abi: parseAbi(["function nonce() view returns(uint256)"]),
@@ -821,12 +936,17 @@ export const reconcile = internalAction({
           revision: execution.revision,
           scanFrom: execution.scanFrom,
           nextBlock: String(toBlock + 1n),
+          scanHash: checkpoint.hash,
           state: result.status,
           txHash: receipt.transactionHash,
           fee: String(result.fee),
           feeProof: result.feeProof,
           settlement,
           originalNonceAvailable: nonce === BigInt(request.safeNonce),
+          principalVerified:
+            execution.paymentScheduleId && result.status === "confirmed"
+              ? true
+              : undefined,
         });
         if (execution.stage === "submitting") {
           if (execution.disbursementId)
@@ -871,6 +991,7 @@ export const reconcile = internalAction({
         revision: execution.revision,
         scanFrom: execution.scanFrom,
         nextBlock: String(toBlock + 1n),
+        scanHash: checkpoint.hash,
         ...(expired
           ? {
               state: "expired" as const,
@@ -896,6 +1017,7 @@ export const checkpoint = internalMutation({
     revision: v.number(),
     scanFrom: v.string(),
     nextBlock: v.string(),
+    scanHash: v.optional(v.string()),
     state: v.optional(
       v.union(
         v.literal("confirmed"),
@@ -909,6 +1031,7 @@ export const checkpoint = internalMutation({
     settlement: v.optional(settlementBlockValidator),
     error: v.optional(v.string()),
     originalNonceAvailable: v.optional(v.boolean()),
+    principalVerified: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
     const execution = await ctx.db.get(args.executionId);
@@ -948,10 +1071,22 @@ export const checkpoint = internalMutation({
       })
     )
       throw new Error("Fee transfer evidence is inconsistent");
+    if (
+      args.state === "confirmed" &&
+      execution.paymentScheduleId &&
+      !args.principalVerified
+    )
+      throw new Error(
+        "The scheduled principal transfers have not been verified.",
+      );
     await ctx.db.patch(execution._id, {
       stage: args.state ?? execution.stage,
       open: !args.state,
       scanFrom: args.nextBlock,
+      scanHash:
+        args.nextBlock === execution.scanFrom
+          ? execution.scanHash
+          : args.scanHash,
       txHash: args.txHash,
       fee: args.fee,
       settlement: args.settlement,
@@ -962,6 +1097,11 @@ export const checkpoint = internalMutation({
     });
     if (args.feeProof)
       await queueReportSource(ctx, execution.orgId, "fee", execution._id);
+    if (
+      args.state &&
+      (execution.paymentScheduleId || execution.scheduleCancellationId)
+    )
+      await settleSchedule(ctx, (await ctx.db.get(execution._id))!);
     if (args.state === "confirmed" && execution.accountSetupId) {
       await ctx.db.patch(execution.accountSetupId, { recoveryAt: Date.now() });
       await ctx.scheduler.runAfter(0, internal.accountSetups.complete, {

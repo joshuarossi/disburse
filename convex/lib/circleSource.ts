@@ -16,8 +16,11 @@ import {
   MAX_OPEN_CIRCLE_REQUESTS,
 } from "../../shared/circleQueue";
 import { decodeCircleRequest } from "../../shared/circleRequest";
+import { readScheduledSource } from "./scheduledPayment";
 
 export const circleSourceArgs = {
+  paymentScheduleId: v.optional(v.id("paymentSchedules")),
+  scheduleCancellationId: v.optional(v.id("paymentSchedules")),
   disbursementId: v.optional(v.id("disbursements")),
   policyChangeId: v.optional(v.id("spendingPolicyChanges")),
   cancellationId: v.optional(v.id("accountCancellations")),
@@ -27,6 +30,8 @@ export const circleSourceArgs = {
   accountSetupId: v.optional(v.id("accountSetups")),
 };
 export type CircleSource = {
+  paymentScheduleId?: Id<"paymentSchedules">;
+  scheduleCancellationId?: Id<"paymentSchedules">;
   disbursementId?: Id<"disbursements">;
   policyChangeId?: Id<"spendingPolicyChanges">;
   cancellationId?: Id<"accountCancellations">;
@@ -38,6 +43,8 @@ export type CircleSource = {
 export function circleSourceIdentity(s: CircleSource) {
   if (
     [
+      s.paymentScheduleId,
+      s.scheduleCancellationId,
       s.disbursementId,
       s.policyChangeId,
       s.cancellationId,
@@ -48,6 +55,9 @@ export function circleSourceIdentity(s: CircleSource) {
     ].filter(Boolean).length !== 1
   )
     throw new Error("Choose one account instruction");
+  if (s.paymentScheduleId) return { paymentScheduleId: s.paymentScheduleId };
+  if (s.scheduleCancellationId)
+    return { scheduleCancellationId: s.scheduleCancellationId };
   if (s.accountSetupId) return { accountSetupId: s.accountSetupId };
   if (s.billingCheckoutId) return { billingCheckoutId: s.billingCheckoutId };
   if (s.receivableId) return { receivableId: s.receivableId };
@@ -66,6 +76,8 @@ export async function readCircleSource(
   write = false,
 ) {
   const identity = circleSourceIdentity(source);
+  if (identity.paymentScheduleId || identity.scheduleCancellationId)
+    return readScheduledSource(ctx, identity, sessionToken, write);
   if (identity.accountSetupId)
     return readAccountSetupSource(
       ctx,
@@ -168,8 +180,13 @@ export async function verifyCircleSource(
   ctx: ActionCtx,
   source: CircleSource,
   sessionToken: string,
-): Promise<{ to: string; data: string }> {
+): Promise<{ to: string; data: string; operation?: 0 | 1 }> {
   const identity = circleSourceIdentity(source);
+  if (identity.paymentScheduleId || identity.scheduleCancellationId)
+    return ctx.runAction(internal.paymentSchedules.verify, {
+      ...identity,
+      sessionToken,
+    });
   if (identity.accountSetupId)
     return ctx.runAction(internal.accountSetups.verify, {
       accountSetupId: identity.accountSetupId,
@@ -213,16 +230,41 @@ export async function assertCircleReservation(
   const key = `${safe.chainId}:${safe.safeAddress.toLowerCase()}`;
   if (executionId) {
     const execution = await ctx.db.get(executionId);
-    if (!execution || execution.accountKey !== key || !execution.open)
+    if (
+      !execution ||
+      execution.accountKey !== key ||
+      execution.orgId !== safe.orgId ||
+      !execution.open
+    )
       throw new Error(
         "The saved fee request belongs to another account or is closed.",
       );
     if (execution.concurrentFees) {
       const open = await openCircleRequests(ctx, key);
+      if (open.some((e) => e.orgId !== execution.orgId))
+        throw new Error(
+          "Another workspace has an open request for this account.",
+        );
+      const schedule = execution.scheduleCancellationId
+        ? await ctx.db.get(execution.scheduleCancellationId)
+        : null;
+      const original = schedule?.executionId
+        ? await ctx.db.get(schedule.executionId)
+        : null;
+      if (
+        execution.scheduleCancellationId &&
+        (!original ||
+          !original.open ||
+          decodeCircleRequest(original.record).operation.nonce !==
+            decodeCircleRequest(execution.record).operation.nonce)
+      )
+        throw new Error(
+          "The cancellation no longer matches its original authorization.",
+        );
       assertCircleQueueCompatible(
         decodeCircleRequest(execution.record),
         open
-          .filter((e) => e._id !== executionId)
+          .filter((e) => e._id !== executionId && e._id !== original?._id)
           .map((e) => ({
             concurrentFees: e.concurrentFees,
             request: decodeCircleRequest(e.record),
@@ -249,5 +291,5 @@ export async function openCircleRequests(ctx: QueryCtx, accountKey: string) {
     .withIndex("by_account_open", (q) =>
       q.eq("accountKey", accountKey).eq("open", true),
     )
-    .take(MAX_OPEN_CIRCLE_REQUESTS + 1);
+    .take(MAX_OPEN_CIRCLE_REQUESTS * 2 + 1);
 }

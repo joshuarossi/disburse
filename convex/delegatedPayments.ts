@@ -196,6 +196,7 @@ async function quoteFrom(
   const { payment } = expected;
   if (
     payment.status !== "draft" ||
+    payment.paymentScheduleId ||
     payment.safeTxHash ||
     payment.allowanceExecution
   )
@@ -396,10 +397,19 @@ export const quote = action({
       args.feeMode,
     );
     const prefix = `${result.chainId}:${result.module.toLowerCase()}:${result.safeAddress.toLowerCase()}:${result.delegate.toLowerCase()}:`;
-    const keys = [result.nonce, ...result.additionalTransfers.map(t => t.nonce)].map(nonce => `${prefix}${result.tokenAddress.toLowerCase()}:${nonce}`);
-    if (result.fee) keys.push(`${prefix}${result.fee.tokenAddress.toLowerCase()}:${result.feeNonce}`);
+    const keys = [
+      result.nonce,
+      ...result.additionalTransfers.map((t) => t.nonce),
+    ].map((nonce) => `${prefix}${result.tokenAddress.toLowerCase()}:${nonce}`);
+    if (result.fee)
+      keys.push(
+        `${prefix}${result.fee.tokenAddress.toLowerCase()}:${result.feeNonce}`,
+      );
     // Catch conflicts before asking the member to sign. Claim rechecks atomically.
-    await ctx.runQuery(internal.delegatedPayments.checkReservations, { disbursementId: args.disbursementId, keys });
+    await ctx.runQuery(internal.delegatedPayments.checkReservations, {
+      disbursementId: args.disbursementId,
+      keys,
+    });
     if (result.fee)
       await ctx.runAction(internal.relayExecutor.validateFee, {
         chainId: result.chainId,
@@ -672,7 +682,11 @@ export const claim = internalMutation({
       reservationKeys.push(
         `${payment.chainId}:${args.intent.module.toLowerCase()}:${safe.safeAddress.toLowerCase()}:${args.intent.delegate.toLowerCase()}:${fee.tokenAddress.toLowerCase()}:${fee.nonce}`,
       );
-    await assertAllowanceReservationsAvailable(ctx, payment.orgId, reservationKeys);
+    await assertAllowanceReservationsAvailable(
+      ctx,
+      payment.orgId,
+      reservationKeys,
+    );
     for (const reservedKey of reservationKeys) {
       await ctx.db.insert("delegationReservations", {
         key: reservedKey,
