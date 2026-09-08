@@ -1,5 +1,5 @@
 import { useRef, useState } from "react";
-import { useAction, useQuery } from "convex/react";
+import { useAction, useMutation, useQuery } from "convex/react";
 import { useQuery as useRemoteQuery } from "@tanstack/react-query";
 import { useAccount } from "wagmi";
 import { formatUnits } from "viem";
@@ -33,7 +33,9 @@ export function CustomerPaidExecution({
     ? "account setup"
     : source.billingCheckoutId
       ? "subscription"
-      : source.disbursementId || source.paymentScheduleId
+      : source.disbursementId ||
+          source.paymentScheduleId ||
+          source.delegatedDisbursementId
         ? "payment"
         : source.policyChangeId
           ? "policy"
@@ -63,6 +65,7 @@ export function CustomerPaidExecution({
     api.circlePayments.get,
     sessionToken ? { ...source, sessionToken } : "skip",
   );
+  const beginApproval = useMutation(api.circlePayments.beginApproval);
   const prepare = useAction(api.circlePayments.prepare),
     approve = useAction(api.circlePayments.approve),
     advance = useAction(api.circlePayments.advance),
@@ -314,6 +317,11 @@ export function CustomerPaidExecution({
                           disabled={busy || blocked || !reviewed || !address}
                           onClick={() =>
                             void run(async () => {
+                              if (execution.stage === "operation")
+                                await beginApproval({
+                                  ...identity!,
+                                  revision: execution.revision,
+                                });
                               const signature = await (
                                 await import("@/lib/services/circleApproval")
                               ).signCircleApproval(

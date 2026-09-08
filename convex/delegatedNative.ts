@@ -41,6 +41,7 @@ export const start = action({
       intent = p.allowanceExecution;
     if (
       !intent ||
+      p.allowanceFeeSafeId ||
       intent.feeAuthorization ||
       p.executionFee ||
       p.status !== "relaying" ||
@@ -101,6 +102,7 @@ export const reserve = internalMutation({
     const p = await ctx.db.get(args.disbursementId);
     if (
       !p?.allowanceExecution ||
+      p.allowanceFeeSafeId ||
       p.allowanceExecution.feeAuthorization ||
       p.executionFee ||
       p.status !== "relaying" ||
@@ -183,6 +185,7 @@ export const reconcile = internalAction({
       intent = p.allowanceExecution;
     if (
       !intent ||
+      p.allowanceFeeSafeId ||
       intent.feeAuthorization ||
       !p.nativeExecution ||
       p.status !== "relaying"

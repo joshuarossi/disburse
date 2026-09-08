@@ -499,7 +499,9 @@ export const stop = mutation({
     if (
       !execution ||
       !execution.open ||
-      (!approval && ["fee", "operation"].includes(execution.stage))
+      (!approval &&
+        !execution.operationApprovalStartedAt &&
+        ["fee", "operation"].includes(execution.stage))
     ) {
       if (execution?.open)
         await ctx.db.patch(execution._id, {
@@ -537,7 +539,10 @@ export const stop = mutation({
       metadata: {
         scheduleId: schedule._id,
         requiresNonceCancellation:
-          !!execution?.open && (!!approval || execution.stage === "ready"),
+          !!execution?.open &&
+          (!!approval ||
+            !!execution.operationApprovalStartedAt ||
+            execution.stage === "ready"),
       },
     });
     return schedule._id;

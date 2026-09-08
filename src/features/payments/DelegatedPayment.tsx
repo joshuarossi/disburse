@@ -1,4 +1,6 @@
-import { userErrorMessage } from '@/lib/userErrors';
+import { StableDelegatedPayment } from "./StableDelegatedPayment";
+import { supportsCircleFees } from "../../../shared/circleExecution";
+import { userErrorMessage } from "@/lib/userErrors";
 import { useRef, useState } from "react";
 import { useAction, useMutation } from "convex/react";
 import { ConvexError } from "convex/values";
@@ -16,7 +18,32 @@ import { formatMoney } from "@/lib/formatMoney";
 import { signAllowanceAuthorization } from "@/lib/delegatedTransfer";
 
 type AllowanceQuote = FunctionReturnType<typeof api.delegatedPayments.quote>;
-export function DelegatedPayment({
+type DelegatedPaymentProps = {
+  payment: Doc<"disbursements">;
+  blocked: boolean;
+  onBusyChange: (value: boolean) => void;
+  onModeChange: (value: boolean) => void;
+  onFeeModeChange: (mode: "managed" | "wallet") => void;
+};
+export function DelegatedPayment(props: DelegatedPaymentProps) {
+  if (
+    (supportsCircleFees(props.payment.chainId) &&
+      !props.payment.allowanceExecution) ||
+    props.payment.allowanceFeeSafeId
+  )
+    return <StableDelegatedPayment {...props} />;
+  // Earlier native testnet authorizations remain recoverable. New production
+  // execution never falls back to buying native gas or a retired relay.
+  if (!props.payment.allowanceExecution && props.payment.chainId !== 11155111)
+    return (
+      <p className="workspace-description">
+        USDC-paid spending allowances are available on Base and Arbitrum. Use a
+        supported account to prepare this payment.
+      </p>
+    );
+  return <LegacyDelegatedPayment {...props} />;
+}
+function LegacyDelegatedPayment({
   payment,
   blocked,
   onBusyChange,
@@ -165,14 +192,27 @@ export function DelegatedPayment({
         "Payment submitted. We will verify settlement before marking it paid.",
       );
     } catch (error) {
-      if (error instanceof ConvexError && error.data?.code === 'ALLOWANCE_AUTHORIZATION_RESERVED') {
-        setError(userErrorMessage(error, 'This allowance authorization is already in use. Open the original payment to check its status.'));
+      if (
+        error instanceof ConvexError &&
+        error.data?.code === "ALLOWANCE_AUTHORIZATION_RESERVED"
+      ) {
+        setError(
+          userErrorMessage(
+            error,
+            "This allowance authorization is already in use. Open the original payment to check its status.",
+          ),
+        );
         setReservedPaymentId(error.data.disbursementId);
-      }
-      else if (confirmingWallet && walletDeclined(error)) setMessage(walletErrorMessage(error, ''));
+      } else if (confirmingWallet && walletDeclined(error))
+        setMessage(walletErrorMessage(error, ""));
       else {
-        const fallback = "Could not complete this payment. Check its status before trying again.";
-        setError(walletDeclined(error) ? fallback : walletErrorMessage(error, fallback));
+        const fallback =
+          "Could not complete this payment. Check its status before trying again.";
+        setError(
+          walletDeclined(error)
+            ? fallback
+            : walletErrorMessage(error, fallback),
+        );
       }
     } finally {
       operationLock.current = false;
@@ -204,7 +244,14 @@ export function DelegatedPayment({
             {message}
           </p>
         )}
-        {reservedPaymentId && <a className="text-sm text-accent-400 underline" href={`/org/${payment.orgId}/disbursements?focus=${encodeURIComponent(reservedPaymentId)}`}>Open the original payment</a>}
+        {reservedPaymentId && (
+          <a
+            className="text-sm text-accent-400 underline"
+            href={`/org/${payment.orgId}/disbursements?focus=${encodeURIComponent(reservedPaymentId)}`}
+          >
+            Open the original payment
+          </a>
+        )}
         {!payment.allowanceExecution && (
           <label className="block">
             <span className="finance-label">Execution fee</span>

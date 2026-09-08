@@ -16,7 +16,11 @@ export function saveCircleFixture(value: unknown) {
   sessionStorage.setItem("qa:circle", JSON.stringify(value));
 }
 export function createCircleFixture() {
-  const safe = safes[0].safeAddress as Address,
+  const safe = (
+      sessionStorage.getItem("qa:scenario")?.startsWith("circle-delegated-")
+        ? "0x5555555555555555555555555555555555555555"
+        : safes[0].safeAddress
+    ) as Address,
     config = circleConfiguration(8453),
     until = Math.floor(Date.now() / 1000) + 1800;
   const request: CircleRequest = {

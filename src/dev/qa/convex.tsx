@@ -81,6 +81,18 @@ export function readQueryFixture(reference: any, args: any) {
       if (name === "accountSetups:current" && value?.open === false)
         value = null;
       break;
+    case "delegatedCircle:feeAccounts":
+      return scenario?.startsWith("circle-delegated-") &&
+        !scenario.endsWith("no-account")
+        ? [
+            {
+              id: "fee-safe1",
+              name: "Alex’s payment account",
+              address: "0x5555555555555555555555555555555555555555",
+              likelyOwner: true,
+            },
+          ]
+        : [];
     case "circlePayments:get":
       value = readCircleFixture();
       break;
@@ -402,6 +414,19 @@ export function readQueryFixture(reference: any, args: any) {
               },
             ]
           : safes;
+      if (scenario === "policy-assigned")
+        value = [
+          ...safes,
+          {
+            ...safes[0],
+            _id: "assigned1",
+            name: "Alex’s payment account",
+            safeAddress: "0x5555555555555555555555555555555555555555",
+            assignedUserId: "user1",
+            owners: [wallet],
+            threshold: 1,
+          },
+        ];
       if (scenario === "policy-archived")
         value = safes.map((s) => ({
           ...s,
@@ -680,6 +705,27 @@ export function readQueryFixture(reference: any, args: any) {
                   approvalMethod: undefined,
                 }
               : {}),
+            ...(scenario?.startsWith("circle-delegated-")
+              ? (() => {
+                  const saved = JSON.parse(
+                    sessionStorage.getItem("qa:delegated") ?? "null",
+                  );
+                  return {
+                    status:
+                      saved?.status === "cancelled"
+                        ? "cancelled"
+                        : saved
+                          ? readCircleFixture()?.stage === "confirmed"
+                            ? "executed"
+                            : "relaying"
+                          : "draft",
+                    safeTxHash: undefined,
+                    approvalMethod: undefined,
+                    nativeExecution: undefined,
+                    ...saved,
+                  };
+                })()
+              : {}),
             ...(scenario?.startsWith("circle-schedule-")
               ? {
                   status:
@@ -796,7 +842,7 @@ export function readQueryFixture(reference: any, args: any) {
                     "This payment failed. No money was sent to the recipients. Create a new payment to try again.",
                 }
               : {}),
-            ...(scenario === "delegated-batch"
+            ...(scenario === "circle-delegated-batch"
               ? { scheduledAt: undefined }
               : {}),
             ...(["recovery", "preparation"].includes(scenario ?? "")
@@ -805,7 +851,7 @@ export function readQueryFixture(reference: any, args: any) {
                   executionFee: { token: "USDC", amount: "0.05" },
                 }
               : {}),
-            ...(scenario === "delegated"
+            ...(scenario === "circle-delegated-single"
               ? {
                   status: "draft",
                   safeTxHash: undefined,
@@ -814,7 +860,7 @@ export function readQueryFixture(reference: any, args: any) {
                 }
               : {}),
             recipients: recipients
-              .slice(0, scenario === "delegated" ? 1 : 2)
+              .slice(0, scenario === "circle-delegated-single" ? 1 : 2)
               .map((r, i) => ({
                 _id: `pr${i}`,
                 beneficiaryId: r._id,
@@ -1398,6 +1444,44 @@ const disabled = async () => {
   );
 };
 export function useMutation(reference?: any) {
+  if (getFunctionName(reference) === "circlePayments:beginApproval")
+    return async () => {
+      saveCircleFixture({
+        ...readCircleFixture(),
+        operationApprovalStartedAt: Date.now(),
+      });
+    };
+  if (
+    getFunctionName(reference) === "delegatedCircle:stop" &&
+    sessionStorage.getItem("qa:scenario")?.startsWith("circle-delegated-")
+  )
+    return async () => {
+      const current = readCircleFixture(),
+        saved = JSON.parse(sessionStorage.getItem("qa:delegated")!);
+      if (current?.stage === "submitting")
+        throw new Error(
+          "Check the original payment settlement before cancelling it.",
+        );
+      const signed =
+        current?.stage === "ready" || current?.operationApprovalStartedAt;
+      sessionStorage.setItem(
+        "qa:delegated",
+        JSON.stringify({
+          ...saved,
+          ...(signed
+            ? {
+                allowanceCancellationRequestedAt: Date.now(),
+                allowanceCircleExecutionId: "circle1",
+              }
+            : { status: "cancelled" }),
+        }),
+      );
+      sessionStorage.removeItem("qa:circle");
+      cache.clear();
+      fixtureRevision++;
+      fixtureListeners.forEach((listener) => listener());
+      return { cancelExecutionId: signed ? "circle1" : null };
+    };
   if (getFunctionName(reference).startsWith("accountFeeSetups:"))
     return async (args: any) => {
       try {
@@ -1631,6 +1715,27 @@ export function useConvex() {
   };
 }
 export function useAction(reference: any) {
+  if (
+    getFunctionName(reference) === "delegatedPayments:prepare" &&
+    sessionStorage.getItem("qa:scenario")?.startsWith("circle-delegated-")
+  )
+    return async (args: any) => {
+      if (args.signature !== "0x")
+        throw new Error("The assigned account must authorize its own payment.");
+      const saved = {
+        allowanceFeeSafeId: args.feeSafeId,
+        allowanceExecution: {
+          signature: "0x",
+          delegate: "0x5555555555555555555555555555555555555555",
+          module: "0x691f59471Bfd2B7d639DCF74671a2d648ED1E331",
+        },
+      };
+      sessionStorage.setItem("qa:delegated", JSON.stringify(saved));
+      cache.clear();
+      fixtureRevision++;
+      fixtureListeners.forEach((listener) => listener());
+      return saved.allowanceExecution;
+    };
   if (getFunctionName(reference).startsWith("accountFeeSetups:"))
     return async (args: any) => {
       try {
@@ -1749,7 +1854,11 @@ export function useAction(reference: any) {
       if (name === "circlePayments:approvals") {
         if (scenario.endsWith("approval-outage"))
           throw new Error("RPC https://rpc.invalid/private unavailable");
-        const path = [safes[0].safeAddress.toLowerCase()],
+        const path = [
+            scenario.startsWith("circle-delegated-")
+              ? "0x5555555555555555555555555555555555555555"
+              : safes[0].safeAddress.toLowerCase(),
+          ],
           approved = current?.stage === "ready" ? 1 : 0;
         return {
           threshold: 1,
@@ -1833,6 +1942,17 @@ export function useAction(reference: any) {
             open: false,
             fee: "7500",
           });
+          if (
+            scenario.startsWith("circle-delegated-") &&
+            JSON.parse(sessionStorage.getItem("qa:delegated") ?? "null")
+              ?.allowanceCancellationRequestedAt
+          ) {
+            const saved = JSON.parse(sessionStorage.getItem("qa:delegated")!);
+            sessionStorage.setItem(
+              "qa:delegated",
+              JSON.stringify({ ...saved, status: "cancelled" }),
+            );
+          }
           if (scenario.startsWith("circle-billing-")) {
             const saved = JSON.parse(sessionStorage.getItem("qa:checkout")!);
             sessionStorage.setItem(
@@ -2088,31 +2208,42 @@ export function useAction(reference: any) {
       });
     };
   if (getFunctionName(reference) === "delegatedPayments:quote")
-    return async (args: any) => ({
-      hash: `0x${"ab".repeat(32)}`,
-      available:
-        sessionStorage.getItem("qa:scenario") === "delegated-batch"
-          ? "50000000000"
-          : "25000000000",
-      additionalTransfers:
-        sessionStorage.getItem("qa:scenario") === "delegated-batch"
-          ? [
-              {
-                hash: `0x${"ef".repeat(32)}`,
-                amount: "14225",
-                nonce: 8,
-                recipientAddress: recipients[1].walletAddress,
-              },
-            ]
-          : [],
-      fee:
-        args.feeMode === "wallet"
-          ? undefined
-          : { amount: "0.05", token: "USDC" },
-      feeHash: args.feeMode === "wallet" ? undefined : `0x${"cd".repeat(32)}`,
-      delegate: wallet,
-      chainId: 8453,
-    });
+    return async (args: any) => {
+      if (
+        sessionStorage.getItem("qa:scenario") === "circle-delegated-over-limit"
+      )
+        throw new Error(
+          "This payment exceeds your remaining allowance. Ask an administrator to review your spending limit.",
+        );
+      return {
+        hash: `0x${"ab".repeat(32)}`,
+        available:
+          sessionStorage.getItem("qa:scenario") === "delegated-batch"
+            ? "50000000000"
+            : "25000000000",
+        additionalTransfers:
+          sessionStorage.getItem("qa:scenario") === "delegated-batch"
+            ? [
+                {
+                  hash: `0x${"ef".repeat(32)}`,
+                  amount: "14225",
+                  nonce: 8,
+                  recipientAddress: recipients[1].walletAddress,
+                },
+              ]
+            : [],
+        fee:
+          args.feeMode === "wallet"
+            ? undefined
+            : { amount: "0.05", token: "USDC" },
+        feeHash: args.feeMode === "wallet" ? undefined : `0x${"cd".repeat(32)}`,
+        delegate:
+          args.feeMode === "stablecoin"
+            ? "0x5555555555555555555555555555555555555555"
+            : wallet,
+        chainId: 8453,
+      };
+    };
   if (getFunctionName(reference) === "paymentExecution:approvalStatus")
     return async () => {
       const scenario = sessionStorage.getItem("qa:scenario");

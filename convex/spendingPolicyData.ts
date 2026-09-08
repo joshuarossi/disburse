@@ -1,8 +1,8 @@
-import type { ObjectType } from 'convex/values';
-import type { MutationCtx } from './_generated/server';
-import { assertCircleReservation } from './lib/circleSource';
-import { accountChangeProgress } from './lib/accountChangeLifecycle';
-import { ORG_READER_ROLES } from '../shared/roles';
+import type { ObjectType } from "convex/values";
+import type { MutationCtx } from "./_generated/server";
+import { assertCircleReservation } from "./lib/circleSource";
+import { accountChangeProgress } from "./lib/accountChangeLifecycle";
+import { ORG_READER_ROLES } from "../shared/roles";
 import { v } from "convex/values";
 import {
   internalMutation,
@@ -66,12 +66,28 @@ export async function grantAccess(
     throw new Error(
       "The administrator who requested this allowance no longer has permission",
     );
-  const member = await ctx.db
-    .query("users")
-    .withIndex("by_wallet", (q) =>
-      q.eq("walletAddress", delegate.toLowerCase()),
+  const assignedAccount = await ctx.db
+    .query("safes")
+    .withIndex("by_org_chain_address", (q) =>
+      q
+        .eq("orgId", safe.orgId)
+        .eq("chainId", safe.chainId)
+        .eq("safeAddress", delegate.toLowerCase()),
     )
-    .first();
+    .unique();
+  if (
+    assignedAccount &&
+    (assignedAccount.isActive === false || !assignedAccount.assignedUserId)
+  )
+    throw new Error("Choose an active account assigned to a payment member.");
+  const member = assignedAccount?.assignedUserId
+    ? await ctx.db.get(assignedAccount.assignedUserId)
+    : await ctx.db
+        .query("users")
+        .withIndex("by_wallet", (q) =>
+          q.eq("walletAddress", delegate.toLowerCase()),
+        )
+        .first();
   const membership =
     member &&
     (await ctx.db
@@ -141,7 +157,9 @@ export const list = query({
   handler: async (ctx, args) => {
     const { access } = await account(ctx, args.safeId, args.sessionToken);
     const rows = await Promise.all(
-      (["pending", "processing", "applied", "failed", "cancelled"] as const).map((status) =>
+      (
+        ["pending", "processing", "applied", "failed", "cancelled"] as const
+      ).map((status) =>
         ctx.db
           .query("spendingPolicyChanges")
           .withIndex("by_safe_status", (q) =>
@@ -152,21 +170,19 @@ export const list = query({
       ),
     );
     return {
-      proposals: rows
-        .flat()
-        .map(({ execution, ...p }) => ({
-          ...p,
-          execution: execution
-            ? {
-                attemptId: execution.attemptId,
-                service: execution.service,
-                startedAt: execution.startedAt,
-                walletRejectedAt: execution.walletRejectedAt,
-                txHash: execution.txHash,
-                phase: execution.phase,
-              }
-            : undefined,
-        })),
+      proposals: rows.flat().map(({ execution, ...p }) => ({
+        ...p,
+        execution: execution
+          ? {
+              attemptId: execution.attemptId,
+              service: execution.service,
+              startedAt: execution.startedAt,
+              walletRejectedAt: execution.walletRejectedAt,
+              txHash: execution.txHash,
+              phase: execution.phase,
+            }
+          : undefined,
+      })),
       canApprove: ["admin", "approver"].includes(access!.membership.role),
     };
   },
@@ -192,7 +208,8 @@ export const context = internalQuery({
     )
       throw new Error("The policy funding account changed");
     if (args.write) {
-      if (policy.cancellationId) throw new Error("Complete or reconcile this policy cancellation");
+      if (policy.cancellationId)
+        throw new Error("Complete or reconcile this policy cancellation");
       if (access && !["admin", "approver"].includes(access.membership.role))
         throw new Error("An account approver must authorize this change");
       if (policy.intent.kind === "grant")
@@ -349,7 +366,12 @@ export const saveSignature = internalMutation({
   },
   handler: async (ctx, args) => {
     const p = await ctx.db.get(args.policyChangeId);
-    if (!p || p.cancellationId || p.status !== "pending" || p.safeTxHash !== args.safeTxHash)
+    if (
+      !p ||
+      p.cancellationId ||
+      p.status !== "pending" ||
+      p.safeTxHash !== args.safeTxHash
+    )
       throw new Error("This policy no longer accepts approvals");
     const { user } = await requireOrgAccess(ctx, p.orgId, args.sessionToken, [
       "admin",
@@ -402,81 +424,86 @@ export const saveSignature = internalMutation({
   },
 });
 const reserveArgs = {
-    ...policyIdentity,
-    safeTxHash: v.string(),
-    to: v.string(),
-    data: v.string(),
-    searchFromBlock: v.string(),
-    attemptId: v.string(),
-    circleExecutionId: v.optional(v.id('circleExecutions')),
-  };
-export async function reservePolicyExecution(ctx: MutationCtx, args: ObjectType<typeof reserveArgs>) {
-    const p = await ctx.db.get(args.policyChangeId);
-    if (p?.cancellationId) throw new Error("Complete or reconcile this policy cancellation");
-    if (
-      !p ||
-      p.safeTxHash !== args.safeTxHash ||
-      (p.status !== "pending" &&
-        !(
-          p.status === "processing" &&
-          !p.executionFee &&
-          p.execution?.walletRejectedAt &&
-          !p.execution.txHash
-        ))
-    )
-      throw new Error(
-        "Check the original policy submission before trying again",
-      );
-    await assertCircleReservation(ctx, p.safeId, args.circleExecutionId);
-    const { user } = await requireOrgAccess(ctx, p.orgId, args.sessionToken, [
-      "admin",
-      "approver",
-    ]);
-    if (p.intent.kind === "grant")
-      await grantAccess(ctx, p.safeId, p.intent.delegate, p.createdBy);
-    if (args.to.toLowerCase() !== p.safeAddress.toLowerCase())
-      throw new Error("Policy belongs to another funding account");
-    const searchFromBlock =
-      p.execution &&
-      BigInt(p.execution.searchFromBlock) < BigInt(args.searchFromBlock)
-        ? p.execution.searchFromBlock
-        : args.searchFromBlock;
-    await appendAudit(ctx, {
-      orgId: p.orgId,
+  ...policyIdentity,
+  safeTxHash: v.string(),
+  to: v.string(),
+  data: v.string(),
+  searchFromBlock: v.string(),
+  attemptId: v.string(),
+  circleExecutionId: v.optional(v.id("circleExecutions")),
+};
+export async function reservePolicyExecution(
+  ctx: MutationCtx,
+  args: ObjectType<typeof reserveArgs>,
+) {
+  const p = await ctx.db.get(args.policyChangeId);
+  if (p?.cancellationId)
+    throw new Error("Complete or reconcile this policy cancellation");
+  if (
+    !p ||
+    p.safeTxHash !== args.safeTxHash ||
+    (p.status !== "pending" &&
+      !(
+        p.status === "processing" &&
+        !p.executionFee &&
+        p.execution?.walletRejectedAt &&
+        !p.execution.txHash
+      ))
+  )
+    throw new Error("Check the original policy submission before trying again");
+  await assertCircleReservation(ctx, p.safeId, args.circleExecutionId);
+  const { user } = await requireOrgAccess(ctx, p.orgId, args.sessionToken, [
+    "admin",
+    "approver",
+  ]);
+  if (p.intent.kind === "grant")
+    await grantAccess(ctx, p.safeId, p.intent.delegate, p.createdBy);
+  if (args.to.toLowerCase() !== p.safeAddress.toLowerCase())
+    throw new Error("Policy belongs to another funding account");
+  const searchFromBlock =
+    p.execution &&
+    BigInt(p.execution.searchFromBlock) < BigInt(args.searchFromBlock)
+      ? p.execution.searchFromBlock
+      : args.searchFromBlock;
+  await appendAudit(ctx, {
+    orgId: p.orgId,
+    actorUserId: user._id,
+    action: "spending_policy.execution_requested",
+    objectType: "spending_policy",
+    objectId: p._id,
+    metadata: {
+      safeTxHash: p.safeTxHash,
+      attemptId: args.attemptId,
+      previousAttemptId: p.execution?.attemptId,
+    },
+  });
+  await ctx.db.patch(p._id, {
+    status: "processing",
+    execution: {
+      ...(args.circleExecutionId ? { service: "circle" as const } : {}),
+      attemptId: args.attemptId,
       actorUserId: user._id,
-      action: "spending_policy.execution_requested",
-      objectType: "spending_policy",
-      objectId: p._id,
-      metadata: {
-        safeTxHash: p.safeTxHash,
-        attemptId: args.attemptId,
-        previousAttemptId: p.execution?.attemptId,
-      },
+      startedAt: Date.now(),
+      searchFromBlock,
+      checks: 0,
+      to: args.to,
+      data: args.data,
+      phase: p.executionFee ? "prepared" : "submitted",
+    },
+    recoveryAt: Date.now() + 60_000,
+    error: undefined,
+    updatedAt: Date.now(),
+  });
+  if (p.executionFee)
+    await ctx.scheduler.runAfter(0, internal.spendingPolicyRelay.process, {
+      policyChangeId: p._id,
     });
-    await ctx.db.patch(p._id, {
-      status: "processing",
-      execution: {
-        ...(args.circleExecutionId ? { service: 'circle' as const } : {}),
-        attemptId: args.attemptId,
-        actorUserId: user._id,
-        startedAt: Date.now(),
-        searchFromBlock,
-        checks: 0,
-        to: args.to,
-        data: args.data,
-        phase: p.executionFee ? "prepared" : "submitted",
-      },
-      recoveryAt: Date.now() + 60_000,
-      error: undefined,
-      updatedAt: Date.now(),
-    });
-    if (p.executionFee)
-      await ctx.scheduler.runAfter(0, internal.spendingPolicyRelay.process, {
-        policyChangeId: p._id,
-      });
-    return args.attemptId;
+  return args.attemptId;
 }
-export const reserve = internalMutation({ args: reserveArgs, handler: reservePolicyExecution });
+export const reserve = internalMutation({
+  args: reserveArgs,
+  handler: reservePolicyExecution,
+});
 export const recordBroadcast = mutation({
   args: { ...policyIdentity, attemptId: v.string(), txHash: v.string() },
   handler: async (ctx, args) => {
@@ -552,7 +579,8 @@ export const beginRelay = internalMutation({
   },
   handler: async (ctx, args) => {
     const p = await ctx.db.get(args.policyChangeId);
-    if (p?.cancellationId) throw new Error("Complete or reconcile this policy cancellation");
+    if (p?.cancellationId)
+      throw new Error("Complete or reconcile this policy cancellation");
     if (
       !p ||
       p.status !== "processing" ||

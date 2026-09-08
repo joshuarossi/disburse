@@ -1,6 +1,6 @@
 # Provider setup for customer-paid stablecoin gas
 
-Reviewed September 7, 2026. The implemented owner execution path uses Circle Paymaster and Candide's public bundler. Do not fund a Disburse Gas Tank or buy an execution API plan to enable it. The customer pays the execution service directly in USDC. This boundary covers setup, payments, account changes, invoices and subscription checkout.
+Reviewed September 7, 2026. The implemented owner and delegated execution paths uses Circle Paymaster and Candide's public bundler. Do not fund a Disburse Gas Tank or buy an execution API plan to enable it. The customer pays the execution service directly in USDC. This boundary covers setup, payments, account changes, invoices and subscription checkout.
 
 ## What to configure
 
@@ -28,9 +28,9 @@ Gelato's migration guidance retires `callWithSyncFee`; old how-to pages remain s
 
 Actual application receipts now cover a payment, signed cancellation, receiving-factory deployment, full-principal invoice collection, parent-owned company-account creation and Team subscription activation. Each used customer USDC with zero native balances in the signing wallet and company Safe. Fee and operation approval preserve the current direct/nested owner quorum. The original signed payload is persisted before one submission request; unknown responses trigger reconciliation of that same hash. See the [QA report](CUSTOMER_PAID_SERVICES_QA_2026-09-07.md).
 
-Existing Safes still need a complete customer-paid module-installation flow. Delegated payments cannot use an owner's SafeOp signature in place of the member's allowance authorization. Unattended scheduling also requires a separate implementation for time windows, fee limits and nonce ordering.
+Existing-account setup is implemented as described below and still needs live MetaMask mainnet acceptance. Owner-approved schedules now dispatch exact time-bound requests automatically, with independent nonce sequences and USDC-paid cancellation. Delegated execution uses a member-owned payment Safe as the allowance delegate and fee payer; the member approves the entire batch. Creation, grant, payment and signed cancellation have live Base Sepolia evidence. See [delegated payments](DELEGATED_PAYMENTS.md).
 
-Biconomy's published MEE 2.2.3 route was tested with both canonical-USDC permits and an already funded Nexus account. Its execution endpoint rejected both with a token-slot-detection error. Old requests remain recoverable; that route is no longer offered for new onboarding. A direct Circle/Candide execution on the published Nexus account succeeded without the Biconomy service, and its validator accepted an exact bounded authorization while rejecting altered calldata in a read-only test. This is a candidate for the remaining execution work, not an integrated delegated-payment feature.
+Biconomy's published MEE 2.2.3 route was tested with both canonical-USDC permits and an already funded Nexus account. Its execution endpoint rejected both with a token-slot-detection error. Old requests remain recoverable; that route is no longer offered for new onboarding. A direct Circle/Candide execution on the published Nexus account succeeded without the Biconomy service, and its validator accepted an exact bounded authorization while rejecting altered calldata in a read-only test. That experiment remains protocol research. The integrated delegated flow uses the published Safe4337 and AllowanceModule contracts instead.
 
 Relay's permit/solver routes were also investigated. No verified quote-to-signature binding and complete Safe execution was established, so no Relay adapter is enabled. Conversion/bridging research remains separate from the working owner payment route.
 

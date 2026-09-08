@@ -1,3 +1,5 @@
+import { amountToBaseUnits } from "../../../shared/validation";
+import { formatUnits } from "viem";
 import { useRef, useState } from "react";
 import { useAction, useMutation, useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
@@ -28,6 +30,9 @@ export function CompanyAccountSetup({
     [show, setShow] = useState(false),
     [name, setName] = useState(""),
     [parent, setParent] = useState(""),
+    [member, setMember] = useState(""),
+    [initialBalance, setInitialBalance] = useState("5"),
+    [memberControl, setMemberControl] = useState(false),
     [busy, setBusy] = useState(false),
     [error, setError] = useState("");
   const lock = useRef(false),
@@ -132,11 +137,16 @@ export function CompanyAccountSetup({
               <>
                 <Notice tone="info">
                   Your new account is connected.{" "}
-                  {parentName(setup.parentSafeId)} controls its approvals.
+                  {setup.memberUserId
+                    ? (members?.find((m) => m?.userId === setup.memberUserId)
+                        ?.name ?? "The assigned member")
+                    : parentName(setup.parentSafeId)}{" "}
+                  controls its approvals.
                 </Notice>
                 <p className="workspace-description">
-                  The account starts empty. You can now select it for funding
-                  and payments.
+                  {setup.initialFunding
+                    ? `${formatUnits(BigInt(setup.initialFunding), 6)} USDC was assigned to this account. Grant its spending limit in Team & approvals to enable delegated company payments.`
+                    : "The account starts empty. You can now select it for funding and payments."}
                 </p>
                 <button
                   className="workspace-button workspace-button-primary"
@@ -153,14 +163,33 @@ export function CompanyAccountSetup({
                     <dd>{setup.name}</dd>
                   </div>
                   <div>
-                    <dt>Controlled and paid for by</dt>
+                    <dt>Setup and funding paid by</dt>
                     <dd>{parentName(setup.parentSafeId)}</dd>
                   </div>
+                  <div>
+                    <dt>Account owner</dt>
+                    <dd>
+                      {setup.memberUserId
+                        ? (members?.find(
+                            (m) => m?.userId === setup.memberUserId,
+                          )?.name ?? setup.memberAddress)
+                        : parentName(setup.parentSafeId)}
+                    </dd>
+                  </div>
+                  {setup.initialFunding && (
+                    <div>
+                      <dt>Assigned balance</dt>
+                      <dd>
+                        {formatUnits(BigInt(setup.initialFunding), 6)} USDC,
+                        plus the setup fee
+                      </dd>
+                    </div>
+                  )}
                 </dl>
                 <p className="workspace-description">
-                  The parent account's current owners approve this setup and
-                  future payments from the new account. The new account starts
-                  empty. Its funds remain under your team's control.
+                  {setup.memberUserId
+                    ? "The funding account’s owners approve this setup and balance assignment. The selected member controls the new account, including withdrawals and ownership changes. They do not become an owner of the funding account. Company payment limits are granted separately."
+                    : "The parent account’s current owners approve this setup and future payments from the new account. The new account starts empty."}
                 </p>
                 <CustomerPaidExecution
                   source={{ accountSetupId: setup._id }}
@@ -229,9 +258,9 @@ export function CompanyAccountSetup({
             ) : (
               <>
                 <p className="workspace-description">
-                  Give payroll, operations, or reserves a separate account. Your
-                  parent company account pays the setup fee in USDC and keeps
-                  control of its approvals.
+                  Create a shared company account, or assign a small payment
+                  account to a team member. The funding account pays setup costs
+                  in USDC.
                 </p>
                 <label className="workspace-field">
                   <span>Account name</span>
@@ -257,11 +286,76 @@ export function CompanyAccountSetup({
                     ))}
                   </select>
                 </label>
+                <label className="workspace-field">
+                  <span>Account control</span>
+                  <select
+                    aria-label="Account control"
+                    value={member}
+                    disabled={busy}
+                    onChange={(e) => {
+                      setMember(e.target.value);
+                      setMemberControl(false);
+                    }}
+                  >
+                    <option value="">Company owners — shared account</option>
+                    {members
+                      ?.filter(
+                        (m) =>
+                          m?.status === "active" &&
+                          ["admin", "approver", "initiator"].includes(m.role),
+                      )
+                      .map(
+                        (m) =>
+                          m && (
+                            <option key={m.userId} value={m.userId}>
+                              {m.name ?? m.walletAddress} — assigned payment
+                              account
+                            </option>
+                          ),
+                      )}
+                  </select>
+                </label>
+                {member && (
+                  <>
+                    <label className="workspace-field">
+                      <span>Initial execution balance (USDC)</span>
+                      <input
+                        inputMode="decimal"
+                        value={initialBalance}
+                        onChange={(e) => {
+                          setInitialBalance(e.target.value);
+                          setMemberControl(false);
+                        }}
+                        disabled={busy}
+                      />
+                    </label>
+                    <p className="workspace-description">
+                      Assign 3–100 USDC for the member to pay execution fees.
+                      This is a balance transfer, separate from the setup fee.
+                      Recipient funds stay in your company account under the
+                      spending limit you grant next.
+                    </p>
+                    <label className="flex items-start gap-3 text-sm">
+                      <input
+                        type="checkbox"
+                        checked={memberControl}
+                        onChange={(e) => setMemberControl(e.target.checked)}
+                        disabled={busy}
+                      />
+                      <span>
+                        I understand this member controls the assigned account’s
+                        balance and ownership. Returning unused funds requires
+                        their approval.
+                      </span>
+                    </label>
+                  </>
+                )}
                 <button
                   className="workspace-button workspace-button-primary"
                   disabled={
                     busy ||
                     !name.trim() ||
+                    (!!member && !memberControl) ||
                     !parentId ||
                     !sessionToken ||
                     !isAdmin
@@ -274,6 +368,15 @@ export function CompanyAccountSetup({
                         parentSafeId: parentId as Id<"safes">,
                         name: name.trim(),
                         requestId: requestId.current,
+                        ...(member
+                          ? {
+                              memberUserId: member as Id<"users">,
+                              initialFunding: String(
+                                amountToBaseUnits(initialBalance, "USDC"),
+                              ),
+                              memberControlAcknowledged: memberControl,
+                            }
+                          : {}),
                       });
                       setId(result);
                     })

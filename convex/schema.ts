@@ -156,6 +156,9 @@ export default defineSchema({
     createdAt: v.number(),
   }).index("by_setup_hash", ["setupId", "txHash"]),
   accountSetups: defineTable({
+    memberUserId: v.optional(v.id("users")),
+    memberAddress: v.optional(v.string()),
+    initialFunding: v.optional(v.string()),
     orgId: v.id("orgs"),
     parentSafeId: v.id("safes"),
     createdBy: v.id("users"),
@@ -181,6 +184,8 @@ export default defineSchema({
     .index("by_request", ["orgId", "requestId"])
     .index("by_due", ["recoveryAt"]),
   circleExecutions: defineTable({
+    cancelExecutionId: v.optional(v.id("circleExecutions")),
+    delegatedDisbursementId: v.optional(v.id("disbursements")),
     paymentScheduleId: v.optional(v.id("paymentSchedules")),
     scheduleCancellationId: v.optional(v.id("paymentSchedules")),
     orgId: v.id("orgs"),
@@ -196,6 +201,7 @@ export default defineSchema({
     createdBy: v.id("users"),
     record: v.string(),
     revision: v.number(),
+    operationApprovalStartedAt: v.optional(v.number()),
     open: v.boolean(),
     concurrentFees: v.optional(v.boolean()),
     stage: v.union(
@@ -221,6 +227,8 @@ export default defineSchema({
     error: v.optional(v.string()),
   })
     .index("by_payment", ["disbursementId"])
+    .index("by_delegated_payment", ["delegatedDisbursementId"])
+    .index("by_cancel_execution", ["cancelExecutionId"])
     .index("by_policy", ["policyChangeId"])
     .index("by_cancellation", ["cancellationId"])
     .index("by_invoice", ["receivableId"])
@@ -794,6 +802,7 @@ export default defineSchema({
     .index("by_provider", ["providerId"]),
 
   safes: defineTable({
+    assignedUserId: v.optional(v.id("users")),
     name: v.optional(v.string()),
     isActive: v.optional(v.boolean()),
     owners: v.optional(v.array(v.string())),
@@ -1035,6 +1044,9 @@ export default defineSchema({
   }).index("by_notification_user", ["notificationId", "userId"]),
 
   disbursements: defineTable({
+    allowanceFeeSafeId: v.optional(v.id("safes")),
+    allowanceCircleExecutionId: v.optional(v.id("circleExecutions")),
+    allowanceCancellationRequestedAt: v.optional(v.number()),
     paymentScheduleId: v.optional(v.id("paymentSchedules")),
     cancellationId: v.optional(v.id("accountCancellations")),
     cancellationConfirmedAt: v.optional(v.number()),

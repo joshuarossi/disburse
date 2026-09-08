@@ -1,3 +1,4 @@
+import { allowanceFeeAccount } from "./lib/circleDelegation";
 import { delegatedIntentValidator } from "./lib/delegatedIntent";
 import { assertAllowanceReservationsAvailable } from "./lib/delegationReservations";
 import { assertBatchContract } from "./lib/accountChange";
@@ -191,7 +192,7 @@ type Quote = {
 
 async function quoteFrom(
   expected: Context,
-  feeMode: "managed" | "wallet" = "managed",
+  feeMode: "managed" | "wallet" | "stablecoin" = "managed",
 ): Promise<Quote> {
   const { payment } = expected;
   if (
@@ -382,20 +383,43 @@ async function quoteFrom(
 export const quote = action({
   args: {
     ...publicArgs,
-    feeMode: v.optional(v.union(v.literal("managed"), v.literal("wallet"))),
+    feeSafeId: v.optional(v.id("safes")),
+    feeMode: v.optional(
+      v.union(
+        v.literal("managed"),
+        v.literal("wallet"),
+        v.literal("stablecoin"),
+      ),
+    ),
   },
   handler: async (ctx, args): Promise<Quote> => {
+    if (args.feeMode === "stablecoin") {
+      if (!args.feeSafeId)
+        throw new Error("Choose the account that will pay the USDC fee.");
+      await ctx.runQuery(internal.delegatedPayments.checkFeeAccount, {
+        disbursementId: args.disbursementId,
+        sessionToken: args.sessionToken,
+        feeSafeId: args.feeSafeId,
+      });
+    } else if (args.feeSafeId)
+      throw new Error("The fee account requires USDC-paid execution.");
     await ctx.runQuery(api.recipientReviews.assertPayable, {
       disbursementId: args.disbursementId,
       sessionToken: args.sessionToken,
     });
-    const result = await quoteFrom(
-      await ctx.runQuery(internal.delegatedPayments.context, {
-        disbursementId: args.disbursementId,
-        sessionToken: args.sessionToken,
-      }),
-      args.feeMode,
-    );
+    const expected = await ctx.runQuery(internal.delegatedPayments.context, {
+      disbursementId: args.disbursementId,
+      sessionToken: args.sessionToken,
+    });
+    if (args.feeMode === "stablecoin")
+      expected.delegate = (
+        await ctx.runQuery(internal.delegatedPayments.checkFeeAccount, {
+          disbursementId: args.disbursementId,
+          sessionToken: args.sessionToken,
+          feeSafeId: args.feeSafeId!,
+        })
+      ).safeAddress;
+    const result = await quoteFrom(expected, args.feeMode);
     const prefix = `${result.chainId}:${result.module.toLowerCase()}:${result.safeAddress.toLowerCase()}:${result.delegate.toLowerCase()}:`;
     const keys = [
       result.nonce,
@@ -431,7 +455,14 @@ export const checkReservations = internalQuery({
 export const prepare = action({
   args: {
     ...publicArgs,
-    feeMode: v.optional(v.union(v.literal("managed"), v.literal("wallet"))),
+    feeSafeId: v.optional(v.id("safes")),
+    feeMode: v.optional(
+      v.union(
+        v.literal("managed"),
+        v.literal("wallet"),
+        v.literal("stablecoin"),
+      ),
+    ),
     hash: v.string(),
     signature: v.string(),
     feeHash: v.optional(v.string()),
@@ -439,6 +470,16 @@ export const prepare = action({
     additionalSignatures: v.optional(v.array(v.string())),
   },
   handler: async (ctx, args): Promise<DelegatedIntent> => {
+    if (args.feeMode === "stablecoin") {
+      if (!args.feeSafeId)
+        throw new Error("Choose the account that will pay the USDC fee.");
+      await ctx.runQuery(internal.delegatedPayments.checkFeeAccount, {
+        disbursementId: args.disbursementId,
+        sessionToken: args.sessionToken,
+        feeSafeId: args.feeSafeId,
+      });
+    } else if (args.feeSafeId)
+      throw new Error("The fee account requires USDC-paid execution.");
     await ctx.runQuery(api.recipientReviews.assertPayable, {
       disbursementId: args.disbursementId,
       sessionToken: args.sessionToken,
@@ -447,6 +488,14 @@ export const prepare = action({
       disbursementId: args.disbursementId,
       sessionToken: args.sessionToken,
     });
+    if (args.feeMode === "stablecoin")
+      expected.delegate = (
+        await ctx.runQuery(internal.delegatedPayments.checkFeeAccount, {
+          disbursementId: args.disbursementId,
+          sessionToken: args.sessionToken,
+          feeSafeId: args.feeSafeId!,
+        })
+      ).safeAddress;
     const quote = await quoteFrom(expected, args.feeMode);
     if (quote.hash.toLowerCase() !== args.hash.toLowerCase())
       throw new Error(
@@ -483,25 +532,40 @@ export const prepare = action({
       throw new Error(
         "Wallet-paid execution must not include a managed fee authorization",
       );
-    const recovered = recoverAddress({
-      hash: hashMessage({ raw: quote.hash as Hex }),
-      signature: args.signature as Hex,
-    });
-    if (recovered.toLowerCase() !== quote.delegate.toLowerCase())
-      throw new Error(
-        "The payment authorization is not signed by your wallet.",
-      );
-    const vByte = parseInt(args.signature.slice(-2), 16);
-    if (![27, 28].includes(vByte))
-      throw new Error("Unsupported wallet signature.");
-    const signature = args.signature.slice(0, -2) + (vByte + 4).toString(16);
-    if (
-      (args.additionalSignatures?.length ?? 0) !==
-      quote.additionalTransfers.length
-    )
-      throw new Error("Every recipient must be authorized.");
-    const additionalTransfers = quote.additionalTransfers.map(
-      (transfer, index) => {
+    let signature: string,
+      additionalTransfers: NonNullable<DelegatedIntent["additionalTransfers"]>;
+    if (args.feeMode === "stablecoin") {
+      if (
+        args.signature !== "0x" ||
+        args.additionalSignatures?.some((s) => s !== "0x")
+      )
+        throw new Error(
+          "Account-based allowance execution must not accept a reusable wallet signature.",
+        );
+      signature = "0x";
+      additionalTransfers = quote.additionalTransfers.map((t) => ({
+        ...t,
+        signature: "0x",
+      }));
+    } else {
+      const recovered = recoverAddress({
+        hash: hashMessage({ raw: quote.hash as Hex }),
+        signature: args.signature as Hex,
+      });
+      if (recovered.toLowerCase() !== quote.delegate.toLowerCase())
+        throw new Error(
+          "The payment authorization is not signed by your wallet.",
+        );
+      const vByte = parseInt(args.signature.slice(-2), 16);
+      if (![27, 28].includes(vByte))
+        throw new Error("Unsupported wallet signature.");
+      signature = args.signature.slice(0, -2) + (vByte + 4).toString(16);
+      if (
+        (args.additionalSignatures?.length ?? 0) !==
+        quote.additionalTransfers.length
+      )
+        throw new Error("Every recipient must be authorized.");
+      additionalTransfers = quote.additionalTransfers.map((transfer, index) => {
         const signature = args.additionalSignatures![index];
         const signer = recoverAddress({
           hash: hashMessage({ raw: transfer.hash as Hex }),
@@ -517,8 +581,8 @@ export const prepare = action({
           ...transfer,
           signature: signature.slice(0, -2) + (vByte + 4).toString(16),
         };
-      },
-    );
+      });
+    }
     const intent: DelegatedIntent = {
       additionalTransfers,
       feeAuthorization,
@@ -546,15 +610,27 @@ export const prepare = action({
         call.to,
         await getChainClient(quote.chainId).getBlockNumber(),
       );
-    await getChainClient(quote.chainId).call({
-      ...call,
-      account: intent.delegate as Address,
-    });
+    if (args.feeMode === "stablecoin" && call.operation === 1) {
+      const { circleAccountCall } = await import("../shared/circleExecution");
+      // eth_call through the published account module preserves the account as
+      // the allowance caller for every transfer in the atomic batch.
+      const { CIRCLE_ENTRY_POINT } = await import("../shared/circleExecution");
+      await getChainClient(quote.chainId).call({
+        to: intent.delegate as Address,
+        data: circleAccountCall(call.to, call.data, 1),
+        account: CIRCLE_ENTRY_POINT,
+      });
+    } else
+      await getChainClient(quote.chainId).call({
+        ...call,
+        account: intent.delegate as Address,
+      });
     const block = await getChainClient(quote.chainId).getBlockNumber();
     await ctx.runMutation(internal.delegatedPayments.claim, {
       disbursementId: args.disbursementId,
       sessionToken: args.sessionToken,
       intent,
+      feeSafeId: args.feeMode === "stablecoin" ? args.feeSafeId : undefined,
       relayFromBlock: String(block > 12n ? block - 12n : 0n),
     });
     return intent;
@@ -565,6 +641,7 @@ export const claim = internalMutation({
   args: {
     ...publicArgs,
     intent: delegatedIntentValidator,
+    feeSafeId: v.optional(v.id("safes")),
     relayFromBlock: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
@@ -582,12 +659,33 @@ export const claim = internalMutation({
       payment.allowanceExecution
     )
       throw new Error("This payment changed or is already being submitted.");
-    if (user.walletAddress.toLowerCase() !== args.intent.delegate.toLowerCase())
+    if (args.feeSafeId) {
+      const feeSafe = await allowanceFeeAccount(ctx, payment, args.feeSafeId);
+      if (
+        feeSafe.assignedUserId !== user._id ||
+        args.intent.delegate.toLowerCase() !==
+          feeSafe.safeAddress.toLowerCase() ||
+        args.intent.signature !== "0x" ||
+        args.intent.additionalTransfers?.some((t) => t.signature !== "0x")
+      )
+        throw new Error(
+          "Choose your assigned payment account and its exact authorization.",
+        );
+    } else if (
+      user.walletAddress.toLowerCase() !== args.intent.delegate.toLowerCase()
+    )
       throw new Error("Wrong delegated wallet.");
     if (payment.scheduledAt && payment.scheduledAt > Date.now())
       throw new Error("This payment is scheduled for later.");
     await assertPaymentMayProceed(ctx, payment);
     const fee = args.intent.feeAuthorization;
+    if (args.feeSafeId) {
+      if (fee)
+        throw new Error(
+          "The USDC fee account cannot use an earlier relay authorization.",
+        );
+      await allowanceFeeAccount(ctx, payment, args.feeSafeId);
+    }
     if (fee) {
       const org = await ctx.db.get(payment.orgId);
       const configured = relayConfiguration(
@@ -698,16 +796,23 @@ export const claim = internalMutation({
       delegatedBy: user._id,
       delegationKey: key,
       allowanceExecution: args.intent,
+      allowanceFeeSafeId: args.feeSafeId,
       ...(!fee ? { executionFee: undefined } : {}),
-      nativeExecution: !fee
-        ? {
-            startedAt: Date.now(),
-            checks: 0,
-            searchFromBlock: args.relayFromBlock,
-          }
-        : undefined,
-      nativeRecoveryAt: !fee ? Date.now() + 60_000 : undefined,
-      relayStatus: fee ? "Preparing submission" : "awaiting_wallet",
+      nativeExecution:
+        !fee && !args.feeSafeId
+          ? {
+              startedAt: Date.now(),
+              checks: 0,
+              searchFromBlock: args.relayFromBlock,
+            }
+          : undefined,
+      nativeRecoveryAt:
+        !fee && !args.feeSafeId ? Date.now() + 60_000 : undefined,
+      relayStatus: args.feeSafeId
+        ? "Review USDC execution fee"
+        : fee
+          ? "Preparing submission"
+          : "awaiting_wallet",
       updatedAt: Date.now(),
     });
     if (fee) {
@@ -967,5 +1072,23 @@ export const markReverted = internalMutation({
         "The transaction reverted without settling this payment. You may resume the same authorization after checking the account balance and allowance.",
       updatedAt: Date.now(),
     });
+  },
+});
+
+export const checkFeeAccount = internalQuery({
+  args: { ...publicArgs, feeSafeId: v.id("safes") },
+  handler: async (ctx, args) => {
+    const payment = await ctx.db.get(args.disbursementId);
+    if (!payment) throw new Error("Payment not found.");
+    const { user } = await requireOrgAccess(
+      ctx,
+      payment.orgId,
+      args.sessionToken,
+      ["admin", "approver", "initiator"],
+    );
+    const safe = await allowanceFeeAccount(ctx, payment, args.feeSafeId);
+    if (safe.assignedUserId !== user._id)
+      throw new Error("Choose the execution account assigned to you.");
+    return { safeAddress: safe.safeAddress };
   },
 });

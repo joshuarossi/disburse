@@ -74,8 +74,7 @@ export function PaymentReview({
   const feeQuote = useQuery(
     api.relayQuotes.preview,
     RELAY_FEATURE_ENABLED &&
-      (!supportsCircleFees(payment?.chainId) ||
-        (usingAllowance && allowanceFeeMode === "managed")) &&
+      !supportsCircleFees(payment?.chainId) &&
       sessionToken
       ? { disbursementId: id, sessionToken }
       : "skip",
@@ -644,7 +643,7 @@ export function PaymentReview({
             !automatic &&
             rows.length > 0 &&
             ((payment.status === "draft" && !payment.safeTxHash) ||
-              (payment.status === "relaying" &&
+              (["relaying", "executed", "cancelled"].includes(payment.status) &&
                 payment.allowanceExecution)) && (
               <DelegatedPayment
                 payment={payment}
@@ -711,6 +710,7 @@ export function PaymentReview({
           )}
           {payment.status === "relaying" &&
             !recovery &&
+            !payment.allowanceFeeSafeId &&
             !payment.nativeExecution && (
               <Notice tone="info">
                 Submission is being reconciled. Do not create a replacement

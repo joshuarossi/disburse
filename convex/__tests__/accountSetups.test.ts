@@ -1,9 +1,22 @@
 import { convexTest } from "convex-test";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import { decodeFunctionData, keccak256, toHex, type Hex } from "viem";
+import {
+  decodeFunctionData,
+  keccak256,
+  toHex,
+  erc20Abi,
+  parseAbi,
+  type Hex,
+} from "viem";
 import schema from "../schema";
 import { api, internal } from "../_generated/api";
-import { createFullOrgSetup, signIn, TEST_WALLETS } from "./factories";
+import {
+  createFullOrgSetup,
+  createTestUser,
+  createTestMembership,
+  signIn,
+  TEST_WALLETS,
+} from "./factories";
 import { assertParentHierarchy } from "../accountSetups";
 import { readCircleSource } from "../lib/circleSource";
 import {
@@ -23,15 +36,40 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
-async function setup() {
+async function setup(assigned = false) {
   const t = convexTest(schema),
     org = await t.run((ctx) =>
       createFullOrgSetup(ctx, { walletAddress: TEST_WALLETS.admin }),
     );
-  await t.run((ctx) => ctx.db.patch(org.safeId, { chainId: 84532 }));
+  await t.run((ctx) =>
+    ctx.db.patch(org.safeId, {
+      chainId: 84532,
+      owners: [TEST_WALLETS.admin.toLowerCase()],
+      threshold: 1,
+    }),
+  );
   const { sessionToken } = await signIn(t, "admin");
   const requestId = "test-account-request-0001";
+  const memberUserId = assigned
+    ? await t.run(async (ctx) => {
+        const userId = await createTestUser(ctx, {
+          walletAddress: TEST_WALLETS.initiator,
+        });
+        await createTestMembership(ctx, org.orgId, userId, {
+          role: "initiator",
+        });
+        return userId;
+      })
+    : undefined;
   const preparation = {
+    ...(assigned
+      ? {
+          memberUserId,
+          memberAddress: TEST_WALLETS.initiator.toLowerCase(),
+          initialFunding: "5000000",
+          memberControlAcknowledged: true,
+        }
+      : {}),
     orgId: org.orgId,
     parentSafeId: org.safeId,
     sessionToken,
@@ -69,7 +107,11 @@ async function setup() {
     operation: {
       sender: safe,
       nonce: 1n << 64n,
-      callData: circleAccountCall(data.call.to, data.call.data),
+      callData: circleAccountCall(
+        data.call.to,
+        data.call.data,
+        "operation" in data.call ? data.call.operation : 0,
+      ),
       callGasLimit: 200000n,
       verificationGasLimit: 900000n,
       preVerificationGas: 100000n,
@@ -289,4 +331,145 @@ it("rejects a parent that would make its new child exceed supported approval dep
       nodes: nodes.slice(1),
     }),
   ).not.toThrow();
+});
+
+it("creates a member-owned account with an exact initial USDC transfer, leaving the parent owners unchanged", async () => {
+  const s = await setup(true);
+  expect("principalUSDC" in s.data && s.data.principalUSDC).toBe("5000000");
+  expect("operation" in s.data.call && s.data.call.operation).toBe(1);
+  const batch = decodeFunctionData({
+    abi: parseAbi(["function multiSend(bytes transactions)"]),
+    data: s.data.call.data,
+  }).args[0];
+  const encoded = batch.slice(2),
+    length = Number(BigInt("0x" + encoded.slice(106, 170))),
+    first = `0x${encoded.slice(170, 170 + length * 2)}` as Hex;
+  expect(encoded.slice(0, 2)).toBe("00");
+  const initializer = decodeFunctionData({
+    abi: companyFactoryAbi,
+    data: first,
+  }).args[1];
+  const setupCall = decodeFunctionData({
+    abi: parseAbi([
+      "function setup(address[] owners,uint256 threshold,address to,bytes data,address fallbackHandler,address paymentToken,uint256 payment,address paymentReceiver)",
+    ]),
+    data: initializer,
+  });
+  expect(setupCall.args[0].map((a) => a.toLowerCase())).toEqual([
+    TEST_WALLETS.initiator.toLowerCase(),
+  ]);
+  const second = encoded.slice(170 + length * 2);
+  expect(second.slice(0, 2)).toBe("00");
+  expect("0x" + second.slice(2, 42)).toBe(
+    circleConfiguration(84532).token.toLowerCase(),
+  );
+  const transfer = decodeFunctionData({
+    abi: erc20Abi,
+    data: `0x${second.slice(170)}`,
+  });
+  expect(transfer.functionName).toBe("transfer");
+  expect(transfer.args?.[0]?.toString().toLowerCase()).toBe(
+    s.preparation.address,
+  );
+  expect(transfer.args?.[1]).toBe(5000000n);
+  const executionId = await s.persistFee(),
+    txHash = `0x${"ab".repeat(32)}`;
+  await s.t.run((ctx) =>
+    ctx.db.patch(executionId, { stage: "confirmed", open: false, txHash }),
+  );
+  await s.t.mutation(internal.accountSetups.finish, {
+    accountSetupId: s.accountSetupId,
+    txHash,
+  });
+  const result = await s.t.query(api.accountSetups.get, s.args);
+  expect(await s.t.run((ctx) => ctx.db.get(result.safeId!))).toMatchObject({
+    owners: [TEST_WALLETS.initiator.toLowerCase()],
+    assignedUserId: s.preparation.memberUserId,
+  });
+  expect((await s.t.run((ctx) => ctx.db.get(s.org.safeId)))?.owners).toEqual([
+    TEST_WALLETS.admin.toLowerCase(),
+  ]);
+});
+it.each([undefined, "0", "2999999", "100000001", "five", "-1", "5000000.5"])(
+  "rejects an invalid assigned balance %s at both preparation and save",
+  async (initialFunding) => {
+    const s = await setup(true);
+    await expect(
+      s.t.mutation(internal.accountSetups.persist, {
+        ...s.preparation,
+        initialFunding,
+      }),
+    ).rejects.toThrow("between 3 and 100");
+    const args = {
+      orgId: s.preparation.orgId,
+      parentSafeId: s.preparation.parentSafeId,
+      name: s.preparation.name,
+      requestId: s.preparation.requestId,
+      memberUserId: s.preparation.memberUserId,
+      memberControlAcknowledged: true,
+      sessionToken: s.args.sessionToken,
+    };
+    await expect(
+      s.t.query(internal.accountSetups.preparationContext, {
+        ...args,
+        initialFunding,
+      }),
+    ).rejects.toThrow("between 3 and 100");
+  },
+);
+it("requires reviewed member control and rejects an unassigned funding transfer", async () => {
+  const s = await setup(true);
+  await expect(
+    s.t.mutation(internal.accountSetups.persist, {
+      ...s.preparation,
+      memberControlAcknowledged: false,
+    }),
+  ).rejects.toThrow("acknowledge");
+  await expect(
+    s.t.mutation(internal.accountSetups.persist, {
+      ...s.preparation,
+      memberUserId: undefined,
+      memberAddress: undefined,
+    }),
+  ).rejects.toThrow("Choose a member");
+  await expect(
+    s.t.mutation(internal.accountSetups.persist, {
+      ...s.preparation,
+      memberAddress: s.preparation.parentAddress,
+    }),
+  ).rejects.toThrow("wallet changed");
+});
+it.each(["viewer", "removed", "outside workspace"])(
+  "blocks assigned account approval for a member who is %s",
+  async (reason) => {
+    const s = await setup(true);
+    await s.t.run(async (ctx) => {
+      const member = await ctx.db
+        .query("orgMemberships")
+        .withIndex("by_org_and_user", (q) =>
+          q.eq("orgId", s.org.orgId).eq("userId", s.preparation.memberUserId!),
+        )
+        .unique();
+      if (reason === "outside workspace") await ctx.db.delete(member!._id);
+      else if (reason === "removed")
+        await ctx.db.patch(member!._id, { status: "removed" });
+      else await ctx.db.patch(member!._id, { role: "viewer" });
+    });
+    await expect(s.persistFee()).rejects.toThrow("active team member");
+    // The original reviewed owner and budget remain readable for receipt recovery.
+    expect(await s.t.query(api.accountSetups.get, s.args)).toMatchObject({
+      memberUserId: s.preparation.memberUserId,
+      initialFunding: "5000000",
+    });
+  },
+);
+it("requires a new review if the assigned amount changes after preparation", async () => {
+  const s = await setup(true);
+  await s.t.run((ctx) =>
+    ctx.db.patch(s.accountSetupId, { initialFunding: "6000000" }),
+  );
+  await expect(s.persistFee()).rejects.toThrow();
+  expect(
+    await s.t.run((ctx) => ctx.db.query("circleExecutions").collect()),
+  ).toHaveLength(0);
 });

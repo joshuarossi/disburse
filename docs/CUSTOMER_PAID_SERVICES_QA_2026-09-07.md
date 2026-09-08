@@ -136,3 +136,12 @@ Discarding an unsigned instruction is free. Once an operation has any owner sign
 The full check passed **1041 tests across 105 files**, frontend/backend typecheck and lint. The production build passed with existing deferred SDK chunk warnings. The full browser suite passed **334 stories** after a transient navigation interruption during editing was rerun successfully. Six scheduled-payment browser stories cover both themes, mobile layout, neutral wallet rejection, retained approvals after reload, unsigned discard, paid cancellation and insufficient funds. Visual review found and fixed low-contrast dark status text and mixed local/UTC dates. Controlled tests also cover batch-transfer evidence, changed instructions/permissions, early claims, missing approvals, expiry, unavailable providers and ambiguous submissions. They are not evidence for an actual live scheduled batch or every possible provider failure.
 
 The prior commit `7abba0b` passed GitHub CI and Cloudflare Pages. Scheduled execution changes remain subject to their own hosted checks. Delegated stablecoin-fee execution remains unfinished.
+
+
+## September 8: assigned-account delegation
+
+The [delegated-payment report](DELEGATED_PAYMENTS.md) records live account creation/funding, grant, a two-recipient batch through the built app, signed cancellation and a successful batch after cancellation. All wallets and Safes had zero ETH. Company principal and the assigned account's gas remained separate. A request above the remaining allowance failed before signing or fee preparation.
+
+The code checks passed 1,071 tests in 107 files, plus TypeScript and ESLint. The complete browser run passed 343 stories; the restored policy regression and all 12 other payout stories then passed. Ten new delegated stories cover assigned-account control, missing accounts, allowance and balance failures, unsigned discard, signed cancellation, signature rejection, reload, uncertain submission and exact settlement. Light desktop and dark phone views were inspected; accessibility and overflow checks passed. The production build passed with the existing wallet/SDK chunk-size warnings.
+
+The real browser runner uses the built application and authenticated backend, with host-held test keys and an EIP-1193 adapter that accepts only the saved typed-data digest. It never permits native-gas sends. This establishes built-app behavior and testnet settlement, not MetaMask mobile/extension compatibility or independent security review.

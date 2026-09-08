@@ -1,9 +1,13 @@
+import { settleCircleCancellation } from "./lib/circleCancellation";
+import { settleDelegatedCircle } from "./lib/circleDelegation";
+import { assertDelegatedCircleReceipt } from "../shared/delegatedSettlement";
 import { v } from "convex/values";
 import {
   action,
   internalAction,
   internalMutation,
   internalQuery,
+  mutation,
   query,
 } from "./_generated/server";
 import { api, internal } from "./_generated/api";
@@ -93,6 +97,22 @@ export const get = query({
         : schedule?.cancellationExecutionId;
       return id ? ctx.db.get(id) : null;
     }
+    if (source.cancelExecutionId)
+      return ctx.db
+        .query("circleExecutions")
+        .withIndex("by_cancel_execution", (q) =>
+          q.eq("cancelExecutionId", source.cancelExecutionId),
+        )
+        .order("desc")
+        .first();
+    if (source.delegatedDisbursementId)
+      return ctx.db
+        .query("circleExecutions")
+        .withIndex("by_delegated_payment", (q) =>
+          q.eq("delegatedDisbursementId", source.delegatedDisbursementId),
+        )
+        .order("desc")
+        .first();
     if (source.accountSetupId)
       return ctx.db
         .query("circleExecutions")
@@ -161,6 +181,8 @@ export const context = internalQuery({
       args.sessionToken,
       execution.disbursementId ||
         execution.receivableId ||
+        execution.cancelExecutionId ||
+        execution.delegatedDisbursementId ||
         execution.paymentScheduleId ||
         execution.scheduleCancellationId
         ? writers
@@ -391,6 +413,10 @@ export const persist = internalMutation({
           ? { executionId: id }
           : { cancellationExecutionId: id },
       );
+    if (source.identity.delegatedDisbursementId)
+      await ctx.db.patch(source.identity.delegatedDisbursementId, {
+        allowanceCircleExecutionId: id,
+      });
     await appendAudit(ctx, {
       orgId: source.target.orgId,
       actorUserId: source.user._id,
@@ -446,6 +472,28 @@ export const approvals = action({
         ),
       })),
     };
+  },
+});
+// Persist before opening the wallet. A lost signature-save response must not
+// make a potentially signed instruction eligible for free local cancellation.
+export const beginApproval = mutation({
+  args: { ...executionIdentity, revision: v.number() },
+  handler: async (ctx, args) => {
+    const execution = await ctx.db.get(args.executionId);
+    if (
+      !execution ||
+      !execution.open ||
+      execution.stage !== "operation" ||
+      execution.revision !== args.revision
+    )
+      throw new Error(
+        "The fee request changed. Review its current approval step.",
+      );
+    await readCircleSource(ctx, execution, args.sessionToken, true);
+    await ctx.db.patch(execution._id, {
+      operationApprovalStartedAt:
+        execution.operationApprovalStartedAt ?? Date.now(),
+    });
   },
 });
 export const approve = action({
@@ -925,6 +973,26 @@ export const reconcile = internalAction({
         );
         if (execution.paymentScheduleId && result.status === "confirmed")
           assertScheduledTransfers(request, receipt.logs, result);
+        if (
+          execution.delegatedDisbursementId &&
+          result.status === "confirmed"
+        ) {
+          const { payment } = await ctx.runQuery(
+            internal.delegatedPayments.context,
+            { disbursementId: execution.delegatedDisbursementId },
+          );
+          if (
+            !payment.allowanceExecution ||
+            payment.allowanceFeeSafeId !== execution.safeId
+          )
+            throw new Error("The original allowance execution changed.");
+          assertDelegatedCircleReceipt(
+            payment.allowanceExecution,
+            payment.token,
+            receipt.logs,
+            result,
+          );
+        }
         const nonce = await client.readContract({
           address: request.safe,
           abi: parseAbi(["function nonce() view returns(uint256)"]),
@@ -944,7 +1012,9 @@ export const reconcile = internalAction({
           settlement,
           originalNonceAvailable: nonce === BigInt(request.safeNonce),
           principalVerified:
-            execution.paymentScheduleId && result.status === "confirmed"
+            (execution.paymentScheduleId ||
+              execution.delegatedDisbursementId) &&
+            result.status === "confirmed"
               ? true
               : undefined,
         });
@@ -1073,12 +1143,10 @@ export const checkpoint = internalMutation({
       throw new Error("Fee transfer evidence is inconsistent");
     if (
       args.state === "confirmed" &&
-      execution.paymentScheduleId &&
+      (execution.paymentScheduleId || execution.delegatedDisbursementId) &&
       !args.principalVerified
     )
-      throw new Error(
-        "The scheduled principal transfers have not been verified.",
-      );
+      throw new Error("The principal transfers have not been verified.");
     await ctx.db.patch(execution._id, {
       stage: args.state ?? execution.stage,
       open: !args.state,
@@ -1097,6 +1165,10 @@ export const checkpoint = internalMutation({
     });
     if (args.feeProof)
       await queueReportSource(ctx, execution.orgId, "fee", execution._id);
+    if (args.state && execution.delegatedDisbursementId)
+      await settleDelegatedCircle(ctx, (await ctx.db.get(execution._id))!);
+    if (args.state && execution.cancelExecutionId)
+      await settleCircleCancellation(ctx, (await ctx.db.get(execution._id))!);
     if (
       args.state &&
       (execution.paymentScheduleId || execution.scheduleCancellationId)

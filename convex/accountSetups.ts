@@ -1,3 +1,17 @@
+import {
+  accountSetupMember,
+  validateAssignedBalance,
+} from "./lib/accountSetupMember";
+import { fundedAccountSetup } from "../shared/fundedAccountSetup";
+import { assertCircleBatch } from "./lib/circleBatch";
+import { decodeCircleRequest } from "../shared/circleRequest";
+import { readCircleSettlement } from "../shared/circleSettlement";
+import {
+  assertSameSettlement,
+  readSettlementBlock,
+} from "./lib/settlementBlock";
+import { parseEventLogs, parseAbiItem } from "viem";
+import { circleConfiguration } from "../shared/circleExecution";
 import { v } from "convex/values";
 import {
   decodeFunctionResult,
@@ -19,7 +33,7 @@ import type { Id } from "./_generated/dataModel";
 import { requireOrgAccess } from "./lib/rbac";
 import { ORG_READER_ROLES } from "../shared/roles";
 import {
-  companyAccountDeployment,
+  safeAccountDeployment,
   companyFactoryAbi,
 } from "../shared/companyAccountSetup";
 import { getChainClient } from "./lib/safeVerification";
@@ -37,6 +51,9 @@ const preparation = {
   parentSafeId: v.id("safes"),
   name: v.string(),
   requestId: v.string(),
+  memberUserId: v.optional(v.id("users")),
+  initialFunding: v.optional(v.string()),
+  memberControlAcknowledged: v.optional(v.boolean()),
 };
 export function assertParentHierarchy(authority: AccountAuthority) {
   if (authority.nodes.length >= 32)
@@ -108,6 +125,12 @@ export const preparationContext = internalQuery({
     const safe = await ctx.db.get(args.parentSafeId);
     if (!safe || safe.orgId !== args.orgId || safe.isActive === false)
       throw new Error("Choose an active parent company account.");
+    const memberAddress = await accountSetupMember(
+      ctx,
+      args.orgId,
+      args.memberUserId,
+    );
+    validateAssignedBalance(args);
     const existing =
       (await ctx.db
         .query("accountSetups")
@@ -124,28 +147,33 @@ export const preparationContext = internalQuery({
     if (
       existing &&
       (existing.parentSafeId !== args.parentSafeId ||
-        existing.name !== args.name.trim())
+        existing.name !== args.name.trim() ||
+        existing.memberUserId !== args.memberUserId ||
+        existing.initialFunding !== args.initialFunding)
     )
       throw new Error(
         "Finish or discard the saved account setup before starting another.",
       );
-    return { safe, userId: user._id, existing };
+    return { safe, userId: user._id, existing, memberAddress };
   },
 });
 async function verifiedPrediction(
   chainId: number,
   parent: string,
   salt: string,
+  memberAddress?: string,
 ) {
-  const call = companyAccountDeployment(
+  const call = safeAccountDeployment(
       chainId,
-      parent as Address,
+      [(memberAddress ?? parent) as Address],
+      1,
       salt as Hex,
     ),
     client = getChainClient(chainId);
   if ((await client.getChainId()) !== chainId)
     throw new Error("The company account network is unavailable.");
-  assertParentHierarchy(await readAccountAuthority(chainId, parent));
+  if (!memberAddress)
+    assertParentHierarchy(await readAccountAuthority(chainId, parent));
   for (const expected of call.code) {
     const code = await client.getCode({ address: expected.address });
     if (!code || keccak256(code) !== expected.hash)
@@ -172,7 +200,7 @@ async function verifiedPrediction(
 export const create = action({
   args: preparation,
   handler: async (ctx, args): Promise<Id<"accountSetups">> => {
-    const { existing, safe } = await ctx.runQuery(
+    const { existing, safe, memberAddress } = await ctx.runQuery(
       internal.accountSetups.preparationContext,
       args,
     );
@@ -182,11 +210,13 @@ export const create = action({
       safe.chainId,
       safe.safeAddress,
       salt,
+      memberAddress,
     );
     return ctx.runMutation(internal.accountSetups.persist, {
       ...args,
       chainId: safe.chainId,
       parentAddress: safe.safeAddress.toLowerCase(),
+      memberAddress,
       address,
       salt,
     });
@@ -197,6 +227,7 @@ export const persist = internalMutation({
     ...preparation,
     chainId: v.number(),
     parentAddress: v.string(),
+    memberAddress: v.optional(v.string()),
     address: v.string(),
     salt: v.string(),
   },
@@ -207,6 +238,14 @@ export const persist = internalMutation({
       args.sessionToken,
       ["admin"],
     );
+    const memberAddress = await accountSetupMember(
+      ctx,
+      args.orgId,
+      args.memberUserId,
+    );
+    validateAssignedBalance(args);
+    if (memberAddress !== args.memberAddress)
+      throw new Error("The assigned member’s wallet changed.");
     const safe = await ctx.db.get(args.parentSafeId);
     if (
       !safe ||
@@ -226,7 +265,9 @@ export const persist = internalMutation({
     if (existing) {
       if (
         existing.name === args.name.trim() &&
-        existing.parentSafeId === args.parentSafeId
+        existing.parentSafeId === args.parentSafeId &&
+        existing.memberUserId === args.memberUserId &&
+        existing.initialFunding === args.initialFunding
       )
         return existing._id;
       throw new Error("Another account setup is already saved.");
@@ -242,7 +283,9 @@ export const persist = internalMutation({
         byRequest.name !== args.name.trim() ||
         byRequest.parentSafeId !== args.parentSafeId ||
         byRequest.address !== args.address ||
-        byRequest.salt !== args.salt
+        byRequest.salt !== args.salt ||
+        byRequest.memberUserId !== args.memberUserId ||
+        byRequest.initialFunding !== args.initialFunding
       )
         throw new Error("The saved account setup has different instructions.");
       return byRequest._id;
@@ -255,6 +298,9 @@ export const persist = internalMutation({
       name: args.name.trim(),
       chainId: args.chainId,
       parentAddress: args.parentAddress,
+      memberUserId: args.memberUserId,
+      memberAddress: args.memberAddress,
+      initialFunding: args.initialFunding,
       address: args.address,
       salt: args.salt,
       open: true,
@@ -272,6 +318,9 @@ export const persist = internalMutation({
         parentSafeId: safe._id,
         address: args.address,
         name: args.name.trim(),
+        memberUserId: args.memberUserId,
+        owner: args.memberAddress ?? args.parentAddress,
+        initialFunding: args.initialFunding,
       },
     });
     return id;
@@ -279,7 +328,10 @@ export const persist = internalMutation({
 });
 export const verify = internalAction({
   args: { accountSetupId: v.id("accountSetups"), sessionToken: v.string() },
-  handler: async (ctx, args): Promise<{ to: string; data: string }> => {
+  handler: async (
+    ctx,
+    args,
+  ): Promise<{ to: string; data: string; operation?: 0 | 1 }> => {
     const data = await ctx.runQuery(
       internal.accountSetups.executionContext,
       args,
@@ -288,10 +340,13 @@ export const verify = internalAction({
       data.safe.chainId,
       data.safe.safeAddress,
       data.setup.salt,
+      data.setup.memberAddress,
     );
     if (result.address !== data.setup.address)
       throw new Error("The new company account address changed.");
-    return result.call;
+    const call = fundedAccountSetup(data.setup);
+    await assertCircleBatch(data.setup.chainId, call);
+    return call;
   },
 });
 export const executionContext = internalQuery({
@@ -341,7 +396,8 @@ export const complete = internalAction({
     if (
       authority.nodes[0].threshold !== 1 ||
       authority.nodes[0].owners.length !== 1 ||
-      authority.nodes[0].owners[0].toLowerCase() !== setup.parentAddress
+      authority.nodes[0].owners[0].toLowerCase() !==
+        (setup.memberAddress ?? setup.parentAddress)
     )
       throw new Error("The new account has different approval requirements.");
     await assertCustomerPaidAccount(
@@ -350,6 +406,46 @@ export const complete = internalAction({
       setup.chainId,
       await client.getBlockNumber(),
     );
+    if (setup.initialFunding) {
+      const receipt = await client.getTransactionReceipt({
+        hash: execution.txHash as Hex,
+      });
+      assertSameSettlement(
+        execution.settlement,
+        await readSettlementBlock(client, setup.chainId, receipt),
+      );
+      const result = readCircleSettlement(
+        setup.chainId,
+        decodeCircleRequest(execution.record).operation,
+        receipt,
+      );
+      if (result.status !== "confirmed")
+        throw new Error("The assigned account deployment did not complete.");
+      const transfers = parseEventLogs({
+        abi: [
+          parseAbiItem(
+            "event Transfer(address indexed from,address indexed to,uint256 value)",
+          ),
+        ],
+        logs: receipt.logs,
+        strict: true,
+      }).filter(
+        (l) =>
+          !l.removed &&
+          l.logIndex !== null &&
+          l.logIndex > result.executionStart &&
+          l.logIndex < result.executionEnd &&
+          l.address.toLowerCase() ===
+            circleConfiguration(setup.chainId).token.toLowerCase() &&
+          l.args.from.toLowerCase() === setup.parentAddress &&
+          l.args.to.toLowerCase() === setup.address,
+      );
+      if (
+        transfers.length !== 1 ||
+        transfers[0].args.value !== BigInt(setup.initialFunding)
+      )
+        throw new Error("The initial member balance has not been verified.");
+    }
     await ctx.runMutation(internal.accountSetups.finish, {
       ...args,
       txHash: execution.txHash,
@@ -388,7 +484,8 @@ export const finish = internalMutation({
       name: setup.name,
       chainId: setup.chainId,
       safeAddress: setup.address,
-      owners: [setup.parentAddress],
+      owners: [setup.memberAddress ?? setup.parentAddress],
+      assignedUserId: setup.memberUserId,
       threshold: 1,
       isActive: true,
       verifiedAt: Date.now(),

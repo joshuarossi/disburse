@@ -1,3 +1,5 @@
+import { readCircleCancellation } from "./circleCancellation";
+import { readDelegatedSource } from "./circleDelegation";
 import { v } from "convex/values";
 import type { ActionCtx, QueryCtx } from "../_generated/server";
 import type { Id } from "../_generated/dataModel";
@@ -19,6 +21,8 @@ import { decodeCircleRequest } from "../../shared/circleRequest";
 import { readScheduledSource } from "./scheduledPayment";
 
 export const circleSourceArgs = {
+  cancelExecutionId: v.optional(v.id("circleExecutions")),
+  delegatedDisbursementId: v.optional(v.id("disbursements")),
   paymentScheduleId: v.optional(v.id("paymentSchedules")),
   scheduleCancellationId: v.optional(v.id("paymentSchedules")),
   disbursementId: v.optional(v.id("disbursements")),
@@ -30,6 +34,8 @@ export const circleSourceArgs = {
   accountSetupId: v.optional(v.id("accountSetups")),
 };
 export type CircleSource = {
+  cancelExecutionId?: Id<"circleExecutions">;
+  delegatedDisbursementId?: Id<"disbursements">;
   paymentScheduleId?: Id<"paymentSchedules">;
   scheduleCancellationId?: Id<"paymentSchedules">;
   disbursementId?: Id<"disbursements">;
@@ -43,6 +49,8 @@ export type CircleSource = {
 export function circleSourceIdentity(s: CircleSource) {
   if (
     [
+      s.cancelExecutionId,
+      s.delegatedDisbursementId,
       s.paymentScheduleId,
       s.scheduleCancellationId,
       s.disbursementId,
@@ -55,6 +63,9 @@ export function circleSourceIdentity(s: CircleSource) {
     ].filter(Boolean).length !== 1
   )
     throw new Error("Choose one account instruction");
+  if (s.cancelExecutionId) return { cancelExecutionId: s.cancelExecutionId };
+  if (s.delegatedDisbursementId)
+    return { delegatedDisbursementId: s.delegatedDisbursementId };
   if (s.paymentScheduleId) return { paymentScheduleId: s.paymentScheduleId };
   if (s.scheduleCancellationId)
     return { scheduleCancellationId: s.scheduleCancellationId };
@@ -76,6 +87,20 @@ export async function readCircleSource(
   write = false,
 ) {
   const identity = circleSourceIdentity(source);
+  if (identity.cancelExecutionId)
+    return readCircleCancellation(
+      ctx,
+      identity.cancelExecutionId,
+      sessionToken,
+      write,
+    );
+  if (identity.delegatedDisbursementId)
+    return readDelegatedSource(
+      ctx,
+      identity.delegatedDisbursementId,
+      sessionToken,
+      write,
+    );
   if (identity.paymentScheduleId || identity.scheduleCancellationId)
     return readScheduledSource(ctx, identity, sessionToken, write);
   if (identity.accountSetupId)
@@ -182,6 +207,18 @@ export async function verifyCircleSource(
   sessionToken: string,
 ): Promise<{ to: string; data: string; operation?: 0 | 1 }> {
   const identity = circleSourceIdentity(source);
+  if (identity.cancelExecutionId)
+    return (
+      await ctx.runQuery(internal.delegatedCircle.cancellationContext, {
+        cancelExecutionId: identity.cancelExecutionId,
+        sessionToken,
+      })
+    ).call;
+  if (identity.delegatedDisbursementId)
+    return ctx.runAction(internal.delegatedCircle.verify, {
+      disbursementId: identity.delegatedDisbursementId,
+      sessionToken,
+    });
   if (identity.paymentScheduleId || identity.scheduleCancellationId)
     return ctx.runAction(internal.paymentSchedules.verify, {
       ...identity,
@@ -248,11 +285,13 @@ export async function assertCircleReservation(
       const schedule = execution.scheduleCancellationId
         ? await ctx.db.get(execution.scheduleCancellationId)
         : null;
-      const original = schedule?.executionId
-        ? await ctx.db.get(schedule.executionId)
-        : null;
+      const original = execution.cancelExecutionId
+        ? await ctx.db.get(execution.cancelExecutionId)
+        : schedule?.executionId
+          ? await ctx.db.get(schedule.executionId)
+          : null;
       if (
-        execution.scheduleCancellationId &&
+        (execution.cancelExecutionId || execution.scheduleCancellationId) &&
         (!original ||
           !original.open ||
           decodeCircleRequest(original.record).operation.nonce !==
