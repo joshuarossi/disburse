@@ -399,5 +399,5 @@ try {
 } finally {
   await browser?.close();
   for (const sessionToken of sessions)
-    await client.mutation(api.auth.signOut, { sessionToken }).catch(() => {});
+    await client.mutation(api.auth.logout, { token: sessionToken }).catch(() => {});
 }

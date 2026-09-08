@@ -299,7 +299,7 @@ it("rejects unreviewed or stale edits and retains a saved source after the bill 
       fileId,
       sessionToken: admin.sessionToken,
     }),
-  ).rejects.toThrow(/retained with the bill/);
+  ).rejects.toThrow(/retained with their invoice or bill/);
 });
 
 it("prunes abandoned sources without deleting attached accounting evidence", async () => {

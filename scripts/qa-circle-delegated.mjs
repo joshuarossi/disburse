@@ -547,5 +547,5 @@ try {
   process.exitCode = 1;
 } finally {
   for (const sessionToken of [adminToken, delegateToken].filter(Boolean))
-    await client.mutation(api.auth.signOut, { sessionToken }).catch(() => {});
+    await client.mutation(api.auth.logout, { token: sessionToken }).catch(() => {});
 }

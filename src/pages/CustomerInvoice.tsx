@@ -6,6 +6,8 @@ import { api } from "../../convex/_generated/api";
 import { formatDate, formatMoney } from "@/lib/formatMoney";
 import { getChainName } from "@/lib/chains";
 import { InvoiceItems } from "@/components/invoices/InvoiceItems";
+import { downloadInvoiceFile } from "@/lib/invoiceFileClient";
+import { userErrorMessage } from "@/lib/userErrors";
 export default function CustomerInvoice() {
   const { token } = useParams();
   const invoice = useQuery(
@@ -13,6 +15,8 @@ export default function CustomerInvoice() {
     token ? { token } : "skip",
   );
   const [copied, setCopied] = useState("");
+  const [documentError, setDocumentError] = useState("");
+  const [downloading, setDownloading] = useState(false);
   const [slowToken, setSlowToken] = useState<string>();
   useEffect(() => {
     if (invoice !== undefined) return;
@@ -95,13 +99,87 @@ export default function CustomerInvoice() {
         </div>
         <InvoiceItems items={invoice.items} token={invoice.token} />
         <div className="flex justify-between gap-4 text-xl font-semibold">
-          <span>Total</span>
+          <span>{invoice.credits?.length ? "Original total" : "Total"}</span>
           <span>
             {formatMoney(invoice.amount, invoice.token, true)} {invoice.token}
           </span>
         </div>
+        {!!invoice.credits?.length && (
+          <section
+            aria-label="Credit notes"
+            className="space-y-3 border-t border-slate-400/20 pt-4"
+          >
+            <h3 className="font-semibold">Credit notes</h3>
+            {invoice.credits.map((c) => (
+              <div key={c.number} className="text-sm">
+                <div className="flex flex-wrap justify-between gap-2">
+                  <strong>{c.number}</strong>
+                  <span>
+                    −{formatMoney(c.amount,invoice.token,true)} {invoice.token}
+                  </span>
+                </div>
+                <p className="workspace-description">
+                  Issued {formatDate(c.issuedAt)}
+                </p>
+                <p className="whitespace-pre-wrap">{c.reason}</p>
+              </div>
+            ))}
+            <div className="flex flex-wrap justify-between gap-2 font-semibold">
+              <span>Adjusted total</span>
+              <span>
+                {formatMoney(invoice.amounts.adjustedTotal,invoice.token,true)} {invoice.token}
+              </span>
+            </div>
+          </section>
+        )}
         {invoice.description && (
           <p className="whitespace-pre-wrap text-sm">{invoice.description}</p>
+        )}
+        {!!invoice.documents?.length && (
+          <section
+            aria-label="Supporting documents"
+            className="space-y-3 border-t border-slate-400/20 pt-4"
+          >
+            <h3 className="font-semibold">Supporting documents</h3>
+            <ul className="space-y-2">
+              {invoice.documents.map((file) => (
+                <li key={file.id}>
+                  <button
+                    className="workspace-action-link break-all text-left"
+                    disabled={downloading}
+                    onClick={async () => {
+                      setDownloading(true);
+                      setDocumentError("");
+                      try {
+                        await downloadInvoiceFile(
+                          file.id,
+                          file.name,
+                          "",
+                          token!,
+                        );
+                      } catch (e) {
+                        setDocumentError(
+                          userErrorMessage(
+                            e,
+                            "The document is unavailable. Contact the business or try again.",
+                          ),
+                        );
+                      } finally {
+                        setDownloading(false);
+                      }
+                    }}
+                  >
+                    Download {file.name}
+                  </button>
+                </li>
+              ))}
+            </ul>
+            {documentError && (
+              <p role="alert" className="text-sm">
+                {documentError}
+              </p>
+            )}
+          </section>
         )}
       </section>
       <section className="workspace-panel space-y-5 p-6">
@@ -109,7 +187,11 @@ export default function CustomerInvoice() {
           {invoice.voided
             ? "Invoice voided"
             : invoice.amounts.remaining === "0"
-              ? "Payment received"
+              ? invoice.status === "Credited"
+                ? "Invoice credited"
+                : invoice.status === "Refunded"
+                  ? "Invoice refunded"
+                  : "Payment received"
               : "Payment instructions"}
         </h2>
         <div className="flex flex-wrap justify-between gap-4">
@@ -130,9 +212,18 @@ export default function CustomerInvoice() {
             </p>
           )}
         </div>
+        {invoice.amounts.refunded !== undefined &&
+          invoice.amounts.refunded !== "0" && (
+            <p>
+              Refunded{" "}
+              <strong>
+                {invoice.amounts.refunded} {invoice.token}
+              </strong>
+            </p>
+          )}
         {invoice.amounts.overpayment !== "0" && (
           <p>
-            Overpayment:{" "}
+            Customer credit:{" "}
             {formatMoney(invoice.amounts.overpayment, invoice.token, true)}{" "}
             {invoice.token}. Contact {invoice.issuer} to resolve it.
           </p>

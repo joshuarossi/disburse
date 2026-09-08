@@ -34,25 +34,25 @@ export function AccountingReview({ orgId, source, onClose }: { orgId: Id<'orgs'>
         }}>{verifying ? 'Verifying original receipt…' : 'Verify original receipt'}</button>}
       </>
         : !config.profile ? <Notice tone="info">Set up your book and chart of accounts in Reports → Reconciliation first.</Notice> : <>
-          <section className="rounded-xl border border-white/10 p-4 space-y-2" aria-label="Settled movement">
+          <section className="rounded-xl border border-white/10 p-4 space-y-2" aria-label={details.fact.nonCash ? "Issued credit note" : "Settled movement"}>
             <p className="font-semibold">{details.fact.label}</p>
             <p className="text-lg font-semibold tabular-nums">{details.fact.amount} {details.fact.token}
-              <span className="ml-2 text-xs font-normal text-slate-400">{details.fact.direction === 'inflow' ? 'Received' : 'Sent'}</span></p>
+              <span className="ml-2 text-xs font-normal text-slate-400">{details.fact.nonCash ? 'Credit issued · no funds moved' : details.fact.direction === 'inflow' ? 'Received' : 'Sent'}</span></p>
             <p className="text-sm">{details.fact.accountName} · {getChainName(details.fact.chainId)}</p>
-            <p className="text-xs text-slate-400">Settled {new Date(details.fact.settledAt).toISOString().replace('T', ' ').slice(0, 19)} UTC</p>
+            <p className="text-xs text-slate-400">{details.fact.nonCash ? 'Issued' : 'Settled'} {new Date(details.fact.settledAt).toISOString().replace('T', ' ').slice(0, 19)} UTC</p>
             {details.fact.companyTransfer && <p className="text-sm">Company transfer · {details.fact.companyAccountName}</p>}
             {details.fact.references.map(ref => <p key={ref.id} className="text-sm">Source {ref.kind}: {ref.number}</p>)}
             {details.fact.invoiceExcessRaw && BigInt(details.fact.invoiceExcessRaw) > 0n && <Notice tone="info">
               {formatUnits(BigInt(details.fact.invoiceAppliedRaw ?? '0'), details.fact.decimals)} {details.fact.token} applies to this invoice.
               {' '}{formatUnits(BigInt(details.fact.invoiceExcessRaw), details.fact.decimals)} {details.fact.token} is an excess receipt. Keep its reviewed book value in a customer liability account.
             </Notice>}
-            <details className="text-xs text-slate-400"><summary className="cursor-pointer">Settlement evidence</summary>
+            {!details.fact.nonCash && <details className="text-xs text-slate-400"><summary className="cursor-pointer">Settlement evidence</summary>
               <p className="mt-2 break-all">Account: {details.fact.accountAddress}</p>
               <p className="mt-2 break-all">Counterparty: {details.fact.counterpartyAddress}</p>
               <p className="mt-2 break-all">Transaction: {details.fact.txHash}</p>
               <p className="mt-2 break-all">Transfer: {details.fact.transferId}</p>
               <p className="mt-2">Date evidence: {details.fact.dateSource === 'settlement' ? 'Verified block' : 'Account history provider'} · Block {details.fact.blockNumber}</p>
-            </details>
+            </details>}
           </section>
           {details.entry && correcting !== details.entry._id ? <section className="space-y-4">
             <div className="flex flex-wrap items-center justify-between gap-3"><h3 className="font-semibold">{details.entry.journalNumber}</h3>
@@ -87,9 +87,9 @@ function ReviewForm({ orgId, details, config, onSaved }: { orgId: Id<'orgs'>; de
   const sessionToken = useSessionToken(), save = useMutation(api.accounting.review);
   const [treatment, setTreatment] = useState<AccountingTreatment | ''>(previous?.treatment ?? '');
   const [assetId, setAssetId] = useState(previous?.lines[0]?.account.id ?? details.assetAccountId ?? '');
-  const [counterId, setCounterId] = useState(previous?.lines[1]?.account.id ?? '');
+  const [counterId, setCounterId] = useState(previous?.treatment === 'credit_note' ? previous.lines.find(l=>l.account.kind === 'receivable')?.account.id ?? '' : previous?.lines[1]?.account.id ?? '');
   const [differenceId, setDifferenceId] = useState(previous?.lines.slice(2).find(line => ['income', 'expense'].includes(line.account.kind))?.account.id ?? '');
-  const [advanceId, setAdvanceId] = useState(previous?.lines.slice(2).find(line => line.account.kind === 'liability')?.account.id ?? '');
+  const [advanceId, setAdvanceId] = useState((previous?.treatment === 'credit_note' ? previous.lines : previous?.lines.slice(2))?.find(line => line.account.kind === 'liability')?.account.id ?? '');
   const [advanceValue, setAdvanceValue] = useState(previous?.advanceBookValue ?? '');
   const [deliveryFeeValue, setDeliveryFeeValue] = useState(previous?.deliveryFeeBookValue ?? '');
   const [deliveryFeeId, setDeliveryFeeId] = useState(previous?.deliveryFeeBookValue !== undefined ? previous.lines.slice(2).find(line => line.account.kind === 'expense')?.account.id ?? '' : '');
@@ -109,7 +109,8 @@ function ReviewForm({ orgId, details, config, onSaved }: { orgId: Id<'orgs'>; de
     if (!row) throw new Error('Choose the accounts in your books');
     return { id: row._id, externalId: row.externalId, name: row.name, kind: row.kind, version: row.version };
   };
-  const obligation = treatment === 'existing_payable' || treatment === 'existing_receivable';
+  const obligation = treatment === 'existing_payable' || treatment === 'existing_receivable' || treatment === 'customer_refund';
+  const credit = treatment === 'credit_note';
   const conversionReceipt = treatment === 'currency_conversion' && fact.direction === 'inflow';
   const withdrawal = treatment === 'investment_withdrawal';
   const receiptHasExcess = !!fact.invoiceExcessRaw && BigInt(fact.invoiceExcessRaw) > 0n;
@@ -122,15 +123,15 @@ function ReviewForm({ orgId, details, config, onSaved }: { orgId: Id<'orgs'>; de
     if (treatment === 'already_recorded') bookUnits(assetValue, profile.currency, true);
     else lines = buildSettlementJournal({ treatment, direction: fact.direction, currency: profile.currency,
       assetBookValue: assetValue, obligationBookValue: obligationValue, assetAccount: account(assetId), counterAccount: account(counterId),
-      differenceAccount: differenceId ? account(differenceId) : undefined, externalName, companyTransfer: fact.companyTransfer, lendingMovement: fact.lendingMovement, conversionMovement: fact.conversionMovement,
+      differenceAccount: differenceId ? account(differenceId) : undefined, externalName, companyTransfer: fact.companyTransfer, nonCash:fact.nonCash, customerRefund:fact.customerRefund, lendingMovement: fact.lendingMovement, conversionMovement: fact.conversionMovement,
       receiptHasExcess, advanceBookValue: advanceValue, advanceAccount: advanceId ? account(advanceId) : undefined,
       deliveryFeeRequired, deliveryFeeBookValue: deliveryFeeValue, deliveryFeeAccount: deliveryFeeId ? account(deliveryFeeId) : undefined });
   } catch (e) { previewError = userErrorMessage(e, 'Review the journal values'); }
   const options = (Object.keys(accountingTreatments) as AccountingTreatment[]).filter(value => value === 'already_recorded'
-    || (fact.conversionMovement ? value === 'currency_conversion' : fact.lendingMovement ? value === (fact.lendingMovement === 'supply' ? 'investment_deposit' : 'investment_withdrawal') : fact.companyTransfer ? value === 'internal_transfer'
+    || (fact.nonCash ? value === 'credit_note' : fact.customerRefund ? value === 'customer_refund' : fact.conversionMovement ? value === 'currency_conversion' : fact.lendingMovement ? value === (fact.lendingMovement === 'supply' ? 'investment_deposit' : 'investment_withdrawal') : fact.companyTransfer ? value === 'internal_transfer'
       : fact.direction === 'inflow' ? (value === 'customer_advance' || value === 'existing_receivable' && fact.invoiceAppliedRaw !== '0') : ['existing_payable', 'expense', 'fee'].includes(value)));
   const counterKind: AccountKind[] = ['internal_transfer', 'investment_deposit', 'investment_withdrawal', 'currency_conversion'].includes(treatment) ? ['asset'] : treatment === 'existing_payable' ? ['payable']
-    : treatment === 'existing_receivable' ? ['receivable'] : treatment === 'customer_advance' ? ['liability'] : ['expense'];
+    : treatment === 'existing_receivable' || credit ? ['receivable'] : ['customer_advance','customer_refund'].includes(treatment) ? ['liability'] : ['expense'];
   const selectAccount = (label: string, value: string, onChange: (value: string) => void, kinds: AccountKind[]) => <label className="block">
     <span className="finance-label">{label}</span><select className="finance-field" aria-label={label} value={value} onChange={e => { onChange(e.target.value); setReviewed(false); }}>
       <option value="">Choose an account</option>{accounts.filter(a => kinds.includes(a.kind)).map(a => <option key={a._id} value={a._id}>{a.name} · {a.externalId}</option>)}
@@ -140,10 +141,10 @@ function ReviewForm({ orgId, details, config, onSaved }: { orgId: Id<'orgs'>; de
     setBusy(true); setError('');
     try {
       await save({ orgId, sessionToken, source: fact.source, expectedFingerprint: fact.fingerprint, expectedProfileVersion: profile.version,
-        treatment, postingDate, assetBookValue: assetValue, obligationBookValue: obligation || withdrawal || conversionReceipt ? obligationValue : undefined,
+        treatment, postingDate, assetBookValue: assetValue, obligationBookValue: obligation || credit || withdrawal || conversionReceipt ? obligationValue : undefined,
         assetAccountId: assetId ? assetId as Id<'accountingAccounts'> : undefined, counterAccountId: counterId ? counterId as Id<'accountingAccounts'> : undefined,
         differenceAccountId: differenceId ? differenceId as Id<'accountingAccounts'> : undefined,
-        advanceAccountId: needsAdvance && advanceId ? advanceId as Id<'accountingAccounts'> : undefined,
+        advanceAccountId: (needsAdvance || credit) && advanceId ? advanceId as Id<'accountingAccounts'> : undefined,
         advanceBookValue: needsAdvance ? advanceValue : undefined,
         deliveryFeeBookValue: needsDeliveryFee ? deliveryFeeValue : undefined,
         deliveryFeeAccountId: needsDeliveryFee && deliveryFeeId ? deliveryFeeId as Id<'accountingAccounts'> : undefined,
@@ -153,7 +154,9 @@ function ReviewForm({ orgId, details, config, onSaved }: { orgId: Id<'orgs'>; de
     } catch (e) { setError(userErrorMessage(e, 'Could not save reconciliation')); }
     finally { setBusy(false); }
   }}>
-    <p className="text-sm text-slate-400">Book values are in {profile.currency}. Use the carrying value and obligation balance from {profile.bookName}. The settled quantity remains {fact.amount} {fact.token}.</p>
+    <p className="text-sm text-slate-400">Book values are in {profile.currency}. Use the carrying value and obligation balance from {profile.bookName}. {fact.nonCash ? 'The issued credit is' : 'The settled quantity remains'} {fact.amount} {fact.token}.</p>
+    {fact.nonCash && <Notice tone="info">This credit adjusts the invoice without moving funds. Review how much reduces the customer's receivable and how much creates a liability available for refund. Match an existing credit instead if it is already in your books.</Notice>}
+    {fact.customerRefund && <Notice tone="info">Release the recorded customer liability when booking this refund. Its execution fee has a separate review.</Notice>}
     {previous && <Notice tone="info">{previous.state === 'reconciled' ? 'This correction creates a reversal and a replacement for export together. The original journal is retained.' : 'The unexported review will be retained as voided and replaced with this journal.'}</Notice>}
     {error && <Notice>{error}</Notice>}
     {fact.treasuryTransferId && <Notice tone="info">Reconcile both sides through the same transfer clearing account. The sending account records the full debit; the receiving account records its net receipt and the provider's retained delivery fee. Keep the separate execution fee in its own review.</Notice>}
@@ -169,11 +172,12 @@ function ReviewForm({ orgId, details, config, onSaved }: { orgId: Id<'orgs'>; de
     </div>
     {profile.closedThrough && <p className="text-xs text-slate-400">Books closed through {profile.closedThrough}.</p>}
     {treatment && treatment !== 'already_recorded' && <div className="grid gap-4 sm:grid-cols-2">
-      {selectAccount('Holding account in your books', assetId, setAssetId, ['asset'])}
+      {selectAccount(credit ? 'Sales returns or adjustment account' : 'Holding account in your books', assetId, setAssetId, credit ? ['income','expense'] : ['asset'])}
       {selectAccount('Offset account in your books', counterId, setCounterId, counterKind)}
     </div>}
     <div className="grid gap-4 sm:grid-cols-2">
-      <label><span className="finance-label">Asset book value · {profile.currency}</span><input className="finance-field" inputMode="decimal" value={assetValue} onChange={e => { setAssetValue(e.target.value); setReviewed(false); }} placeholder="Enter the reviewed book value" required /></label>
+      <label><span className="finance-label">{credit ? 'Credit book value' : 'Asset book value'} · {profile.currency}</span><input className="finance-field" inputMode="decimal" value={assetValue} onChange={e => { setAssetValue(e.target.value); setReviewed(false); }} placeholder="Enter the reviewed book value" required /></label>
+      {credit && <label><span className="finance-label">Receivable reduction · {profile.currency}</span><input className="finance-field" inputMode="decimal" value={obligationValue} onChange={e=>{setObligationValue(e.target.value);setReviewed(false);}} required placeholder="Use zero if the invoice is already paid" /></label>}
       {obligation && <label><span className="finance-label">Obligation settled · {profile.currency}</span><input className="finance-field" inputMode="decimal" value={obligationValue} onChange={e => { setObligationValue(e.target.value); setReviewed(false); }} placeholder="Value of this settlement in the books" required /></label>}
       {withdrawal && <label><span className="finance-label">Lending asset carrying value released · {profile.currency}</span><input className="finance-field" inputMode="decimal" value={obligationValue} onChange={e => { setObligationValue(e.target.value); setReviewed(false); }} placeholder="Reviewed basis, including recorded accruals" required /></label>}
       {conversionReceipt && <label><span className="finance-label">Conversion clearing value released · {profile.currency}</span><input className="finance-field" inputMode="decimal" value={obligationValue} onChange={e => { setObligationValue(e.target.value); setReviewed(false); }} placeholder="Carrying value from the corresponding paid entry" required /></label>}
@@ -182,14 +186,15 @@ function ReviewForm({ orgId, details, config, onSaved }: { orgId: Id<'orgs'>; de
       <label><span className="finance-label">Delivery fee book value · {profile.currency}</span><input className="finance-field" inputMode="decimal" value={deliveryFeeValue} onChange={e => { setDeliveryFeeValue(e.target.value); setReviewed(false); }} required placeholder="Reviewed value of the retained fee" /></label>
       {selectAccount('Delivery fee expense account', deliveryFeeId, setDeliveryFeeId, ['expense'])}
     </div>}
-    {obligation && <>
+    {(obligation || credit) && <>
       <label className="block"><span className="finance-label">Vendor or customer name in the books</span><input className="finance-field" value={externalName} onChange={e => { setExternalName(e.target.value); setReviewed(false); }} maxLength={200} required /></label>
       {needsAdvance && <div className="grid gap-4 sm:grid-cols-2">
         <label><span className="finance-label">Excess receipt book value · {profile.currency}</span><input className="finance-field" inputMode="decimal" value={advanceValue}
           onChange={e => { setAdvanceValue(e.target.value); setReviewed(false); }} required placeholder="Reviewed value of the customer credit" /></label>
         {selectAccount('Customer liability for excess receipt', advanceId, setAdvanceId, ['liability'])}
       </div>}
-      {selectAccount('Valuation difference account, if needed', differenceId, setDifferenceId, ['income', 'expense'])}
+      {!credit && selectAccount('Valuation difference account, if needed', differenceId, setDifferenceId, ['income', 'expense'])}
+      {credit && selectAccount('Customer liability for refundable credit, if needed', advanceId, setAdvanceId, ['liability'])}
     </>}
     {(withdrawal || conversionReceipt) && selectAccount('Unrecorded income or valuation difference account, if needed', differenceId, setDifferenceId, ['income', 'expense'])}
     <label className="block"><span className="finance-label">Book value evidence</span><textarea className="finance-field min-h-20" value={evidence}

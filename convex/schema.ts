@@ -668,6 +668,10 @@ export default defineSchema({
     .index("by_cancellation", ["cancellationId"])
     .index("by_cancellation_signer", ["cancellationId", "pathKey", "owner"]),
   receivables: defineTable({
+    credited: v.optional(v.string()),
+    followUpAt: v.optional(v.number()),
+    lastReminderPreparedAt: v.optional(v.number()),
+    lastReminderRequestId: v.optional(v.string()),
     orgId: v.id("orgs"),
     safeId: v.id("safes"),
     createdBy: v.id("users"),
@@ -721,6 +725,20 @@ export default defineSchema({
     .index("by_public", ["publicToken"])
     .index("by_issued_scan", ["state", "nextScanAt"])
     .index("by_receiving_address", ["orgId", "chainId", "receivingAddress"]),
+  receivableCreditNotes: defineTable({
+    orgId: v.id("orgs"),
+    invoiceId: v.id("receivables"),
+    number: v.string(),
+    normalizedNumber: v.string(),
+    requestId: v.string(),
+    amountRaw: v.string(),
+    reason: v.string(),
+    issuedAt: v.number(),
+    createdBy: v.id("users"),
+  }).index("by_invoice", ["invoiceId"])
+    .index("by_org_time", ["orgId", "issuedAt"])
+    .index("by_org_number", ["orgId", "normalizedNumber"])
+    .index("by_invoice_request", ["invoiceId", "requestId"]),
   receivableEvents: defineTable({
     invoiceId: v.id("receivables"),
     orgId: v.id("orgs"),
@@ -1019,6 +1037,8 @@ export default defineSchema({
     orgId: v.id("orgs"),
     storageId: v.id("_storage"),
     invoiceId: v.optional(v.id("invoices")),
+    receivableId: v.optional(v.id("receivables")),
+    sharedWithCustomer: v.optional(v.boolean()),
     requestId: v.string(),
     name: v.string(),
     contentType: v.string(),
@@ -1029,9 +1049,10 @@ export default defineSchema({
     expiresAt: v.optional(v.number()),
   })
     .index("by_invoice", ["invoiceId"])
+    .index("by_receivable", ["receivableId"])
     .index("by_request", ["orgId", "requestId"])
     .index("by_expiry", ["expiresAt"])
-    .index("by_user_unattached", ["uploadedBy", "invoiceId"]),
+    .index("by_user_unattached", ["uploadedBy", "invoiceId", "receivableId"]),
 
   invoices: defineTable({
     sourceReviewedBy: v.optional(v.id("users")),
@@ -1126,6 +1147,8 @@ export default defineSchema({
   }).index("by_notification_user", ["notificationId", "userId"]),
 
   disbursements: defineTable({
+    refundInvoiceId: v.optional(v.id("receivables")),
+    refundRequestId: v.optional(v.string()),
     allowanceFeeSafeId: v.optional(v.id("safes")),
     allowanceCircleExecutionId: v.optional(v.id("circleExecutions")),
     allowanceCancellationRequestedAt: v.optional(v.number()),
@@ -1219,6 +1242,8 @@ export default defineSchema({
     .index("by_org", ["orgId"])
     .index("by_org_status", ["orgId", "status"])
     .index("by_native_recovery", ["nativeRecoveryAt"])
+    .index("by_refund_invoice", ["refundInvoiceId"])
+    .index("by_refund_request", ["refundInvoiceId", "refundRequestId"])
     .index("by_followup", ["followupAt"])
     .index("by_org_chain", ["orgId", "chainId"])
     .index("by_safe", ["safeId"])

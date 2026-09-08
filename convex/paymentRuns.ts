@@ -692,6 +692,7 @@ export const updateDraft = mutation({
       payment.type !== "batch"
     )
       throw new Error("Only an unsigned batch draft can be edited");
+    if(payment.refundInvoiceId)throw new Error("This payment is a reserved customer refund. Cancel it and prepare a replacement from the invoice to change its details.");
     const linkedBill = await ctx.db
       .query("invoices")
       .withIndex("by_payment", (q) => q.eq("disbursementId", payment._id))

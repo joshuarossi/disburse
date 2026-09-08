@@ -127,7 +127,11 @@ test('an existing export downloads stable journal numbers and exact movement evi
   const evidenceDownload = page.waitForEvent('download');
   await dialog.getByRole('button', { name: 'Download reconciliation evidence' }).click();
   const evidence = await readFile((await (await evidenceDownload).path())!, 'utf8');
-  expect(evidence).toContain('100.000001,100000001,USDC');
+  const [headers,first]=evidence.split(/\r?\n/).map(line=>line.split(','));
+  expect(first[headers.indexOf('asset_quantity')]).toBe('100.000001');
+  expect(first[headers.indexOf('document_quantity')]).toBe('');
+  expect(first[headers.indexOf('raw_units')]).toBe('100000001');
+  expect(first[headers.indexOf('token')]).toBe('USDC');
   expect(evidence).toContain('QBO-BILL-1042');
   await expect(dialog.getByRole('button', { name: 'Confirm import', exact: true })).toBeDisabled();
   await dialog.getByLabel('Import reference in your books').fill('QBO-IMPORT-2026-9');

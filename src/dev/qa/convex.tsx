@@ -41,6 +41,8 @@ import {
 import { accountFeeSetupFixture, readAccountFeeSetup } from "./accountFeeSetup";
 import { readTreasuryFixture, treasuryAccounts, treasuryCircleStep, treasuryFixtureAction } from "./treasury";
 import { readServiceFixture, serviceFixtureAction, serviceCircleStep } from "./treasuryService";
+import { arInvoice, arQuery, arMutation, readARFixture } from "./receivables";
+import { formatBaseUnits } from "../../../shared/validation";
 const cache = new Map<string, any>();
 let fixtureRevision = 0;
 const fixtureListeners = new Set<() => void>();
@@ -54,6 +56,7 @@ export function readQueryFixture(reference: any, args: any) {
   if (args === "skip") return undefined;
   const name = getFunctionName(reference);
   const scenario = sessionStorage.getItem("qa:scenario");
+  if(name.startsWith("receivableWorkflows:") || name === "invoiceFiles:forReceivable" || ["disbursements:getWithRecipients","disbursements:get"].includes(name) && args.disbursementId === "ar-refund")return arQuery(name,args);
   if (name.startsWith("licenseAdmin:"))
     return licenseQueryFixture(name, args, scenario);
   if (
@@ -303,7 +306,7 @@ export function readQueryFixture(reference: any, args: any) {
       break;
     case "receivables:list":
       value = {
-        items: (scenario === "empty" ? [] : customerInvoices).map((row) => {
+        items: (scenario === "empty" ? [] : customerInvoices).map(arInvoice).map((row) => {
           const i =
             scenario === "ar-void"
               ? { ...row, state: "void" }
@@ -337,7 +340,7 @@ export function readQueryFixture(reference: any, args: any) {
         value = undefined;
         break;
       }
-      const row = customerInvoices.find((i) => i.publicToken === args.token);
+      const row = customerInvoices.map(arInvoice).find((i) => i.publicToken === args.token);
       const i = row
         ? {
             ...row,
@@ -355,6 +358,8 @@ export function readQueryFixture(reference: any, args: any) {
             amounts: receivableAmounts(i),
             voided: i.state === "void",
             syncDelayed: false,
+            documents: readARFixture().files.filter((f:any)=>f.invoiceId === i._id && f.sharedWithCustomer),
+            credits: readARFixture().credits.filter((c:any)=>c.invoiceId === i._id).map((c:any)=>({...c,amount:formatBaseUnits(BigInt(c.amountRaw),i.token)})),
           }
         : null;
       break;
@@ -1461,6 +1466,9 @@ const disabled = async () => {
   );
 };
 export function useMutation(reference?: any) {
+  if(getFunctionName(reference).startsWith("receivableWorkflows:") || ["invoiceFiles:attachToReceivable","invoiceFiles:shareReceivableFile"].includes(getFunctionName(reference)) || getFunctionName(reference) === "accounting:review" && sessionStorage.getItem("qa:scenario")?.startsWith("ar-workflow-"))return async(args:any)=>{
+    try{return await arMutation(getFunctionName(reference),args);}finally{cache.clear();fixtureRevision++;fixtureListeners.forEach(listener=>listener());}
+  };
   if (getFunctionName(reference).startsWith("treasuryServices:")) return async (args: any) => {
     try {return await serviceFixtureAction(getFunctionName(reference), args);}
     finally {cache.clear(); fixtureRevision++; fixtureListeners.forEach(listener => listener());}

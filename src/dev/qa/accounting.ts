@@ -1,6 +1,8 @@
 /* eslint-disable @typescript-eslint/no-explicit-any -- local browser fixtures only */
 import { configuredTokenAddress, identifyAsset } from '../../../shared/assets';
 import { safes, wallet } from './fixtures';
+import { readARFixture } from './receivables';
+import { buildSettlementJournal } from '../../../shared/accounting';
 
 export function accountingFixture(name: string, args: any, scenario: string | null): any {
   const accounts = [
@@ -19,7 +21,7 @@ export function accountingFixture(name: string, args: any, scenario: string | nu
   const profile = { _id: 'profile', orgId: 'demo', currency: 'USD', bookName: 'Northstar · QuickBooks', version: 2, nextJournal: 3, updatedAt: 1 };
   const excess = scenario === 'accounting-excess';
   const treasury = scenario === 'accounting-treasury';
-  const fact = { key: `8453:e${'ab'.repeat(32)}4`, fingerprint: 'verified-settlement-identity',
+  const fact:any = { key: `8453:e${'ab'.repeat(32)}4`, fingerprint: 'verified-settlement-identity',
     source: { kind: excess ? 'receipt' : 'activity', id: excess ? 'receipt1' : 'activity1' }, label: excess ? 'Invoice INV-1042 · Acme Studio' : 'Studio North · INV-1042',
     chainId: 8453, token: 'USDC', tokenAddress: configuredTokenAddress(8453, 'USDC'), decimals: 6,
     amount: excess ? '1250.000001' : '100.000001', amountRaw: excess ? '1250000001' : '100000001', transferId: `e${'ab'.repeat(32)}4`, txHash: `0x${'ab'.repeat(32)}`,
@@ -30,11 +32,17 @@ export function accountingFixture(name: string, args: any, scenario: string | nu
     ...(excess ? { invoiceAppliedRaw: '1000000000', invoiceExcessRaw: '250000001' } : {}),
     ...(treasury ? { treasuryTransferId: 'treasury1', deliveryFeeRaw: '200000', amount: '100.05', amountRaw: '100050000', label: 'Transfer from Operations', companyAccountName: 'Operations' } : {}),
   };
+  if(args.source?.kind === 'credit_note'){
+    const credit=readARFixture().credits.find((c:any)=>c._id === args.source.id);
+    Object.assign(fact,{key:`credit_note:${args.source.id}`,fingerprint:`credit-${args.source.id}`,source:args.source,label:`Credit ${credit?.number ?? 'CN-10'} · Acme Studio`,amount:credit?.amount ?? '100',amountRaw:credit?.amountRaw ?? '100000000',nonCash:'credit_note',direction:'noncash',dateSource:'document',txHash:undefined,transferId:undefined,blockNumber:undefined,references:[{kind:'credit_note',id:args.source.id,number:credit?.number ?? 'CN-10'}]});
+  }
   const entry = { _id: 'journal1', _creationTime: 1, orgId: 'demo', journalNumber: 'DSB-1', fact, currency: 'USD', treatment: 'existing_payable',
     postingDate: '2026-08-31', assetBookValue: '99.80', obligationBookValue: '100.00', bookReference: 'QBO-BILL-1042', externalName: 'Studio North',
     valuationEvidence: 'Carrying value from August close schedule', memo: 'Settle previously recorded invoice INV-1042',
     lines: [{ account: snapshot('holding'), debit: '', credit: '99.80' }, { account: snapshot('payable'), debit: '100.00', credit: '', name: 'Studio North' },
       { account: snapshot('gain'), debit: '', credit: '0.20' }], state: 'ready', reviewedBy: 'user1', reviewedAt: 1, profileVersion: 2 };
+  const creditInput=JSON.parse(sessionStorage.getItem('qa:ar-book-input') ?? 'null');
+  const creditEntry=fact.nonCash && creditInput?.source.id === fact.source.id ? {...entry,...creditInput,_id:'ar-journal',journalNumber:'DSB-3',fact,lines:buildSettlementJournal({...creditInput,direction:'noncash',nonCash:'credit_note',companyTransfer:false,currency:'USD',assetAccount:snapshot(creditInput.assetAccountId),counterAccount:snapshot(creditInput.counterAccountId),advanceAccount:creditInput.advanceAccountId?snapshot(creditInput.advanceAccountId):undefined})} : null;
   const batch = { _id: 'export1', orgId: 'demo', requestId: 'qa-export-request', entryIds: ['journal1'], currency: 'USD', environment: 'production', createdBy: 'user1', createdAt: Date.UTC(2026, 8, 1) };
   const page = (rows: any[]) => ({ page: rows, isDone: true, continueCursor: '' });
   switch (name) {
@@ -48,7 +56,7 @@ export function accountingFixture(name: string, args: any, scenario: string | nu
     case 'accounting:configuration': return { profile, accounts, canConfigure: true, canReview: true };
     case 'accounting:sourceDetails': return ['accounting-evidence-missing', 'accounting-receipt-legacy'].includes(scenario ?? '')
       ? { fact: null, error: 'Refresh account history to match this movement to settled transfer evidence first', entry: null, history: [], historyLimited: false }
-      : { fact, entry: scenario === 'accounting-correction' ? { ...entry, state: 'reconciled', exportId: 'export1' } : null, history: [], historyLimited: false, assetAccountId: excess ? 'receiving' : 'holding', error: null };
+      : { fact, entry: creditEntry ?? (scenario === 'accounting-correction' ? { ...entry, state: 'reconciled', exportId: 'export1' } : null), history: [], historyLimited: false, assetAccountId: fact.nonCash ? undefined : excess ? 'receiving' : 'holding', error: null };
     case 'accounting:listReceipts': return page([{ id: 'receipt1', label: fact.label, amount: fact.amount, token: 'USDC', settledAt: fact.settledAt, companyTransfer: false, error: null }]);
     case 'accounting:listEntries': return page(args.environment === 'test' ? [] : [entry]);
     case 'accounting:listExports': return page(args.environment === 'test' ? [] : [batch]);

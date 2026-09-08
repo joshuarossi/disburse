@@ -40,12 +40,12 @@ export async function uploadInvoiceFile(
     signal: AbortSignal.timeout(90_000),
   }).catch(() => {
     throw new Error(
-      "The document upload was interrupted. Retry with this source document; your bill has not been added.",
+      "The document upload was interrupted. Keep this selection and retry to recover the same upload.",
     );
   });
   if (!response.ok)
     throw new Error(
-      "The source document could not be saved. Your bill has not been added. Check your connection and retry.",
+      "The document could not be saved. Check your connection and retry with the same selection.",
     );
   const receipt: { fileId?: Id<"invoiceFiles"> } = await response.json();
   if (!receipt.fileId)
@@ -58,13 +58,18 @@ export async function downloadInvoiceFile(
   fileId: Id<"invoiceFiles">,
   name: string,
   sessionToken: string,
+  publicToken?: string,
 ) {
-  const response = await fetch(endpoint({ fileId }), {
-    headers: { Authorization: `Bearer ${sessionToken}` },
-    credentials: "omit",
-    signal: AbortSignal.timeout(60_000),
-    redirect: "error",
-  }).catch(() => {
+  const response = await fetch(
+    endpoint({ fileId, ...(publicToken ? { publicToken } : {}) }),
+    {
+      headers: publicToken ? {} : { Authorization: `Bearer ${sessionToken}` },
+      credentials: "omit",
+      referrerPolicy: "no-referrer",
+      signal: AbortSignal.timeout(60_000),
+      redirect: "error",
+    },
+  ).catch(() => {
     throw new Error(
       "The document download was interrupted. Check your connection and retry.",
     );

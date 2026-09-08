@@ -62,3 +62,5 @@ Actual receipts, failure results and remaining work are in [the customer-paid se
 ## License acceptance
 
 `bun scripts/qa-license-management.mjs` uses the normal build at `http://127.0.0.1:4190` and the isolated QA company. It temporarily updates the development operator allowlist, then restores it in `finally`. The company grant is restored as well. It cannot send a network transaction. A restricted journal supports `--restore` after an interruption. Run this against a synchronized development backend; `convex codegen` alone generates bindings and does not publish the new function routes.
+
+`qa-receivable-workflows.mjs --phase=browser|status|inspect` exercises the fixed, already-collected Base Sepolia QA invoice through credit issuance and a 0.01 USDC customer refund. It uses the built app on port 4183 and the hosted development backend, keeps its journal under `.local/qa/receivable-workflows`, and refuses to replay a submission. The wallet prompt is intentionally declined once. Status verifies exact block balance changes and the separate customer fee; inspect checks the completed payment and public credit statement. It is not a general-purpose refund command.

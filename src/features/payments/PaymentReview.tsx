@@ -883,6 +883,7 @@ export function PaymentReview({
                   {canManage &&
                     payment.status === "draft" &&
                     payment.type === "batch" &&
+                    !payment.refundInvoiceId &&
                     payment.purpose !== "invoice" &&
                     !payment.safeTxHash && (
                       <button

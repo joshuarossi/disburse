@@ -120,7 +120,7 @@ export const sourceDetails = query({
     }
     const movement = await ctx.db.query('accountingMovements').withIndex('by_movement', q => q.eq('orgId', args.orgId).eq('key', fact.key)).unique();
     const history = await ctx.db.query('accountingEntries').withIndex('by_movement', q => q.eq('orgId', args.orgId).eq('fact.key', fact.key)).order('desc').take(101);
-    const mapping = await ctx.db.query('accountingMappings').withIndex('by_location', q => q.eq('orgId', args.orgId).eq('location', accountingLocation(fact))).unique();
+    const mapping = fact.nonCash ? null : await ctx.db.query('accountingMappings').withIndex('by_location', q => q.eq('orgId', args.orgId).eq('location', accountingLocation(fact))).unique();
     return { fact, entry: movement ? await ctx.db.get(movement.entryId) : null, history: history.slice(0, 100), historyLimited: history.length > 100, assetAccountId: mapping?.accountId, error: null };
   },
 });
@@ -143,7 +143,7 @@ export const review = mutation({
     if (args.treatment === 'existing_receivable' && fact.invoiceAppliedRaw === '0')
       throw new Error('The invoice was already fully funded. Record this receipt as a customer advance or match its existing book entry.');
     const lines: JournalLine[] = args.treatment === 'already_recorded' ? [] : buildSettlementJournal({
-      ...args, treatment: args.treatment, direction: fact.direction, companyTransfer: fact.companyTransfer, lendingMovement: fact.lendingMovement, conversionMovement: fact.conversionMovement, currency: profile.currency,
+      ...args, treatment: args.treatment, direction: fact.direction, companyTransfer: fact.companyTransfer, nonCash:fact.nonCash, customerRefund:fact.customerRefund, lendingMovement: fact.lendingMovement, conversionMovement: fact.conversionMovement, currency: profile.currency,
       assetAccount: await bookAccount(ctx, args.orgId, args.assetAccountId),
       counterAccount: await bookAccount(ctx, args.orgId, args.counterAccountId),
       differenceAccount: args.differenceAccountId ? await bookAccount(ctx, args.orgId, args.differenceAccountId) : undefined,
@@ -155,9 +155,9 @@ export const review = mutation({
     const movement = await ctx.db.query('accountingMovements').withIndex('by_movement', q => q.eq('orgId', args.orgId).eq('key', fact.key)).unique();
     const previous = movement ? await ctx.db.get(movement.entryId) : null;
     const core = { fact, currency: profile.currency, treatment: args.treatment, postingDate: args.postingDate, assetBookValue: value,
-      obligationBookValue: (['existing_payable', 'existing_receivable', 'investment_withdrawal'].includes(args.treatment) || args.treatment === 'currency_conversion' && fact.direction === 'inflow') && args.obligationBookValue
-        ? formatBookUnits(bookUnits(args.obligationBookValue, profile.currency, args.treatment === 'investment_withdrawal'), profile.currency) : undefined,
-      advanceBookValue: receiptHasExcess && args.treatment === 'existing_receivable' ? formatBookUnits(bookUnits(args.advanceBookValue ?? '', profile.currency), profile.currency) : undefined,
+      obligationBookValue: (['existing_payable', 'existing_receivable', 'investment_withdrawal', 'customer_refund', 'credit_note'].includes(args.treatment) || args.treatment === 'currency_conversion' && fact.direction === 'inflow') && args.obligationBookValue
+        ? formatBookUnits(bookUnits(args.obligationBookValue, profile.currency, ['investment_withdrawal','credit_note'].includes(args.treatment)), profile.currency) : undefined,
+      advanceBookValue: args.treatment === 'credit_note' ? formatBookUnits(bookUnits(value,profile.currency)-bookUnits(args.obligationBookValue ?? '',profile.currency,true),profile.currency) : receiptHasExcess && args.treatment === 'existing_receivable' ? formatBookUnits(bookUnits(args.advanceBookValue ?? '', profile.currency), profile.currency) : undefined,
       deliveryFeeBookValue: deliveryFeeRequired && args.treatment === 'internal_transfer' ? formatBookUnits(bookUnits(args.deliveryFeeBookValue ?? '', profile.currency, true), profile.currency) : undefined,
       bookReference, externalName: args.externalName?.trim() || undefined, valuationEvidence, memo, lines, profileVersion: profile.version };
     if (previous && (!args.replaces || previous.replaces === args.replaces)) {
@@ -208,7 +208,7 @@ export const review = mutation({
     if (movement) await ctx.db.patch(movement._id, { entryId }); else await ctx.db.insert('accountingMovements', { orgId: args.orgId, key: fact.key, entryId });
     if (previous) await ctx.db.patch(previous._id, { supersededBy: entryId, ...(previous.state === 'ready' ? { state: 'void' as const } : {}) });
     if (reversalId) await ctx.db.patch(reversalId, { pairedEntryId: entryId });
-    if (args.assetAccountId && args.treatment !== 'already_recorded') {
+    if (args.assetAccountId && args.treatment !== 'already_recorded' && !fact.nonCash) {
       const location = accountingLocation(fact);
       const mapping = await ctx.db.query('accountingMappings').withIndex('by_location', q => q.eq('orgId', args.orgId).eq('location', location)).unique();
       if (mapping) await ctx.db.patch(mapping._id, { accountId: args.assetAccountId, updatedAt: Date.now() });

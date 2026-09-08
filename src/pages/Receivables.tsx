@@ -1,5 +1,8 @@
 import { useReceivingService } from '@/features/receivables/useReceivingService';
 import { userErrorMessage } from '@/lib/userErrors';
+import { ReceivableDocuments } from '@/features/receivables/ReceivableDocuments';
+import { ReceivableFollowUp } from '@/features/receivables/ReceivableFollowUp';
+import { ReceivableCredits } from '@/features/receivables/ReceivableCredits';
 import { useActivityEnvironment } from "@/features/workspace/ActivityEnvironment";
 import { chainEnvironment } from "../../shared/assets";
 import { useState } from "react";
@@ -406,11 +409,13 @@ function InvoiceDetails({
           {formatMoney(invoice.amount, invoice.token, true)}{" "}
           <span className="text-base">{invoice.token}</span>
         </p>
+        {BigInt(invoice.credited ?? "0") > 0n && <p className="workspace-description">Original total shown above · credits {amounts.credited} {invoice.token} · adjusted total {amounts.adjustedTotal} {invoice.token}.</p>}
         <p className="workspace-description">
           Receiving account: {getChainName(invoice.chainId)} ·{" "}
           {invoice.treasury.slice(0, 8)}…{invoice.treasury.slice(-6)}
         </p>
         <InvoiceItems items={invoice.items} token={invoice.token} />
+        <ReceivableDocuments invoice={invoice} canManage={canManage} />
         {invoice.description && (
           <p className="whitespace-pre-wrap text-sm">{invoice.description}</p>
         )}
@@ -576,7 +581,9 @@ function InvoiceDetails({
             )}
           </>
         )}
-        {canManage && invoice.state !== "void" && invoice.received === "0" && (
+        <ReceivableFollowUp key={`${invoice._id}:${invoice.followUpAt ?? ''}`} invoice={invoice} canManage={canManage} />
+        <ReceivableCredits invoice={invoice} />
+        {canManage && invoice.state !== "void" && invoice.received === "0" && !invoice.credited && (
           <div className="border-t border-slate-400/20 pt-4">
             {voiding ? (
               <>
@@ -635,11 +642,12 @@ export default function Receivables() {
   const [editor, setEditor] = useState<Doc<"receivables"> | "new" | null>(null),
     [focus, setFocus] = useState<string | null>(null),
     [search, setSearch] = useState("");
+  const [followUpsOnly,setFollowUpsOnly]=useState(false);
   const selected = result?.items.find((i) => i._id === focus),
     visible = result?.items.filter((i) =>
       `${i.number} ${i.customerName}`
         .toLowerCase()
-        .includes(search.toLowerCase()),
+        .includes(search.toLowerCase()) && (!followUpsOnly || i.state === "issued" && i.amounts.remaining !== "0" && !!i.followUpAt && i.followUpAt <= Date.now()),
     );
   return (
     <>
@@ -661,7 +669,10 @@ export default function Receivables() {
                       network: getChainName(i.chainId),
                       currency: i.token,
                       amount: i.amount,
+                      credited: i.amounts.credited,
+                      adjusted_total: i.amounts.adjustedTotal,
                       received: i.amounts.received,
+                      refunded: i.amounts.refunded,
                       remaining: i.amounts.remaining,
                       awaiting_forwarding: i.amounts.awaitingForwarding,
                       status: i.status,
@@ -673,6 +684,7 @@ export default function Receivables() {
                       "network",
                       "currency",
                       "amount",
+                      "credited", "adjusted_total", "refunded",
                       "received",
                       "remaining",
                       "awaiting_forwarding",
@@ -708,6 +720,7 @@ export default function Receivables() {
               onChange={(e) => setSearch(e.target.value)}
             />
           </label>
+          <label className="mt-3 flex items-center gap-2 text-sm"><input type="checkbox" checked={followUpsOnly} onChange={e=>setFollowUpsOnly(e.target.checked)}/>Follow-ups due</label>
         </div>
         {!result ? (
           <LoadingRows />
@@ -749,7 +762,7 @@ export default function Receivables() {
                         {i.customerName}
                       </span>
                     </td>
-                    <td>{formatDate(i.dueDate)}</td>
+                    <td>{formatDate(i.dueDate)}{i.followUpAt && i.state === "issued" && i.amounts.remaining !== "0" && <span className="workspace-table-secondary">{i.followUpAt <= Date.now() ? "Follow-up due" : "Follow up"} {formatDate(i.followUpAt)}</span>}</td>
                     <td>
                       <strong>{formatMoney(i.amount, i.token, true)}</strong>
                       <span className="workspace-table-secondary">
