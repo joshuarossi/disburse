@@ -13,9 +13,9 @@ const languages = [
   { code: 'pt-BR', label: 'Português (Brasil)', flag: '🇧🇷' },
 ] as const;
 
-type SwitcherProps = { variant?: ButtonProps['variant']; size?: ButtonProps['size'] };
+type SwitcherProps = { variant?: ButtonProps['variant']; size?: ButtonProps['size']; compactOnSmallScreens?: boolean };
 
-export function LanguageSwitcher({ variant = 'ghost', size = 'sm' }: SwitcherProps) {
+export function LanguageSwitcher({ variant = 'ghost', size = 'sm', compactOnSmallScreens = false }: SwitcherProps) {
   const { i18n } = useTranslation();
   const sessionToken = useSessionToken();
   const [isOpen, setIsOpen] = useState(false);
@@ -45,10 +45,11 @@ export function LanguageSwitcher({ variant = 'ghost', size = 'sm' }: SwitcherPro
         variant={variant}
         size={size}
         onClick={() => setIsOpen(!isOpen)}
-        className="gap-2 w-full justify-start"
+        aria-expanded={isOpen}
+        className={cn('gap-2 w-full justify-start', compactOnSmallScreens && 'h-10 w-10 justify-center px-0 sm:h-9 sm:w-auto sm:justify-start sm:px-3')}
       >
         <Languages className="h-4 w-4" />
-        <span>{currentLanguage.label}</span>
+        <span className={compactOnSmallScreens ? 'sr-only sm:not-sr-only' : undefined}>{currentLanguage.label}</span>
       </Button>
 
       {isOpen && (
@@ -58,7 +59,7 @@ export function LanguageSwitcher({ variant = 'ghost', size = 'sm' }: SwitcherPro
             onClick={() => setIsOpen(false)}
           />
           <div 
-            className="absolute right-0 top-full mt-2 z-[60] w-48 rounded-lg border border-white/10 bg-navy-900 shadow-xl overflow-hidden"
+            className={cn('absolute right-0 top-full mt-2 z-[60] w-48 rounded-lg border border-white/10 bg-navy-900 shadow-xl overflow-hidden', compactOnSmallScreens && 'fixed inset-x-4 top-16 w-auto sm:absolute sm:left-auto sm:right-0 sm:top-full sm:w-48')}
             onClick={(e) => e.stopPropagation()}
           >
             {languages.map((lang) => (
