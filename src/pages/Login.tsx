@@ -131,7 +131,10 @@ export default function Login() {
   return (
     <div className="workspace workspace-entry flex min-h-screen flex-col items-center justify-center bg-navy-950 px-6 py-12">
       {/* Background */}
-      <div className="absolute inset-0 -z-10">
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-0 -z-10 overflow-hidden"
+      >
         <div className="absolute left-1/2 top-1/2 h-[500px] w-[500px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-accent-500/10 blur-[120px]" />
       </div>
 
