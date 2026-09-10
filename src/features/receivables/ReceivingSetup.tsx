@@ -1,3 +1,4 @@
+import { tx, useWorkspaceLanguage } from "@/lib/workspaceI18n";
 import type { useReceivingService } from "./useReceivingService";
 import type { Id } from "../../../convex/_generated/dataModel";
 import { CustomerPaidExecution } from "@/features/payments/CustomerPaidExecution";
@@ -17,6 +18,7 @@ export function ReceivingSetup({
   busy: boolean;
   onBusyChange: (busy: boolean) => void;
 }) {
+  useWorkspaceLanguage();
   if (state.isError)
     return (
       <Notice>
@@ -25,23 +27,23 @@ export function ReceivingSetup({
           className="workspace-action-link"
           onClick={() => void state.refetch()}
         >
-          Check again
+          {tx("Check again")}
         </button>
       </Notice>
     );
   if (state.isPending)
     return (
       <p role="status" className="workspace-description">
-        Checking invoice receiving…
+        {tx("Checking invoice receiving…")}
       </p>
     );
   if (!state.data?.supported || state.data.ready) return null;
   return (
     <section className="space-y-3">
       <Notice tone="info">
-        Receiving needs a one-time setup on this network. Your company account
-        pays the quoted setup fee in USDC. Payment links can be generated once
-        setup is confirmed.
+        {tx(
+          "Receiving needs a one-time setup on this network. Your company account pays the quoted setup fee in USDC. Payment links can be generated once setup is confirmed.",
+        )}
       </Notice>
       <CustomerPaidExecution
         source={{ receivingSetupSafeId: safeId }}

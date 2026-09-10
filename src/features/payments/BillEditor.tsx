@@ -1,4 +1,5 @@
-import { userErrorMessage } from '@/lib/userErrors';
+import { tx, useWorkspaceLanguage } from "@/lib/workspaceI18n";
+import { userErrorMessage } from "@/lib/userErrors";
 import { useState, type FormEvent } from "react";
 import { useMutation, useQuery } from "convex/react";
 import { Link } from "react-router-dom";
@@ -23,6 +24,7 @@ export function BillEditor({
   bill?: Doc<"invoices">;
   onClose: () => void;
 }) {
+  useWorkspaceLanguage();
   const sessionToken = useSessionToken();
   const recipients = useQuery(
     api.beneficiaries.list,
@@ -101,17 +103,18 @@ export function BillEditor({
   };
   return (
     <Dialog
-      title={bill ? "Edit bill" : "Add a bill"}
+      title={bill ? tx("Edit bill") : tx("Add a bill")}
       onClose={() => {
         if (!busy) onClose();
       }}
     >
       <form className="space-y-5 p-6" onSubmit={save}>
         <p className="workspace-description !mt-0">
-          Record an invoice you received. Your team reviews its payment
-          separately.
+          {tx(
+            "Record an invoice you received. Your team reviews its payment separately.",
+          )}
         </p>
-        {error && <Notice>{error}</Notice>}
+        {error && <Notice>{tx(error)}</Notice>}
         {bill && <InvoiceAttachments invoiceId={bill._id} />}
         <InvoiceSource
           source={source}
@@ -135,56 +138,58 @@ export function BillEditor({
           onChange={() => setSourceReviewed(false)}
         >
           <div>
-          <label className="block">
-            <span className="finance-label">Vendor or contractor</span>
-            <select
-              className="finance-field"
-              required
-              disabled={!!bill}
-              value={vendor}
-              onChange={(e) => {
-                setVendor(e.target.value);
-                const chosen = recipients?.find(
-                  (r) => r._id === e.target.value,
-                );
-                if (
-                  chosen?.preferredToken &&
-                  !source?.document?.suggestions.token
-                )
-                  setToken(chosen.preferredToken);
-              }}
-            >
-              <option value="">Choose a saved recipient</option>
-              {recipients?.map((r) => (
-                <option key={r._id} value={r._id}>
-                  {r.name}
-                </option>
-              ))}
-            </select>
-          </label>
+            <label className="block">
+              <span className="finance-label">
+                {tx("Vendor or contractor")}
+              </span>
+              <select
+                className="finance-field"
+                required
+                disabled={!!bill}
+                value={vendor}
+                onChange={(e) => {
+                  setVendor(e.target.value);
+                  const chosen = recipients?.find(
+                    (r) => r._id === e.target.value,
+                  );
+                  if (
+                    chosen?.preferredToken &&
+                    !source?.document?.suggestions.token
+                  )
+                    setToken(chosen.preferredToken);
+                }}
+              >
+                <option value="">{tx("Choose a saved recipient")}</option>
+                {recipients?.map((r) => (
+                  <option key={r._id} value={r._id}>
+                    {r.name}
+                  </option>
+                ))}
+              </select>
+            </label>
             {!bill && (
               <Link
                 className="workspace-action-link mt-2"
                 to={`/org/${orgId}/beneficiaries`}
               >
-                Add a recipient first
+                {tx("Add a recipient first")}
               </Link>
             )}
           </div>
           <div className="grid gap-4 sm:grid-cols-2">
             <label>
-              <span className="finance-label">Invoice number</span>
+              <span className="finance-label">{tx("Invoice number")}</span>
               <input
                 className="finance-field"
                 required
                 maxLength={100}
-                placeholder="INV-1042"
+                placeholder={tx("INV-1042")}
                 value={number}
                 onChange={(e) => setNumber(e.target.value)}
               />
             </label>
             <label>
-              <span className="finance-label">Due date</span>
+              <span className="finance-label">{tx("Due date")}</span>
               <input
                 className="finance-field"
                 required
@@ -194,7 +199,7 @@ export function BillEditor({
               />
             </label>
             <label>
-              <span className="finance-label">Amount due</span>
+              <span className="finance-label">{tx("Amount due")}</span>
               <input
                 className="finance-field"
                 required
@@ -205,7 +210,7 @@ export function BillEditor({
               />
             </label>
             <label>
-              <span className="finance-label">Payment currency</span>
+              <span className="finance-label">{tx("Payment currency")}</span>
               <select
                 className="finance-field"
                 value={token}
@@ -218,12 +223,12 @@ export function BillEditor({
             </label>
           </div>
           <label className="block">
-            <span className="finance-label">Description</span>
+            <span className="finance-label">{tx("Description")}</span>
             <textarea
               className="finance-field"
               rows={3}
               maxLength={2000}
-              placeholder="What is this invoice for?"
+              placeholder={tx("What is this invoice for?")}
               value={description}
               onChange={(e) => setDescription(e.target.value)}
             />
@@ -238,8 +243,9 @@ export function BillEditor({
               disabled={busy || readingSource}
               onChange={(e) => setSourceReviewed(e.target.checked)}
             />
-            I checked the recipient, invoice number, amount, payment currency
-            and due date against the source document.
+            {tx(
+              "I checked the recipient, invoice number, amount, payment currency and due date against the source document.",
+            )}
           </label>
         )}
         <div className="flex justify-end gap-2 border-t border-white/10 pt-5">
@@ -249,7 +255,7 @@ export function BillEditor({
             disabled={busy}
             onClick={onClose}
           >
-            Cancel
+            {tx("Cancel")}
           </button>
           <button
             className="workspace-button workspace-button-primary"
@@ -260,7 +266,7 @@ export function BillEditor({
               ((!!source || !!existingSources?.length) && !sourceReviewed)
             }
           >
-            {busy ? "Saving…" : bill ? "Save changes" : "Add bill"}
+            {busy ? tx("Saving…") : bill ? tx("Save changes") : tx("Add bill")}
           </button>
         </div>
       </form>

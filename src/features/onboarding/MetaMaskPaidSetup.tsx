@@ -1,3 +1,4 @@
+import { tx, useWorkspaceLanguage } from "@/lib/workspaceI18n";
 import { useEffect, useRef, useState } from "react";
 import { useAction, useMutation, useQuery } from "convex/react";
 import { useAccount, useSwitchChain } from "wagmi";
@@ -40,6 +41,7 @@ export function MetaMaskPaidSetup({
   onComplete,
   onRestore,
 }: SetupProps) {
+  useWorkspaceLanguage();
   const sessionToken = useSessionToken(),
     { address, chain } = useAccount(),
     { switchChainAsync } = useSwitchChain();
@@ -220,46 +222,49 @@ export function MetaMaskPaidSetup({
     });
   }
   return (
-    <section className="space-y-4" aria-label="Account setup cost">
-      {notice && <Notice tone={notice.tone}>{notice.message}</Notice>}
+    <section className="space-y-4" aria-label={tx("Account setup cost")}>
+      {notice && <Notice tone={notice.tone}>{tx(notice.message)}</Notice>}
       {current === undefined || (setupId && saved === undefined) ? (
         <p role="status" className="workspace-description">
-          Loading saved account setup…
+          {tx("Loading saved account setup…")}
         </p>
       ) : setup ? (
         <>
           <div
             className="rounded-lg border border-slate-400/20 p-4 space-y-3"
-            aria-label="Setup review"
+            aria-label={tx("Setup review")}
           >
             <div className="flex justify-between gap-4">
-              <span>Company account deposit</span>
-              <strong>{formatUnits(BigInt(setup.deposit), 6)} USDC</strong>
+              <span>{tx("Company account deposit")}</span>
+              <strong>
+                {formatUnits(BigInt(setup.deposit), 6)} {tx("USDC")}
+              </strong>
             </div>
             <div className="flex justify-between gap-4">
-              <span>Setup fee</span>
-              <strong>Review in MetaMask</strong>
+              <span>{tx("Setup fee")}</span>
+              <strong>{tx("Review in MetaMask")}</strong>
             </div>
             <p className="workspace-description">
-              {setup.threshold} of {setup.owners.length} account owners must
-              approve future payments. Your account uses its own USDC for
-              payment fees.
+              {tx(
+                "Account-owner approvals required for future payments: {{required}} of {{owners}}. Your account uses its own USDC for payment fees.",
+                { required: setup.threshold, owners: setup.owners.length },
+              )}
             </p>
           </div>
           {setup.stage === "prepared" ? (
             <>
               {address?.toLowerCase() !== setup.payer.toLowerCase() && (
                 <Notice tone="info">
-                  Reconnect the wallet that prepared this account to continue:{" "}
+                  {tx(
+                    "Reconnect the wallet that prepared this account to continue:",
+                  )}{" "}
                   <span className="break-all">{setup.payer}</span>.
                 </Notice>
               )}
               <p className="workspace-description">
-                MetaMask shows the final setup fee before you approve. Choose
-                USDC in its Network fee field. Your wallet pays MetaMask
-                directly. If USDC is unavailable, cancel the confirmation and
-                enable Smart Transactions and Estimate balance changes in
-                MetaMask settings.
+                {tx(
+                  "MetaMask shows the final setup fee before you approve. Choose USDC in its Network fee field. Your wallet pays MetaMask directly. If USDC is unavailable, cancel the confirmation and enable Smart Transactions and Estimate balance changes in MetaMask settings.",
+                )}
               </p>
               <label className="flex gap-3 items-start text-sm">
                 <input
@@ -270,8 +275,9 @@ export function MetaMaskPaidSetup({
                   className="mt-1"
                 />
                 <span>
-                  I will review and pay the setup fee in USDC in MetaMask. A
-                  failed transaction may still incur a fee.
+                  {tx(
+                    "I will review and pay the setup fee in USDC in MetaMask. A failed transaction may still incur a fee.",
+                  )}
                 </span>
               </label>
               <div className="flex flex-wrap gap-3">
@@ -290,7 +296,7 @@ export function MetaMaskPaidSetup({
                     })
                   }
                 >
-                  Edit setup
+                  {tx("Edit setup")}
                 </Button>
                 <Button
                   disabled={
@@ -300,16 +306,18 @@ export function MetaMaskPaidSetup({
                   }
                   onClick={() => void run(submit)}
                 >
-                  {busy ? "Confirm in MetaMask…" : "Confirm setup in MetaMask"}
+                  {busy
+                    ? tx("Confirm in MetaMask…")
+                    : tx("Confirm setup in MetaMask")}
                 </Button>
               </div>
             </>
           ) : restorable ? (
             <>
               <Notice tone="info">
-                This browser saved the request before sending it, or recorded
-                that the wallet declined it. Restore the saved setup to
-                continue.
+                {tx(
+                  "This browser saved the request before sending it, or recorded that the wallet declined it. Restore the saved setup to continue.",
+                )}
               </Notice>
               <Button
                 disabled={busy}
@@ -333,28 +341,29 @@ export function MetaMaskPaidSetup({
                   })
                 }
               >
-                Restore saved setup
+                {tx("Restore saved setup")}
               </Button>
             </>
           ) : (
             <Button disabled={busy} onClick={() => void run(check)}>
               {busy
-                ? "Checking setup…"
+                ? tx("Checking setup…")
                 : setup.stage === "complete"
-                  ? "Open company account"
-                  : "Check setup status"}
+                  ? tx("Open company account")
+                  : tx("Check setup status")}
             </Button>
           )}
         </>
       ) : (
         <>
           <p className="workspace-description">
-            Create and fund your company account in one MetaMask confirmation.
-            Keep USDC in your wallet for the deposit and setup fee.
+            {tx(
+              "Create and fund your company account in one MetaMask confirmation. Keep USDC in your wallet for the deposit and setup fee.",
+            )}
           </p>
           <label className="block">
             <span className="finance-label">
-              Deposit into company account (USDC)
+              {tx("Deposit into company account (USDC)")}
             </span>
             <input
               className="finance-field"
@@ -366,13 +375,15 @@ export function MetaMaskPaidSetup({
             />
           </label>
           <p className="text-sm text-slate-400">
-            Enter 0 to create an empty account. You still need USDC for its
-            setup fee.
+            {tx(
+              "Enter 0 to create an empty account. You still need USDC for its setup fee.",
+            )}
           </p>
           {!supported && (
             <Notice tone="info">
-              Choose Base or Arbitrum for account setup with USDC fees.
-              MetaMask's fee service is not available on testnets.
+              {tx(
+                "Choose Base or Arbitrum for account setup with USDC fees. MetaMask's fee service is not available on testnets.",
+              )}
             </Notice>
           )}
           <Button
@@ -397,7 +408,7 @@ export function MetaMaskPaidSetup({
               })
             }
           >
-            {busy ? "Preparing account…" : "Review setup"}
+            {busy ? tx("Preparing account…") : tx("Review setup")}
           </Button>
         </>
       )}

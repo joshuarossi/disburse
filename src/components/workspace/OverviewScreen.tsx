@@ -1,3 +1,4 @@
+import { tx, useWorkspaceLanguage, workspaceLocale } from "@/lib/workspaceI18n";
 import { Link } from "react-router-dom";
 import { useState } from "react";
 import {
@@ -81,6 +82,7 @@ export function OverviewScreen({
     loading: boolean;
   }>;
 }) {
+  useWorkspaceLanguage();
   const needSetup = !model.accountCount || !model.recipientCount;
   const [showEmptyBalances, setShowEmptyBalances] = useState(false);
   const zero = (amount: string) => /^0(?:\.0+)?$/.test(amount);
@@ -96,8 +98,10 @@ export function OverviewScreen({
   return (
     <>
       <PageHeader
-        title="Overview"
-        description={`Here's what's happening with ${orgName}'s payments.`}
+        title={tx("Overview")}
+        description={tx("Here's what's happening with {{value1}}'s payments.", {
+          value1: orgName,
+        })}
         actions={
           <>
             <Link
@@ -105,25 +109,25 @@ export function OverviewScreen({
               to={`${prefix}/beneficiaries?import=1`}
             >
               <Upload size={14} />
-              Import recipients
+              {tx("Import recipients")}
             </Link>
             <Link className="workspace-button" to={`${prefix}/reports`}>
               <ArrowUpRight size={14} />
-              View reports
+              {tx("View reports")}
             </Link>
             <Link
               className="workspace-button workspace-button-primary"
               to={`${prefix}/disbursements?new=1`}
             >
               <Plus size={14} />
-              New payment
+              {tx("New payment")}
             </Link>
           </>
         }
       />
       {needSetup && (
         <section className="workspace-setup">
-          <h2>Get your workspace ready for its first payment</h2>
+          <h2>{tx("Get your workspace ready for its first payment")}</h2>
           <div className="workspace-setup-steps">
             <Link to={`${prefix}/treasury`}>
               {model.accountCount ? (
@@ -131,7 +135,7 @@ export function OverviewScreen({
               ) : (
                 <Circle size={15} />
               )}
-              Connect a funding account
+              {tx("Connect a funding account")}
             </Link>
             <Link to={`${prefix}/beneficiaries?import=1`}>
               {model.recipientCount ? (
@@ -139,42 +143,44 @@ export function OverviewScreen({
               ) : (
                 <Circle size={15} />
               )}
-              Add your recipients
+              {tx("Add your recipients")}
             </Link>
             <Link to={`${prefix}/disbursements?new=1`}>
               <Circle size={15} />
-              Prepare a payment
+              {tx("Prepare a payment")}
             </Link>
           </div>
         </section>
       )}
       <div className="workspace-metrics">
         <Metric
-          label="Awaiting approval"
+          label={tx("Awaiting approval")}
           value={model.needsReview}
-          detail="Payments prepared for team approval"
+          detail={tx("Payments prepared for team approval")}
           href={`${prefix}/disbursements?view=approvals`}
         />
         <Metric
-          label="Upcoming payments"
+          label={tx("Upcoming payments")}
           value={model.scheduledCount}
-          detail="Prepared for a future pay date"
+          detail={tx("Prepared for a future pay date")}
           href={`${prefix}/disbursements?view=upcoming`}
         />
         <Metric
-          label="Payment exceptions"
+          label={tx("Payment exceptions")}
           value={model.exceptionCount}
-          detail="Failed, delayed or past the approval deadline"
+          detail={tx("Failed, delayed or past the approval deadline")}
           tone={model.exceptionCount ? "warning" : undefined}
           href={`${prefix}/disbursements?view=attention`}
         />
         <Metric
-          label="Reviewed recipients"
+          label={tx("Reviewed recipients")}
           value={model.reviewedRecipients}
           detail={
             model.recipientsNeedReview
-              ? `${model.recipientsNeedReview} need details or review`
-              : "Payout details approved; funding checked per payment"
+              ? tx("{{count}} need details or review", {
+                  count: model.recipientsNeedReview,
+                })
+              : tx("Payout details approved; funding checked per payment")
           }
           href={`${prefix}/beneficiaries`}
         />
@@ -184,15 +190,15 @@ export function OverviewScreen({
           {model.exceptions.length > 0 && (
             <section
               className="workspace-panel"
-              aria-label="Payment exceptions"
+              aria-label={tx("Payment exceptions")}
             >
               <div className="workspace-panel-heading">
                 <div>
-                  <h2>Resolve payment exceptions</h2>
-                  <p>Check the original payment before trying again.</p>
+                  <h2>{tx("Resolve payment exceptions")}</h2>
+                  <p>{tx("Check the original payment before trying again.")}</p>
                 </div>
                 <Link to={`${prefix}/disbursements?view=attention`}>
-                  View all <ArrowRight size={13} />
+                  {tx("View all")} <ArrowRight size={13} />
                 </Link>
               </div>
               {model.exceptions.map((payment) => (
@@ -204,7 +210,7 @@ export function OverviewScreen({
                   <div>
                     <strong>{payment.displayName}</strong>
                     <p className="workspace-funding-warning">
-                      {payment.exceptionReason}
+                      {tx(payment.exceptionReason)}
                     </p>
                   </div>
                   <span className="text-right tabular-nums">
@@ -223,13 +229,13 @@ export function OverviewScreen({
             <div className="workspace-panel-heading">
               <div>
                 <h2>
-                  Awaiting approval{" "}
+                  {tx("Awaiting approval")}{" "}
                   <span className="workspace-count">{model.needsReview}</span>
                 </h2>
-                <p>Review the details before payments move.</p>
+                <p>{tx("Review the details before payments move.")}</p>
               </div>
               <Link to={`${prefix}/disbursements?view=approvals`}>
-                View all
+                {tx("View all")}
                 <ArrowRight size={13} />
               </Link>
             </div>
@@ -244,7 +250,9 @@ export function OverviewScreen({
                       key={payment._id}
                       className="block space-y-3 p-4"
                       to={`${prefix}/disbursements?focus=${payment._id}`}
-                      aria-label={`Review ${payment.displayName}`}
+                      aria-label={tx("Review {{value1}}", {
+                        value1: payment.displayName,
+                      })}
                     >
                       <strong className="block break-words text-sm">
                         {payment.displayName}
@@ -264,8 +272,10 @@ export function OverviewScreen({
                       </div>
                       <span className="block text-xs text-slate-400">
                         {payment.scheduledAt
-                          ? `Pay ${formatDate(payment.scheduledAt)}`
-                          : "As soon as approved"}
+                          ? tx("Pay {{value1}}", {
+                              value1: formatDate(payment.scheduledAt),
+                            })
+                          : tx("As soon as approved")}
                       </span>
                     </Link>
                   ))}
@@ -274,12 +284,12 @@ export function OverviewScreen({
                   <table className="workspace-table">
                     <thead>
                       <tr>
-                        <th>Payment</th>
-                        <th>Pay date</th>
-                        <th className="numeric">Amount</th>
-                        <th>Status</th>
+                        <th>{tx("Payment")}</th>
+                        <th>{tx("Pay date")}</th>
+                        <th className="numeric">{tx("Amount")}</th>
+                        <th>{tx("Status")}</th>
                         <th>
-                          <span className="sr-only">Review</span>
+                          <span className="sr-only">{tx("Review")}</span>
                         </th>
                       </tr>
                     </thead>
@@ -304,10 +314,10 @@ export function OverviewScreen({
                                 </Link>
                                 <span className="workspace-table-secondary">
                                   {payment.purpose === "payroll"
-                                    ? "Payroll"
+                                    ? tx("Payroll")
                                     : payment.purpose === "invoice"
-                                      ? "Vendor payment"
-                                      : "Team payment"}
+                                      ? tx("Vendor payment")
+                                      : tx("Team payment")}
                                 </span>
                               </span>
                             </div>
@@ -336,7 +346,9 @@ export function OverviewScreen({
                           </td>
                           <td>
                             <Link
-                              aria-label={`Review ${payment.displayName}`}
+                              aria-label={tx("Review {{value1}}", {
+                                value1: payment.displayName,
+                              })}
                               className="workspace-action-link"
                               to={`${prefix}/disbursements?focus=${payment._id}`}
                             >
@@ -352,25 +364,32 @@ export function OverviewScreen({
             ) : (
               <EmptyState
                 icon={FileCheck2}
-                title="No payments awaiting approval"
-                description="Prepare a draft to send it to your team's approval queue."
+                title={tx("No payments awaiting approval")}
+                description={tx(
+                  "Prepare a draft to send it to your team's approval queue.",
+                )}
               />
             )}
           </section>
           {model.drafts.length > 0 && (
-            <section className="workspace-panel" aria-label="Payment drafts">
+            <section
+              className="workspace-panel"
+              aria-label={tx("Payment drafts")}
+            >
               <div className="workspace-panel-heading">
                 <div>
                   <h2>
-                    Drafts to prepare{" "}
+                    {tx("Drafts to prepare")}{" "}
                     <span className="workspace-count">{model.draftCount}</span>
                   </h2>
                   <p>
-                    Check amounts and recipients before requesting approval.
+                    {tx(
+                      "Check amounts and recipients before requesting approval.",
+                    )}
                   </p>
                 </div>
                 <Link to={`${prefix}/disbursements?view=drafts`}>
-                  View drafts <ArrowRight size={13} />
+                  {tx("View drafts")} <ArrowRight size={13} />
                 </Link>
               </div>
               {model.drafts.map((payment) => (
@@ -383,8 +402,10 @@ export function OverviewScreen({
                     <strong>{payment.displayName}</strong>
                     <p>
                       {payment.scheduledAt
-                        ? `Pay ${formatDate(payment.scheduledAt)}`
-                        : "As soon as approved"}
+                        ? tx("Pay {{value1}}", {
+                            value1: formatDate(payment.scheduledAt),
+                          })
+                        : tx("As soon as approved")}
                     </p>
                   </div>
                   <span className="text-right tabular-nums">
@@ -402,11 +423,11 @@ export function OverviewScreen({
           <section className="workspace-panel">
             <div className="workspace-panel-heading">
               <div>
-                <h2>Recent activity</h2>
-                <p>A record of your team's payments.</p>
+                <h2>{tx("Recent activity")}</h2>
+                <p>{tx("A record of your team's payments.")}</p>
               </div>
               <Link to={`${prefix}/disbursements`}>
-                All payments
+                {tx("All payments")}
                 <ArrowRight size={13} />
               </Link>
             </div>
@@ -443,8 +464,10 @@ export function OverviewScreen({
             ) : (
               <EmptyState
                 icon={Receipt}
-                title="Your payment history starts here"
-                description="Completed and in-progress payments stay together with their approval and payment records."
+                title={tx("Your payment history starts here")}
+                description={tx(
+                  "Completed and in-progress payments stay together with their approval and payment records.",
+                )}
               />
             )}
           </section>
@@ -452,10 +475,10 @@ export function OverviewScreen({
         <div className="workspace-stack">
           <section className="workspace-panel">
             <div className="workspace-panel-heading">
-              <h2>Funds & planned payments</h2>
+              <h2>{tx("Funds & planned payments")}</h2>
               <Link
                 to={`${prefix}/treasury`}
-                aria-label="View funding accounts"
+                aria-label={tx("View funding accounts")}
               >
                 <ArrowUpRight size={15} />
               </Link>
@@ -476,39 +499,42 @@ export function OverviewScreen({
                   </div>
                   <dl className="space-y-2 text-xs">
                     <div className="flex justify-between gap-3">
-                      <dt>Current balance</dt>
+                      <dt>{tx("Current balance")}</dt>
                       <dd className="tabular-nums">
                         {balance.amount === null
                           ? balance.loading
-                            ? "Checking…"
-                            : "Unavailable"
+                            ? tx("Checking…")
+                            : tx("Unavailable")
                           : formatMoney(balance.amount, balance.token, true)}
                       </dd>
                     </div>
                     <div className="flex justify-between gap-3">
-                      <dt>Planned payments</dt>
+                      <dt>{tx("Planned payments")}</dt>
                       <dd className="tabular-nums">
                         {model.plansIncomplete
-                          ? "Incomplete history"
+                          ? tx("Incomplete history")
                           : formatMoney(balance.planned, balance.token, true)}
                       </dd>
                     </div>
                     <div className="flex justify-between gap-3 font-semibold">
-                      <dt>Remaining after plan</dt>
+                      <dt>{tx("Remaining after plan")}</dt>
                       <dd className="tabular-nums">
                         {balance.remaining === null
-                          ? "Unavailable"
+                          ? tx("Unavailable")
                           : formatMoney(balance.remaining, balance.token, true)}
                       </dd>
                     </div>
                   </dl>
                   {balance.checkedAt && (
                     <p className="mt-3 text-xs text-slate-400">
-                      Checked{" "}
-                      {new Date(balance.checkedAt).toLocaleTimeString([], {
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      })}
+                      {tx("Checked")}{" "}
+                      {new Date(balance.checkedAt).toLocaleTimeString(
+                        workspaceLocale(),
+                        {
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        },
+                      )}
                     </p>
                   )}
                   {!balance.ready && (
@@ -516,7 +542,8 @@ export function OverviewScreen({
                       className="workspace-action-link mt-3"
                       to={`${prefix}/treasury`}
                     >
-                      Check payment availability <ArrowRight size={12} />
+                      {tx("Check payment availability")}{" "}
+                      <ArrowRight size={12} />
                     </Link>
                   )}
                 </div>
@@ -525,14 +552,16 @@ export function OverviewScreen({
               <div className="p-5">
                 <p className="workspace-description">
                   {balances.length
-                    ? "Your accounts have no funds or planned payments yet."
-                    : "Connect an account to see the funds available for payments."}
+                    ? tx("Your accounts have no funds or planned payments yet.")
+                    : tx(
+                        "Connect an account to see the funds available for payments.",
+                      )}
                 </p>
                 <Link
                   to={`${prefix}/treasury`}
                   className="workspace-action-link mt-4"
                 >
-                  {balances.length ? "Add funds" : "Set up funding"}
+                  {balances.length ? tx("Add funds") : tx("Set up funding")}
                   <ArrowRight size={13} />
                 </Link>
               </div>
@@ -545,27 +574,29 @@ export function OverviewScreen({
                   onClick={() => setShowEmptyBalances((value) => !value)}
                 >
                   {showEmptyBalances
-                    ? "Hide empty balances"
-                    : `Show ${hiddenBalanceCount} empty balance${hiddenBalanceCount === 1 ? "" : "s"}`}
+                    ? tx("Hide empty balances")
+                    : tx("Show {{count}} empty balances", {
+                        count: hiddenBalanceCount,
+                      })}
                 </button>
               </div>
             )}
             <div className="workspace-table-footer">
               <span>
-                Plan includes unpaid drafts and confirmed fees.
+                {tx("Plan includes unpaid drafts and confirmed fees.")}
                 {model.unquotedFees
-                  ? " Some fees are not quoted yet."
+                  ? tx(" Some fees are not quoted yet.")
                   : ""}{" "}
-                Funds are not reserved.
+                {tx("Funds are not reserved.")}
               </span>
               <Link className="workspace-action-link" to={`${prefix}/treasury`}>
-                Manage
+                {tx("Manage")}
               </Link>
             </div>
           </section>
           <section className="workspace-panel">
             <div className="workspace-panel-heading">
-              <h2>Coming up</h2>
+              <h2>{tx("Coming up")}</h2>
               <CalendarDays size={16} className="text-slate-400" />
             </div>
             {model.upcoming.length ? (
@@ -578,7 +609,7 @@ export function OverviewScreen({
                   <span className="workspace-date-tile">
                     <small>
                       {new Date(payment.scheduledAt!).toLocaleDateString(
-                        undefined,
+                        workspaceLocale(),
                         { month: "short", timeZone: "UTC" },
                       )}
                     </small>
@@ -594,16 +625,17 @@ export function OverviewScreen({
                       )}{" "}
                       ·{" "}
                       {payment.status === "scheduled"
-                        ? "Scheduled"
-                        : "Approval needed"}
+                        ? tx("Scheduled")
+                        : tx("Approval needed")}
                     </p>
                   </div>
                 </Link>
               ))
             ) : (
               <p className="workspace-description p-5">
-                No upcoming payments. Choose a pay date when you create your
-                next batch.
+                {tx(
+                  "No upcoming payments. Choose a pay date when you create your next batch.",
+                )}
               </p>
             )}
           </section>
@@ -611,11 +643,15 @@ export function OverviewScreen({
             <section className="workspace-panel">
               <div className="workspace-panel-heading">
                 <h2>
-                  Bills due next
-                  {model.overdueBills ? ` · ${model.overdueBills} overdue` : ""}
+                  {tx("Bills due next")}
+                  {model.overdueBills
+                    ? tx(" · {{value1}} overdue", {
+                        value1: model.overdueBills,
+                      })
+                    : ""}
                 </h2>
                 <Link to={`${prefix}/invoices`}>
-                  View bills
+                  {tx("View bills")}
                   <ArrowRight size={13} />
                 </Link>
               </div>
@@ -628,7 +664,7 @@ export function OverviewScreen({
                   <div>
                     <strong>{bill.vendorName}</strong>
                     <p>
-                      {bill.invoiceNumber} · Due{" "}
+                      {bill.invoiceNumber} {tx("· Due")}{" "}
                       {formatDate(bill.dueDate, {
                         month: "short",
                         day: "numeric",
@@ -645,10 +681,9 @@ export function OverviewScreen({
       </div>
       {model.limitedHistory && (
         <p className="workspace-description mt-5">
-          This overview is a partial summary of up to 5,000 payments, 1,000
-          recipients, 1,000 bills and 100 accounts. Open the corresponding lists
-          or Reports for the full records. Available-to-spend estimates are
-          withheld.
+          {tx(
+            "This overview is a partial summary of up to 5,000 payments, 1,000 recipients, 1,000 bills and 100 accounts. Open the corresponding lists or Reports for the full records. Available-to-spend estimates are withheld.",
+          )}
         </p>
       )}
     </>

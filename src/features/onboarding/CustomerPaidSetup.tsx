@@ -1,3 +1,4 @@
+import { tx, useWorkspaceLanguage } from "@/lib/workspaceI18n";
 import { useEffect, useRef, useState } from "react";
 import { useAction, useQuery } from "convex/react";
 import { formatUnits } from "viem";
@@ -12,6 +13,7 @@ import { MetaMaskPaidSetup, type SetupProps } from "./MetaMaskPaidSetup";
 /** Previously authorized provider requests retain their original recovery path.
  * New setups use the customer's MetaMask fee service. */
 export function CustomerPaidSetup(props: SetupProps) {
+  useWorkspaceLanguage();
   const { orgId, chainId, onBusy, onRestore, onComplete } = props,
     sessionToken = useSessionToken();
   const current = useQuery(
@@ -52,7 +54,7 @@ export function CustomerPaidSetup(props: SetupProps) {
   if (current === undefined || conflict === undefined)
     return (
       <p role="status" className="workspace-description">
-        Checking for an earlier setup request…
+        {tx("Checking for an earlier setup request…")}
       </p>
     );
   if (!current && !conflict) return <MetaMaskPaidSetup {...props} />;
@@ -88,28 +90,30 @@ export function CustomerPaidSetup(props: SetupProps) {
     }
   };
   return (
-    <section aria-label="Account setup cost" className="space-y-4">
+    <section aria-label={tx("Account setup cost")} className="space-y-4">
       <Notice tone="info">
-        An earlier account setup request is saved for this wallet
-        {conflict && !current ? " in another organization" : ""}. Check it
-        before starting another.
+        {tx("An earlier account setup request is saved for this wallet")}
+        {conflict && !current ? tx(" in another organization") : ""}
+        {tx(". Check it before starting another.")}
       </Notice>
-      {error && <Notice>{error}</Notice>}
+      {error && <Notice>{tx(error)}</Notice>}
       {notice && <Notice tone="info">{notice}</Notice>}
       {current && (
         <p className="workspace-description">
           {/^(?:0|[1-9]\d{0,77})$/.test(current.fee)
-            ? `Approved provider fee: ${formatUnits(BigInt(current.fee), 6)} USDC.`
-            : "The saved fee amount needs verification."}{" "}
-          Checking status does not charge a fee.
+            ? tx("Approved provider fee: {{value1}} USDC.", {
+                value1: formatUnits(BigInt(current.fee), 6),
+              })
+            : tx("The saved fee amount needs verification.")}{" "}
+          {tx("Checking status does not charge a fee.")}
         </p>
       )}
       <Button className="w-full" disabled={busy} onClick={() => void check()}>
         {busy
-          ? "Checking setup…"
+          ? tx("Checking setup…")
           : current
-            ? "Check setup status"
-            : "Check earlier setup"}
+            ? tx("Check setup status")
+            : tx("Check earlier setup")}
       </Button>
     </section>
   );

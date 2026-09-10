@@ -1,3 +1,4 @@
+import { tx, useWorkspaceLanguage, workspaceLocale } from "@/lib/workspaceI18n";
 import { useMemo, useState } from "react";
 import { useQuery } from "convex/react";
 import { useTranslation } from "react-i18next";
@@ -15,6 +16,7 @@ interface AuditLogTabProps {
 }
 
 export function AuditLogTab({ orgId, address }: AuditLogTabProps) {
+  useWorkspaceLanguage();
   const { t } = useTranslation();
 
   // Filter state
@@ -102,15 +104,15 @@ export function AuditLogTab({ orgId, address }: AuditLogTabProps) {
     if (!reportData?.length) return;
 
     const columns = [
-      { key: "timestamp", label: t("reports.export.timestamp") },
-      { key: "user", label: t("reports.export.user") },
-      { key: "wallet", label: t("reports.export.wallet") },
-      { key: "action", label: t("reports.export.action") },
-      { key: "details", label: t("reports.export.details") },
+      { key: "timestamp", label: t("reports.export.timestamp", { lng: "en" }) },
+      { key: "user", label: t("reports.export.user", { lng: "en" }) },
+      { key: "wallet", label: t("reports.export.wallet", { lng: "en" }) },
+      { key: "action", label: t("reports.export.action", { lng: "en" }) },
+      { key: "details", label: t("reports.export.details", { lng: "en" }) },
     ];
 
     const rows = reportData.map((item) => ({
-      timestamp: new Date(item.timestamp).toLocaleString(),
+      timestamp: new Date(item.timestamp).toISOString(),
       user: item.actor?.walletAddress || "System",
       wallet: item.actor?.walletAddress || "",
       action: formatAction(item.action),
@@ -197,7 +199,7 @@ export function AuditLogTab({ orgId, address }: AuditLogTabProps) {
               <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
                 <input
                   type="date"
-                  aria-label="Start date"
+                  aria-label={tx("Start date")}
                   value={dateFrom}
                   onChange={(e) => setDateFrom(e.target.value)}
                   className="flex-1 rounded-lg border border-white/10 bg-navy-800 px-3 py-2 text-sm text-white"
@@ -207,7 +209,7 @@ export function AuditLogTab({ orgId, address }: AuditLogTabProps) {
                 </span>
                 <input
                   type="date"
-                  aria-label="End date"
+                  aria-label={tx("End date")}
                   value={dateTo}
                   onChange={(e) => setDateTo(e.target.value)}
                   className="flex-1 rounded-lg border border-white/10 bg-navy-800 px-3 py-2 text-sm text-white"
@@ -313,13 +315,15 @@ export function AuditLogTab({ orgId, address }: AuditLogTabProps) {
                 {reportData.map((item) => (
                   <tr key={item._id} className="hover:bg-navy-800/50">
                     <td className="whitespace-nowrap px-4 py-3 text-sm text-white">
-                      {new Date(item.timestamp).toLocaleString()}
+                      {new Date(item.timestamp).toLocaleString(
+                        workspaceLocale(),
+                      )}
                     </td>
                     <td className="px-4 py-3 text-sm">
                       <p className="font-mono text-xs text-slate-300">
                         {item.actor?.walletAddress
                           ? `${item.actor.walletAddress.slice(0, 6)}...${item.actor.walletAddress.slice(-4)}`
-                          : "System"}
+                          : tx("System")}
                       </p>
                     </td>
                     <td className="whitespace-nowrap px-4 py-3">
@@ -357,9 +361,11 @@ export function AuditLogTab({ orgId, address }: AuditLogTabProps) {
                   <span className="font-mono">
                     {item.actor?.walletAddress
                       ? `${item.actor.walletAddress.slice(0, 6)}...${item.actor.walletAddress.slice(-4)}`
-                      : "System"}
+                      : tx("System")}
                   </span>
-                  <span>{new Date(item.timestamp).toLocaleString()}</span>
+                  <span>
+                    {new Date(item.timestamp).toLocaleString(workspaceLocale())}
+                  </span>
                 </div>
               </div>
             ))}

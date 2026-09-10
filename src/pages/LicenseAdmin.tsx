@@ -1,3 +1,5 @@
+import { LanguageSwitcher } from "@/components/ui/LanguageSwitcher";
+import { tx, useWorkspaceLanguage } from "@/lib/workspaceI18n";
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { useQuery } from "convex/react";
@@ -19,6 +21,7 @@ import { fieldClass, LicenseField } from "@/features/licenses/LicenseFields";
 import type { LicenseTier } from "../../shared/billing";
 
 export default function LicenseAdmin() {
+  useWorkspaceLanguage();
   const sessionToken = useSessionToken(),
     { theme, toggleTheme } = useTheme();
   const access = useQuery(
@@ -28,35 +31,43 @@ export default function LicenseAdmin() {
   return (
     <div className="workspace min-h-screen bg-[var(--ws-bg)] text-[var(--ws-text)]">
       <div className="max-w-6xl mx-auto px-4 py-6 sm:px-8 sm:py-10">
-        <div className="flex items-center justify-between gap-4 mb-8">
+        <div className="flex flex-wrap items-center justify-between gap-4 mb-8">
           <Link
             to="/select-org"
             className="workspace-action-link flex items-center gap-2 text-sm"
           >
             <ArrowLeft size={16} />
-            Your workspaces
+            {tx("Your workspaces")}
           </Link>
+          <LanguageSwitcher inline />
           <Button
             variant="secondary"
-            aria-label={`Switch to ${theme === "dark" ? "light" : "dark"} theme`}
+            aria-label={
+              theme === "light"
+                ? tx("Switch to dark theme")
+                : tx("Switch to light theme")
+            }
             onClick={toggleTheme}
           >
             {theme === "dark" ? <Sun size={18} /> : <Moon size={18} />}
           </Button>
         </div>
         <PageHeader
-          title="License management"
-          eyebrow="Disburse operators"
-          description="Manage company access, complimentary tiers, and new signup terms."
+          title={tx("License management")}
+          eyebrow={tx("Disburse operators")}
+          description={tx(
+            "Manage company access, complimentary tiers, and new signup terms.",
+          )}
         />
         {access === undefined ? (
           <PageLoading />
         ) : !access.allowed ? (
           <section className="workspace-panel p-6">
-            <h2 className="font-semibold">Operator access required</h2>
+            <h2 className="font-semibold">{tx("Operator access required")}</h2>
             <p className="workspace-description mt-2">
-              This account is not authorized to manage company licenses.
-              Workspace administrators manage their own plan in Settings.
+              {tx(
+                "This account is not authorized to manage company licenses. Workspace administrators manage their own plan in Settings.",
+              )}
             </p>
           </section>
         ) : (
@@ -69,17 +80,19 @@ export default function LicenseAdmin() {
   );
 }
 function LicenseConsole({ sessionToken }: { sessionToken: string }) {
+  useWorkspaceLanguage();
   const [tab, setTab] = useState<"companies" | "tiers" | "signup">("companies");
   const catalog = useQuery(api.licenseAdmin.catalog, { sessionToken });
   const [generation, setGeneration] = useState(0);
   return (
     <>
       <p className="workspace-description mb-5">
-        Free access waives the subscription only. Customers pay all network and
-        provider fees.
+        {tx(
+          "Free access waives the subscription only. Customers pay all network and provider fees.",
+        )}
       </p>
       <nav
-        aria-label="License management sections"
+        aria-label={tx("License management sections")}
         className="workspace-tabs mb-6"
       >
         {(
@@ -94,7 +107,7 @@ function LicenseConsole({ sessionToken }: { sessionToken: string }) {
             aria-pressed={tab === value}
             onClick={() => setTab(value)}
           >
-            {label}
+            {tx(label)}
           </button>
         ))}
       </nav>
@@ -122,6 +135,7 @@ function CompanyDirectory({
   sessionToken: string;
   tiers: LicenseTier[];
 }) {
+  useWorkspaceLanguage();
   const [search, setSearch] = useState(""),
     [filter, setFilter] = useState("");
   const [cursors, setCursors] = useState<(string | null)[]>([null]);
@@ -141,7 +155,7 @@ function CompanyDirectory({
   );
   return (
     <div className="grid items-start gap-6 lg:grid-cols-[minmax(240px,1fr)_minmax(0,2fr)]">
-      <section className="workspace-panel p-5" aria-label="Companies">
+      <section className="workspace-panel p-5" aria-label={tx("Companies")}>
         <form
           className="space-y-3"
           onSubmit={(event) => {
@@ -150,18 +164,18 @@ function CompanyDirectory({
             setCursors([null]);
           }}
         >
-          <LicenseField label="Find a company">
+          <LicenseField label={tx("Find a company")}>
             <input
               className={fieldClass}
               type="search"
               maxLength={100}
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Company name"
+              placeholder={tx("Company name")}
             />
           </LicenseField>
           <Button type="submit" size="sm" variant="secondary">
-            Search companies
+            {tx("Search companies")}
           </Button>
         </form>
         {!companies ? (
@@ -188,7 +202,7 @@ function CompanyDirectory({
             </ul>
             {!companies.page.length && (
               <p className="workspace-description mt-5">
-                No matching companies.
+                {tx("No matching companies.")}
               </p>
             )}
             <div className="flex gap-2 mt-4">
@@ -198,7 +212,7 @@ function CompanyDirectory({
                 disabled={cursors.length === 1}
                 onClick={() => setCursors((list) => list.slice(0, -1))}
               >
-                Previous
+                {tx("Previous")}
               </Button>
               <Button
                 size="sm"
@@ -208,7 +222,7 @@ function CompanyDirectory({
                   setCursors((list) => [...list, companies.continueCursor])
                 }
               >
-                Next
+                {tx("Next")}
               </Button>
             </div>
           </>
@@ -228,10 +242,11 @@ function CompanyDirectory({
         )
       ) : (
         <div className="workspace-panel p-8">
-          <h2 className="font-semibold">Choose a company</h2>
+          <h2 className="font-semibold">{tx("Choose a company")}</h2>
           <p className="workspace-description mt-2">
-            Review its current access before extending a trial or granting a
-            free tier.
+            {tx(
+              "Review its current access before extending a trial or granting a free tier.",
+            )}
           </p>
         </div>
       )}

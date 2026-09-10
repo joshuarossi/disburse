@@ -620,7 +620,9 @@
       "timestamp": "Timestamp",
       "user": "User",
       "action": "Action",
-      "details": "Details"
+      "details": "Details",
+      "direction": "Direction",
+      "counterparty": "Counterparty"
     },
     "export": {
       "csv": "Export CSV",
@@ -640,7 +642,8 @@
       "user": "User",
       "wallet": "Wallet",
       "action": "Action",
-      "details": "Details"
+      "details": "Details",
+      "direction": "Direction"
     },
     "summary": {
       "showing": "Showing {{count}} transaction",
@@ -670,6 +673,10 @@
       "team": "Team",
       "safe": "Safe",
       "org": "Organization"
+    },
+    "direction": {
+      "inflow": "Inflow",
+      "outflow": "Outflow"
     }
   },
   "settings": {
@@ -897,7 +904,8 @@
     "invited": "Invited",
     "removed": "Removed",
     "trial": "Trial",
-    "expired": "Expired"
+    "expired": "Expired",
+    "received": "Received"
   },
   "theme": {
     "light": "Light",

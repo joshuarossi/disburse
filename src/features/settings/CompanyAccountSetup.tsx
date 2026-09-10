@@ -1,3 +1,4 @@
+import { tx, useWorkspaceLanguage } from "@/lib/workspaceI18n";
 import { amountToBaseUnits } from "../../../shared/validation";
 import { formatUnits } from "viem";
 import { useRef, useState } from "react";
@@ -18,6 +19,7 @@ export function CompanyAccountSetup({
 }: {
   controller: ReturnType<typeof useSettingsController>;
 }) {
+  useWorkspaceLanguage();
   const { orgId, safes, isAdmin, currentUserRole, members } = controller,
     sessionToken = useSessionToken();
   const current = useQuery(
@@ -100,7 +102,7 @@ export function CompanyAccountSetup({
       <div className="mb-5 flex flex-wrap items-center gap-3">
         {current ? (
           <button className="workspace-button" onClick={open}>
-            Review account setup
+            {tx("Review account setup")}
           </button>
         ) : (
           isAdmin &&
@@ -110,13 +112,13 @@ export function CompanyAccountSetup({
               disabled={current === undefined}
               onClick={open}
             >
-              Create company account
+              {tx("Create company account")}
             </button>
           )
         )}
         {current && (
           <p className="workspace-description">
-            {current.name} is waiting for setup.
+            {current.name} {tx("is waiting for setup.")}
           </p>
         )}
       </div>
@@ -124,50 +126,57 @@ export function CompanyAccountSetup({
         <Dialog
           title={
             setup?.status === "complete"
-              ? `${setup.name} is ready`
-              : "Create company account"
+              ? tx("{{value1}} is ready", { value1: setup.name })
+              : tx("Create company account")
           }
           onClose={() => {
             if (!busy) setShow(false);
           }}
         >
           <div className="p-6 space-y-5">
-            {error && <Notice>{error}</Notice>}
+            {error && <Notice>{tx(error)}</Notice>}
             {setup?.status === "complete" ? (
               <>
                 <Notice tone="info">
-                  Your new account is connected.{" "}
+                  {tx("Your new account is connected.")}{" "}
                   {setup.memberUserId
                     ? (members?.find((m) => m?.userId === setup.memberUserId)
-                        ?.name ?? "The assigned member")
+                        ?.name ?? tx("The assigned member"))
                     : parentName(setup.parentSafeId)}{" "}
-                  controls its approvals.
+                  {tx("controls its approvals.")}
                 </Notice>
                 <p className="workspace-description">
                   {setup.initialFunding
-                    ? `${formatUnits(BigInt(setup.initialFunding), 6)} USDC was assigned to this account. Grant its spending limit in Team & approvals to enable delegated company payments.`
-                    : "The account starts empty. You can now select it for funding and payments."}
+                    ? tx(
+                        "{{value1}} USDC was assigned to this account. Grant its spending limit in Team & approvals to enable delegated company payments.",
+                        {
+                          value1: formatUnits(BigInt(setup.initialFunding), 6),
+                        },
+                      )
+                    : tx(
+                        "The account starts empty. You can now select it for funding and payments.",
+                      )}
                 </p>
                 <button
                   className="workspace-button workspace-button-primary"
                   onClick={() => setShow(false)}
                 >
-                  Done
+                  {tx("Done")}
                 </button>
               </>
             ) : setup ? (
               <>
                 <dl className="workspace-detail-grid">
                   <div>
-                    <dt>New account</dt>
+                    <dt>{tx("New account")}</dt>
                     <dd>{setup.name}</dd>
                   </div>
                   <div>
-                    <dt>Setup and funding paid by</dt>
+                    <dt>{tx("Setup and funding paid by")}</dt>
                     <dd>{parentName(setup.parentSafeId)}</dd>
                   </div>
                   <div>
-                    <dt>Account owner</dt>
+                    <dt>{tx("Account owner")}</dt>
                     <dd>
                       {setup.memberUserId
                         ? (members?.find(
@@ -178,18 +187,22 @@ export function CompanyAccountSetup({
                   </div>
                   {setup.initialFunding && (
                     <div>
-                      <dt>Assigned balance</dt>
+                      <dt>{tx("Assigned balance")}</dt>
                       <dd>
-                        {formatUnits(BigInt(setup.initialFunding), 6)} USDC,
-                        plus the setup fee
+                        {formatUnits(BigInt(setup.initialFunding), 6)}{" "}
+                        {tx("USDC, plus the setup fee")}
                       </dd>
                     </div>
                   )}
                 </dl>
                 <p className="workspace-description">
                   {setup.memberUserId
-                    ? "The funding account’s owners approve this setup and balance assignment. The selected member controls the new account, including withdrawals and ownership changes. They do not become an owner of the funding account. Company payment limits are granted separately."
-                    : "The parent account’s current owners approve this setup and future payments from the new account. The new account starts empty."}
+                    ? tx(
+                        "The funding account’s owners approve this setup and balance assignment. The selected member controls the new account, including withdrawals and ownership changes. They do not become an owner of the funding account. Company payment limits are granted separately.",
+                      )
+                    : tx(
+                        "The parent account’s current owners approve this setup and future payments from the new account. The new account starts empty.",
+                      )}
                 </p>
                 <CustomerPaidExecution
                   source={{ accountSetupId: setup._id }}
@@ -225,7 +238,7 @@ export function CompanyAccountSetup({
                           )
                         }
                       >
-                        Connect completed account
+                        {tx("Connect completed account")}
                       </button>
                     )}
                     {execution !== undefined &&
@@ -245,7 +258,7 @@ export function CompanyAccountSetup({
                             })
                           }
                         >
-                          Discard unsubmitted setup
+                          {tx("Discard unsubmitted setup")}
                         </button>
                       )}
                   </div>
@@ -253,27 +266,27 @@ export function CompanyAccountSetup({
               </>
             ) : current === undefined || (id && saved === undefined) ? (
               <p role="status" className="workspace-description">
-                Loading saved setup…
+                {tx("Loading saved setup…")}
               </p>
             ) : (
               <>
                 <p className="workspace-description">
-                  Create a shared company account, or assign a small payment
-                  account to a team member. The funding account pays setup costs
-                  in USDC.
+                  {tx(
+                    "Create a shared company account, or assign a small payment account to a team member. The funding account pays setup costs in USDC.",
+                  )}
                 </p>
                 <label className="workspace-field">
-                  <span>Account name</span>
+                  <span>{tx("Account name")}</span>
                   <input
                     value={name}
                     maxLength={80}
-                    placeholder="Payroll"
+                    placeholder={tx("Payroll")}
                     onChange={(e) => setName(e.target.value)}
                     disabled={busy}
                   />
                 </label>
                 <label className="workspace-field">
-                  <span>Parent company account</span>
+                  <span>{tx("Parent company account")}</span>
                   <select
                     value={parentId}
                     onChange={(e) => setParent(e.target.value)}
@@ -287,9 +300,9 @@ export function CompanyAccountSetup({
                   </select>
                 </label>
                 <label className="workspace-field">
-                  <span>Account control</span>
+                  <span>{tx("Account control")}</span>
                   <select
-                    aria-label="Account control"
+                    aria-label={tx("Account control")}
                     value={member}
                     disabled={busy}
                     onChange={(e) => {
@@ -297,7 +310,9 @@ export function CompanyAccountSetup({
                       setMemberControl(false);
                     }}
                   >
-                    <option value="">Company owners — shared account</option>
+                    <option value="">
+                      {tx("Company owners — shared account")}
+                    </option>
                     {members
                       ?.filter(
                         (m) =>
@@ -308,8 +323,8 @@ export function CompanyAccountSetup({
                         (m) =>
                           m && (
                             <option key={m.userId} value={m.userId}>
-                              {m.name ?? m.walletAddress} — assigned payment
-                              account
+                              {m.name ?? m.walletAddress}{" "}
+                              {tx("— assigned payment account")}
                             </option>
                           ),
                       )}
@@ -318,7 +333,7 @@ export function CompanyAccountSetup({
                 {member && (
                   <>
                     <label className="workspace-field">
-                      <span>Initial execution balance (USDC)</span>
+                      <span>{tx("Initial execution balance (USDC)")}</span>
                       <input
                         inputMode="decimal"
                         value={initialBalance}
@@ -330,10 +345,9 @@ export function CompanyAccountSetup({
                       />
                     </label>
                     <p className="workspace-description">
-                      Assign 3–100 USDC for the member to pay execution fees.
-                      This is a balance transfer, separate from the setup fee.
-                      Recipient funds stay in your company account under the
-                      spending limit you grant next.
+                      {tx(
+                        "Assign 3–100 USDC for the member to pay execution fees. This is a balance transfer, separate from the setup fee. Recipient funds stay in your company account under the spending limit you grant next.",
+                      )}
                     </p>
                     <label className="flex items-start gap-3 text-sm">
                       <input
@@ -343,9 +357,9 @@ export function CompanyAccountSetup({
                         disabled={busy}
                       />
                       <span>
-                        I understand this member controls the assigned account’s
-                        balance and ownership. Returning unused funds requires
-                        their approval.
+                        {tx(
+                          "I understand this member controls the assigned account’s balance and ownership. Returning unused funds requires their approval.",
+                        )}
                       </span>
                     </label>
                   </>
@@ -382,7 +396,7 @@ export function CompanyAccountSetup({
                     })
                   }
                 >
-                  {busy ? "Preparing account…" : "Review account setup"}
+                  {busy ? tx("Preparing account…") : tx("Review account setup")}
                 </button>
               </>
             )}

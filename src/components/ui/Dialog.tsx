@@ -1,3 +1,4 @@
+import { tx, useWorkspaceLanguage } from "@/lib/workspaceI18n";
 import { useEffect, useId, useRef, type ReactNode } from "react";
 import { X } from "lucide-react";
 
@@ -10,6 +11,7 @@ export function Dialog({
   children: ReactNode;
   onClose: () => void;
 }) {
+  useWorkspaceLanguage();
   const ref = useRef<HTMLDialogElement>(null);
   const titleId = useId();
   useEffect(() => {
@@ -66,7 +68,7 @@ export function Dialog({
         </h2>
         <button
           type="button"
-          aria-label="Close dialog"
+          aria-label={tx("Close dialog")}
           onClick={onClose}
           className="rounded-md p-2 text-slate-400 hover:bg-navy-800"
         >

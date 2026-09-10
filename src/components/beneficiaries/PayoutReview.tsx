@@ -1,4 +1,5 @@
-import { userErrorMessage } from '@/lib/userErrors';
+import { tx, useWorkspaceLanguage, workspaceLocale } from "@/lib/workspaceI18n";
+import { userErrorMessage } from "@/lib/userErrors";
 import { useState } from "react";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
@@ -19,17 +20,18 @@ function Instructions({
   details: PayoutDetails;
   label: string;
 }) {
+  useWorkspaceLanguage();
   return (
     <section className="rounded-xl border border-white/10 p-4 space-y-2">
       <h3 className="text-sm font-semibold">{label}</h3>
       <p className="break-all font-mono text-sm leading-6">
-        {details.walletAddress || "No address saved"}
+        {details.walletAddress || tx("No address saved")}
       </p>
       <p className="text-sm text-slate-400">
-        {details.preferredToken ?? "Currency chosen per payment"} ·{" "}
+        {details.preferredToken ?? tx("Currency chosen per payment")} ·{" "}
         {details.preferredChainId
           ? getChainName(details.preferredChainId)
-          : "Network chosen per payment"}
+          : tx("Network chosen per payment")}
       </p>
     </section>
   );
@@ -42,6 +44,7 @@ export function PayoutReview({
   beneficiaryId: Id<"beneficiaries">;
   onClose: () => void;
 }) {
+  useWorkspaceLanguage();
   const sessionToken = useSessionToken();
   const review = useQuery(
     api.recipientReviews.get,
@@ -73,7 +76,7 @@ export function PayoutReview({
   const pending = review?.pending;
   return (
     <Dialog
-      title="Review payout details"
+      title={tx("Review payout details")}
       onClose={() => {
         if (!busy) onClose();
       }}
@@ -85,27 +88,27 @@ export function PayoutReview({
           <div>
             <h2 className="text-xl font-semibold">{review.recipient.name}</h2>
             <p className="workspace-description">
-              Confirm the complete address, currency and network using contact
-              details you already trust. Incoming transfers and copied
-              transaction history are not proof of ownership.
+              {tx(
+                "Confirm the complete address, currency and network using contact details you already trust. Incoming transfers and copied transaction history are not proof of ownership.",
+              )}
             </p>
           </div>
-          {error && <Notice>{error}</Notice>}
+          {error && <Notice>{tx(error)}</Notice>}
           {!pending ? (
             <>
               <Instructions
                 details={review.recipient}
                 label={
                   review.recipient.payoutReviewStatus === "approved"
-                    ? "Approved payout instructions"
-                    : "Saved payout instructions · review needed"
+                    ? tx("Approved payout instructions")
+                    : tx("Saved payout instructions · review needed")
                 }
               />
               {review.recipient.payoutReviewStatus !== "approved" && (
                 <Notice tone="info">
-                  Existing recipient records need a first review before their
-                  next payment. Previously settled payments stay in your
-                  history.
+                  {tx(
+                    "Existing recipient records need a first review before their next payment. Previously settled payments stay in your history.",
+                  )}
                 </Notice>
               )}
               {review.canRequest &&
@@ -126,7 +129,7 @@ export function PayoutReview({
                       )
                     }
                   >
-                    Request payout review
+                    {tx("Request payout review")}
                   </button>
                 )}
             </>
@@ -134,59 +137,65 @@ export function PayoutReview({
             <>
               {pending.collectionId && (
                 <Notice tone="info">
-                  These details were submitted through a recipient link. Confirm
-                  them using your established contact details before approval;
-                  the link does not verify who submitted them or who controls
-                  the address.
+                  {tx(
+                    "These details were submitted through a recipient link. Confirm them using your established contact details before approval; the link does not verify who submitted them or who controls the address.",
+                  )}
                 </Notice>
               )}
               {pending.baseVersion > 0 && (
                 <Instructions
                   details={pending.before}
-                  label="Currently approved instructions"
+                  label={tx("Currently approved instructions")}
                 />
               )}
               <Instructions
                 details={pending.proposed}
                 label={
                   pending.baseVersion
-                    ? "Proposed replacement"
-                    : "Payout instructions to verify"
+                    ? tx("Proposed replacement")
+                    : tx("Payout instructions to verify")
                 }
               />
               {!!review.lookalikes.length && (
                 <Notice>
-                  This address has the same beginning and ending as the saved
-                  address for {review.lookalikes.join(", ")}. Compare every
-                  character and confirm it through your trusted contact.
+                  {tx(
+                    "This address has the same beginning and ending as the saved address for",
+                  )}{" "}
+                  {review.lookalikes.join(", ")}
+                  {tx(
+                    ". Compare every character and confirm it through your trusted contact.",
+                  )}
                 </Notice>
               )}
               <Notice tone="info">
-                Payments to this recipient are on hold during review. Approving
-                changed details requires new payments and new approvals.
+                {tx(
+                  "Payments to this recipient are on hold during review. Approving changed details requires new payments and new approvals.",
+                )}
               </Notice>
               <details className="text-sm text-slate-400">
                 <summary className="cursor-pointer">
-                  If a payment has already been signed
+                  {tx("If a payment has already been signed")}
                 </summary>
                 <p className="mt-2">
-                  Previously signed Safe transactions remain valid on-chain
-                  until executed or cancelled by the account owners. This review
-                  prevents their use through Disburse.
+                  {tx(
+                    "Previously signed Safe transactions remain valid on-chain until executed or cancelled by the account owners. This review prevents their use through Disburse.",
+                  )}
                 </p>
               </details>
               {review.independentRequired && review.isRequester && (
                 <Notice tone="info">
-                  Another approver must review this request because you
-                  submitted the details.
+                  {tx(
+                    "Another approver must review this request because you submitted the details.",
+                  )}
                 </Notice>
               )}
               {review.canDecide &&
                 !review.independentRequired &&
                 review.isRequester && (
                   <p className="text-sm text-slate-400">
-                    You are the only available approver. Record how you verified
-                    these details independently with the recipient.
+                    {tx(
+                      "You are the only available approver. Record how you verified these details independently with the recipient.",
+                    )}
                   </p>
                 )}
               {(review.canDecide || review.canWithdraw) && (
@@ -194,7 +203,7 @@ export function PayoutReview({
                   {review.canDecide && (
                     <label className="block">
                       <span className="finance-label">
-                        Verification channel
+                        {tx("Verification channel")}
                       </span>
                       <select
                         className="finance-field"
@@ -205,22 +214,26 @@ export function PayoutReview({
                         disabled={busy}
                       >
                         <option value="known_contact">
-                          Known contact · call or established channel
+                          {tx("Known contact · call or established channel")}
                         </option>
-                        <option value="in_person">Confirmed in person</option>
+                        <option value="in_person">
+                          {tx("Confirmed in person")}
+                        </option>
                         <option value="verified_portal">
-                          Previously verified recipient portal
+                          {tx("Previously verified recipient portal")}
                         </option>
                       </select>
                     </label>
                   )}
                   <label className="block">
-                    <span className="finance-label">Review note</span>
+                    <span className="finance-label">{tx("Review note")}</span>
                     <textarea
                       className="finance-field min-h-24"
                       value={reason}
                       onChange={(e) => setReason(e.target.value)}
-                      placeholder="Who confirmed the instructions, when, and through which established channel? Do not include passwords or private keys."
+                      placeholder={tx(
+                        "Who confirmed the instructions, when, and through which established channel? Do not include passwords or private keys.",
+                      )}
                       minLength={10}
                       maxLength={1000}
                       disabled={busy}
@@ -236,8 +249,9 @@ export function PayoutReview({
                         disabled={busy}
                       />
                       <span>
-                        I verified the full instructions with the recipient
-                        through the independent channel above.
+                        {tx(
+                          "I verified the full instructions with the recipient through the independent channel above.",
+                        )}
                       </span>
                     </label>
                   )}
@@ -256,7 +270,7 @@ export function PayoutReview({
                           )
                         }
                       >
-                        Withdraw request
+                        {tx("Withdraw request")}
                       </button>
                     )}
                     {review.canDecide && (
@@ -275,7 +289,7 @@ export function PayoutReview({
                             )
                           }
                         >
-                          Reject details
+                          {tx("Reject details")}
                         </button>
                         <button
                           className="workspace-button workspace-button-primary"
@@ -295,7 +309,7 @@ export function PayoutReview({
                             )
                           }
                         >
-                          Approve payout details
+                          {tx("Approve payout details")}
                         </button>
                       </>
                     )}
@@ -307,19 +321,30 @@ export function PayoutReview({
           {!!review.changes.filter((c) => c.status !== "pending").length && (
             <details className="border-t border-white/10 pt-4">
               <summary className="cursor-pointer text-sm">
-                Review history
+                {tx("Review history")}
               </summary>
               <ul className="mt-4 space-y-3">
                 {review.changes
                   .filter((c) => c.status !== "pending")
                   .map((c) => (
                     <li key={c._id} className="text-sm">
-                      <strong className="capitalize">{c.status}</strong> ·{" "}
-                      {new Date(c.reviewedAt ?? c.requestedAt).toLocaleString()}
+                      <strong className="capitalize">
+                        {tx(
+                          c.status === "approved"
+                            ? "Approved"
+                            : c.status === "rejected"
+                              ? "Rejected"
+                              : "Cancelled",
+                        )}
+                      </strong>{" "}
+                      ·{" "}
+                      {new Date(c.reviewedAt ?? c.requestedAt).toLocaleString(
+                        workspaceLocale(),
+                      )}
                       <p className="text-slate-400">{c.reason}</p>
                       {c.collectionId && (
                         <p className="text-xs text-slate-400">
-                          Submitted through a recipient link
+                          {tx("Submitted through a recipient link")}
                         </p>
                       )}
                     </li>

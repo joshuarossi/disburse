@@ -1,3 +1,4 @@
+import { tx, useWorkspaceLanguage } from "@/lib/workspaceI18n";
 import { useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useAccount, useSwitchChain } from "wagmi";
@@ -9,8 +10,8 @@ import { walletDeclined, walletErrorMessage } from "@/lib/walletErrors";
 import { ApprovalPathReview } from "@/features/payments/ApprovalPathReview";
 import { Button } from "@/components/ui/button";
 import type { AccountApprovalView } from "../../../shared/accountApprovalView";
-import type { CircleSource } from '../../../convex/lib/circleSource';
-import { CustomerPaidExecution } from '@/features/payments/CustomerPaidExecution';
+import type { CircleSource } from "../../../convex/lib/circleSource";
+import { CustomerPaidExecution } from "@/features/payments/CustomerPaidExecution";
 
 type Prepared = {
   to: string;
@@ -69,6 +70,7 @@ export function AccountChangeApproval({
   recheck: () => Promise<unknown>;
   feeSource?: CircleSource;
 }) {
+  useWorkspaceLanguage();
   const { address, chainId: connectedChain } = useAccount();
   const { switchChainAsync } = useSwitchChain();
   const retryable =
@@ -115,7 +117,7 @@ export function AccountChangeApproval({
     confirmingWallet.current = false;
     await approve({ safeTxHash: request.proposal.safeTxHash, path, signature });
     setPathRequest(null);
-    setMessage(`Your ${subject} approval is saved.`);
+    setMessage(`Your ${tx(subject)} approval is saved.`);
     setReviewed(false);
     await approvals.refetch();
   };
@@ -135,7 +137,7 @@ export function AccountChangeApproval({
       if (operation === "recheck") {
         await recheck();
         await approvals.refetch();
-        setMessage(`Checking the original ${subject} submission.`);
+        setMessage(`Checking the original ${tx(subject)} submission.`);
         return;
       }
       if (operation === "approve") {
@@ -156,7 +158,8 @@ export function AccountChangeApproval({
         }
         await sign(fresh, available[0].path);
       } else {
-        if (feeSource) throw new Error('Review and approve the USDC execution fee below');
+        if (feeSource)
+          throw new Error("Review and approve the USDC execution fee below");
         await prepareWallet();
         const prepared = await execute();
         if (!prepared.managed) {
@@ -174,24 +177,28 @@ export function AccountChangeApproval({
                 rejected: true,
               });
               setMessage(
-                `Wallet approval declined. Your ${subject} and account approvals are saved. You can retry this original request.`,
+                `Wallet approval declined. Your ${tx(subject)} and account approvals are saved. You can retry this original request.`,
               );
               return;
             }
             throw new Error(
-              `The wallet response was interrupted. Check the original ${subject} submission before trying again.`,
+              `The wallet response was interrupted. Check the original ${tx(subject)} submission before trying again.`,
             );
           }
           await walletResult({ attemptId: prepared.attemptId, txHash: hash });
         }
         setMessage(
-          `${subject === "policy" ? "Policy" : "Cancellation"} submitted. We are checking its confirmation.`,
+          `${tx(subject === "policy" ? "Policy" : "Cancellation")} submitted. We are checking its confirmation.`,
         );
       }
     } catch (e) {
-      const fallback = `Could not update this ${subject}. Check its status before trying again.`;
-      if (confirmingWallet.current && walletDeclined(e)) setMessage(walletErrorMessage(e, ''));
-      else setError(walletDeclined(e) ? fallback : walletErrorMessage(e, fallback));
+      const fallback = `Could not update this ${tx(subject)}. Check its status before trying again.`;
+      if (confirmingWallet.current && walletDeclined(e))
+        setMessage(walletErrorMessage(e, ""));
+      else
+        setError(
+          walletDeclined(e) ? fallback : walletErrorMessage(e, fallback),
+        );
     } finally {
       confirmingWallet.current = false;
       setBusy(false);
@@ -204,28 +211,28 @@ export function AccountChangeApproval({
     <div className="space-y-3">
       {error && (
         <p role="alert" className="min-w-0 break-words text-sm text-red-400">
-          {error}
+          {tx(error)}
         </p>
       )}
       {message && (
         <p role="status" className="text-sm text-[var(--ws-accent)]">
-          {message}
+          {tx(message)}
         </p>
       )}
       {reviewable &&
         (approvals.isPending ? (
           <p role="status" className="text-sm text-[var(--ws-muted)]">
-            Checking account approvals…
+            {tx("Checking account approvals…")}
           </p>
         ) : approvals.isError ? (
           <div role="alert" className="text-sm">
-            <p>Could not verify account approvals.</p>
+            <p>{tx("Could not verify account approvals.")}</p>
             <Button
               size="sm"
               variant="ghost"
               onClick={() => void approvals.refetch()}
             >
-              Retry approval check
+              {tx("Retry approval check")}
             </Button>
           </div>
         ) : (
@@ -233,7 +240,7 @@ export function AccountChangeApproval({
             <>
               {approvals.data.blockedReason && (
                 <p role="alert" className="text-sm text-amber-500">
-                  {approvals.data.blockedReason}
+                  {tx(approvals.data.blockedReason)}
                 </p>
               )}
               {approvals.data.groups.map((group) => (
@@ -242,16 +249,16 @@ export function AccountChangeApproval({
                   className="rounded-lg border border-[var(--ws-border)] p-3"
                 >
                   <p className="text-sm font-medium">
-                    {name(group.address)} · {group.confirmedOwners.length} of{" "}
-                    {group.threshold} approvals
+                    {name(group.address)} · {group.confirmedOwners.length}{" "}
+                    {tx("of")} {group.threshold} {tx("approvals")}
                   </p>
                   <ul className="mt-2 space-y-1 text-xs text-[var(--ws-muted)]">
                     {group.owners.map((owner) => (
                       <li className="break-all" key={owner}>
                         {name(owner)} ·{" "}
                         {group.confirmedOwners.includes(owner)
-                          ? "Approved"
-                          : "Awaiting approval"}
+                          ? tx("Approved")
+                          : tx("Awaiting approval")}
                       </li>
                     ))}
                   </ul>
@@ -260,70 +267,92 @@ export function AccountChangeApproval({
               {approvals.data.currentNonce <
                 approvals.data.proposal.safeTransactionData.nonce && (
                 <p className="text-sm text-amber-500">
-                  An earlier payment or account change must complete first.
+                  {tx(
+                    "An earlier payment or account change must complete first.",
+                  )}
                 </p>
               )}
-              {canApprove && !approvals.data.blockedReason && (!feeSource || approvals.data.paths.some(p => !p.approved)) && (
-                <>
-                  <label className="flex items-start gap-2 text-sm">
-                    <input
-                      type="checkbox"
-                      checked={reviewed}
-                      disabled={busy}
-                      onChange={(e) => {
-                        setReviewed(e.target.checked);
-                        if (!e.target.checked) setPathRequest(null);
-                      }}
-                    />
-                    <span>{reviewText}</span>
-                  </label>
-                  {pathRequest ? (
-                    <ApprovalPathReview
-                      subject={subject}
-                      paths={pathRequest.paths}
-                      busy={busy}
-                      onApprove={(path) => void act("approve", path)}
-                      onCancel={() => setPathRequest(null)}
-                    />
-                  ) : (
-                    <div className="flex flex-wrap gap-2">
-                      {status === "pending" &&
-                        approvals.data.paths.some((p) => !p.approved) && (
+              {canApprove &&
+                !approvals.data.blockedReason &&
+                (!feeSource ||
+                  approvals.data.paths.some((p) => !p.approved)) && (
+                  <>
+                    <label className="flex items-start gap-2 text-sm">
+                      <input
+                        type="checkbox"
+                        checked={reviewed}
+                        disabled={busy}
+                        onChange={(e) => {
+                          setReviewed(e.target.checked);
+                          if (!e.target.checked) setPathRequest(null);
+                        }}
+                      />
+                      <span>{reviewText}</span>
+                    </label>
+                    {pathRequest ? (
+                      <ApprovalPathReview
+                        subject={subject}
+                        paths={pathRequest.paths}
+                        busy={busy}
+                        onApprove={(path) => void act("approve", path)}
+                        onCancel={() => setPathRequest(null)}
+                      />
+                    ) : (
+                      <div className="flex flex-wrap gap-2">
+                        {status === "pending" &&
+                          approvals.data.paths.some((p) => !p.approved) && (
+                            <Button
+                              size="sm"
+                              variant="secondary"
+                              disabled={busy || !reviewed}
+                              onClick={() => void act("approve")}
+                            >
+                              {busy
+                                ? tx("Waiting for wallet…")
+                                : tx("Approve {{value1}}", {
+                                    value1: tx(subject),
+                                  })}
+                            </Button>
+                          )}
+                        {!feeSource && (
                           <Button
                             size="sm"
-                            variant="secondary"
-                            disabled={busy || !reviewed}
-                            onClick={() => void act("approve")}
+                            disabled={
+                              busy || !reviewed || !approvals.data.ready
+                            }
+                            onClick={() => void act("apply")}
                           >
                             {busy
-                              ? "Waiting for wallet…"
-                              : `Approve ${subject}`}
+                              ? tx("Processing…")
+                              : retryable
+                                ? tx("Retry original {{value1}}", {
+                                    value1: tx(subject),
+                                  })
+                                : subject === "policy"
+                                  ? tx("Apply policy")
+                                  : tx("Complete cancellation")}
                           </Button>
                         )}
-                      {!feeSource && <Button
-                        size="sm"
-                        disabled={busy || !reviewed || !approvals.data.ready}
-                        onClick={() => void act("apply")}
-                      >
-                        {busy
-                          ? "Processing…"
-                          : retryable
-                            ? `Retry original ${subject}`
-                            : subject === "policy"
-                              ? "Apply policy"
-                              : "Complete cancellation"}
-                      </Button>}
-                    </div>
-                  )}
-                </>
-              )}
+                      </div>
+                    )}
+                  </>
+                )}
             </>
           )
         ))}
-      {feeSource && <CustomerPaidExecution compact source={feeSource} ready={status === 'pending' && !!approvals.data?.ready}
-        blocked={busy || !canApprove || !!approvals.data?.blockedReason} memberName={name} onBusyChange={setBusy} />}
-      {!feeSource && (status === "processing" ||
-        (subject === "cancellation" && status === "pending")) &&
+      {feeSource && (
+        <CustomerPaidExecution
+          compact
+          source={feeSource}
+          ready={status === "pending" && !!approvals.data?.ready}
+          blocked={busy || !canApprove || !!approvals.data?.blockedReason}
+          memberName={name}
+          onBusyChange={setBusy}
+        />
+      )}
+      {!feeSource &&
+        (status === "processing" ||
+          (subject === "cancellation" && status === "pending")) &&
         canCheck && (
           <Button
             size="sm"
@@ -331,7 +360,7 @@ export function AccountChangeApproval({
             disabled={busy}
             onClick={() => void act("recheck")}
           >
-            Check {subject} confirmation
+            {tx("Check")} {tx(subject)} {tx("confirmation")}
           </Button>
         )}
     </div>

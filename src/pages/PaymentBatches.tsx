@@ -1,3 +1,4 @@
+import { tx, useWorkspaceLanguage } from "@/lib/workspaceI18n";
 import { userErrorMessage } from "@/lib/userErrors";
 import { scheduleDateTime } from "@/lib/formatMoney";
 import { useActivityEnvironment } from "@/features/workspace/ActivityEnvironment";
@@ -29,6 +30,7 @@ const frequency = {
   monthly: "Every month",
 };
 export default function PaymentBatches() {
+  useWorkspaceLanguage();
   const { environment } = useActivityEnvironment();
   const { orgId } = useParams();
   const [params, setParams] = useSearchParams();
@@ -90,8 +92,10 @@ export default function PaymentBatches() {
   return (
     <>
       <PageHeader
-        title="Schedules"
-        description="Plan recurring payments, track the next draft, and keep each payday on course."
+        title={tx("Schedules")}
+        description={tx(
+          "Plan recurring payments, track the next draft, and keep each payday on course.",
+        )}
         actions={
           canCreate &&
           !!recurring?.length && (
@@ -100,52 +104,52 @@ export default function PaymentBatches() {
               onClick={() => setCreating(true)}
             >
               <Plus size={14} />
-              New schedule
+              {tx("New schedule")}
             </button>
           )
         }
       />
       <div className="workspace-metrics">
         <Metric
-          label="Active schedules"
+          label={tx("Active schedules")}
           value={recurring?.filter((r) => r.status === "active").length ?? "…"}
-          detail="Drafts prepared automatically"
+          detail={tx("Drafts prepared automatically")}
         />
         <Metric
-          label="Paused schedules"
+          label={tx("Paused schedules")}
           value={recurring?.filter((r) => r.status === "paused").length ?? "…"}
-          detail="No new drafts while paused"
+          detail={tx("No new drafts while paused")}
         />
         <Metric
-          label="Review window"
-          value="3 days"
-          detail="Drafts prepared before each pay date"
+          label={tx("Review window")}
+          value={tx("3 days")}
+          detail={tx("Drafts prepared before each pay date")}
         />
         <Metric
-          label="Payment approval"
-          value="Required"
-          detail="Owners or an authorized spending delegate"
+          label={tx("Payment approval")}
+          value={tx("Required")}
+          detail={tx("Owners or an authorized spending delegate")}
         />
       </div>
-      {error && <Notice>{error}</Notice>}
+      {error && <Notice>{tx(error)}</Notice>}
       {params.has("focus") && recurring && !selected && (
         <Notice>
-          This schedule is not available in the selected activity.{" "}
+          {tx("This schedule is not available in the selected activity.")}{" "}
           <button className="workspace-action-link" onClick={closeDetails}>
-            Dismiss
+            {tx("Dismiss")}
           </button>
         </Notice>
       )}
       <section className="workspace-panel">
         <div className="workspace-toolbar">
           <div>
-            <h2 className="font-semibold">Recurring schedules</h2>
+            <h2 className="font-semibold">{tx("Recurring schedules")}</h2>
             <p className="workspace-description">
-              Review generated drafts and payment history in Payments.
+              {tx("Review generated drafts and payment history in Payments.")}
             </p>
           </div>
           <SearchField
-            placeholder="Search schedules"
+            placeholder={tx("Search schedules")}
             value={search}
             onChange={setSearch}
           />
@@ -155,15 +159,17 @@ export default function PaymentBatches() {
         ) : !series.length ? (
           <EmptyState
             icon={Repeat2}
-            title="Prepare for every payday"
-            description="Choose your recipients, amounts, and frequency. Each future payment is prepared for your team to review."
+            title={tx("Prepare for every payday")}
+            description={tx(
+              "Choose your recipients, amounts, and frequency. Each future payment is prepared for your team to review.",
+            )}
             action={
               canCreate && (
                 <button
                   className="workspace-button workspace-button-primary"
                   onClick={() => setCreating(true)}
                 >
-                  Create a schedule
+                  {tx("Create a schedule")}
                   <Plus size={14} />
                 </button>
               )
@@ -178,22 +184,22 @@ export default function PaymentBatches() {
               <thead role="rowgroup">
                 <tr role="row">
                   <th role="columnheader" scope="col">
-                    Schedule
+                    {tx("Schedule")}
                   </th>
                   <th role="columnheader" scope="col">
-                    Frequency
+                    {tx("Frequency")}
                   </th>
                   <th role="columnheader" scope="col">
-                    Next draft & pay date
+                    {tx("Next draft & pay date")}
                   </th>
                   <th role="columnheader" scope="col" className="numeric">
-                    Per payment
+                    {tx("Per payment")}
                   </th>
                   <th role="columnheader" scope="col">
-                    Status
+                    {tx("Status")}
                   </th>
                   <th role="columnheader" scope="col">
-                    Latest payment & actions
+                    {tx("Latest payment & actions")}
                   </th>
                 </tr>
               </thead>
@@ -203,37 +209,41 @@ export default function PaymentBatches() {
                     <td role="cell" data-primary>
                       <button
                         className="workspace-action-link font-semibold text-left"
-                        aria-label={`Review schedule ${r.name}`}
+                        aria-label={tx("Review schedule {{value1}}", {
+                          value1: r.name,
+                        })}
                         onClick={() => setParams({ focus: r._id })}
                       >
                         {r.name}
                       </button>
                       <span className="workspace-table-secondary">
-                        {r.recipients.length} recipient
-                        {r.recipients.length === 1 ? "" : "s"} · {r.ownerName}
+                        {tx("{{count}} recipients", {
+                          count: r.recipients.length,
+                        })}{" "}
+                        · {r.ownerName}
                       </span>
                       {r.pauseReason && (
                         <p className="mt-2 max-w-xs text-xs workspace-funding-warning">
-                          {r.pauseReason}
+                          {tx(r.pauseReason)}
                         </p>
                       )}
                     </td>
-                    <td role="cell" data-label="Frequency">
-                      {frequency[r.cadence]}
+                    <td role="cell" data-label={tx("Frequency")}>
+                      {tx(frequency[r.cadence])}
                     </td>
-                    <td role="cell" data-label="Next draft & pay date">
+                    <td role="cell" data-label={tx("Next draft & pay date")}>
                       <strong>{formatDate(r.nextDraftAt)}</strong>
                       <span className="workspace-table-secondary">
-                        {r.status === "paused" ? "Paused · " : ""}Pay{" "}
-                        {formatDate(r.nextPayDate)}
+                        {r.status === "paused" ? tx("Paused · ") : ""}
+                        {tx("Pay")} {formatDate(r.nextPayDate)}
                       </span>
                       <span className="workspace-table-secondary">
-                        Approve by {scheduleDateTime(r.nextPayDate)}
+                        {tx("Approve by")} {scheduleDateTime(r.nextPayDate)}
                       </span>
                     </td>
                     <td
                       role="cell"
-                      data-label="Per payment"
+                      data-label={tx("Per payment")}
                       className="numeric"
                     >
                       <strong>
@@ -243,7 +253,7 @@ export default function PaymentBatches() {
                         {r.token}
                       </span>
                     </td>
-                    <td role="cell" data-label="Status">
+                    <td role="cell" data-label={tx("Status")}>
                       <StatusBadge status={r.status} />
                     </td>
                     <td role="cell" data-actions>
@@ -253,14 +263,16 @@ export default function PaymentBatches() {
                             className="workspace-action-link"
                             to={`/org/${orgId}/disbursements?focus=${r.latestPayment._id}`}
                           >
-                            Review latest payment <ArrowRight size={13} />
+                            {tx("Review latest payment")}{" "}
+                            <ArrowRight size={13} />
                           </Link>
                           <span className="ml-2">
                             <StatusBadge status={r.latestPayment.status} />
                           </span>
                           {r.latestPayment.scheduledAt && (
                             <p className="workspace-table-secondary">
-                              Pay {formatDate(r.latestPayment.scheduledAt)}
+                              {tx("Pay")}{" "}
+                              {formatDate(r.latestPayment.scheduledAt)}
                             </p>
                           )}
                         </div>
@@ -269,7 +281,7 @@ export default function PaymentBatches() {
                         className="workspace-action-link mb-3"
                         to={`/org/${orgId}/disbursements?schedule=${r._id}`}
                       >
-                        Payment history <ArrowRight size={13} />
+                        {tx("Payment history")} <ArrowRight size={13} />
                       </Link>
                       {canCreate && (
                         <div className="flex items-center gap-3">
@@ -277,7 +289,7 @@ export default function PaymentBatches() {
                             className="workspace-action-link"
                             onClick={() => setEditing(r)}
                           >
-                            Edit
+                            {tx("Edit")}
                           </button>
                           <button
                             className="workspace-button"
@@ -288,7 +300,7 @@ export default function PaymentBatches() {
                             ) : (
                               <Play size={12} />
                             )}
-                            {r.status === "active" ? "Pause" : "Resume"}
+                            {r.status === "active" ? tx("Pause") : tx("Resume")}
                           </button>
                         </div>
                       )}
@@ -301,11 +313,12 @@ export default function PaymentBatches() {
         )}
         <div className="workspace-table-footer">
           <span>
-            {series?.length ?? 0} schedule{series?.length === 1 ? "" : "s"}
+            {tx("{{count}} schedules", { count: series?.length ?? 0 })}
           </span>
           <span>
-            Changes affect future drafts. Already prepared payments remain in
-            Payments.
+            {tx(
+              "Changes affect future drafts. Already prepared payments remain in Payments.",
+            )}
           </span>
         </div>
       </section>
@@ -324,8 +337,8 @@ export default function PaymentBatches() {
         <Dialog
           title={
             confirm.status === "active"
-              ? "Pause this schedule?"
-              : "Resume this schedule?"
+              ? tx("Pause this schedule?")
+              : tx("Resume this schedule?")
           }
           onClose={() => {
             if (!busy) setConfirm(null);
@@ -334,20 +347,24 @@ export default function PaymentBatches() {
           <div className="space-y-5 p-6">
             <p className="workspace-description">
               {confirm.status === "active"
-                ? "Future batches will stop being prepared. Existing drafts and scheduled payments remain in Payments and can be cancelled separately."
-                : "The next future occurrence will be prepared for review. Missed periods will not create catch-up payments."}
+                ? tx(
+                    "Future batches will stop being prepared. Existing drafts and scheduled payments remain in Payments and can be cancelled separately.",
+                  )
+                : tx(
+                    "The next future occurrence will be prepared for review. Missed periods will not create catch-up payments.",
+                  )}
             </p>
-            {error && <Notice>{error}</Notice>}
+            {error && <Notice>{tx(error)}</Notice>}
             <button
               className="workspace-button workspace-button-primary"
               disabled={busy}
               onClick={() => void change()}
             >
               {busy
-                ? "Saving…"
+                ? tx("Saving…")
                 : confirm.status === "active"
-                  ? "Pause schedule"
-                  : "Resume schedule"}
+                  ? tx("Pause schedule")
+                  : tx("Resume schedule")}
             </button>
           </div>
         </Dialog>

@@ -1,4 +1,5 @@
-import { userErrorMessage } from '@/lib/userErrors';
+import { tx, useWorkspaceLanguage } from "@/lib/workspaceI18n";
+import { userErrorMessage } from "@/lib/userErrors";
 import { useState } from "react";
 import { useAction, useMutation, useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
@@ -27,6 +28,7 @@ export function RecipientCollection({
   beneficiaryId: Id<"beneficiaries">;
   name: string;
 }) {
+  useWorkspaceLanguage();
   const sessionToken = useSessionToken();
   const { environment } = useActivityEnvironment();
   const history = useQuery(
@@ -60,36 +62,45 @@ export function RecipientCollection({
   };
   return (
     <section
-      aria-label="Collect payment details"
+      aria-label={tx("Collect payment details")}
       className="rounded-xl border border-white/10 bg-navy-800/30 p-4 space-y-3"
     >
       <div>
-        <h2 className="font-semibold">Let {name} add their payment details</h2>
+        <h2 className="font-semibold">
+          {tx("Let {{name}} add their payment details", { name })}
+        </h2>
         <p className="mt-1 text-sm text-slate-400">
-          Share a private form. Submitted details need your team’s review before
-          payment.
+          {tx(
+            "Share a private form. Submitted details need your team’s review before payment.",
+          )}
         </p>
       </div>
       {history === undefined && (
         <p role="status" className="text-sm text-slate-400">
-          Checking detail requests…
+          {tx("Checking detail requests…")}
         </p>
       )}
-      {error && <Notice>{error}</Notice>}
+      {error && <Notice>{tx(error)}</Notice>}
       {latest && (
         <p className="text-sm">
-          <strong>{labels[latest.state]}</strong>
+          <strong>{tx(labels[latest.state])}</strong>
           {latest.state === "requested"
-            ? ` · Expires ${formatDate(latest.expiresAt)}`
+            ? tx(" · Expires {{value1}}", {
+                value1: formatDate(latest.expiresAt),
+              })
             : latest.submittedAt
-              ? ` · Received ${formatDate(latest.submittedAt)}`
+              ? tx(" · Received {{value1}}", {
+                  value1: formatDate(latest.submittedAt),
+                })
               : ""}
         </p>
       )}
       {canShare && (
         <div className="space-y-3">
           <label className="block">
-            <span className="finance-label">Private payment details link</span>
+            <span className="finance-label">
+              {tx("Private payment details link")}
+            </span>
             <input
               className="finance-field text-xs"
               readOnly
@@ -98,9 +109,10 @@ export function RecipientCollection({
             />
           </label>
           <p className="text-xs text-slate-400">
-            Anyone with this link can submit details for {name}. Send it through
-            a contact channel you already trust. Disburse has not sent a
-            message.
+            {tx(
+              "Anyone with this link can submit details for {{name}}. Send it through a contact channel you already trust. Disburse has not sent a message.",
+              { name },
+            )}
           </p>
           <button
             type="button"
@@ -112,7 +124,7 @@ export function RecipientCollection({
               })
             }
           >
-            {copied ? "Link copied" : "Copy link"}
+            {copied ? tx("Link copied") : tx("Copy link")}
           </button>
         </div>
       )}
@@ -138,10 +150,10 @@ export function RecipientCollection({
             }
           >
             {busy
-              ? "Updating…"
+              ? tx("Updating…")
               : latest?.state === "requested"
-                ? "Replace link"
-                : "Create details link"}
+                ? tx("Replace link")
+                : tx("Create details link")}
           </button>
           {latest?.state === "requested" && (
             <button
@@ -158,37 +170,38 @@ export function RecipientCollection({
                 })
               }
             >
-              Revoke link
+              {tx("Revoke link")}
             </button>
           )}
         </div>
       )}
       {history?.canCreate && environment === "unclassified" && (
         <p className="text-sm workspace-funding-warning">
-          Choose Business or Test activity before creating a request.
+          {tx("Choose Business or Test activity before creating a request.")}
         </p>
       )}
       {latest?.state === "requested" && !link && (
         <p className="text-xs text-slate-400">
-          The original link is only shown when created. Replace it to get a new
-          link; the previous link will stop accepting details.
+          {tx(
+            "The original link is only shown when created. Replace it to get a new link; the previous link will stop accepting details.",
+          )}
         </p>
       )}
       {environment === "test" && (
         <p className="text-xs workspace-funding-warning">
-          Test activity · this form will request a test payment address.
+          {tx("Test activity · this form will request a test payment address.")}
         </p>
       )}
       {!!history && history.requests.length > 1 && (
         <details className="text-sm">
-          <summary className="cursor-pointer">Request history</summary>
+          <summary className="cursor-pointer">{tx("Request history")}</summary>
           <ul className="mt-2 space-y-2">
             {history.requests.map((r) => (
               <li key={r.id}>
-                <span>{labels[r.state]}</span>
+                <span>{tx(labels[r.state])}</span>
                 <span className="text-slate-400">
                   {" "}
-                  · Created {formatDate(r.createdAt)}
+                  {tx("· Created")} {formatDate(r.createdAt)}
                 </span>
               </li>
             ))}

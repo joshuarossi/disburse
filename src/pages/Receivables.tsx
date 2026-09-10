@@ -1,3 +1,4 @@
+import { tx, useWorkspaceLanguage, workspaceLocale } from "@/lib/workspaceI18n";
 import { useReceivingService } from "@/features/receivables/useReceivingService";
 import { userErrorMessage } from "@/lib/userErrors";
 import { ReceivableDocuments } from "@/features/receivables/ReceivableDocuments";
@@ -48,6 +49,7 @@ function InvoiceEditor({
   draft?: Doc<"receivables">;
   onClose: () => void;
 }) {
+  useWorkspaceLanguage();
   const token = useSessionToken();
   const save = useMutation(api.receivables.create);
   const [safeId, setSafe] = useState(draft?.safeId ?? safes[0]?._id ?? "");
@@ -88,7 +90,7 @@ function InvoiceEditor({
   }
   return (
     <Dialog
-      title={draft ? "Edit invoice draft" : "Create invoice"}
+      title={draft ? tx("Edit invoice draft") : tx("Create invoice")}
       onClose={() => {
         if (!busy) onClose();
       }}
@@ -135,28 +137,30 @@ function InvoiceEditor({
         }}
       >
         <p className="workspace-description">
-          Create a customer invoice. Review it before generating its payment
-          link.
+          {tx(
+            "Create a customer invoice. Review it before generating its payment link.",
+          )}
         </p>
-        {error && <Notice>{error}</Notice>}
+        {error && <Notice>{tx(error)}</Notice>}
         {safeId && !safe && (
           <Notice tone="info">
-            The saved receiving account is archived or unavailable. Choose an
-            active account to continue. Your invoice details are kept.
+            {tx(
+              "The saved receiving account is archived or unavailable. Choose an active account to continue. Your invoice details are kept.",
+            )}
           </Notice>
         )}
         {!safes.length && (
           <Notice tone="info">
-            Connect a business account before creating an invoice.{" "}
+            {tx("Connect a business account before creating an invoice.")}{" "}
             <Link className="underline" to={`/org/${orgId}/settings?tab=safe`}>
-              Connect an account
+              {tx("Connect an account")}
             </Link>
           </Notice>
         )}
         <fieldset disabled={busy} className="space-y-4">
           <div className="grid gap-4 sm:grid-cols-2">
             <label>
-              <span className="finance-label">Customer name</span>
+              <span className="finance-label">{tx("Customer name")}</span>
               <input
                 className="finance-field"
                 required
@@ -166,7 +170,9 @@ function InvoiceEditor({
               />
             </label>
             <label>
-              <span className="finance-label">Customer email (optional)</span>
+              <span className="finance-label">
+                {tx("Customer email (optional)")}
+              </span>
               <input
                 className="finance-field"
                 type="email"
@@ -175,18 +181,18 @@ function InvoiceEditor({
               />
             </label>
             <label>
-              <span className="finance-label">Invoice number</span>
+              <span className="finance-label">{tx("Invoice number")}</span>
               <input
                 className="finance-field"
                 required
                 maxLength={100}
-                placeholder="INV-1001"
+                placeholder={tx("INV-1001")}
                 value={number}
                 onChange={(e) => setNumber(e.target.value)}
               />
             </label>
             <label>
-              <span className="finance-label">Due date</span>
+              <span className="finance-label">{tx("Due date")}</span>
               <input
                 className="finance-field"
                 required
@@ -196,7 +202,7 @@ function InvoiceEditor({
               />
             </label>
             <label>
-              <span className="finance-label">Receive into</span>
+              <span className="finance-label">{tx("Receive into")}</span>
               <select
                 className="finance-field"
                 required
@@ -208,8 +214,8 @@ function InvoiceEditor({
                 {!safe && (
                   <option value={safeId} disabled>
                     {safeId
-                      ? "Saved account unavailable. Choose an account"
-                      : "Choose a receiving account"}
+                      ? tx("Saved account unavailable. Choose an account")
+                      : tx("Choose a receiving account")}
                   </option>
                 )}
                 {safes.map((s) => (
@@ -220,7 +226,7 @@ function InvoiceEditor({
               </select>
             </label>
             <label>
-              <span className="finance-label">Invoice currency</span>
+              <span className="finance-label">{tx("Invoice currency")}</span>
               <select
                 className="finance-field"
                 value={currency}
@@ -228,7 +234,7 @@ function InvoiceEditor({
               >
                 {!currencyAvailable && (
                   <option value={currency} disabled>
-                    {currency} · choose a compatible account or currency
+                    {currency} {tx("· choose a compatible account or currency")}
                   </option>
                 )}
                 {supportedCurrencies.map((t) => (
@@ -239,18 +245,21 @@ function InvoiceEditor({
           </div>
           {configuration && !configuration.canIssue && (
             <Notice tone="info">
-              You can save a draft for this account. Receiving payments on this
-              network is not available yet.
+              {tx(
+                "You can save a draft for this account. Receiving payments on this network is not available yet.",
+              )}
             </Notice>
           )}
-          <h3 className="font-semibold">Invoice items</h3>
+          <h3 className="font-semibold">{tx("Invoice items")}</h3>
           {items.map((item, index) => (
             <div
               key={index}
               className="grid gap-3 rounded-lg border border-slate-400/20 p-3 sm:grid-cols-[1fr_90px_130px_auto]"
             >
               <label>
-                <span className="finance-label">Item {index + 1}</span>
+                <span className="finance-label">
+                  {tx("Item")} {index + 1}
+                </span>
                 <input
                   className="finance-field"
                   required
@@ -265,7 +274,9 @@ function InvoiceEditor({
                 />
               </label>
               <label>
-                <span className="finance-label">Quantity {index + 1}</span>
+                <span className="finance-label">
+                  {tx("Quantity")} {index + 1}
+                </span>
                 <input
                   className="finance-field"
                   required
@@ -285,7 +296,9 @@ function InvoiceEditor({
                 />
               </label>
               <label>
-                <span className="finance-label">Unit price {index + 1}</span>
+                <span className="finance-label">
+                  {tx("Unit price")} {index + 1}
+                </span>
                 <input
                   className="finance-field"
                   required
@@ -303,11 +316,11 @@ function InvoiceEditor({
               <button
                 type="button"
                 className="workspace-button self-end"
-                aria-label={`Remove item ${index + 1}`}
+                aria-label={tx("Remove item {{value1}}", { value1: index + 1 })}
                 disabled={items.length === 1}
                 onClick={() => setItems(items.filter((_, n) => n !== index))}
               >
-                Remove
+                {tx("Remove")}
               </button>
             </div>
           ))}
@@ -322,19 +335,19 @@ function InvoiceEditor({
               ])
             }
           >
-            Add item
+            {tx("Add item")}
           </button>
           <p className="flex justify-between gap-3 text-lg font-semibold">
-            <span>Invoice total</span>
+            <span>{tx("Invoice total")}</span>
             <span>
               {total
                 ? `${formatMoney(total, currency, true)} ${currency}`
-                : "Complete the item amounts"}
+                : tx("Complete the item amounts")}
             </span>
           </p>
           <label className="block">
             <span className="finance-label">
-              Invoice note (visible to customer)
+              {tx("Invoice note (visible to customer)")}
             </span>
             <textarea
               className="finance-field"
@@ -351,13 +364,13 @@ function InvoiceEditor({
             disabled={busy}
             onClick={onClose}
           >
-            Cancel
+            {tx("Cancel")}
           </button>
           <button
             className="workspace-button workspace-button-primary"
             disabled={busy || !safe || !currencyAvailable}
           >
-            {busy ? "Saving…" : "Save draft"}
+            {busy ? tx("Saving…") : tx("Save draft")}
           </button>
         </div>
       </form>
@@ -376,6 +389,7 @@ function InvoiceDetails({
   onClose: () => void;
   onEdit: () => void;
 }) {
+  useWorkspaceLanguage();
   const sessionToken = useSessionToken();
   const issue = useAction(api.receivableActions.issue),
     refresh = useAction(api.receivableActions.refresh);
@@ -431,7 +445,7 @@ function InvoiceDetails({
   const amounts = receivableAmounts(invoice);
   return (
     <Dialog
-      title={`Invoice ${invoice.number}`}
+      title={tx("Invoice {{value1}}", { value1: invoice.number })}
       onClose={() => {
         if (!busy) onClose();
       }}
@@ -441,10 +455,12 @@ function InvoiceDetails({
           <div>
             <h3 className="text-xl font-semibold">{invoice.customerName}</h3>
             <p className="workspace-description">
-              Due {formatDate(invoice.dueDate)}
+              {tx("Due")} {formatDate(invoice.dueDate)}
             </p>
           </div>
-          <span className="workspace-status">{receivableStatus(invoice)}</span>
+          <span className="workspace-status">
+            {tx(receivableStatus(invoice))}
+          </span>
         </div>
         <p className="text-3xl font-semibold break-words">
           {formatMoney(invoice.amount, invoice.token, true)}{" "}
@@ -452,13 +468,13 @@ function InvoiceDetails({
         </p>
         {BigInt(invoice.credited ?? "0") > 0n && (
           <p className="workspace-description">
-            Original total shown above · credits {amounts.credited}{" "}
-            {invoice.token} · adjusted total {amounts.adjustedTotal}{" "}
+            {tx("Original total shown above · credits")} {amounts.credited}{" "}
+            {invoice.token} {tx("· adjusted total")} {amounts.adjustedTotal}{" "}
             {invoice.token}.
           </p>
         )}
         <p className="workspace-description">
-          Receiving account: {getChainName(invoice.chainId)} ·{" "}
+          {tx("Receiving account:")} {getChainName(invoice.chainId)} ·{" "}
           {invoice.treasury.slice(0, 8)}…{invoice.treasury.slice(-6)}
         </p>
         <InvoiceItems items={invoice.items} token={invoice.token} />
@@ -469,27 +485,28 @@ function InvoiceDetails({
         {invoice.state === "draft" ? (
           <>
             <Notice tone="info">
-              Generating a payment link fixes the receiving account, currency
-              and amount for this invoice. Share the link yourself; no email is
-              sent automatically.
+              {tx(
+                "Generating a payment link fixes the receiving account, currency and amount for this invoice. Share the link yourself; no email is sent automatically.",
+              )}
             </Notice>
             <div className="rounded-lg border border-slate-400/20 p-4 text-sm space-y-2">
-              <p className="font-semibold">Collection costs</p>
+              <p className="font-semibold">{tx("Collection costs")}</p>
               <p>
-                Creating this link needs no network transaction. A network fee
-                applies when payments move to your account; the first collection
-                also activates this invoice's receiving address.
+                {tx(
+                  "Creating this link needs no network transaction. A network fee applies when payments move to your account; the first collection also activates this invoice's receiving address.",
+                )}
               </p>
               <p>
-                Your company account pays collection fees in USDC. Its owners
-                review the complete fee before confirming. The invoice's full
-                balance moves into that account.
+                {tx(
+                  "Your company account pays collection fees in USDC. Its owners review the complete fee before confirming. The invoice's full balance moves into that account.",
+                )}
               </p>
             </div>
             {configuration && !configuration.canIssue && (
               <Notice>
-                Payment links are not available for this network yet. You can
-                keep editing this draft.
+                {tx(
+                  "Payment links are not available for this network yet. You can keep editing this draft.",
+                )}
               </Notice>
             )}
             {configuration?.canIssue && (
@@ -509,7 +526,7 @@ function InvoiceDetails({
                     disabled={busy}
                     onClick={onEdit}
                   >
-                    Edit draft
+                    {tx("Edit draft")}
                   </button>
                   <button
                     className="workspace-button workspace-button-primary"
@@ -522,7 +539,7 @@ function InvoiceDetails({
                       run(() => issue(args!), "Payment link created.")
                     }
                   >
-                    Generate payment link
+                    {tx("Generate payment link")}
                   </button>
                 </>
               )}
@@ -536,8 +553,8 @@ function InvoiceDetails({
                 ["Remaining", amounts.remaining],
                 ["Awaiting collection", amounts.awaitingForwarding],
               ].map(([label, amount]) => (
-                <div key={label}>
-                  <p className="finance-label">{label}</p>
+                <div key={tx(label)}>
+                  <p className="finance-label">{tx(label)}</p>
                   <strong>
                     {formatMoney(amount, invoice.token, true)} {invoice.token}
                   </strong>
@@ -545,12 +562,14 @@ function InvoiceDetails({
               ))}
             </div>
             <p className="workspace-description">
-              Confirmed payments count toward the invoice. Collection moves
-              those funds into your account.
+              {tx(
+                "Confirmed payments count toward the invoice. Collection moves those funds into your account.",
+              )}
             </p>
             <div className="rounded-lg border border-slate-400/20 p-4">
               <span className="finance-label">
-                Unique receiving address · {getChainName(invoice.chainId)}
+                {tx("Unique receiving address ·")}{" "}
+                {getChainName(invoice.chainId)}
               </span>
               <code className="block break-all text-sm">
                 {invoice.receivingAddress}
@@ -564,7 +583,7 @@ function InvoiceDetails({
                   target="_blank"
                   rel="noreferrer"
                 >
-                  Open customer invoice
+                  {tx("Open customer invoice")}
                 </Link>
                 <button
                   className="workspace-button"
@@ -578,15 +597,19 @@ function InvoiceDetails({
                     )
                   }
                 >
-                  Copy payment link
+                  {tx("Copy payment link")}
                 </button>
               </div>
             )}
             {invoice.syncError && <Notice>{invoice.syncError}</Notice>}
             <p className="workspace-description">
               {invoice.lastCheckedAt
-                ? `Last checked ${new Date(invoice.lastCheckedAt).toLocaleString()}`
-                : "Waiting for the first receipt check."}
+                ? tx("Last checked {{value1}}", {
+                    value1: new Date(invoice.lastCheckedAt).toLocaleString(
+                      workspaceLocale(),
+                    ),
+                  })
+                : tx("Waiting for the first receipt check.")}
             </p>
             <div className="flex flex-wrap gap-2">
               <button
@@ -599,7 +622,7 @@ function InvoiceDetails({
                   )
                 }
               >
-                Check payments
+                {tx("Check payments")}
               </button>
             </div>
             <InvoiceCollection
@@ -610,7 +633,9 @@ function InvoiceDetails({
             />
             {!!events?.length && (
               <section>
-                <h3 className="font-semibold mb-3">Confirmed activity</h3>
+                <h3 className="font-semibold mb-3">
+                  {tx("Confirmed activity")}
+                </h3>
                 <ul className="space-y-3">
                   {events.map((e) => (
                     <li
@@ -619,8 +644,8 @@ function InvoiceDetails({
                     >
                       <span>
                         {e.kind === "received"
-                          ? "Payment received"
-                          : "Collected into account"}
+                          ? tx("Payment received")
+                          : tx("Collected into account")}
                         <span className="workspace-table-secondary">
                           {formatMoney(
                             formatBaseUnits(BigInt(e.amount), invoice.token),
@@ -628,7 +653,7 @@ function InvoiceDetails({
                             true,
                           )}{" "}
                           {invoice.token} ·{" "}
-                          {e.settledAt ? "Settled" : "Recorded"}{" "}
+                          {e.settledAt ? tx("Settled") : tx("Recorded")}{" "}
                           {formatDate(e.settledAt ?? e.recordedAt)}
                         </span>
                       </span>
@@ -638,7 +663,7 @@ function InvoiceDetails({
                         target="_blank"
                         rel="noreferrer"
                       >
-                        View transaction
+                        {tx("View transaction")}
                       </a>
                     </li>
                   ))}
@@ -662,8 +687,12 @@ function InvoiceDetails({
                 <>
                   <p className="workspace-description">
                     {invoice.receivingAddress
-                      ? "The invoice will stay in your records. Its address cannot be revoked; late payments will still be tracked and can be collected."
-                      : "This draft will stay in your records as voided. No payment address has been issued."}
+                      ? tx(
+                          "The invoice will stay in your records. Its address cannot be revoked; late payments will still be tracked and can be collected.",
+                        )
+                      : tx(
+                          "This draft will stay in your records as voided. No payment address has been issued.",
+                        )}
                   </p>
                   <button
                     className="workspace-button"
@@ -672,7 +701,7 @@ function InvoiceDetails({
                       run(() => voidInvoice(args!), "Invoice voided.")
                     }
                   >
-                    Confirm void
+                    {tx("Confirm void")}
                   </button>
                 </>
               ) : (
@@ -681,18 +710,19 @@ function InvoiceDetails({
                   disabled={busy}
                   onClick={() => setVoiding(true)}
                 >
-                  Void invoice
+                  {tx("Void invoice")}
                 </button>
               )}
             </div>
           )}
-        {busy && <p role="status">Working…</p>}
-        {message && <Notice tone={messageTone}>{message}</Notice>}
+        {busy && <p role="status">{tx("Working…")}</p>}
+        {message && <Notice tone={messageTone}>{tx(message)}</Notice>}
       </div>
     </Dialog>
   );
 }
 export default function Receivables() {
+  useWorkspaceLanguage();
   const { environment } = useActivityEnvironment();
   const { orgId } = useParams();
   const sessionToken = useSessionToken();
@@ -736,8 +766,10 @@ export default function Receivables() {
   return (
     <>
       <PageHeader
-        title="Invoices"
-        description="Bill customers, track incoming payments, and collect funds into your account."
+        title={tx("Invoices")}
+        description={tx(
+          "Bill customers, track incoming payments, and collect funds into your account.",
+        )}
         actions={
           <>
             {!!result?.items.length && (
@@ -783,7 +815,7 @@ export default function Receivables() {
                   )
                 }
               >
-                Export invoices
+                {tx("Export invoices")}
               </button>
             )}
             {canManage && (
@@ -792,7 +824,7 @@ export default function Receivables() {
                 onClick={() => setEditor("new")}
               >
                 <Plus size={16} />
-                Create invoice
+                {tx("Create invoice")}
               </button>
             )}
           </>
@@ -801,10 +833,10 @@ export default function Receivables() {
       <div className="workspace-panel">
         <div className="p-5">
           <label>
-            <span className="sr-only">Search customer or invoice</span>
+            <span className="sr-only">{tx("Search customer or invoice")}</span>
             <input
               className="finance-field"
-              placeholder="Search customer or invoice"
+              placeholder={tx("Search customer or invoice")}
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />
@@ -815,7 +847,7 @@ export default function Receivables() {
               checked={followUpsOnly}
               onChange={(e) => setFollowUpsOnly(e.target.checked)}
             />
-            Follow-ups due
+            {tx("Follow-ups due")}
           </label>
         </div>
         {!result ? (
@@ -824,12 +856,16 @@ export default function Receivables() {
           <EmptyState
             icon={Receipt}
             title={
-              search ? "No invoices match your search" : "No customer invoices"
+              search
+                ? tx("No invoices match your search")
+                : tx("No customer invoices")
             }
             description={
               search
-                ? "Try another customer or invoice number."
-                : "Create an invoice and share its payment link. Each invoice has its own receiving address."
+                ? tx("Try another customer or invoice number.")
+                : tx(
+                    "Create an invoice and share its payment link. Each invoice has its own receiving address.",
+                  )
             }
           />
         ) : (
@@ -841,19 +877,19 @@ export default function Receivables() {
               <thead role="rowgroup">
                 <tr role="row">
                   <th role="columnheader" scope="col">
-                    Invoice & customer
+                    {tx("Invoice & customer")}
                   </th>
                   <th role="columnheader" scope="col">
-                    Due
+                    {tx("Due")}
                   </th>
                   <th role="columnheader" scope="col">
-                    Amount
+                    {tx("Amount")}
                   </th>
                   <th role="columnheader" scope="col">
-                    Status
+                    {tx("Status")}
                   </th>
                   <th role="columnheader" scope="col">
-                    Collection
+                    {tx("Collection")}
                   </th>
                 </tr>
               </thead>
@@ -871,38 +907,38 @@ export default function Receivables() {
                         {i.customerName}
                       </span>
                     </td>
-                    <td role="cell" data-label="Due date">
+                    <td role="cell" data-label={tx("Due date")}>
                       {formatDate(i.dueDate)}
                       {i.followUpAt &&
                         i.state === "issued" &&
                         i.amounts.remaining !== "0" && (
                           <span className="workspace-table-secondary">
                             {i.followUpAt <= Date.now()
-                              ? "Follow-up due"
-                              : "Follow up"}{" "}
+                              ? tx("Follow-up due")
+                              : tx("Follow up")}{" "}
                             {formatDate(i.followUpAt)}
                           </span>
                         )}
                     </td>
-                    <td role="cell" data-label="Amount">
+                    <td role="cell" data-label={tx("Amount")}>
                       <strong>{formatMoney(i.amount, i.token, true)}</strong>
                       <span className="workspace-table-secondary">
                         {i.token} · {getChainName(i.chainId)}
                       </span>
                     </td>
-                    <td role="cell" data-label="Status">
-                      <span className="workspace-status">{i.status}</span>
+                    <td role="cell" data-label={tx("Status")}>
+                      <span className="workspace-status">{tx(i.status)}</span>
                     </td>
-                    <td role="cell" data-label="Collection">
+                    <td role="cell" data-label={tx("Collection")}>
                       {i.state === "draft"
-                        ? "Not issued"
+                        ? tx("Not issued")
                         : BigInt(i.received) > BigInt(i.forwarded)
-                          ? "Awaiting collection"
+                          ? tx("Awaiting collection")
                           : BigInt(i.received) > 0n
-                            ? "In account"
+                            ? tx("In account")
                             : i.state === "void"
-                              ? "No collection due"
-                              : "Awaiting payment"}
+                              ? tx("No collection due")
+                              : tx("Awaiting payment")}
                     </td>
                   </tr>
                 ))}
@@ -911,7 +947,9 @@ export default function Receivables() {
           </div>
         )}
         {result?.limited && (
-          <p className="p-4 text-sm">Showing the latest 200 invoices.</p>
+          <p className="p-4 text-sm">
+            {tx("Showing the latest 200 invoices.")}
+          </p>
         )}
       </div>
       {editor && safes && (

@@ -1,4 +1,6 @@
-import { userErrorMessage } from '@/lib/userErrors';
+import { LanguageSwitcher } from "@/components/ui/LanguageSwitcher";
+import { tx, useWorkspaceLanguage } from "@/lib/workspaceI18n";
+import { userErrorMessage } from "@/lib/userErrors";
 import { useRef, useState } from "react";
 import { getSessionToken } from "@/lib/session";
 import { useNavigate, useSearchParams } from "react-router-dom";
@@ -45,6 +47,7 @@ interface TeamMember {
 // Onboarding
 // ---------------------------------------------------------------------------
 export default function Onboarding() {
+  useWorkspaceLanguage();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { address, chain } = useAccount();
@@ -74,15 +77,20 @@ export default function Onboarding() {
   // ---- safe state ----
   const [hasSafe, setHasSafe] = useState<boolean | null>(null); // null = not yet chosen
   const [existingSafeAddress, setExistingSafeAddress] = useState("");
-  const [selectedChainId, setSelectedChainId] = useState(chain?.id === 11155111 ? 84532 : chain?.id ?? 8453);
+  const [selectedChainId, setSelectedChainId] = useState(
+    chain?.id === 11155111 ? 84532 : (chain?.id ?? 8453),
+  );
   const [safeThreshold, setSafeThreshold] = useState(1);
   const [deploying, setDeploying] = useState(false);
   const [safeError, setSafeError] = useState<string | null>(null);
   const [linkingExisting, setLinkingExisting] = useState(false);
-  const primaryOwner = deploying && recoveredOwners.length ? recoveredOwners[0] : address;
+  const primaryOwner =
+    deploying && recoveredOwners.length ? recoveredOwners[0] : address;
 
   // ---- nav state ----
-  const [step, setStep] = useState<Step>(searchParams.has("org") ? "safe" : "profile");
+  const [step, setStep] = useState<Step>(
+    searchParams.has("org") ? "safe" : "profile",
+  );
   const [orgError, setOrgError] = useState<string | null>(null);
   const [teamError, setTeamError] = useState<string | null>(null);
 
@@ -91,7 +99,6 @@ export default function Onboarding() {
   const updateOwnProfile = useMutation(api.orgs.updateOwnProfile);
   const inviteMember = useMutation(api.orgs.inviteMember);
   const linkSafe = useAction(api.safes.link);
-
 
   // ---------------------------------------------------------------------------
   // Handlers
@@ -132,9 +139,7 @@ export default function Onboarding() {
 
       setStep("team");
     } catch (err) {
-      setOrgError(
-        userErrorMessage(err, "Failed to create organization"),
-      );
+      setOrgError(userErrorMessage(err, "Failed to create organization"));
     } finally {
       setupLock.current = false;
     }
@@ -145,8 +150,11 @@ export default function Onboarding() {
     const supplied = newMember.walletAddress.trim();
     if (!supplied) return;
     setTeamError(null);
-    if (!isAddress(supplied, { strict: false }) || /^0x0{40}$/i.test(supplied)) {
-      setTeamError('Enter a valid wallet address for this team member.');
+    if (
+      !isAddress(supplied, { strict: false }) ||
+      /^0x0{40}$/i.test(supplied)
+    ) {
+      setTeamError("Enter a valid wallet address for this team member.");
       return;
     }
     const memberAddress = getAddress(supplied.toLowerCase());
@@ -157,9 +165,7 @@ export default function Onboarding() {
     }
     if (
       teamMembers.some(
-        (m) =>
-          m.walletAddress.toLowerCase() ===
-          memberAddress.toLowerCase(),
+        (m) => m.walletAddress.toLowerCase() === memberAddress.toLowerCase(),
       )
     ) {
       setTeamError("This wallet is already in the list.");
@@ -201,9 +207,7 @@ export default function Onboarding() {
       }
       setStep("safe");
     } catch (err) {
-      setTeamError(
-        userErrorMessage(err, "Failed to add team members"),
-      );
+      setTeamError(userErrorMessage(err, "Failed to add team members"));
     } finally {
       setupLock.current = false;
     }
@@ -226,7 +230,12 @@ export default function Onboarding() {
       // Done — go to dashboard
       navigate(`/org/${orgId}/dashboard`);
     } catch (err) {
-      setSafeError(walletErrorMessage(err, "Could not link this account. Check its address and network, then try again."));
+      setSafeError(
+        walletErrorMessage(
+          err,
+          "Could not link this account. Check its address and network, then try again.",
+        ),
+      );
     } finally {
       setLinkingExisting(false);
     }
@@ -277,7 +286,7 @@ export default function Onboarding() {
         <span
           className={`text-[11px] font-medium sm:text-xs ${active ? "text-white" : done ? "text-accent-400" : "text-slate-500"}`}
         >
-          {label}
+          {tx(label)}
         </span>
       </div>
     );
@@ -325,15 +334,19 @@ export default function Onboarding() {
           {/* ================================================================
               STEP: PROFILE
               ============================================================== */}
+          <div className="mb-6 flex justify-end">
+            <LanguageSwitcher inline />
+          </div>
           {step === "profile" && (
             <div className="space-y-6">
               <div className="text-center">
                 <h1 className="text-2xl font-bold text-white">
-                  Welcome to Disburse
+                  {tx("Welcome to Disburse")}
                 </h1>
                 <p className="mt-2 text-slate-400">
-                  Tell us a bit about yourself. Both fields are optional — you
-                  can always update later.
+                  {tx(
+                    "Tell us a bit about yourself. Both fields are optional — you can always update later.",
+                  )}
                 </p>
               </div>
 
@@ -343,14 +356,14 @@ export default function Onboarding() {
                     htmlFor="onboarding-name"
                     className="mb-1.5 block text-sm font-medium text-slate-300"
                   >
-                    Name
+                    {tx("Name")}
                   </label>
                   <input
                     id="onboarding-name"
                     type="text"
                     value={name}
                     onChange={(e) => setName(e.target.value)}
-                    placeholder="Your name"
+                    placeholder={tx("Your name")}
                     className="w-full rounded-lg border border-white/10 bg-navy-800 px-4 py-2.5 text-white placeholder-slate-500 focus:border-accent-500 focus:outline-none focus:ring-1 focus:ring-accent-500"
                   />
                 </div>
@@ -359,14 +372,14 @@ export default function Onboarding() {
                     htmlFor="onboarding-email"
                     className="mb-1.5 block text-sm font-medium text-slate-300"
                   >
-                    Email
+                    {tx("Email")}
                   </label>
                   <input
                     id="onboarding-email"
                     type="email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    placeholder="you@example.com"
+                    placeholder={tx("you@example.com")}
                     className="w-full rounded-lg border border-white/10 bg-navy-800 px-4 py-2.5 text-white placeholder-slate-500 focus:border-accent-500 focus:outline-none focus:ring-1 focus:ring-accent-500"
                   />
                 </div>
@@ -374,7 +387,7 @@ export default function Onboarding() {
 
               <div className="flex gap-3 pt-2">
                 <Button onClick={handleProfileAndAdvance} className="flex-1">
-                  Continue
+                  {tx("Continue")}
                   <ArrowRight className="h-4 w-4" />
                 </Button>
               </div>
@@ -388,11 +401,12 @@ export default function Onboarding() {
             <div className="space-y-6">
               <div className="text-center">
                 <h1 className="text-2xl font-bold text-white">
-                  Create your organization
+                  {tx("Create your organization")}
                 </h1>
                 <p className="mt-2 text-slate-400">
-                  Your organization is the workspace where you manage
-                  disbursements and team members.
+                  {tx(
+                    "Your organization is the workspace where you manage disbursements and team members.",
+                  )}
                 </p>
               </div>
 
@@ -401,14 +415,14 @@ export default function Onboarding() {
                   htmlFor="onboarding-orgName"
                   className="mb-1.5 block text-sm font-medium text-slate-300"
                 >
-                  Organization name
+                  {tx("Organization name")}
                 </label>
                 <input
                   id="onboarding-orgName"
                   type="text"
                   value={orgName}
                   onChange={(e) => setOrgName(e.target.value)}
-                  placeholder="e.g. Acme Corp"
+                  placeholder={tx("e.g. Acme Corp")}
                   autoFocus
                   className="w-full rounded-lg border border-white/10 bg-navy-800 px-4 py-2.5 text-white placeholder-slate-500 focus:border-accent-500 focus:outline-none focus:ring-1 focus:ring-accent-500"
                 />
@@ -420,14 +434,14 @@ export default function Onboarding() {
                   className="flex items-start gap-2 rounded-lg border border-red-500/30 bg-red-500/5 p-3"
                 >
                   <AlertCircle className="h-4 w-4 text-red-400 shrink-0 mt-0.5" />
-                  <p className="text-sm text-red-400">{orgError}</p>
+                  <p className="text-sm text-red-400">{tx(orgError)}</p>
                 </div>
               )}
 
               <div className="flex gap-3 pt-2">
                 <Button
                   variant="secondary"
-                  aria-label="Back"
+                  aria-label={tx("Back")}
                   onClick={goBack}
                   className="w-12 shrink-0"
                 >
@@ -438,7 +452,7 @@ export default function Onboarding() {
                   disabled={!orgName.trim()}
                   className="flex-1"
                 >
-                  Create organization
+                  {tx("Create organization")}
                   <ArrowRight className="h-4 w-4" />
                 </Button>
               </div>
@@ -452,11 +466,12 @@ export default function Onboarding() {
             <div className="space-y-6">
               <div className="text-center">
                 <h1 className="text-2xl font-bold text-white">
-                  Add team members
+                  {tx("Add team members")}
                 </h1>
                 <p className="mt-2 text-slate-400">
-                  Invite people to your organization. You can always add more
-                  later. This step is optional.
+                  {tx(
+                    "Invite people to your organization. You can always add more later. This step is optional.",
+                  )}
                 </p>
               </div>
 
@@ -474,11 +489,13 @@ export default function Onboarding() {
                           {m.walletAddress.slice(-4)}
                         </p>
                         <p className="text-xs text-slate-500 capitalize">
-                          {m.name || "No name"} · {m.role}
+                          {m.name || tx("No name")} · {m.role}
                         </p>
                       </div>
                       <button
-                        aria-label={`Remove ${m.name || 'team member'} from this list`}
+                        aria-label={tx("Remove {{value1}} from this list", {
+                          value1: m.name || "team member",
+                        })}
                         onClick={() => handleRemoveMember(idx)}
                         className="text-slate-500 hover:text-red-400 transition-colors"
                       >
@@ -497,7 +514,7 @@ export default function Onboarding() {
                       htmlFor="onboarding-newMember-walletAddress"
                       className="mb-1 block text-xs font-medium text-slate-400"
                     >
-                      Wallet address *
+                      {tx("Wallet address *")}
                     </label>
                     <input
                       id="onboarding-newMember-walletAddress"
@@ -509,7 +526,7 @@ export default function Onboarding() {
                           walletAddress: e.target.value,
                         }))
                       }
-                      placeholder="0x..."
+                      placeholder={tx("0x...")}
                       autoFocus
                       className="w-full rounded-lg border border-white/10 bg-navy-800 px-3 py-2 font-mono text-sm text-white placeholder-slate-500 focus:border-accent-500 focus:outline-none focus:ring-1 focus:ring-accent-500"
                     />
@@ -520,7 +537,7 @@ export default function Onboarding() {
                         htmlFor="onboarding-newMember-name"
                         className="mb-1 block text-xs font-medium text-slate-400"
                       >
-                        Name
+                        {tx("Name")}
                       </label>
                       <input
                         id="onboarding-newMember-name"
@@ -532,7 +549,7 @@ export default function Onboarding() {
                             name: e.target.value,
                           }))
                         }
-                        placeholder="Name"
+                        placeholder={tx("Name")}
                         className="w-full rounded-lg border border-white/10 bg-navy-800 px-3 py-2 text-sm text-white placeholder-slate-500 focus:border-accent-500 focus:outline-none focus:ring-1 focus:ring-accent-500"
                       />
                     </div>
@@ -541,7 +558,7 @@ export default function Onboarding() {
                         htmlFor="onboarding-newMember-email"
                         className="mb-1 block text-xs font-medium text-slate-400"
                       >
-                        Email
+                        {tx("Email")}
                       </label>
                       <input
                         id="onboarding-newMember-email"
@@ -553,7 +570,7 @@ export default function Onboarding() {
                             email: e.target.value,
                           }))
                         }
-                        placeholder="Email"
+                        placeholder={tx("Email")}
                         className="w-full rounded-lg border border-white/10 bg-navy-800 px-3 py-2 text-sm text-white placeholder-slate-500 focus:border-accent-500 focus:outline-none focus:ring-1 focus:ring-accent-500"
                       />
                     </div>
@@ -563,7 +580,7 @@ export default function Onboarding() {
                       htmlFor="onboarding-newMember-role"
                       className="mb-1 block text-xs font-medium text-slate-400"
                     >
-                      Role
+                      {tx("Role")}
                     </label>
                     <select
                       id="onboarding-newMember-role"
@@ -576,10 +593,10 @@ export default function Onboarding() {
                       }
                       className="w-full rounded-lg border border-white/10 bg-navy-800 px-3 py-2 text-sm text-white focus:border-accent-500 focus:outline-none focus:ring-1 focus:ring-accent-500"
                     >
-                      <option value="approver">Approver</option>
-                      <option value="initiator">Initiator</option>
-                      <option value="clerk">Clerk</option>
-                      <option value="viewer">Viewer</option>
+                      <option value="approver">{tx("Approver")}</option>
+                      <option value="initiator">{tx("Initiator")}</option>
+                      <option value="clerk">{tx("Clerk")}</option>
+                      <option value="viewer">{tx("Viewer")}</option>
                     </select>
                   </div>
                   <div className="flex gap-2 pt-1">
@@ -589,14 +606,14 @@ export default function Onboarding() {
                       disabled={!newMember.walletAddress.trim()}
                       className="flex-1"
                     >
-                      Add
+                      {tx("Add")}
                     </Button>
                     <Button
                       size="sm"
                       variant="secondary"
                       onClick={() => setIsAddingMember(false)}
                     >
-                      Cancel
+                      {tx("Cancel")}
                     </Button>
                   </div>
                 </div>
@@ -607,7 +624,7 @@ export default function Onboarding() {
                   className="w-full"
                 >
                   <Plus className="h-4 w-4" />
-                  Add a team member
+                  {tx("Add a team member")}
                 </Button>
               )}
 
@@ -617,21 +634,23 @@ export default function Onboarding() {
                   className="flex items-start gap-2 rounded-lg border border-red-500/30 bg-red-500/5 p-3"
                 >
                   <AlertCircle className="h-4 w-4 text-red-400 shrink-0 mt-0.5" />
-                  <p className="text-sm text-red-400">{teamError}</p>
+                  <p className="text-sm text-red-400">{tx(teamError)}</p>
                 </div>
               )}
 
               <div className="flex gap-3 pt-2">
                 <Button
                   variant="secondary"
-                  aria-label="Back"
+                  aria-label={tx("Back")}
                   onClick={goBack}
                   className="w-12 shrink-0"
                 >
                   <ArrowLeft className="h-4 w-4" />
                 </Button>
                 <Button onClick={handleTeamNext} className="flex-1">
-                  {teamMembers.length === 0 ? "Skip for now" : "Continue"}
+                  {teamMembers.length === 0
+                    ? tx("Skip for now")
+                    : tx("Continue")}
                   <ArrowRight className="h-4 w-4" />
                 </Button>
               </div>
@@ -645,10 +664,12 @@ export default function Onboarding() {
             <div className="space-y-6">
               <div className="text-center">
                 <h1 className="text-2xl font-bold text-white">
-                  Set up your company account
+                  {tx("Set up your company account")}
                 </h1>
                 <p className="mt-2 text-slate-400">
-                  Create an account for your team, or connect one you already control.
+                  {tx(
+                    "Create an account for your team, or connect one you already control.",
+                  )}
                 </p>
               </div>
 
@@ -659,18 +680,22 @@ export default function Onboarding() {
                     onClick={() => setHasSafe(true)}
                     className="rounded-xl border border-white/10 bg-navy-800 p-4 text-left transition-all hover:border-accent-500/40 hover:bg-navy-800/80"
                   >
-                    <p className="font-semibold text-white">Yes, I have one</p>
+                    <p className="font-semibold text-white">
+                      {tx("Yes, I have one")}
+                    </p>
                     <p className="mt-1 text-xs text-slate-400">
-                      Link an existing Safe wallet
+                      {tx("Link an existing Safe wallet")}
                     </p>
                   </button>
                   <button
                     onClick={() => setHasSafe(false)}
                     className="rounded-xl border border-white/10 bg-navy-800 p-4 text-left transition-all hover:border-accent-500/40 hover:bg-navy-800/80"
                   >
-                    <p className="font-semibold text-white">No, create one</p>
+                    <p className="font-semibold text-white">
+                      {tx("No, create one")}
+                    </p>
                     <p className="mt-1 text-xs text-slate-400">
-                      We'll set it up for you
+                      {tx("We'll set it up for you")}
                     </p>
                   </button>
                 </div>
@@ -684,7 +709,7 @@ export default function Onboarding() {
                       htmlFor="onboarding-existingSafeAddress"
                       className="mb-1.5 block text-sm font-medium text-slate-300"
                     >
-                      Safe address
+                      {tx("Safe address")}
                     </label>
                     <input
                       id="onboarding-existingSafeAddress"
@@ -694,7 +719,7 @@ export default function Onboarding() {
                         setExistingSafeAddress(e.target.value);
                         setSafeError(null);
                       }}
-                      placeholder="0x..."
+                      placeholder={tx("0x...")}
                       autoFocus
                       className="w-full rounded-lg border border-white/10 bg-navy-800 px-4 py-2.5 font-mono text-sm text-white placeholder-slate-500 focus:border-accent-500 focus:outline-none focus:ring-1 focus:ring-accent-500"
                     />
@@ -704,7 +729,7 @@ export default function Onboarding() {
                       htmlFor="onboarding-selectedChainId"
                       className="mb-1.5 block text-sm font-medium text-slate-300"
                     >
-                      Chain
+                      {tx("Chain")}
                     </label>
                     <select
                       id="onboarding-selectedChainId"
@@ -723,16 +748,17 @@ export default function Onboarding() {
                     </select>
                   </div>
 
-                  {safeError && (
-                    <Notice tone="error">{safeError}</Notice>
-                  )}
+                  {safeError && <Notice tone="error">{tx(safeError)}</Notice>}
 
                   <div className="flex gap-3 pt-2">
                     <Button
                       variant="secondary"
-                      aria-label="Back"
+                      aria-label={tx("Back")}
                       disabled={linkingExisting}
-                      onClick={() => { setHasSafe(null); setSafeError(null); }}
+                      onClick={() => {
+                        setHasSafe(null);
+                        setSafeError(null);
+                      }}
                       className="w-12 shrink-0"
                     >
                       <ArrowLeft className="h-4 w-4" />
@@ -745,10 +771,10 @@ export default function Onboarding() {
                       {linkingExisting ? (
                         <>
                           <Loader2 className="h-4 w-4 animate-spin" />
-                          Validating...
+                          {tx("Validating...")}
                         </>
                       ) : (
-                        "Link Safe"
+                        tx("Link Safe")
                       )}
                     </Button>
                   </div>
@@ -760,21 +786,46 @@ export default function Onboarding() {
                 <div className="space-y-4">
                   <div className="rounded-lg border border-white/10 bg-navy-800 p-4">
                     <p className="text-sm font-medium text-slate-300">
-                      Account owners
+                      {tx("Account owners")}
                     </p>
                     <p className="mt-2 text-xs leading-5 text-slate-400">
-                      Owners can authorize transfers and change account
-                      permissions outside Disburse. Choose them separately from
-                      application roles.
+                      {tx(
+                        "Owners can authorize transfers and change account permissions outside Disburse. Choose them separately from application roles.",
+                      )}
                     </p>
                     <div className="mt-2 space-y-1.5">
                       <div className="flex items-center gap-2">
                         <span className="rounded bg-accent-500/15 px-2 py-0.5 text-xs font-mono text-[var(--ws-text)]">
-                          {primaryOwner?.slice(0, 8)}...{primaryOwner?.slice(-4)}
+                          {primaryOwner?.slice(0, 8)}...
+                          {primaryOwner?.slice(-4)}
                         </span>
-                        <span className="text-xs text-slate-500">{primaryOwner?.toLowerCase() === address?.toLowerCase() ? '(you)' : '(setup owner)'}</span>
+                        <span className="text-xs text-slate-500">
+                          {primaryOwner?.toLowerCase() ===
+                          address?.toLowerCase()
+                            ? tx("(you)")
+                            : tx("(setup owner)")}
+                        </span>
                       </div>
-                      {[...teamMembers, ...Array.from(new Set([...recoveredOwners, ...ownerWallets])).filter(wallet => wallet.toLowerCase() !== primaryOwner?.toLowerCase() && !teamMembers.some(member => member.walletAddress.toLowerCase() === wallet.toLowerCase())).map(walletAddress => ({ walletAddress, name: "" }))].map((m, idx) => (
+                      {[
+                        ...teamMembers,
+                        ...Array.from(
+                          new Set([...recoveredOwners, ...ownerWallets]),
+                        )
+                          .filter(
+                            (wallet) =>
+                              wallet.toLowerCase() !==
+                                primaryOwner?.toLowerCase() &&
+                              !teamMembers.some(
+                                (member) =>
+                                  member.walletAddress.toLowerCase() ===
+                                  wallet.toLowerCase(),
+                              ),
+                          )
+                          .map((walletAddress) => ({
+                            walletAddress,
+                            name: "",
+                          })),
+                      ].map((m, idx) => (
                         <label key={idx} className="flex items-center gap-2">
                           <input
                             type="checkbox"
@@ -811,10 +862,12 @@ export default function Onboarding() {
                       htmlFor="onboarding-safeThreshold"
                       className="mb-1.5 block text-sm font-medium text-slate-300"
                     >
-                      Approval threshold
+                      {tx("Approval threshold")}
                     </label>
                     <p className="mb-2 text-xs text-slate-500">
-                      How many signatures are required to approve a transaction?
+                      {tx(
+                        "How many signatures are required to approve a transaction?",
+                      )}
                     </p>
                     <div className="flex items-center gap-3">
                       <select
@@ -836,8 +889,10 @@ export default function Onboarding() {
                         ))}
                       </select>
                       <span className="text-sm text-slate-400">
-                        of {1 + ownerWallets.length}{" "}
-                        {1 + ownerWallets.length === 1 ? "owner" : "owners"}
+                        {tx("of")} {1 + ownerWallets.length}{" "}
+                        {1 + ownerWallets.length === 1
+                          ? tx("owner")
+                          : tx("owners")}
                       </span>
                     </div>
                   </div>
@@ -847,7 +902,7 @@ export default function Onboarding() {
                       htmlFor="onboarding-selectedChainId"
                       className="mb-1.5 block text-sm font-medium text-slate-300"
                     >
-                      Chain
+                      {tx("Chain")}
                     </label>
                     <select
                       id="onboarding-selectedChainId"
@@ -866,16 +921,32 @@ export default function Onboarding() {
                     </select>
                   </div>
 
-                  {orgId && address && <CustomerPaidSetup
-                    orgId={orgId as Id<"orgs">}
-                    owners={[address, ...ownerWallets]}
-                    threshold={safeThreshold}
-                    chainId={selectedChainId}
-                    onBusy={setDeploying}
-                    onRestore={saved => { setSelectedChainId(saved.chainId); setSafeThreshold(saved.threshold); setRecoveredOwners(saved.owners); setOwnerWallets(saved.owners.slice(1)); }}
-                    onComplete={() => navigate(`/org/${orgId}/dashboard`)}
-                  />}
-                  {!deploying && <Button variant="secondary" aria-label="Back" onClick={() => setHasSafe(null)} className="w-12"><ArrowLeft className="h-4 w-4" /></Button>}
+                  {orgId && address && (
+                    <CustomerPaidSetup
+                      orgId={orgId as Id<"orgs">}
+                      owners={[address, ...ownerWallets]}
+                      threshold={safeThreshold}
+                      chainId={selectedChainId}
+                      onBusy={setDeploying}
+                      onRestore={(saved) => {
+                        setSelectedChainId(saved.chainId);
+                        setSafeThreshold(saved.threshold);
+                        setRecoveredOwners(saved.owners);
+                        setOwnerWallets(saved.owners.slice(1));
+                      }}
+                      onComplete={() => navigate(`/org/${orgId}/dashboard`)}
+                    />
+                  )}
+                  {!deploying && (
+                    <Button
+                      variant="secondary"
+                      aria-label={tx("Back")}
+                      onClick={() => setHasSafe(null)}
+                      className="w-12"
+                    >
+                      <ArrowLeft className="h-4 w-4" />
+                    </Button>
+                  )}
                 </div>
               )}
 
@@ -886,8 +957,9 @@ export default function Onboarding() {
 
         {/* Footer hint */}
         <p className="mt-6 text-center text-xs text-slate-400">
-          You can always configure these settings later in your organization's
-          Settings page.
+          {tx(
+            "You can always configure these settings later in your organization's Settings page.",
+          )}
         </p>
       </div>
     </div>

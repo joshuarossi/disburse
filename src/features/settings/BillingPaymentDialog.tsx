@@ -1,12 +1,9 @@
+import { tx, useWorkspaceLanguage } from "@/lib/workspaceI18n";
 import { useState } from "react";
 import { AccountSubscriptionPayment } from "./AccountSubscriptionPayment";
 import { Dialog } from "@/components/ui/Dialog";
 import { Button } from "@/components/ui/button";
-import {
-  AlertCircle,
-  ExternalLink,
-  CheckCircle,
-} from "lucide-react";
+import { AlertCircle, ExternalLink, CheckCircle } from "lucide-react";
 import { PLANS } from "@/lib/billingPlans";
 import type { useSettingsController } from "./useSettingsController";
 export function BillingPaymentDialog({
@@ -14,6 +11,7 @@ export function BillingPaymentDialog({
 }: {
   controller: ReturnType<typeof useSettingsController>;
 }) {
+  useWorkspaceLanguage();
   const {
     showPaymentModal,
     hasPendingBilling,
@@ -43,18 +41,38 @@ export function BillingPaymentDialog({
         <Dialog
           title={
             paymentStep === "success"
-              ? "Payment successful"
-              : `Subscribe to ${PLANS[selectedPlan].name}`
+              ? tx("Payment successful")
+              : tx("Subscribe to {{value1}}", {
+                  value1: PLANS[selectedPlan].name,
+                })
           }
-          onClose={() => { if (!accountBusy) handleClosePayment(); }}
+          onClose={() => {
+            if (!accountBusy) handleClosePayment();
+          }}
         >
           <div className="p-6">
             <p className="workspace-description mb-5">
               {paymentConfig
-                ? `${paymentConfig.testnet ? "Test billing · use test tokens only. " : ""}USDC on ${paymentConfig.network}. Each payment buys 30 days. No automatic charges.`
-                : "Subscription checkout is unavailable until the payment destination is configured."}
+                ? tx(
+                    "{{value1}}USDC on {{value2}}. Each payment buys 30 days. No automatic charges.",
+                    {
+                      value1: paymentConfig.testnet
+                        ? tx("Test billing · use test tokens only.") + " "
+                        : "",
+                      value2: paymentConfig.network,
+                    },
+                  )
+                : tx(
+                    "Subscription checkout is unavailable until the payment destination is configured.",
+                  )}
             </p>
-            {billing?.licenseGrant && paymentStep !== "success" && <p className="workspace-description mb-5">A confirmed subscription payment replaces the current trial or complimentary grant. Any free fallback tier remains available when paid access ends. You pay the network fee for this payment.</p>}
+            {billing?.licenseGrant && paymentStep !== "success" && (
+              <p className="workspace-description mb-5">
+                {tx(
+                  "A confirmed subscription payment replaces the current trial or complimentary grant. Any free fallback tier remains available when paid access ends. You pay the network fee for this payment.",
+                )}
+              </p>
+            )}
             {/* Error Message */}
             {billingError && (
               <div
@@ -62,7 +80,7 @@ export function BillingPaymentDialog({
                 className="mb-4 flex items-center gap-2 rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-400"
               >
                 <AlertCircle className="h-4 w-4 flex-shrink-0" />
-                {billingError}
+                {tx(billingError)}
               </div>
             )}
 
@@ -72,10 +90,10 @@ export function BillingPaymentDialog({
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="font-medium text-white">
-                        {PLANS[selectedPlan].name} Plan
+                        {PLANS[selectedPlan].name} {tx("Plan")}
                       </p>
                       <p className="text-sm text-slate-400">
-                        {PLANS[selectedPlan].description}
+                        {tx(PLANS[selectedPlan].description)}
                       </p>
                     </div>
                     <p className="text-2xl font-bold text-white">
@@ -84,23 +102,39 @@ export function BillingPaymentDialog({
                   </div>
                 </div>
 
-                {!hasPendingBilling && <AccountSubscriptionPayment controller={controller} onBusyChange={setAccountBusy} />}
-                {!checkout?.safeId && <Button variant="secondary" className="w-full" onClick={() => setPaymentStep("confirm")} disabled={!paymentConfig}>Verify an existing payment</Button>}
+                {!hasPendingBilling && (
+                  <AccountSubscriptionPayment
+                    controller={controller}
+                    onBusyChange={setAccountBusy}
+                  />
+                )}
+                {!checkout?.safeId && (
+                  <Button
+                    variant="secondary"
+                    className="w-full"
+                    onClick={() => setPaymentStep("confirm")}
+                    disabled={!paymentConfig}
+                  >
+                    {tx("Verify an existing payment")}
+                  </Button>
+                )}
 
                 {checkout?.status === "prepared" && !checkout.safeId && (
                   <div className="space-y-2">
                     <p className="workspace-description">
-                      This checkout is saved for your team.{" "}
+                      {tx("This checkout is saved for your team.")}{" "}
                       {canSendCheckout
-                        ? "No wallet payment has been requested."
-                        : "Connect the administrator wallet that prepared it to pay."}
+                        ? tx("No wallet payment has been requested.")
+                        : tx(
+                            "Connect the administrator wallet that prepared it to pay.",
+                          )}
                     </p>
                     <Button
                       variant="secondary"
                       disabled={isVerifying}
                       onClick={() => void discardCheckout()}
                     >
-                      Discard unsubmitted checkout
+                      {tx("Discard unsubmitted checkout")}
                     </Button>
                   </div>
                 )}
@@ -111,27 +145,27 @@ export function BillingPaymentDialog({
               <div className="space-y-4">
                 {checkout && (
                   <section
-                    aria-label="Subscription payment recovery"
+                    aria-label={tx("Subscription payment recovery")}
                     className="rounded-lg border border-[var(--ws-border)] p-4 space-y-3"
                   >
                     <h3 className="font-semibold">
-                      Check the original payment
+                      {tx("Check the original payment")}
                     </h3>
                     <p className="workspace-description">
-                      Your team has one saved request for this subscription. We
-                      can find its receipt even if the wallet did not return a
-                      reference.
+                      {tx(
+                        "Your team has one saved request for this subscription. We can find its receipt even if the wallet did not return a reference.",
+                      )}
                     </p>
                     <Button
                       disabled={isVerifying}
                       onClick={() => void checkOriginalCheckout()}
                     >
-                      Check original payment
+                      {tx("Check original payment")}
                     </Button>
                   </section>
                 )}
                 <p className="text-slate-400">
-                  Enter the transaction hash of your payment to verify.
+                  {tx("Enter the transaction hash of your payment to verify.")}
                 </p>
 
                 <div>
@@ -139,26 +173,28 @@ export function BillingPaymentDialog({
                     htmlFor="billing-tx-hash"
                     className="block text-sm font-medium text-slate-300 mb-2"
                   >
-                    Payment transaction hash
+                    {tx("Payment transaction hash")}
                   </label>
                   <input
                     id="billing-tx-hash"
                     type="text"
                     value={manualTxHash}
                     onChange={(e) => setManualTxHash(e.target.value)}
-                    placeholder="0x..."
+                    placeholder={tx("0x...")}
                     className="w-full rounded-lg border border-white/10 bg-navy-800 px-4 py-2 font-mono text-sm text-white placeholder-slate-500 focus:border-accent-500 focus:outline-none"
                   />
                 </div>
                 {checkout && (
                   <details className="text-sm">
                     <summary className="cursor-pointer">
-                      Cancelled or replaced the transaction in your wallet?
+                      {tx(
+                        "Cancelled or replaced the transaction in your wallet?",
+                      )}
                     </summary>
                     <p className="workspace-description mt-3">
-                      Paste that transaction's hash above. We will verify that
-                      it consumed the original transaction number before
-                      releasing this checkout.
+                      {tx(
+                        "Paste that transaction's hash above. We will verify that it consumed the original transaction number before releasing this checkout.",
+                      )}
                     </p>
                     <Button
                       className="mt-3"
@@ -168,15 +204,17 @@ export function BillingPaymentDialog({
                       }
                       onClick={() => void checkOriginalCheckout(true)}
                     >
-                      Verify replacement receipt
+                      {tx("Verify replacement receipt")}
                     </Button>
                   </details>
                 )}
 
                 <div className="rounded-lg border border-white/10 bg-navy-800/50 p-4">
-                  <p className="text-sm text-slate-400">Expected payment:</p>
+                  <p className="text-sm text-slate-400">
+                    {tx("Expected payment:")}
+                  </p>
                   <p className="mt-1 font-medium text-white">
-                    {checkoutPrice} {selectedToken} to
+                    {checkoutPrice} {selectedToken} {tx("to")}
                   </p>
                   <p className="mt-1 font-mono text-sm text-slate-400 break-all">
                     {paymentConfig?.treasury ?? ""}
@@ -191,14 +229,16 @@ export function BillingPaymentDialog({
                       !manualTxHash.trim() || isVerifying || !paymentConfig
                     }
                   >
-                    {isVerifying ? "Verifying payment…" : "Verify payment"}
+                    {isVerifying
+                      ? tx("Verifying payment…")
+                      : tx("Verify payment")}
                   </Button>
                   <Button
                     variant="secondary"
                     disabled={isVerifying}
                     onClick={() => setPaymentStep("select")}
                   >
-                    Back
+                    {tx("Back")}
                   </Button>
                 </div>
               </div>
@@ -209,11 +249,12 @@ export function BillingPaymentDialog({
                 <CheckCircle className="mx-auto h-12 w-12 text-green-400" />
                 <div>
                   <p className="text-xl font-medium text-white">
-                    Payment applied
+                    {tx("Payment applied")}
                   </p>
                   <p className="mt-2 text-slate-400">
-                    This receipt has been applied to your subscription. Plan &
-                    billing shows your current plan and paid access date.
+                    {tx(
+                      "This receipt has been applied to your subscription. Plan & billing shows your current plan and paid access date.",
+                    )}
                   </p>
                 </div>
                 {txHash && (
@@ -223,12 +264,12 @@ export function BillingPaymentDialog({
                     rel="noopener noreferrer"
                     className="inline-flex items-center gap-2 text-sm text-accent-400 hover:underline"
                   >
-                    View receipt
+                    {tx("View receipt")}
                     <ExternalLink className="h-4 w-4" />
                   </a>
                 )}
                 <Button className="w-full" onClick={handleClosePayment}>
-                  Done
+                  {tx("Done")}
                 </Button>
               </div>
             )}

@@ -1,3 +1,4 @@
+import { tx, useWorkspaceLanguage, workspaceLocale } from "@/lib/workspaceI18n";
 import { Component, useState, type ReactNode } from "react";
 import { useMutation, useQuery } from "convex/react";
 import { Bell, ArrowRight } from "lucide-react";
@@ -25,12 +26,12 @@ export class ReminderBoundary extends Component<
     return this.state.failed ? (
       <button
         className="workspace-button"
-        title="Reminders could not be loaded. Retry."
-        aria-label="Retry loading payment reminders"
+        title={tx("Reminders could not be loaded. Retry.")}
+        aria-label={tx("Retry loading payment reminders")}
         onClick={() => this.setState({ failed: false })}
       >
         <Bell size={17} />
-        <span className="sr-only">Retry reminders</span>
+        <span className="sr-only">{tx("Retry reminders")}</span>
       </button>
     ) : (
       this.props.children
@@ -39,6 +40,7 @@ export class ReminderBoundary extends Component<
 }
 
 export function PaymentReminders({ orgId }: { orgId: Id<"orgs"> }) {
+  useWorkspaceLanguage();
   const sessionToken = useSessionToken();
   const { environment } = useActivityEnvironment();
   const recent = useQuery(
@@ -51,8 +53,14 @@ export function PaymentReminders({ orgId }: { orgId: Id<"orgs"> }) {
     <>
       <button
         className="workspace-button relative"
-        title="Payment reminders"
-        aria-label={`Payment reminders${count ? ` · ${count} unread on the latest page` : ""}`}
+        title={tx("Payment reminders")}
+        aria-label={
+          count
+            ? tx("Payment reminders · {{count}} unread on the latest page", {
+                count,
+              })
+            : tx("Payment reminders")
+        }
         onClick={() => setOpen(true)}
       >
         <Bell size={17} />
@@ -84,6 +92,7 @@ function ReminderList({
   orgId: Id<"orgs">;
   onClose: () => void;
 }) {
+  useWorkspaceLanguage();
   const sessionToken = useSessionToken();
   const { environment } = useActivityEnvironment();
   const [cursor, setCursor] = useState<string | null>(null);
@@ -97,11 +106,12 @@ function ReminderList({
   const markRead = useMutation(api.paymentFollowups.markRead);
   const items = data?.items.filter((i) => !onlyMine || i.assigned);
   return (
-    <Dialog title="Payment reminders" onClose={onClose}>
+    <Dialog title={tx("Payment reminders")} onClose={onClose}>
       <div className="space-y-5 p-5 sm:p-6">
         <p className="workspace-description">
-          Review approaching deadlines and payment exceptions. These reminders
-          are checked in the background and delivered here in the app.
+          {tx(
+            "Review approaching deadlines and payment exceptions. These reminders are checked in the background and delivered here in the app.",
+          )}
         </p>
         <div className="flex flex-wrap items-center justify-between gap-3">
           <label className="flex items-center gap-2 text-sm">
@@ -110,32 +120,32 @@ function ReminderList({
               checked={onlyMine}
               onChange={(e) => setOnlyMine(e.target.checked)}
             />
-            Assigned to me
+            {tx("Assigned to me")}
           </label>
           <span className="text-xs text-slate-400">
             {environment === "production"
-              ? "Business activity"
+              ? tx("Business activity")
               : environment === "test"
-                ? "Test activity"
-                : "Unclassified records"}
+                ? tx("Test activity")
+                : tx("Unclassified records")}
           </span>
         </div>
-        {error && <Notice>{error}</Notice>}
+        {error && <Notice>{tx(error)}</Notice>}
         {!data ? (
           <LoadingRows />
         ) : !items?.length ? (
           <p className="rounded-xl border border-white/10 p-5 text-sm text-slate-400">
             {cursor || !data.isDone
-              ? "No matching reminders on this page."
+              ? tx("No matching reminders on this page.")
               : onlyMine
-                ? "No current reminders assigned to you."
-                : "No current payment reminders."}
+                ? tx("No current reminders assigned to you.")
+                : tx("No current payment reminders.")}
           </p>
         ) : (
           items.map((item) => (
             <article
               key={item.id}
-              aria-label={item.title + " · " + item.paymentName}
+              aria-label={tx(item.title) + " · " + item.paymentName}
               className="space-y-3 rounded-xl border border-white/10 p-4"
             >
               <div className="flex items-start justify-between gap-3">
@@ -143,33 +153,35 @@ function ReminderList({
                   <p
                     className={`text-xs font-medium ${item.urgent ? "workspace-funding-warning" : "text-slate-400"}`}
                   >
-                    {item.title}
+                    {tx(item.title)}
                   </p>
                   <h3 className="mt-1 font-semibold">{item.paymentName}</h3>
                 </div>
                 {item.unread && (
                   <span className="text-xs font-medium text-accent-400">
-                    New
+                    {tx("New")}
                   </span>
                 )}
               </div>
               <p className="text-xs text-slate-400">
-                Pay date:{" "}
-                {new Date(item.payAt).toLocaleString(undefined, {
+                {tx("Pay date:")}{" "}
+                {new Date(item.payAt).toLocaleString(workspaceLocale(), {
                   dateStyle: "medium",
                   timeStyle: "short",
                   timeZone: "UTC",
                 })}{" "}
-                UTC
+                {tx("UTC")}
               </p>
-              <p className="text-sm leading-6">{item.description}</p>
+              <p className="text-sm leading-6">{tx(item.description)}</p>
               {item.pauseReason && (
                 <p className="text-sm workspace-funding-warning">
-                  {item.pauseReason}
+                  {tx(item.pauseReason)}
                 </p>
               )}
               {item.ownershipError && (
-                <p className="text-xs text-slate-400">{item.ownershipError}</p>
+                <p className="text-xs text-slate-400">
+                  {tx(item.ownershipError)}
+                </p>
               )}
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <Link
@@ -181,7 +193,9 @@ function ReminderList({
                       : `/org/${orgId}/payments?focus=${item.recurringPaymentId}`
                   }
                 >
-                  {item.disbursementId ? "Review payment" : "Review schedule"}
+                  {item.disbursementId
+                    ? tx("Review payment")
+                    : tx("Review schedule")}
                   <ArrowRight size={14} />
                 </Link>
                 {item.unread && (
@@ -211,7 +225,7 @@ function ReminderList({
                       }
                     }}
                   >
-                    {busy === item.id ? "Saving…" : "Mark read"}
+                    {busy === item.id ? tx("Saving…") : tx("Mark read")}
                   </button>
                 )}
               </div>
@@ -225,7 +239,7 @@ function ReminderList({
                 className="workspace-button"
                 onClick={() => setCursor(null)}
               >
-                Back to latest
+                {tx("Back to latest")}
               </button>
             ) : (
               <span />
@@ -235,15 +249,15 @@ function ReminderList({
                 className="workspace-button"
                 onClick={() => setCursor(data.cursor)}
               >
-                Older reminders
+                {tx("Older reminders")}
               </button>
             )}
           </div>
         )}
         <p className="border-t border-white/10 pt-4 text-xs leading-5 text-slate-400">
-          Current account approvers, the payment coordinator and workspace
-          admins receive these reminders. Unresolved late items repeat daily.
-          Marking a reminder as read does not approve, cancel or send a payment.
+          {tx(
+            "Current account approvers, the payment coordinator and workspace admins receive these reminders. Unresolved late items repeat daily. Marking a reminder as read does not approve, cancel or send a payment.",
+          )}
         </p>
       </div>
     </Dialog>

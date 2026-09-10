@@ -1,3 +1,4 @@
+import { tx, useWorkspaceLanguage } from "@/lib/workspaceI18n";
 import { useRef, useState } from "react";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
@@ -18,6 +19,7 @@ export function ReceivableDocuments({
   invoice: Doc<"receivables">;
   canManage: boolean;
 }) {
+  useWorkspaceLanguage();
   const sessionToken = useSessionToken();
   const files = useQuery(
     api.invoiceFiles.forReceivable,
@@ -52,21 +54,22 @@ export function ReceivableDocuments({
   };
   return (
     <section
-      aria-label="Invoice documents"
+      aria-label={tx("Invoice documents")}
       className="space-y-3 rounded-xl border border-slate-400/20 p-4"
     >
       <div>
-        <h3 className="font-semibold">Documents</h3>
+        <h3 className="font-semibold">{tx("Documents")}</h3>
         <p className="workspace-description">
-          Files stay private to your team until you share them on the customer
-          invoice.
+          {tx(
+            "Files stay private to your team until you share them on the customer invoice.",
+          )}
         </p>
       </div>
       {files === undefined ? (
-        <p role="status">Loading documents…</p>
+        <p role="status">{tx("Loading documents…")}</p>
       ) : files.length === 0 ? (
         <p className="workspace-description">
-          No supporting documents attached.
+          {tx("No supporting documents attached.")}
         </p>
       ) : (
         <ul className="space-y-3">
@@ -77,12 +80,12 @@ export function ReceivableDocuments({
             >
               <p className="break-all font-medium">{file.name}</p>
               <p className="workspace-description">
-                {Math.ceil(file.size / 1024)} KB ·{" "}
+                {Math.ceil(file.size / 1024)} {tx("KB ·")}{" "}
                 {file.sharedWithCustomer
                   ? invoice.state === "draft"
-                    ? "Will be shared when issued"
-                    : "Shared on customer invoice"
-                  : "Private to your team"}
+                    ? tx("Will be shared when issued")
+                    : tx("Shared on customer invoice")
+                  : tx("Private to your team")}
               </p>
               <div className="flex flex-wrap gap-3">
                 <button
@@ -94,7 +97,7 @@ export function ReceivableDocuments({
                     )
                   }
                 >
-                  Download {file.name}
+                  {tx("Download")} {file.name}
                 </button>
                 {canManage &&
                   (!file.sharedWithCustomer
@@ -114,8 +117,10 @@ export function ReceivableDocuments({
                       }
                     >
                       {file.sharedWithCustomer
-                        ? `Make ${file.name} private`
-                        : `Share ${file.name} with customer`}
+                        ? tx("Make {{value1}} private", { value1: file.name })
+                        : tx("Share {{value1}} with customer", {
+                            value1: file.name,
+                          })}
                     </button>
                   )}
               </div>
@@ -126,7 +131,9 @@ export function ReceivableDocuments({
       {canManage && invoice.state !== "void" && (files?.length ?? 0) < 5 && (
         <div className="space-y-3">
           <label className="block">
-            <span className="finance-label">Attach a supporting document</span>
+            <span className="finance-label">
+              {tx("Attach a supporting document")}
+            </span>
             <input
               ref={input}
               type="file"
@@ -149,7 +156,9 @@ export function ReceivableDocuments({
             />
           </label>
           <p className="workspace-description">
-            PDF, image or text · up to 10 MB each · five documents per invoice.
+            {tx(
+              "PDF, image or text · up to 10 MB each · five documents per invoice.",
+            )}
           </p>
           {selection && (
             <button
@@ -176,12 +185,12 @@ export function ReceivableDocuments({
                 })
               }
             >
-              {busy ? "Saving document…" : "Save private document"}
+              {busy ? tx("Saving document…") : tx("Save private document")}
             </button>
           )}
         </div>
       )}
-      {error && <Notice>{error}</Notice>}
+      {error && <Notice>{tx(error)}</Notice>}
     </section>
   );
 }

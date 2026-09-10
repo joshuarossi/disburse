@@ -1,57 +1,61 @@
-import { userErrorMessage } from '@/lib/userErrors';
-import { useEffect, useState } from 'react';
-import { Notice } from '@/components/workspace/WorkspacePrimitives';
-import { useNavigate } from 'react-router-dom';
-import { useAccount } from 'wagmi';
-import { useTranslation } from 'react-i18next';
-import { useMutation, useQuery } from 'convex/react';
-import { api } from '../../convex/_generated/api';
-import { Id } from '../../convex/_generated/dataModel';
-import { Button } from '@/components/ui/button';
-import { Plus, Building2, ChevronRight, Mail } from 'lucide-react';
-import { useSessionToken, clearSessionToken } from '@/lib/session';
-import { teamRoles } from '../../shared/teamRoles';
-import { formatDate } from '@/lib/formatMoney';
+import { LanguageSwitcher } from "@/components/ui/LanguageSwitcher";
+import { tx, useWorkspaceLanguage } from "@/lib/workspaceI18n";
+import { userErrorMessage } from "@/lib/userErrors";
+import { useEffect, useState } from "react";
+import { Notice } from "@/components/workspace/WorkspacePrimitives";
+import { useNavigate } from "react-router-dom";
+import { useAccount } from "wagmi";
+import { useTranslation } from "react-i18next";
+import { useMutation, useQuery } from "convex/react";
+import { api } from "../../convex/_generated/api";
+import { Id } from "../../convex/_generated/dataModel";
+import { Button } from "@/components/ui/button";
+import { Plus, Building2, ChevronRight, Mail } from "lucide-react";
+import { useSessionToken, clearSessionToken } from "@/lib/session";
+import { teamRoles } from "../../shared/teamRoles";
+import { formatDate } from "@/lib/formatMoney";
 
 export default function SelectOrg() {
+  useWorkspaceLanguage();
   const { t } = useTranslation();
   const navigate = useNavigate();
   const { address } = useAccount();
   const token = useSessionToken();
-  const [error, setError] = useState('');
-  const [accepting, setAccepting] = useState('');
+  const [error, setError] = useState("");
+  const [accepting, setAccepting] = useState("");
   useEffect(() => {
     if (!address || !token) {
       clearSessionToken();
-      navigate('/login', { replace: true });
+      navigate("/login", { replace: true });
     }
   }, [address, token, navigate]);
 
   // Token-based identity: lists active memberships AND pending invites
   const orgs = useQuery(
     api.orgs.listForUser,
-    address && token ? { sessionToken: token } : 'skip',
+    address && token ? { sessionToken: token } : "skip",
   );
 
   const acceptInvite = useMutation(api.orgs.acceptInvite);
-  const licenseAccess = useQuery(api.licenseAdmin.access, token && address ? { sessionToken: token } : 'skip');
+  const licenseAccess = useQuery(
+    api.licenseAdmin.access,
+    token && address ? { sessionToken: token } : "skip",
+  );
 
-  const handleSelectOrg = (orgId: string | Id<'orgs'>) => {
+  const handleSelectOrg = (orgId: string | Id<"orgs">) => {
     navigate(`/org/${orgId}/dashboard`);
   };
 
-  const handleAcceptInvite = async (orgId: Id<'orgs'>) => {
+  const handleAcceptInvite = async (orgId: Id<"orgs">) => {
     if (!token || accepting) return;
     setAccepting(orgId);
-    setError('');
+    setError("");
     try {
       await acceptInvite({ orgId, sessionToken: token });
     } catch (error) {
-      setError(
-        userErrorMessage(error, 'Could not accept invitation'),
-      );
+      setError(userErrorMessage(error, "Could not accept invitation"));
     } finally {
-      setAccepting('');
+      setAccepting("");
     }
   };
 
@@ -75,18 +79,21 @@ export default function SelectOrg() {
             </div>
           </div>
           <h1 className="text-2xl font-bold text-white">
-            {t('auth.selectOrg.title')}
+            {t("auth.selectOrg.title")}
           </h1>
-          <p className="mt-2 text-slate-400">{t('auth.selectOrg.subtitle')}</p>
+          <p className="mt-2 text-slate-400">{t("auth.selectOrg.subtitle")}</p>
         </div>
 
-        {error && <Notice>{error}</Notice>}
+        <div className="mb-6 flex justify-end">
+          <LanguageSwitcher inline />
+        </div>
+        {error && <Notice>{tx(error)}</Notice>}
         {/* Org List */}
         <div className="space-y-3">
           {orgs
             ?.filter((o): o is NonNullable<typeof o> => !!o)
             .map((org) =>
-              org.membershipStatus === 'invited' ? (
+              org.membershipStatus === "invited" ? (
                 // Pending invite — must be accepted before access is granted
                 <div
                   key={org._id}
@@ -99,9 +106,23 @@ export default function SelectOrg() {
                     <div>
                       <p className="font-medium text-white">{org.name}</p>
                       <p className="text-sm text-accent-400">
-                        {org.invitationAvailable === false ? 'Invitation unavailable' : 'Invitation pending'} · {teamRoles[org.role][0]}
+                        {org.invitationAvailable === false
+                          ? tx("Invitation unavailable")
+                          : tx("Invitation pending")}{" "}
+                        · {teamRoles[org.role][0]}
                       </p>
-                      {org.invitationAvailable === false ? <p className="text-xs text-slate-400">Ask an administrator for a new invitation.</p> : org.invitationExpiresAt && <p className="text-xs text-slate-400">Expires {formatDate(org.invitationExpiresAt)}</p>}
+                      {org.invitationAvailable === false ? (
+                        <p className="text-xs text-slate-400">
+                          {tx("Ask an administrator for a new invitation.")}
+                        </p>
+                      ) : (
+                        org.invitationExpiresAt && (
+                          <p className="text-xs text-slate-400">
+                            {tx("Expires")}{" "}
+                            {formatDate(org.invitationExpiresAt)}
+                          </p>
+                        )
+                      )}
                     </div>
                   </div>
                   <Button
@@ -109,7 +130,7 @@ export default function SelectOrg() {
                     disabled={!!accepting || org.invitationAvailable === false}
                     onClick={() => handleAcceptInvite(org._id)}
                   >
-                    Accept
+                    {tx("Accept")}
                   </Button>
                 </div>
               ) : (
@@ -136,21 +157,29 @@ export default function SelectOrg() {
 
           {orgs?.length === 0 && (
             <p className="text-center text-slate-500 py-4">
-              {t('auth.selectOrg.noOrgs')}
+              {t("auth.selectOrg.noOrgs")}
             </p>
           )}
         </div>
 
         {/* Create New Org — routes to the onboarding wizard */}
         <Button
-          onClick={() => navigate('/onboarding')}
+          onClick={() => navigate("/onboarding")}
           variant="secondary"
           className="mt-6 w-full"
         >
           <Plus className="h-4 w-4" />
-          {t('auth.selectOrg.createNew')}
+          {t("auth.selectOrg.createNew")}
         </Button>
-        {licenseAccess?.allowed && <Button variant="secondary" className="mt-3 w-full" onClick={() => navigate('/admin/licenses')}>Manage company licenses</Button>}
+        {licenseAccess?.allowed && (
+          <Button
+            variant="secondary"
+            className="mt-3 w-full"
+            onClick={() => navigate("/admin/licenses")}
+          >
+            {tx("Manage company licenses")}
+          </Button>
+        )}
       </div>
     </div>
   );

@@ -1,3 +1,4 @@
+import { tx, useWorkspaceLanguage } from "@/lib/workspaceI18n";
 import { Button } from "@/components/ui/button";
 import { Loader2, Save, Rocket } from "lucide-react";
 import {
@@ -11,6 +12,7 @@ export function FeeSettings({
 }: {
   controller: ReturnType<typeof useSettingsController>;
 }) {
+  useWorkspaceLanguage();
   const {
     t,
     relayFeeTokenSymbol,
@@ -67,13 +69,19 @@ export function FeeSettings({
           </div>
 
           <p className="text-sm text-slate-400">
-            You review the fee before approving each payment. The managed payment service handles network gas; recipient amounts and currencies stay unchanged.
+            {tx(
+              "You review the fee before approving each payment. The managed payment service handles network gas; recipient amounts and currencies stay unchanged.",
+            )}
           </p>
-          {!RELAY_FEATURE_ENABLED && <p className="text-sm text-amber-400">Managed payments are disabled in this environment.</p>}
+          {!RELAY_FEATURE_ENABLED && (
+            <p className="text-sm text-amber-400">
+              {tx("Managed payments are disabled in this environment.")}
+            </p>
+          )}
 
           {relaySettingsError && (
             <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-400">
-              {relaySettingsError}
+              {tx(relaySettingsError)}
             </div>
           )}
 

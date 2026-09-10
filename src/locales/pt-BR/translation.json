@@ -620,7 +620,9 @@
       "timestamp": "Data e Hora",
       "user": "Usuário",
       "action": "Ação",
-      "details": "Detalhes"
+      "details": "Detalhes",
+      "direction": "Direção",
+      "counterparty": "Contraparte"
     },
     "export": {
       "csv": "Exportar CSV",
@@ -640,7 +642,8 @@
       "user": "Usuário",
       "wallet": "Carteira",
       "action": "Ação",
-      "details": "Detalhes"
+      "details": "Detalhes",
+      "direction": "Direção"
     },
     "summary": {
       "showing": "Mostrando {{count}} transação",
@@ -670,6 +673,10 @@
       "team": "Equipe",
       "safe": "Safe",
       "org": "Organização"
+    },
+    "direction": {
+      "inflow": "Entrada",
+      "outflow": "Saída"
     }
   },
   "settings": {
@@ -897,7 +904,8 @@
     "invited": "Convidado",
     "removed": "Removido",
     "trial": "Teste",
-    "expired": "Expirado"
+    "expired": "Expirado",
+    "received": "Recebido"
   },
   "theme": {
     "light": "Claro",

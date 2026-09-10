@@ -1,4 +1,5 @@
-import { userErrorMessage } from '@/lib/userErrors';
+import { tx, useWorkspaceLanguage } from "@/lib/workspaceI18n";
+import { userErrorMessage } from "@/lib/userErrors";
 import { useState } from "react";
 import { useMutation } from "convex/react";
 import { api } from "../../../convex/_generated/api";
@@ -16,6 +17,7 @@ export function AccountNameEditor({
   account: Doc<"safes">;
   onClose: () => void;
 }) {
+  useWorkspaceLanguage();
   const [name, setName] = useState(
     account.name ?? `${getChainName(account.chainId)} account`,
   );
@@ -26,7 +28,7 @@ export function AccountNameEditor({
   const queryClient = useQueryClient();
   return (
     <Dialog
-      title="Name this account"
+      title={tx("Name this account")}
       onClose={() => {
         if (!saving) onClose();
       }}
@@ -46,7 +48,10 @@ export function AccountNameEditor({
             onClose();
           } catch (e) {
             setError(
-              userErrorMessage(e, "Could not save the account name. Try again."),
+              userErrorMessage(
+                e,
+                "Could not save the account name. Try again.",
+              ),
             );
           } finally {
             setSaving(false);
@@ -54,10 +59,12 @@ export function AccountNameEditor({
         }}
       >
         <p className="workspace-description">
-          Use a name your team recognizes, such as Payroll or Operating account.
+          {tx(
+            "Use a name your team recognizes, such as Payroll or Operating account.",
+          )}
         </p>
         <label className="block">
-          <span className="finance-label">Account name</span>
+          <span className="finance-label">{tx("Account name")}</span>
           <input
             data-autofocus
             className="finance-field"
@@ -73,7 +80,7 @@ export function AccountNameEditor({
         </p>
         {error && (
           <p role="alert" className="text-sm text-red-400">
-            {error}
+            {tx(error)}
           </p>
         )}
         <div className="flex justify-end gap-2">
@@ -83,10 +90,10 @@ export function AccountNameEditor({
             onClick={onClose}
             disabled={saving}
           >
-            Cancel
+            {tx("Cancel")}
           </Button>
           <Button type="submit" disabled={saving || !name.trim()}>
-            {saving ? "Saving…" : "Save account name"}
+            {saving ? tx("Saving…") : tx("Save account name")}
           </Button>
         </div>
       </form>

@@ -1,4 +1,5 @@
-import { userErrorMessage } from '@/lib/userErrors';
+import { tx, useWorkspaceLanguage } from "@/lib/workspaceI18n";
+import { userErrorMessage } from "@/lib/userErrors";
 import { useState, type FormEvent } from "react";
 import { useMutation } from "convex/react";
 import { api } from "../../../convex/_generated/api";
@@ -20,6 +21,7 @@ export function RecipientEditor({
   onClose: () => void;
   readOnly?: boolean;
 }) {
+  useWorkspaceLanguage();
   const sessionToken = useSessionToken();
   const create = useMutation(api.beneficiaries.create);
   const update = useMutation(api.beneficiaries.update);
@@ -103,42 +105,44 @@ export function RecipientEditor({
       title={
         recipient
           ? readOnly
-            ? "Recipient details"
-            : "Edit recipient"
-          : "Add a recipient"
+            ? tx("Recipient details")
+            : tx("Edit recipient")
+          : tx("Add a recipient")
       }
       onClose={() => {
         if (!busy) onClose();
       }}
     >
       <form className="space-y-5 p-6" onSubmit={save}>
-        {error && <Notice>{error}</Notice>}
+        {error && <Notice>{tx(error)}</Notice>}
         {recipient?.pendingPayoutChangeId && (
           <Notice tone="info">
-            Payout details are awaiting review. Review or withdraw that request
-            from Recipients before making another change.
+            {tx(
+              "Payout details are awaiting review. Review or withdraw that request from Recipients before making another change.",
+            )}
           </Notice>
         )}
         <p className="workspace-description !mt-0">
-          Save their details once. Use this recipient for payroll, bills, and
-          future payments.
+          {tx(
+            "Save their details once. Use this recipient for payroll, bills, and future payments.",
+          )}
         </p>
         <fieldset disabled={busy || readOnly} className="space-y-5">
           <div className="grid gap-4 sm:grid-cols-2">
             <label>
-              <span className="finance-label">Recipient type</span>
+              <span className="finance-label">{tx("Recipient type")}</span>
               <select
                 className="finance-field"
                 value={type}
                 onChange={(e) => setType(e.target.value as typeof type)}
               >
-                <option value="individual">Person</option>
-                <option value="business">Business</option>
+                <option value="individual">{tx("Person")}</option>
+                <option value="business">{tx("Business")}</option>
               </select>
             </label>
             <label>
               <span className="finance-label">
-                {type === "business" ? "Business name" : "Full name"}
+                {type === "business" ? tx("Business name") : tx("Full name")}
               </span>
               <input
                 className="finance-field"
@@ -152,38 +156,39 @@ export function RecipientEditor({
           </div>
           <div className="grid gap-4 sm:grid-cols-2">
             <label>
-              <span className="finance-label">Email address</span>
+              <span className="finance-label">{tx("Email address")}</span>
               <input
                 className="finance-field"
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="name@company.com"
+                placeholder={tx("name@company.com")}
               />
             </label>
             <label>
-              <span className="finance-label">Groups</span>
+              <span className="finance-label">{tx("Groups")}</span>
               <input
                 className="finance-field"
                 value={groups}
                 onChange={(e) => setGroups(e.target.value)}
-                placeholder="Payroll, Contractors"
+                placeholder={tx("Payroll, Contractors")}
               />
               <span className="workspace-table-secondary">
-                Separate groups with commas
+                {tx("Separate groups with commas")}
               </span>
             </label>
           </div>
           <div className="border-t border-white/10 pt-5">
-            <h3 className="mb-2 text-sm font-semibold">Payment details</h3>
+            <h3 className="mb-2 text-sm font-semibold">
+              {tx("Payment details")}
+            </h3>
             <p className="workspace-description !mt-0 mb-4">
-              You can add these later if you have an email address. Confirm the
-              payout details with the recipient before their first payment. New
-              or changed instructions go through payout review before they can
-              be used.
+              {tx(
+                "You can add these later if you have an email address. Confirm the payout details with the recipient before their first payment. New or changed instructions go through payout review before they can be used.",
+              )}
             </p>
             <label>
-              <span className="finance-label">Payout address</span>
+              <span className="finance-label">{tx("Payout address")}</span>
               <input
                 className="finance-field font-mono"
                 value={address}
@@ -191,7 +196,7 @@ export function RecipientEditor({
                   setAddress(e.target.value);
                   setConfirmedAddress(false);
                 }}
-                placeholder="0x…"
+                placeholder={tx("0x…")}
                 spellCheck={false}
               />
             </label>
@@ -204,14 +209,15 @@ export function RecipientEditor({
                   className="mt-1"
                 />
                 <span>
-                  Request review of this replacement address. The currently
-                  approved instructions stay unchanged until approval.
+                  {tx(
+                    "Request review of this replacement address. The currently approved instructions stay unchanged until approval.",
+                  )}
                 </span>
               </label>
             )}
             <div className="mt-4 grid gap-4 sm:grid-cols-2">
               <label>
-                <span className="finance-label">Preferred network</span>
+                <span className="finance-label">{tx("Preferred network")}</span>
                 <select
                   className="finance-field"
                   value={chain}
@@ -220,7 +226,7 @@ export function RecipientEditor({
                     setToken("");
                   }}
                 >
-                  <option value="">Choose when paying</option>
+                  <option value="">{tx("Choose when paying")}</option>
                   {CHAINS_LIST.map((c) => (
                     <option value={c.chainId} key={c.chainId}>
                       {c.chainName}
@@ -229,13 +235,15 @@ export function RecipientEditor({
                 </select>
               </label>
               <label>
-                <span className="finance-label">Preferred currency</span>
+                <span className="finance-label">
+                  {tx("Preferred currency")}
+                </span>
                 <select
                   className="finance-field"
                   value={token}
                   onChange={(e) => setToken(e.target.value)}
                 >
-                  <option value="">Choose when paying</option>
+                  <option value="">{tx("Choose when paying")}</option>
                   {(chain
                     ? getTokenSymbolsForChain(Number(chain))
                     : ["USDC", "USDT", "PYUSD"]
@@ -247,13 +255,13 @@ export function RecipientEditor({
             </div>
           </div>
           <label className="block">
-            <span className="finance-label">Internal notes</span>
+            <span className="finance-label">{tx("Internal notes")}</span>
             <textarea
               className="finance-field"
               rows={3}
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
-              placeholder="Details your team should know"
+              placeholder={tx("Details your team should know")}
             />
           </label>
         </fieldset>
@@ -276,7 +284,7 @@ export function RecipientEditor({
             disabled={busy}
             onClick={onClose}
           >
-            {readOnly ? "Close" : "Cancel"}
+            {readOnly ? tx("Close") : tx("Cancel")}
           </button>
           {!readOnly && (
             <button
@@ -284,12 +292,12 @@ export function RecipientEditor({
               disabled={busy}
             >
               {busy
-                ? "Saving…"
+                ? tx("Saving…")
                 : recipient
                   ? instructionsChanged
-                    ? "Request payout review"
-                    : "Save changes"
-                  : "Add recipient"}
+                    ? tx("Request payout review")
+                    : tx("Save changes")
+                  : tx("Add recipient")}
             </button>
           )}
         </div>

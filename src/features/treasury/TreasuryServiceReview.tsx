@@ -1,3 +1,4 @@
+import { tx, useWorkspaceLanguage } from "@/lib/workspaceI18n";
 import { useRef, useState } from "react";
 import { useMutation, useQuery } from "convex/react";
 import { ExternalLink } from "lucide-react";
@@ -38,6 +39,7 @@ export function TreasuryServiceReview({
   onNew: () => void;
   refreshLabel: string;
 }) {
+  useWorkspaceLanguage();
   const sessionToken = useSessionToken();
   const saved = useQuery(
     api.treasuryServices.get,
@@ -59,7 +61,9 @@ export function TreasuryServiceReview({
   if (!saved)
     return (
       <Notice>
-        This request could not be found. Refresh the page before continuing.
+        {tx(
+          "This request could not be found. Refresh the page before continuing.",
+        )}
       </Notice>
     );
   let quote: TreasuryServiceQuote;
@@ -68,8 +72,9 @@ export function TreasuryServiceReview({
   } catch {
     return (
       <Notice>
-        The saved review could not be read. Check the original request before
-        creating another.
+        {tx(
+          "The saved review could not be read. Check the original request before creating another.",
+        )}
       </Notice>
     );
   }
@@ -95,17 +100,17 @@ export function TreasuryServiceReview({
   };
   return (
     <div className="space-y-5">
-      {error && <Notice>{error}</Notice>}
+      {error && <Notice>{tx(error)}</Notice>}
       <div className="rounded-lg border border-[var(--ws-border)] p-5">
         <p className="finance-label">
           {conversion
-            ? "Receive in your account"
+            ? tx("Receive in your account")
             : lending?.kind === "supply"
-              ? "Lending deposit"
-              : "Withdrawal to your account"}
+              ? tx("Lending deposit")
+              : tx("Withdrawal to your account")}
         </p>
         <p className="mt-1 text-2xl font-semibold">
-          {lending?.withdrawAll && !saved.settledAmount ? "Estimated " : ""}
+          {lending?.withdrawAll && !saved.settledAmount ? tx("Estimated ") : ""}
           {treasuryUnits(
             conversion ? q.amount : (saved.settledAmount ?? q.amount),
           )}{" "}
@@ -116,15 +121,17 @@ export function TreasuryServiceReview({
         <p className="mt-2 text-sm text-[var(--ws-muted)]">
           {accountName(saved.safeId)} · {getChainName(q.chainId)}
         </p>
-        <p className="mt-3 text-sm">{treasuryRequestStatuses[saved.status]}</p>
+        <p className="mt-3 text-sm">
+          {tx(treasuryRequestStatuses[saved.status])}
+        </p>
       </div>
       {conversion && (
         <dl className="space-y-3 text-sm">
           <div className="flex flex-wrap justify-between gap-2">
             <dt>
               {saved.settledAmount
-                ? "Actual amount paid"
-                : "Expected amount to pay"}
+                ? tx("Actual amount paid")
+                : tx("Expected amount to pay")}
             </dt>
             <dd>
               {treasuryUnits(saved.settledAmount ?? conversion.expectedInput)}{" "}
@@ -132,7 +139,7 @@ export function TreasuryServiceReview({
             </dd>
           </div>
           <div className="flex flex-wrap justify-between gap-2">
-            <dt>Maximum conversion cost</dt>
+            <dt>{tx("Maximum conversion cost")}</dt>
             <dd>
               {treasuryUnits(conversion.maximumInput)} {assets!.input.symbol}
             </dd>
@@ -142,33 +149,36 @@ export function TreasuryServiceReview({
       {conversion && (
         <details className="text-sm text-[var(--ws-muted)]">
           <summary className="cursor-pointer">
-            Rate and price protection
+            {tx("Rate and price protection")}
           </summary>
           <dl className="mt-3 space-y-3">
             <div className="flex flex-wrap justify-between gap-2">
-              <dt>Price tolerance</dt>
+              <dt>{tx("Price tolerance")}</dt>
               <dd>{conversion.slippageBps / 100}%</dd>
             </div>
             <div className="flex flex-wrap justify-between gap-2">
-              <dt>Pool fee included in quote</dt>
+              <dt>{tx("Pool fee included in quote")}</dt>
               <dd>{conversion.poolFee / 10000}%</dd>
             </div>
             <div className="flex flex-wrap justify-between gap-2">
-              <dt>Quoted price impact</dt>
+              <dt>{tx("Quoted price impact")}</dt>
               <dd>{conversion.priceImpactBps / 100}%</dd>
             </div>
           </dl>
           <p className="mt-3">
-            This quote uses one Uniswap pool. The reviewed maximum includes the
-            pool fee and protects against a worse exchange rate.
+            {tx(
+              "This quote uses one Uniswap pool. The reviewed maximum includes the pool fee and protects against a worse exchange rate.",
+            )}
           </p>
         </details>
       )}
       {lending?.kind === "supply" && (
         <p className="text-sm text-[var(--ws-muted)]">
-          Variable supply APR at review:{" "}
-          {(Number(lending.rateRay) / 1e25).toFixed(2)}%. Your lending position
-          stays separate from funds available for payments.
+          {tx("Variable supply APR at review:")}{" "}
+          {(Number(lending.rateRay) / 1e25).toFixed(2)}
+          {tx(
+            "%. Your lending position stays separate from funds available for payments.",
+          )}
         </p>
       )}
       {saved.sourceTxHash && (
@@ -178,41 +188,54 @@ export function TreasuryServiceReview({
           target="_blank"
           rel="noreferrer"
         >
-          View confirmed transaction <ExternalLink size={13} />
+          {tx("View confirmed transaction")} <ExternalLink size={13} />
         </a>
       )}
       {saved.status === "processing" && (
         <Notice tone="info">
-          Your original request is being checked. You can close this window
-          while it completes. Do not create a replacement.
+          {tx(
+            "Your original request is being checked. You can close this window while it completes. Do not create a replacement.",
+          )}
         </Notice>
       )}
       {saved.status === "failed" && (
         <Notice>
-          The {conversion ? "conversion" : "lending operation"} did not
-          complete. Any execution fee charged is shown below. Refresh the
-          account {conversion ? "balances" : "position"} before reviewing
-          another request.
+          {tx("The")} {conversion ? tx("conversion") : tx("lending operation")}{" "}
+          {tx(
+            "did not complete. Any execution fee charged is shown below. Refresh the account",
+          )}{" "}
+          {conversion ? tx("balances") : tx("position")}{" "}
+          {tx("before reviewing another request.")}
         </Notice>
       )}
       {saved.status === "expired" && (
         <Notice tone="info">
-          The approval window ended. Review a fresh amount after refreshing your
-          account's current {conversion ? "balances" : "position"}.
+          {tx(
+            "The approval window ended. Review a fresh amount after refreshing your account's current",
+          )}{" "}
+          {conversion ? tx("balances") : tx("position")}.
         </Notice>
       )}
       {pending && (
         <>
           <p className="text-sm text-[var(--ws-muted)]">
-            This review expires {scheduleDateTime(q.expiresAt)}.{" "}
+            {tx("This review expires")} {scheduleDateTime(q.expiresAt)}.{" "}
             {conversion
-              ? "Uniswap must deliver the exact receiving amount to this account without exceeding the maximum conversion cost. The pool fee is included in the quote; the execution fee is separate."
+              ? tx(
+                  "Uniswap must deliver the exact receiving amount to this account without exceeding the maximum conversion cost. The pool fee is included in the quote; the execution fee is separate.",
+                )
               : lending?.kind === "withdraw"
                 ? lending.withdrawAll
-                  ? "Aave will return the full position to this account. The final amount depends on its balance and accrued interest at execution."
-                  : "Aave will return this amount to the same company account."
-                : "The amount goes directly to Aave's lending pool. This flow does not borrow or enable the position as collateral."}{" "}
-            You pay the execution cost in USDC.
+                  ? tx(
+                      "Aave will return the full position to this account. The final amount depends on its balance and accrued interest at execution.",
+                    )
+                  : tx(
+                      "Aave will return this amount to the same company account.",
+                    )
+                : tx(
+                    "The amount goes directly to Aave's lending pool. This flow does not borrow or enable the position as collateral.",
+                  )}{" "}
+            {tx("You pay the execution cost in USDC.")}
           </p>
           <label className="flex items-start gap-3 text-sm">
             <input
@@ -224,8 +247,12 @@ export function TreasuryServiceReview({
             />
             <span>
               {conversion
-                ? "I reviewed the company account, currencies, exact receipt and maximum conversion cost."
-                : "I reviewed the company account, amount and Aave's lending and withdrawal terms."}
+                ? tx(
+                    "I reviewed the company account, currencies, exact receipt and maximum conversion cost.",
+                  )
+                : tx(
+                    "I reviewed the company account, amount and Aave's lending and withdrawal terms.",
+                  )}
             </span>
           </label>
         </>
@@ -249,9 +276,9 @@ export function TreasuryServiceReview({
         <>
           {saved.open && (
             <Notice tone="info">
-              An approval may already exist. Confirm cancellation to invalidate
-              it before preparing another request. You pay its execution cost in
-              USDC.
+              {tx(
+                "An approval may already exist. Confirm cancellation to invalidate it before preparing another request. You pay its execution cost in USDC.",
+              )}
             </Notice>
           )}
           {(saved.open || cancellation) && (
@@ -291,7 +318,7 @@ export function TreasuryServiceReview({
               });
           }}
         >
-          Stop this request
+          {tx("Stop this request")}
         </button>
       )}
       {!saved.open && (

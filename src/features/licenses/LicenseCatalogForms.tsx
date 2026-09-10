@@ -1,14 +1,11 @@
+import { tx, useWorkspaceLanguage } from "@/lib/workspaceI18n";
 import { useState } from "react";
 import { useMutation } from "convex/react";
 import type { FunctionReturnType } from "convex/server";
 import { api } from "../../../convex/_generated/api";
 import { Button } from "@/components/ui/button";
 import { Notice } from "@/components/workspace/WorkspacePrimitives";
-import {
-  fieldClass,
-  LicenseField,
-  TierSelect,
-} from "./LicenseFields";
+import { fieldClass, LicenseField, TierSelect } from "./LicenseFields";
 import { tierLimits } from "./licensePresentation";
 import { useLicenseCommand } from "./useLicenseCommand";
 type Catalog = FunctionReturnType<typeof api.licenseAdmin.catalog>;
@@ -20,6 +17,7 @@ export function CreateLicenseTier({
   catalog: Catalog;
   sessionToken: string;
 }) {
+  useWorkspaceLanguage();
   const [name, setName] = useState(""),
     [users, setUsers] = useState("1"),
     [recipients, setRecipients] = useState("25"),
@@ -29,12 +27,13 @@ export function CreateLicenseTier({
   return (
     <section
       className="workspace-panel p-5 sm:p-6"
-      aria-label="Free tier catalog"
+      aria-label={tx("Free tier catalog")}
     >
-      <h2 className="text-xl font-semibold">Free tier catalog</h2>
+      <h2 className="text-xl font-semibold">{tx("Free tier catalog")}</h2>
       <p className="workspace-description mt-2">
-        Create a reusable tier with no subscription charge. You can also grant
-        any existing paid tier for free.
+        {tx(
+          "Create a reusable tier with no subscription charge. You can also grant any existing paid tier for free.",
+        )}
       </p>
       <ul className="divide-y divide-[var(--ws-border)] mt-4">
         {catalog.tiers.map((tier) => (
@@ -69,18 +68,18 @@ export function CreateLicenseTier({
         {command.error && <Notice>{command.error}</Notice>}
         {command.success && <Notice tone="success">{command.success}</Notice>}
         <fieldset className="space-y-4" disabled={command.busy}>
-          <LicenseField label="New tier name">
+          <LicenseField label={tx("New tier name")}>
             <input
               className={fieldClass}
               required
               maxLength={60}
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="For example, Community"
+              placeholder={tx("For example, Community")}
             />
           </LicenseField>
           <div className="grid gap-4 sm:grid-cols-2">
-            <LicenseField label="Member seats">
+            <LicenseField label={tx("Member seats")}>
               <input
                 className={fieldClass}
                 type="number"
@@ -89,10 +88,10 @@ export function CreateLicenseTier({
                 step={1}
                 value={users}
                 onChange={(e) => setUsers(e.target.value)}
-                placeholder="Unlimited"
+                placeholder={tx("Unlimited")}
               />
             </LicenseField>
-            <LicenseField label="Saved recipients">
+            <LicenseField label={tx("Saved recipients")}>
               <input
                 className={fieldClass}
                 type="number"
@@ -101,16 +100,16 @@ export function CreateLicenseTier({
                 step={1}
                 value={recipients}
                 onChange={(e) => setRecipients(e.target.value)}
-                placeholder="Unlimited"
+                placeholder={tx("Unlimited")}
               />
             </LicenseField>
           </div>
           <p className="workspace-description !text-xs">
-            Leave a limit blank for unlimited. Account controls, payment fees,
-            and technical service limits still apply. Existing tier definitions
-            stay fixed.
+            {tx(
+              "Leave a limit blank for unlimited. Account controls, payment fees, and technical service limits still apply. Existing tier definitions stay fixed.",
+            )}
           </p>
-          <LicenseField label="Reason for creating this tier">
+          <LicenseField label={tx("Reason for creating this tier")}>
             <textarea
               className={fieldClass}
               required
@@ -122,7 +121,7 @@ export function CreateLicenseTier({
             />
           </LicenseField>
           <Button type="submit" disabled={command.busy}>
-            {command.busy ? "Creating tier…" : "Create free tier"}
+            {command.busy ? tx("Creating tier…") : tx("Create free tier")}
           </Button>
         </fieldset>
       </form>
@@ -139,6 +138,7 @@ export function SignupProgram({
   sessionToken: string;
   onReload: () => void;
 }) {
+  useWorkspaceLanguage();
   const [days, setDays] = useState(String(catalog.program.trialDays)),
     [tier, setTier] = useState(catalog.program.trialTier.key);
   const [fallback, setFallback] = useState(
@@ -150,11 +150,15 @@ export function SignupProgram({
     command = useLicenseCommand(),
     stale = revision !== catalog.program.revision;
   return (
-    <section className="workspace-panel p-5 sm:p-6" aria-label="Signup program">
-      <h2 className="text-xl font-semibold">New company access</h2>
+    <section
+      className="workspace-panel p-5 sm:p-6"
+      aria-label={tx("Signup program")}
+    >
+      <h2 className="text-xl font-semibold">{tx("New company access")}</h2>
       <p className="workspace-description mt-2">
-        Choose the trial and free fallback for companies created after this
-        change. Existing companies keep their terms.
+        {tx(
+          "Choose the trial and free fallback for companies created after this change. Existing companies keep their terms.",
+        )}
       </p>
       <form
         className="mt-5 space-y-4"
@@ -182,11 +186,11 @@ export function SignupProgram({
         {command.success && <Notice tone="success">{command.success}</Notice>}
         {stale && (
           <Notice>
-            The signup program changed.{" "}
+            {tx("The signup program changed.")}{" "}
             <button type="button" className="underline" onClick={onReload}>
-              Reload current program
+              {tx("Reload current program")}
             </button>{" "}
-            before saving.
+            {tx("before saving.")}
           </Notice>
         )}
         <fieldset className="space-y-4" disabled={command.busy}>
@@ -199,9 +203,9 @@ export function SignupProgram({
               setFallback("free");
             }}
           >
-            Use 30 days Pro, then Free
+            {tx("Use 30 days Pro, then Free")}
           </Button>
-          <LicenseField label="Trial length in days">
+          <LicenseField label={tx("Trial length in days")}>
             <input
               className={fieldClass}
               type="number"
@@ -215,28 +219,33 @@ export function SignupProgram({
           </LicenseField>
           {Number(days) > 0 && (
             <TierSelect
-              label="Trial tier"
+              label={tx("Trial tier")}
               tiers={catalog.tiers}
               value={tier}
               onChange={setTier}
             />
           )}
           <TierSelect
-            label="Lifetime free tier"
+            label={tx("Lifetime free tier")}
             tiers={catalog.tiers}
             value={fallback}
             onChange={setFallback}
           />
           <p className="workspace-description">
             {Number(days) > 0
-              ? `${days} days of ${catalog.tiers.find((t) => t.key === tier)?.name}, then `
-              : "Starts on "}
+              ? tx("{{value1}} days of {{value2}}, then ", {
+                  value1: days,
+                  value2: catalog.tiers.find((t) => t.key === tier)?.name,
+                })
+              : tx("Starts on ")}
             {fallback
-              ? `${catalog.tiers.find((t) => t.key === fallback)?.name} with no subscription charge or expiry date.`
-              : "a paid plan is needed to submit new payments."}{" "}
-            Customers pay their own network and provider fees.
+              ? tx("{{value1}} with no subscription charge or expiry date.", {
+                  value1: catalog.tiers.find((t) => t.key === fallback)?.name,
+                })
+              : tx("a paid plan is needed to submit new payments.")}{" "}
+            {tx("Customers pay their own network and provider fees.")}
           </p>
-          <LicenseField label="Reason for the signup change">
+          <LicenseField label={tx("Reason for the signup change")}>
             <textarea
               className={fieldClass}
               required
@@ -251,7 +260,7 @@ export function SignupProgram({
             type="submit"
             disabled={stale || command.busy || (!Number(days) && !fallback)}
           >
-            {command.busy ? "Saving program…" : "Save signup program"}
+            {command.busy ? tx("Saving program…") : tx("Save signup program")}
           </Button>
         </fieldset>
       </form>

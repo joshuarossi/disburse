@@ -1,4 +1,5 @@
-import { userErrorMessage } from '@/lib/userErrors';
+import { tx, useWorkspaceLanguage, workspaceLocale } from "@/lib/workspaceI18n";
+import { userErrorMessage } from "@/lib/userErrors";
 import { AssetDetails } from "./AssetDetails";
 import { useActivityEnvironment } from "@/features/workspace/ActivityEnvironment";
 import {
@@ -16,9 +17,9 @@ import { getSessionToken } from "@/lib/session";
 import { getChainName, getBlockExplorerTxUrl, CHAINS_LIST } from "@/lib/chains";
 import { exportToCsv, generateFilename } from "@/lib/csv";
 import { useQuery, useAction, useConvex } from "convex/react";
-import { ReportProgress } from './ReportProgress';
-import { useReportPages } from './useReportPages';
-import { collectReportExport } from './reportExport';
+import { ReportProgress } from "./ReportProgress";
+import { useReportPages } from "./useReportPages";
+import { collectReportExport } from "./reportExport";
 import {
   ArrowUpRight,
   Download,
@@ -35,9 +36,10 @@ interface TransactionsTabProps {
 }
 
 export function TransactionsTab({ orgId, address }: TransactionsTabProps) {
+  useWorkspaceLanguage();
   const { t } = useTranslation();
   const client = useConvex();
-  const [exportError, setExportError] = useState('');
+  const [exportError, setExportError] = useState("");
   const [exportCount, setExportCount] = useState<number | null>(null);
   const exportController = useRef<AbortController | null>(null);
   const { environment } = useActivityEnvironment();
@@ -64,7 +66,7 @@ export function TransactionsTab({ orgId, address }: TransactionsTabProps) {
   const [statusFilter, setStatusFilter] = useState<string[]>([]);
   const [tokenFilter, setTokenFilter] = useState<string[]>([]);
   const [otherAsset, setOtherAsset] = useState("");
-  const [assetSearch, setAssetSearch] = useState('');
+  const [assetSearch, setAssetSearch] = useState("");
   const [chainFilter, setChainFilter] = useState<number | "">("");
   const [beneficiaryFilter, setBeneficiaryFilter] = useState("");
   useEffect(() => {
@@ -101,7 +103,9 @@ export function TransactionsTab({ orgId, address }: TransactionsTabProps) {
       status: statusFilter.length > 0 ? statusFilter : undefined,
       token: tokenFilter.length > 0 ? tokenFilter : undefined,
       assetIds: otherAsset ? [otherAsset] : undefined,
-      assetSearch: /^0x[\da-fA-F]{40}$/.test(assetSearch) ? assetSearch : undefined,
+      assetSearch: /^0x[\da-fA-F]{40}$/.test(assetSearch)
+        ? assetSearch
+        : undefined,
       chainId: chainFilter !== "" ? chainFilter : undefined,
       beneficiaryId: beneficiaryFilter
         ? (beneficiaryFilter as Id<"beneficiaries">)
@@ -122,7 +126,12 @@ export function TransactionsTab({ orgId, address }: TransactionsTabProps) {
   ]);
 
   const pages = useReportPages(queryArgs);
-  useEffect(() => () => { exportController.current?.abort(); }, [queryArgs]);
+  useEffect(
+    () => () => {
+      exportController.current?.abort();
+    },
+    [queryArgs],
+  );
   const reportData = useQuery(
     api.reports.getTransactionReport,
     queryArgs ? { ...queryArgs, cursor: pages.cursor } : "skip",
@@ -155,7 +164,10 @@ export function TransactionsTab({ orgId, address }: TransactionsTabProps) {
       if (result.errors.length)
         setSyncError(
           result.errors
-            .map((e) => `${getChainName(e.chainId)}: ${userErrorMessage({ message: e.message }, "Could not load transactions. Try again shortly.")}`)
+            .map(
+              (e) =>
+                `${getChainName(e.chainId)}: ${userErrorMessage({ message: e.message }, "Could not load transactions. Try again shortly.")}`,
+            )
             .join(" "),
         );
     } catch {
@@ -213,97 +225,158 @@ export function TransactionsTab({ orgId, address }: TransactionsTabProps) {
 
   const handleExport = async () => {
     if (!queryArgs || exportCount !== null) return;
-    const controller = new AbortController(); exportController.current = controller;
-    setExportError(''); setExportCount(0);
+    const controller = new AbortController();
+    exportController.current = controller;
+    setExportError("");
+    setExportCount(0);
     try {
-    const items = await collectReportExport((cursor, snapshotVersion) => client.query(api.reports.getTransactionReport, { ...queryArgs, cursor, snapshotVersion }), { signal: controller.signal, progress: setExportCount });
+      const items = await collectReportExport(
+        (cursor, snapshotVersion) =>
+          client.query(api.reports.getTransactionReport, {
+            ...queryArgs,
+            cursor,
+            snapshotVersion,
+          }),
+        { signal: controller.signal, progress: setExportCount },
+      );
 
-    const columns = [
-      { key: 'rowId', label: 'Reconciliation ID' },
-      { key: 'sourceId', label: 'Source record ID' },
-      { key: 'timestamp', label: 'Activity timestamp UTC' },
-      { key: 'observedAt', label: 'Observed timestamp UTC' },
-      { key: 'dateSource', label: 'Date evidence' },
-      { key: 'blockNumber', label: 'Settlement block' },
-      { key: 'blockHash', label: 'Block hash' },
-      { key: 'transferId', label: 'Chain transfer ID' },
-      { key: 'amountRaw', label: 'Raw asset units' },
-      { key: 'transferMatch', label: 'Payment transfer match' },
-      { key: "kind", label: "Entry type" },
-      { key: "environment", label: "Environment" },
-      { key: "chainId", label: "Network ID" },
-      { key: "tokenAddress", label: "Token contract" },
-      { key: "accountAddress", label: "Funding account" },
-      { key: "includedInTotals", label: "Included in totals" },
-      { key: "date", label: t("reports.export.date") },
-      {
-        key: "direction",
-        label: t("reports.export.direction", { defaultValue: "Direction" }),
-      },
-      {
-        key: "beneficiary",
-        label: t("reports.export.beneficiary", {
-          defaultValue: "Counterparty",
-        }),
-      },
-      {
-        key: "walletAddress",
-        label: t("reports.export.walletAddress", {
-          defaultValue: "Wallet Address",
-        }),
-      },
-      { key: "amount", label: t("reports.export.amount") },
-      { key: "token", label: t("reports.export.token") },
-      { key: "chain", label: t("reports.export.chain") },
-      { key: "status", label: t("reports.export.status") },
-      { key: "memo", label: t("reports.export.memo") },
-      { key: "txHash", label: t("reports.export.txHash") },
-    ];
+      const columns = [
+        { key: "rowId", label: "Reconciliation ID" },
+        { key: "sourceId", label: "Source record ID" },
+        { key: "timestamp", label: "Activity timestamp UTC" },
+        { key: "observedAt", label: "Observed timestamp UTC" },
+        { key: "dateSource", label: "Date evidence" },
+        { key: "blockNumber", label: "Settlement block" },
+        { key: "blockHash", label: "Block hash" },
+        { key: "transferId", label: "Chain transfer ID" },
+        { key: "amountRaw", label: "Raw asset units" },
+        { key: "transferMatch", label: "Payment transfer match" },
+        { key: "kind", label: "Entry type" },
+        { key: "environment", label: "Environment" },
+        { key: "chainId", label: "Network ID" },
+        { key: "tokenAddress", label: "Token contract" },
+        { key: "accountAddress", label: "Funding account" },
+        { key: "includedInTotals", label: "Included in totals" },
+        { key: "date", label: t("reports.export.date", { lng: "en" }) },
+        {
+          key: "direction",
+          label: t("reports.export.direction", {
+            lng: "en",
+            defaultValue: "Direction",
+          }),
+        },
+        {
+          key: "beneficiary",
+          label: t("reports.export.beneficiary", {
+            lng: "en",
+            defaultValue: "Counterparty",
+          }),
+        },
+        {
+          key: "walletAddress",
+          label: t("reports.export.walletAddress", {
+            lng: "en",
+            defaultValue: "Wallet Address",
+          }),
+        },
+        { key: "amount", label: t("reports.export.amount", { lng: "en" }) },
+        { key: "token", label: t("reports.export.token", { lng: "en" }) },
+        { key: "chain", label: t("reports.export.chain", { lng: "en" }) },
+        { key: "status", label: t("reports.export.status", { lng: "en" }) },
+        { key: "memo", label: t("reports.export.memo", { lng: "en" }) },
+        { key: "txHash", label: t("reports.export.txHash", { lng: "en" }) },
+      ];
 
-    const rows = items.map((item) => ({
-      rowId: item.rowId, sourceId: item.sourceId,
-      timestamp: new Date(item.createdAt).toISOString(),
-      observedAt: item.observedAt ? new Date(item.observedAt).toISOString() : '',
-      dateSource: item.dateSource ?? (item.kind === 'deposit' ? 'provider' : 'recorded'),
-      blockNumber: item.blockNumber ?? '',
-      blockHash: item.blockHash ?? '',
-      transferId: item.transferId ?? '',
-      amountRaw: item.amountRaw ?? '',
-      transferMatch: item.transferMatch ?? '',
-      kind: item.kind,
-      environment: item.environment,
-      chainId: item.chainId ?? "",
-      tokenAddress: item.tokenAddress ?? "",
-      accountAddress: item.accountAddress,
-      includedInTotals: item.includedInTotals ? "yes" : "no",
-      date: new Date(item.createdAt).toISOString().slice(0, 10),
-      direction:
-        item.direction === "inflow"
-          ? t("reports.direction.inflow", { defaultValue: "Inflow" })
-          : t("reports.direction.outflow", { defaultValue: "Outflow" }),
-      beneficiary: item.beneficiaryName,
-      walletAddress: item.beneficiaryWallet,
-      amount: item.amount,
-      token: item.token,
-      chain: item.chainId != null ? getChainName(item.chainId) : "",
-      status: item.status,
-      memo: item.memo || "",
-      txHash: item.txHash || "",
-    }));
+      const rows = items.map((item) => ({
+        rowId: item.rowId,
+        sourceId: item.sourceId,
+        timestamp: new Date(item.createdAt).toISOString(),
+        observedAt: item.observedAt
+          ? new Date(item.observedAt).toISOString()
+          : "",
+        dateSource:
+          item.dateSource ??
+          (item.kind === "deposit" ? "provider" : "recorded"),
+        blockNumber: item.blockNumber ?? "",
+        blockHash: item.blockHash ?? "",
+        transferId: item.transferId ?? "",
+        amountRaw: item.amountRaw ?? "",
+        transferMatch: item.transferMatch ?? "",
+        kind: item.kind,
+        environment: item.environment,
+        chainId: item.chainId ?? "",
+        tokenAddress: item.tokenAddress ?? "",
+        accountAddress: item.accountAddress,
+        includedInTotals: item.includedInTotals ? "yes" : "no",
+        date: new Date(item.createdAt).toISOString().slice(0, 10),
+        direction:
+          item.direction === "inflow"
+            ? t("reports.direction.inflow", {
+                lng: "en",
+                defaultValue: "Inflow",
+              })
+            : t("reports.direction.outflow", {
+                lng: "en",
+                defaultValue: "Outflow",
+              }),
+        beneficiary: item.beneficiaryName,
+        walletAddress: item.beneficiaryWallet,
+        amount: item.amount,
+        token: item.token,
+        chain: item.chainId != null ? getChainName(item.chainId) : "",
+        status: item.status,
+        memo: item.memo || "",
+        txHash: item.txHash || "",
+      }));
 
-    exportToCsv(generateFilename(`transactions_${environment}`), rows, columns);
-    } catch (error) { setExportError(userErrorMessage(error, 'The export could not be completed. Try again.')); }
-    finally { setExportCount(null); exportController.current = null; }
+      exportToCsv(
+        generateFilename(`transactions_${environment}`),
+        rows,
+        columns,
+      );
+    } catch (error) {
+      setExportError(
+        userErrorMessage(
+          error,
+          "The export could not be completed. Try again.",
+        ),
+      );
+    } finally {
+      setExportCount(null);
+      exportController.current = null;
+    }
   };
 
   return (
     <div className="space-y-4">
-      <ReportProgress orgId={orgId} data={reportData} page={pages.page} previous={pages.previous} next={pages.next} />
-      {exportError && <div className="workspace-notice" role="alert" data-tone="error">{exportError}</div>}
-      {exportCount !== null && <div className="workspace-notice" role="status"><span>Preparing export · {exportCount} entries</span><button className="workspace-button" onClick={() => exportController.current?.abort()}>Cancel export</button></div>}
+      <ReportProgress
+        orgId={orgId}
+        data={reportData}
+        page={pages.page}
+        previous={pages.previous}
+        next={pages.next}
+      />
+      {exportError && (
+        <div className="workspace-notice" role="alert" data-tone="error">
+          {tx(exportError)}
+        </div>
+      )}
+      {exportCount !== null && (
+        <div className="workspace-notice" role="status">
+          <span>
+            {tx("Preparing export ·")} {exportCount} {tx("entries")}
+          </span>
+          <button
+            className="workspace-button"
+            onClick={() => exportController.current?.abort()}
+          >
+            {tx("Cancel export")}
+          </button>
+        </div>
+      )}
       {syncError && (
         <div className="workspace-environment-notice" role="status">
-          <span>{syncError}</span>
+          <span>{tx(syncError)}</span>
         </div>
       )}
       {syncStates
@@ -315,20 +388,33 @@ export function TransactionsTab({ orgId, address }: TransactionsTabProps) {
             key={s.safeId}
           >
             <span>
-              {getChainName(s.chainId)}: {s.error} Last completed refresh:{" "}
+              {getChainName(s.chainId)}: {tx(s.error ?? "")}{" "}
+              {tx("Last completed refresh:")}{" "}
               {s.lastSyncedAt
-                ? new Date(s.lastSyncedAt).toLocaleString()
-                : "Not yet completed"}
+                ? new Date(s.lastSyncedAt).toLocaleString(workspaceLocale())
+                : tx("Not yet completed")}
               .
-              {s.nextAttemptAt && <>{' '}{s.nextAttemptAt > Date.now() ? `Automatic retry: ${new Date(s.nextAttemptAt).toLocaleString()}.` : 'An automatic retry is queued.'}</>}
+              {s.nextAttemptAt && (
+                <>
+                  {" "}
+                  {s.nextAttemptAt > Date.now()
+                    ? tx("Automatic retry: {{value1}}.", {
+                        value1: new Date(s.nextAttemptAt).toLocaleString(
+                          workspaceLocale(),
+                        ),
+                      })
+                    : tx("An automatic retry is queued.")}
+                </>
+              )}
             </span>
           </div>
         ))}
       {syncStates?.some((s) => s.syncing) && (
         <div className="workspace-environment-notice" role="status">
           <span>
-            Refreshing account history in the background. You can leave this
-            page; recorded entries remain available.
+            {tx(
+              "Refreshing account history in the background. You can leave this page; recorded entries remain available.",
+            )}
           </span>
         </div>
       )}
@@ -336,30 +422,69 @@ export function TransactionsTab({ orgId, address }: TransactionsTabProps) {
         <div className="workspace-environment-notice" role="status">
           <span>
             {reportData.excludedCount}{" "}
-            {reportData.excludedCount === 1 ? "entry is" : "entries are"}{" "}
-            excluded from totals. Review pending transfer matches and unverified
-            assets before reconciling.
+            {reportData.excludedCount === 1
+              ? tx("entry is")
+              : tx("entries are")}{" "}
+            {tx(
+              "excluded from totals. Review pending transfer matches and unverified assets before reconciling.",
+            )}
           </span>
         </div>
       )}
-      <p className="text-sm text-slate-400">Amounts are recorded currency units. This activity report does not apply a book valuation.</p>
-      {!!syncStates?.length && <details className="rounded-xl border border-white/10 px-4 py-3 text-sm">
-        <summary className="cursor-pointer font-medium">History coverage</summary>
-        <p className="mt-3 text-slate-400">Activity includes transfers indexed for your accounts. Check coverage before matching a period to your books.</p>
-        <ul className="mt-3 space-y-2">
-          {syncStates.map(s => <li key={s.safeId} className="flex flex-wrap justify-between gap-x-4 gap-y-1">
-            <strong>{getChainName(s.chainId)}</strong>
-            <span>{s.includesOutgoing && s.completedThrough ? `Incoming and outgoing history checked through ${new Date(s.completedThrough).toISOString().replace('T', ' ').slice(0, 19)} UTC` : 'Complete account history is awaiting refresh'}</span>
-          </li>)}
-        </ul>
-        <p className="mt-3 text-slate-400">These are recorded movements. Opening and closing balances still need to be reconciled.</p>
-      </details>}
+      <p className="text-sm text-slate-400">
+        {tx(
+          "Amounts are recorded currency units. This activity report does not apply a book valuation.",
+        )}
+      </p>
+      {!!syncStates?.length && (
+        <details className="rounded-xl border border-white/10 px-4 py-3 text-sm">
+          <summary className="cursor-pointer font-medium">
+            {tx("History coverage")}
+          </summary>
+          <p className="mt-3 text-slate-400">
+            {tx(
+              "Activity includes transfers indexed for your accounts. Check coverage before matching a period to your books.",
+            )}
+          </p>
+          <ul className="mt-3 space-y-2">
+            {syncStates.map((s) => (
+              <li
+                key={s.safeId}
+                className="flex flex-wrap justify-between gap-x-4 gap-y-1"
+              >
+                <strong>{getChainName(s.chainId)}</strong>
+                <span>
+                  {s.includesOutgoing && s.completedThrough
+                    ? tx(
+                        "Incoming and outgoing history checked through {{value1}} UTC",
+                        {
+                          value1: new Date(s.completedThrough)
+                            .toISOString()
+                            .replace("T", " ")
+                            .slice(0, 19),
+                        },
+                      )
+                    : tx("Complete account history is awaiting refresh")}
+                </span>
+              </li>
+            ))}
+          </ul>
+          <p className="mt-3 text-slate-400">
+            {tx(
+              "These are recorded movements. Opening and closing balances still need to be reconciled.",
+            )}
+          </p>
+        </details>
+      )}
       {/* Filters Bar */}
       <div className="flex flex-wrap items-center gap-3">
         <button
           onClick={() => setShowFilters(!showFilters)}
           aria-expanded={showFilters}
-          className={cn('workspace-button', activeFilterCount > 0 && 'workspace-filter-active')}
+          className={cn(
+            "workspace-button",
+            activeFilterCount > 0 && "workspace-filter-active",
+          )}
         >
           <Filter className="h-4 w-4" />
           {t("common.filters")}
@@ -385,17 +510,22 @@ export function TransactionsTab({ orgId, address }: TransactionsTabProps) {
           disabled={syncInProgress}
           onClick={() => void refreshDeposits(true)}
         >
-          {syncInProgress ? "Refreshing history…" : "Refresh history"}
+          {syncInProgress ? tx("Refreshing history…") : tx("Refresh history")}
         </button>
         <div className="ml-auto">
           <Button
             onClick={() => void handleExport()}
-            disabled={isLoading || exportCount !== null || reportData?.indexing || !!reportData?.rangeError}
+            disabled={
+              isLoading ||
+              exportCount !== null ||
+              reportData?.indexing ||
+              !!reportData?.rangeError
+            }
             variant="secondary"
             size="sm"
           >
             <Download className="mr-2 h-4 w-4" />
-            Export all matches
+            {tx("Export all matches")}
           </Button>
         </div>
       </div>
@@ -412,7 +542,7 @@ export function TransactionsTab({ orgId, address }: TransactionsTabProps) {
               <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
                 <input
                   type="date"
-                  aria-label="Start date"
+                  aria-label={tx("Start date")}
                   value={dateFrom}
                   onChange={(e) => setDateFrom(e.target.value)}
                   className="flex-1 rounded-lg border border-white/10 bg-navy-800 px-3 py-2 text-sm text-white"
@@ -422,7 +552,7 @@ export function TransactionsTab({ orgId, address }: TransactionsTabProps) {
                 </span>
                 <input
                   type="date"
-                  aria-label="End date"
+                  aria-label={tx("End date")}
                   value={dateTo}
                   onChange={(e) => setDateTo(e.target.value)}
                   className="flex-1 rounded-lg border border-white/10 bg-navy-800 px-3 py-2 text-sm text-white"
@@ -443,7 +573,7 @@ export function TransactionsTab({ orgId, address }: TransactionsTabProps) {
                     aria-pressed={statusFilter.includes(opt.value)}
                     className="workspace-filter-chip"
                   >
-                    {opt.label}
+                    {tx(opt.label)}
                   </button>
                 ))}
               </div>
@@ -462,7 +592,7 @@ export function TransactionsTab({ orgId, address }: TransactionsTabProps) {
                     aria-pressed={tokenFilter.includes(opt.value)}
                     className="workspace-filter-chip"
                   >
-                    {opt.label}
+                    {tx(opt.label)}
                   </button>
                 ))}
               </div>
@@ -474,7 +604,7 @@ export function TransactionsTab({ orgId, address }: TransactionsTabProps) {
                 className="block text-sm font-medium text-slate-300"
                 htmlFor="report-other-asset"
               >
-                Other received assets
+                {tx("Other received assets")}
               </label>
               <select
                 id="report-other-asset"
@@ -487,28 +617,42 @@ export function TransactionsTab({ orgId, address }: TransactionsTabProps) {
               >
                 <option value="">
                   {otherAssets.length
-                    ? "Choose an unrecognized asset"
-                    : "No unrecognized assets in this view"}
+                    ? tx("Choose an unrecognized asset")
+                    : tx("No unrecognized assets in this view")}
                 </option>
                 {otherAsset &&
                   !otherAssets.some(
                     (asset) => asset.assetId === otherAsset,
                   ) && (
                     <option value={otherAsset}>
-                      Selected asset · outside these filters
+                      {tx("Selected asset · outside these filters")}
                     </option>
                   )}
                 {otherAssets.map((asset) => (
                   <option key={asset.assetId} value={asset.assetId}>
                     {asset.token} · {asset.network} ·{" "}
-                    {asset.tokenAddress ?? "Unresolved contract"}
+                    {asset.tokenAddress ?? tx("Unresolved contract")}
                   </option>
                 ))}
               </select>
-              {(reportData?.assetsTruncated || assetSearch) && <label className="block text-xs text-slate-400">Find another asset by full contract
-                <input className="finance-field w-full mt-1" value={assetSearch} placeholder="0x…" onChange={e => setAssetSearch(e.target.value.trim())} />
-                {reportData?.assetsTruncated && <span>Showing the first 100 received assets. Search to find another contract.</span>}
-              </label>}
+              {(reportData?.assetsTruncated || assetSearch) && (
+                <label className="block text-xs text-slate-400">
+                  {tx("Find another asset by full contract")}
+                  <input
+                    className="finance-field w-full mt-1"
+                    value={assetSearch}
+                    placeholder={tx("0x…")}
+                    onChange={(e) => setAssetSearch(e.target.value.trim())}
+                  />
+                  {reportData?.assetsTruncated && (
+                    <span>
+                      {tx(
+                        "Showing the first 100 received assets. Search to find another contract.",
+                      )}
+                    </span>
+                  )}
+                </label>
+              )}
               {otherAsset && (
                 <p className="break-all text-xs leading-5 text-slate-400">
                   {otherAssets.find((asset) => asset.assetId === otherAsset)
@@ -516,8 +660,9 @@ export function TransactionsTab({ orgId, address }: TransactionsTabProps) {
                 </p>
               )}
               <p className="text-xs leading-5 text-slate-400">
-                Currency filters use supported assets. Other received assets can
-                be inspected here and are excluded from totals.
+                {tx(
+                  "Currency filters use supported assets. Other received assets can be inspected here and are excluded from totals.",
+                )}
               </p>
             </div>
 
@@ -563,7 +708,7 @@ export function TransactionsTab({ orgId, address }: TransactionsTabProps) {
                 {beneficiaries?.map((b) => (
                   <option key={b._id} value={b._id}>
                     {b.name}
-                    {b.isActive === false ? " (archived)" : ""}
+                    {b.isActive === false ? tx(" (archived)") : ""}
                   </option>
                 ))}
               </select>
@@ -581,10 +726,16 @@ export function TransactionsTab({ orgId, address }: TransactionsTabProps) {
         <div className="rounded-xl border border-dashed border-white/20 bg-navy-900/30 p-12 text-center">
           <FileText className="mx-auto h-12 w-12 text-slate-600" />
           <h3 className="mt-4 text-lg font-medium text-white">
-            {reportData?.isDone === false ? "No matches on this page" : t("reports.empty.transactions.title")}
+            {reportData?.isDone === false
+              ? tx("No matches on this page")
+              : t("reports.empty.transactions.title")}
           </h3>
           <p className="mt-2 text-slate-400">
-            {reportData?.isDone === false ? "Continue to the next page to check more history, or adjust the filters." : t("reports.empty.transactions.description")}
+            {reportData?.isDone === false
+              ? tx(
+                  "Continue to the next page to check more history, or adjust the filters.",
+                )
+              : t("reports.empty.transactions.description")}
           </p>
         </div>
       ) : (
@@ -595,7 +746,7 @@ export function TransactionsTab({ orgId, address }: TransactionsTabProps) {
               <thead className="bg-navy-900/50">
                 <tr>
                   <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-400">
-                    {t("reports.table.date")} (UTC)
+                    {t("reports.table.date")} {tx("(UTC)")}
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-400">
                     {t("reports.table.direction", {
@@ -631,7 +782,10 @@ export function TransactionsTab({ orgId, address }: TransactionsTabProps) {
                 {reportData.items.map((item) => (
                   <tr key={item.rowId} className="hover:bg-navy-800/50">
                     <td className="whitespace-nowrap px-4 py-3 text-sm text-white">
-                      {new Date(item.createdAt).toLocaleDateString(undefined, { timeZone: 'UTC' })}
+                      {new Date(item.createdAt).toLocaleDateString(
+                        workspaceLocale(),
+                        { timeZone: "UTC" },
+                      )}
                     </td>
                     <td className="whitespace-nowrap px-4 py-3 text-sm">
                       <DirectionBadge direction={item.direction} />
@@ -655,12 +809,16 @@ export function TransactionsTab({ orgId, address }: TransactionsTabProps) {
                       {!item.includedInTotals && (
                         <>
                           <span className="block max-w-[10rem] whitespace-normal text-xs leading-4">
-                            {item.transferMatch === 'pending' ? 'Transfer match pending · excluded' : 'Unverified · excluded'}
+                            {item.transferMatch === "pending"
+                              ? tx("Transfer match pending · excluded")
+                              : tx("Unverified · excluded")}
                           </span>
-                          {item.transferMatch !== 'pending' && <AssetDetails
-                            tokenAddress={item.tokenAddress}
-                            accountAddress={item.accountAddress}
-                          />}
+                          {item.transferMatch !== "pending" && (
+                            <AssetDetails
+                              tokenAddress={item.tokenAddress}
+                              accountAddress={item.accountAddress}
+                            />
+                          )}
                         </>
                       )}
                     </td>
@@ -721,7 +879,11 @@ export function TransactionsTab({ orgId, address }: TransactionsTabProps) {
                       </p>
                     )}
                     <p className="text-sm text-slate-400">
-                      {new Date(item.createdAt).toLocaleDateString(undefined, { timeZone: 'UTC' })} UTC
+                      {new Date(item.createdAt).toLocaleDateString(
+                        workspaceLocale(),
+                        { timeZone: "UTC" },
+                      )}{" "}
+                      {tx("UTC")}
                     </p>
                   </div>
                   <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
@@ -731,16 +893,23 @@ export function TransactionsTab({ orgId, address }: TransactionsTabProps) {
                 </div>
                 <div className="mt-3 flex items-center justify-between">
                   <div className="text-lg font-bold text-white">
-                    {formatAssetAmount(item.amount, item.token, false)} {item.token}
+                    {formatAssetAmount(item.amount, item.token, false)}{" "}
+                    {item.token}
                     {!item.includedInTotals && (
                       <>
                         <span className="block text-xs">
-                          {item.transferMatch === 'pending' ? 'Transfer match pending · excluded from totals' : 'Unverified · excluded from totals'}
+                          {item.transferMatch === "pending"
+                            ? tx(
+                                "Transfer match pending · excluded from totals",
+                              )
+                            : tx("Unverified · excluded from totals")}
                         </span>
-                        {item.transferMatch !== 'pending' && <AssetDetails
-                          tokenAddress={item.tokenAddress}
-                          accountAddress={item.accountAddress}
-                        />}
+                        {item.transferMatch !== "pending" && (
+                          <AssetDetails
+                            tokenAddress={item.tokenAddress}
+                            accountAddress={item.accountAddress}
+                          />
+                        )}
                       </>
                     )}
                     {item.chainId != null && (
@@ -782,29 +951,37 @@ export function TransactionsTab({ orgId, address }: TransactionsTabProps) {
                 })}
               </span>
               <span className="text-slate-600">|</span>
-              <strong className="w-full">{reportData.indexing ? 'Totals are still being prepared' : 'Totals for all matching activity'}</strong>
-              {!reportData.indexing && reportData.totals.map((total) => (
-                <div
-                  key={total.assetId}
-                  className="flex flex-wrap gap-x-4 gap-y-2 tabular-nums"
-                >
-                  <strong className="w-full">
-                    {total.token} · {total.network}
-                  </strong>
-                  <span>
-                    Inflow: {formatAssetAmount(total.inflow, total.token, false)}{" "}
-                    {total.token}
-                  </span>
-                  <span>
-                    Outflow: {formatAssetAmount(total.outflow, total.token, false)}{" "}
-                    {total.token}
-                  </span>
-                  <span>
-                    Net change: {formatAssetAmount(total.net, total.token, false)}{" "}
-                    {total.token}
-                  </span>
-                </div>
-              ))}
+              <strong className="w-full">
+                {reportData.indexing
+                  ? tx("Totals are still being prepared")
+                  : tx("Totals for all matching activity")}
+              </strong>
+              {!reportData.indexing &&
+                reportData.totals.map((total) => (
+                  <div
+                    key={total.assetId}
+                    className="flex flex-wrap gap-x-4 gap-y-2 tabular-nums"
+                  >
+                    <strong className="w-full">
+                      {total.token} · {total.network}
+                    </strong>
+                    <span>
+                      {tx("Inflow:")}{" "}
+                      {formatAssetAmount(total.inflow, total.token, false)}{" "}
+                      {total.token}
+                    </span>
+                    <span>
+                      {tx("Outflow:")}{" "}
+                      {formatAssetAmount(total.outflow, total.token, false)}{" "}
+                      {total.token}
+                    </span>
+                    <span>
+                      {tx("Net change:")}{" "}
+                      {formatAssetAmount(total.net, total.token, false)}{" "}
+                      {total.token}
+                    </span>
+                  </div>
+                ))}
             </div>
           </div>
         </>

@@ -1,6 +1,7 @@
-import type { ReactNode } from 'react';
-import { Search, ArrowUpRight, type LucideIcon } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { tx, useWorkspaceLanguage } from "@/lib/workspaceI18n";
+import type { ReactNode } from "react";
+import { Search, ArrowUpRight, type LucideIcon } from "lucide-react";
+import { Link } from "react-router-dom";
 
 export function PageHeader({
   title,
@@ -13,6 +14,7 @@ export function PageHeader({
   actions?: ReactNode;
   eyebrow?: string;
 }) {
+  useWorkspaceLanguage();
   return (
     <header className="workspace-page-header">
       <div>
@@ -35,6 +37,7 @@ export function EmptyState({
   description: string;
   action?: ReactNode;
 }) {
+  useWorkspaceLanguage();
   return (
     <div className="workspace-empty">
       <div className="workspace-empty-icon">
@@ -55,37 +58,38 @@ export function StatusBadge({
   status: string;
   label?: string;
 }) {
+  useWorkspaceLanguage();
   const labels: Record<string, string> = {
-    draft: 'Draft',
-    pending: 'Needs approval',
-    proposed: 'Awaiting signatures',
-    scheduled: 'Scheduled',
-    relaying: 'Processing',
-    executed: 'Paid',
-    failed: 'Needs attention',
-    cancelled: 'Cancelled',
-    active: 'Active',
-    paused: 'Paused',
-    unpaid: 'Unpaid',
-    in_payment: 'Payment in progress',
-    paid: 'Paid',
-    ready: 'Ready to pay',
-    incomplete: 'Details needed',
-    archived: 'Archived',
-    overdue: 'Overdue',
-    void: 'Voided',
+    draft: "Draft",
+    pending: "Needs approval",
+    proposed: "Awaiting signatures",
+    scheduled: "Scheduled",
+    relaying: "Processing",
+    executed: "Paid",
+    failed: "Needs attention",
+    cancelled: "Cancelled",
+    active: "Active",
+    paused: "Paused",
+    unpaid: "Unpaid",
+    in_payment: "Payment in progress",
+    paid: "Paid",
+    ready: "Ready to pay",
+    incomplete: "Details needed",
+    archived: "Archived",
+    overdue: "Overdue",
+    void: "Voided",
   };
   return (
     <span className="workspace-status" data-status={status}>
       <span aria-hidden="true" />
-      {label ?? labels[status] ?? status}
+      {tx(label ?? labels[status] ?? status)}
     </span>
   );
 }
 export function SearchField({
   value,
   onChange,
-  placeholder = 'Search',
+  placeholder = "Search",
   label,
 }: {
   value: string;
@@ -93,12 +97,13 @@ export function SearchField({
   placeholder?: string;
   label?: string;
 }) {
+  useWorkspaceLanguage();
   return (
     <div className="workspace-search">
       <Search size={16} />
       <input
-        aria-label={label ?? placeholder}
-        placeholder={placeholder}
+        aria-label={label ?? tx(placeholder)}
+        placeholder={tx(placeholder)}
         value={value}
         onChange={(e) => onChange(e.target.value)}
       />
@@ -116,8 +121,9 @@ export function Metric({
   value: ReactNode;
   detail?: string;
   href?: string;
-  tone?: 'warning' | 'success';
+  tone?: "warning" | "success";
 }) {
+  useWorkspaceLanguage();
   const content = (
     <>
       <div className="workspace-metric-label">
@@ -139,10 +145,11 @@ export function Metric({
   );
 }
 export function LoadingRows({ count = 5 }: { count?: number }) {
+  useWorkspaceLanguage();
   return (
     <div
       role="status"
-      aria-label="Loading records"
+      aria-label={tx("Loading records")}
       className="workspace-loading"
     >
       {Array.from({ length: count }, (_, i) => (
@@ -153,18 +160,19 @@ export function LoadingRows({ count = 5 }: { count?: number }) {
 }
 export function Notice({
   children,
-  tone = 'error',
+  tone = "error",
 }: {
   children: ReactNode;
-  tone?: 'error' | 'info' | 'success';
+  tone?: "error" | "info" | "success";
 }) {
+  useWorkspaceLanguage();
   return (
     <div
-      role={tone === 'error' ? 'alert' : 'status'}
+      role={tone === "error" ? "alert" : "status"}
       className="workspace-notice min-w-0 break-words [overflow-wrap:anywhere]"
       data-tone={tone}
     >
-      {children}
+      {typeof children === "string" ? tx(children) : children}
     </div>
   );
 }

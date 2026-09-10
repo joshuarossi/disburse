@@ -1,4 +1,5 @@
-import { userErrorMessage } from '@/lib/userErrors';
+import { tx, useWorkspaceLanguage } from "@/lib/workspaceI18n";
+import { userErrorMessage } from "@/lib/userErrors";
 import { useState, type FormEvent } from "react";
 import { useMutation, useQuery } from "convex/react";
 import { Plus, Trash2 } from "lucide-react";
@@ -16,6 +17,7 @@ export function RecurringEditor({
   series: Doc<"recurringPayments">;
   onClose: () => void;
 }) {
+  useWorkspaceLanguage();
   const sessionToken = useSessionToken();
   const beneficiaries = useQuery(
     api.beneficiaries.list,
@@ -54,35 +56,35 @@ export function RecurringEditor({
       });
       onClose();
     } catch (e) {
-      setError(
-        userErrorMessage(e, "Could not save recurring payment"),
-      );
+      setError(userErrorMessage(e, "Could not save recurring payment"));
     } finally {
       setBusy(false);
     }
   };
   return (
     <Dialog
-      title="Edit recurring payment"
+      title={tx("Edit recurring payment")}
       onClose={() => {
         if (!busy) onClose();
       }}
     >
       <form className="space-y-5 p-6" onSubmit={save}>
-        {error && <Notice>{error}</Notice>}
+        {error && <Notice>{tx(error)}</Notice>}
         {instructionErrors.map((message) => (
-          <Notice key={message}>{message}</Notice>
+          <Notice key={message}>{tx(message)}</Notice>
         ))}
         <Notice tone="info">
-          Changes apply to future batches. Existing drafts and scheduled
-          payments keep their saved details.
+          {tx(
+            "Changes apply to future batches. Existing drafts and scheduled payments keep their saved details.",
+          )}
         </Notice>
         <p className="text-sm text-slate-400">
-          Payments use {series.token} on {getChainName(series.chainId)}.
-          Recipients must have matching payout instructions.
+          {tx("Payments use")} {series.token} {tx("on")}{" "}
+          {getChainName(series.chainId)}
+          {tx(". Recipients must have matching payout instructions.")}
         </p>
         <label className="block">
-          <span className="finance-label">Schedule name</span>
+          <span className="finance-label">{tx("Schedule name")}</span>
           <input
             className="finance-field"
             required
@@ -92,19 +94,21 @@ export function RecurringEditor({
         </label>
         <div className="grid gap-4 sm:grid-cols-2">
           <label>
-            <span className="finance-label">Frequency</span>
+            <span className="finance-label">{tx("Frequency")}</span>
             <select
               className="finance-field"
               value={cadence}
               onChange={(e) => setCadence(e.target.value as typeof cadence)}
             >
-              <option value="weekly">Every week</option>
-              <option value="biweekly">Every 2 weeks</option>
-              <option value="monthly">Every month</option>
+              <option value="weekly">{tx("Every week")}</option>
+              <option value="biweekly">{tx("Every 2 weeks")}</option>
+              <option value="monthly">{tx("Every month")}</option>
             </select>
           </label>
           <label>
-            <span className="finance-label">Next pay date · 12:00 UTC</span>
+            <span className="finance-label">
+              {tx("Next pay date · 12:00 UTC")}
+            </span>
             <input
               className="finance-field"
               type="date"
@@ -115,7 +119,9 @@ export function RecurringEditor({
           </label>
         </div>
         <div>
-          <h3 className="mb-3 text-sm font-semibold">Recipients and amounts</h3>
+          <h3 className="mb-3 text-sm font-semibold">
+            {tx("Recipients and amounts")}
+          </h3>
           <div className="max-h-64 overflow-auto">
             {recipients.map((r, i) => (
               <div
@@ -124,11 +130,13 @@ export function RecurringEditor({
               >
                 <span className="flex-1 text-xs">
                   {beneficiaries?.find((b) => b._id === r.beneficiaryId)
-                    ?.name ?? "Unavailable recipient"}
+                    ?.name ?? tx("Unavailable recipient")}
                 </span>
                 <input
                   className="finance-field !w-28 text-right"
-                  aria-label={`Amount for recipient ${i + 1}`}
+                  aria-label={tx("Amount for recipient {{value1}}", {
+                    value1: i + 1,
+                  })}
                   inputMode="decimal"
                   required
                   value={r.amount}
@@ -146,7 +154,9 @@ export function RecurringEditor({
                 </span>
                 <button
                   type="button"
-                  aria-label={`Remove recipient ${i + 1}`}
+                  aria-label={tx("Remove recipient {{value1}}", {
+                    value1: i + 1,
+                  })}
                   onClick={() =>
                     setRecipients((rows) => rows.filter((_, j) => j !== i))
                   }
@@ -159,11 +169,11 @@ export function RecurringEditor({
           <div className="mt-4 flex gap-2">
             <select
               className="finance-field"
-              aria-label="Add a recipient"
+              aria-label={tx("Add a recipient")}
               value={adding}
               onChange={(e) => setAdding(e.target.value)}
             >
-              <option value="">Add a saved recipient</option>
+              <option value="">{tx("Add a saved recipient")}</option>
               {beneficiaries
                 ?.filter(
                   (b) =>
@@ -191,7 +201,7 @@ export function RecurringEditor({
               }}
             >
               <Plus size={14} />
-              Add
+              {tx("Add")}
             </button>
           </div>
         </div>
@@ -202,7 +212,7 @@ export function RecurringEditor({
             onClick={onClose}
             disabled={busy}
           >
-            Cancel
+            {tx("Cancel")}
           </button>
           <button
             className="workspace-button workspace-button-primary"
@@ -210,7 +220,7 @@ export function RecurringEditor({
               busy || !recipients.length || instructionErrors.length > 0
             }
           >
-            {busy ? "Saving…" : "Save schedule"}
+            {busy ? tx("Saving…") : tx("Save schedule")}
           </button>
         </div>
       </form>

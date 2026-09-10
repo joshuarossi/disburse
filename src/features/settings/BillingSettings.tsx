@@ -1,4 +1,5 @@
-import { billingNetwork } from '../../../shared/billingNetwork';
+import { tx, useWorkspaceLanguage, workspaceLocale } from "@/lib/workspaceI18n";
+import { billingNetwork } from "../../../shared/billingNetwork";
 import { Button } from "@/components/ui/button";
 import { CreditCard, Check } from "lucide-react";
 import { getPlanFeatures, PLANS, type PlanKey } from "@/lib/billingPlans";
@@ -9,6 +10,7 @@ export function BillingSettings({
 }: {
   controller: ReturnType<typeof useSettingsController>;
 }) {
+  useWorkspaceLanguage();
   const {
     t,
     billing,
@@ -19,8 +21,11 @@ export function BillingSettings({
     currentCheckout,
     includedWithoutSubscription,
   } = controller;
-  const nextAccess = billing?.expiresAt ? billingAccess(billing, billing.expiresAt) : null;
-  const freeAccess = billing && ["free", "complimentary"].includes(billing.source);
+  const nextAccess = billing?.expiresAt
+    ? billingAccess(billing, billing.expiresAt)
+    : null;
+  const freeAccess =
+    billing && ["free", "complimentary"].includes(billing.source);
   return (
     <>
       <div className="rounded-2xl border border-white/10 bg-navy-900/50 p-4 sm:p-6">
@@ -39,7 +44,11 @@ export function BillingSettings({
             </div>
           </div>
           <div className="flex flex-wrap gap-2">
-            {freeAccess && <div className="rounded-full bg-green-500/10 px-3 py-2 text-xs font-medium text-green-400">{t("settings.billing.noSubscriptionCharge")}</div>}
+            {freeAccess && (
+              <div className="rounded-full bg-green-500/10 px-3 py-2 text-xs font-medium text-green-400">
+                {t("settings.billing.noSubscriptionCharge")}
+              </div>
+            )}
             {billing?.status === "trial" && (
               <div className="billing-trial-badge rounded-full bg-yellow-500/10 px-3 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm font-medium text-yellow-400">
                 {t("settings.billing.trialDaysLeft", {
@@ -58,7 +67,14 @@ export function BillingSettings({
         </div>
 
         <p className="workspace-description mb-4">
-          {t(freeAccess && billing.expiresAt === null ? "settings.billing.freePolicy" : nextAccess?.isActive ? "settings.billing.fallbackPolicy" : "settings.billing.expiryPolicy", { tier: nextAccess?.effectiveTier.name })}
+          {t(
+            freeAccess && billing.expiresAt === null
+              ? "settings.billing.freePolicy"
+              : nextAccess?.isActive
+                ? "settings.billing.fallbackPolicy"
+                : "settings.billing.expiryPolicy",
+            { tier: nextAccess?.effectiveTier.name },
+          )}
         </p>
         {/* Current Plan Status */}
         <div className="mb-4 sm:mb-6 rounded-xl border border-white/10 bg-navy-800/50 p-3 sm:p-4">
@@ -68,7 +84,7 @@ export function BillingSettings({
                 {t("settings.billing.currentPlan")}
               </p>
               <p className="text-lg sm:text-xl font-bold text-white capitalize">
-                {billing?.effectiveTier.name || "Loading..."}
+                {billing?.effectiveTier.name || tx("Loading...")}
               </p>
             </div>
           </div>
@@ -128,7 +144,12 @@ export function BillingSettings({
                   </dd>
                 </div>
               </dl>
-              {(billing.usage.reservedSeats > billing.limits.maxUsers || billing.usage.recipients > billing.limits.maxBeneficiaries) && <p className="workspace-description mt-4">{t("settings.billing.overLimitPolicy")}</p>}
+              {(billing.usage.reservedSeats > billing.limits.maxUsers ||
+                billing.usage.recipients > billing.limits.maxBeneficiaries) && (
+                <p className="workspace-description mt-4">
+                  {t("settings.billing.overLimitPolicy")}
+                </p>
+              )}
             </section>
           ) : (
             billing && (
@@ -144,9 +165,14 @@ export function BillingSettings({
             {t(
               billing.source === "trial"
                 ? "settings.billing.trialEnd"
-                : billing.source === "complimentary" ? "settings.billing.complimentaryEnd"
-                : "settings.billing.paidEnd",
-              { date: new Date(billing.expiresAt).toLocaleString() },
+                : billing.source === "complimentary"
+                  ? "settings.billing.complimentaryEnd"
+                  : "settings.billing.paidEnd",
+              {
+                date: new Date(billing.expiresAt).toLocaleString(
+                  workspaceLocale(),
+                ),
+              },
             )}
           </p>
         )}
@@ -155,149 +181,160 @@ export function BillingSettings({
         </p>
         {currentCheckout && (
           <section
-            aria-label="Saved subscription checkout"
+            aria-label={tx("Saved subscription checkout")}
             className="mb-5 rounded-lg border border-[var(--ws-border)] p-4 space-y-3"
           >
-            <h3 className="font-semibold">Subscription request in progress</h3>
+            <h3 className="font-semibold">
+              {tx("Subscription request in progress")}
+            </h3>
             <p className="workspace-description">
               {currentCheckout.status === "prepared"
-                ? "Your team has prepared a checkout. Review it before asking the wallet to pay."
-                : "The original wallet request is saved. Review its status before making another subscription payment."}
+                ? tx(
+                    "Your team has prepared a checkout. Review it before asking the wallet to pay.",
+                  )
+                : tx(
+                    "The original wallet request is saved. Review its status before making another subscription payment.",
+                  )}
             </p>
             <Button
               variant="secondary"
               onClick={() => handleOpenPayment(currentCheckout.plan)}
             >
-              Review saved checkout
+              {tx("Review saved checkout")}
             </Button>
           </section>
         )}
         {/* Available Plans */}
         <div className="grid gap-4 grid-cols-1 sm:grid-cols-2">
-          {AVAILABLE_PAID_PLANS.map(key => [key, PLANS[key]] as [PlanKey, (typeof PLANS)[PlanKey]]).map(
-            ([key, plan]) => {
-              const Icon = plan.icon;
-              const isCurrent = isCurrentPlan(key);
-              const canSelectPlan = canUpgrade(key);
+          {AVAILABLE_PAID_PLANS.map(
+            (key) => [key, PLANS[key]] as [PlanKey, (typeof PLANS)[PlanKey]],
+          ).map(([key, plan]) => {
+            const Icon = plan.icon;
+            const isCurrent = isCurrentPlan(key);
+            const canSelectPlan = canUpgrade(key);
 
-              return (
-                <div
-                  key={key}
-                  className={`relative rounded-xl border p-4 ${
-                    plan.popular
-                      ? "border-accent-500/50 bg-gradient-to-br from-accent-500/10 to-transparent"
-                      : "border-white/10 bg-navy-800/30"
-                  }`}
-                >
-                  {plan.popular && (
-                    <span className="absolute -top-2 left-1/2 -translate-x-1/2 rounded-full bg-accent-500 px-2 py-0.5 text-xs font-medium text-[#102624]">
-                      {t("settings.billing.popular")}
-                    </span>
-                  )}
+            return (
+              <div
+                key={key}
+                className={`relative rounded-xl border p-4 ${
+                  plan.popular
+                    ? "border-accent-500/50 bg-gradient-to-br from-accent-500/10 to-transparent"
+                    : "border-white/10 bg-navy-800/30"
+                }`}
+              >
+                {plan.popular && (
+                  <span className="absolute -top-2 left-1/2 -translate-x-1/2 rounded-full bg-accent-500 px-2 py-0.5 text-xs font-medium text-[#102624]">
+                    {t("settings.billing.popular")}
+                  </span>
+                )}
 
-                  {isCurrent && (
-                    <span className="absolute -top-2 right-3 rounded-full bg-green-500 px-2 py-0.5 text-xs font-medium text-[#102624]">
-                      {t("settings.billing.current")}
-                    </span>
-                  )}
+                {isCurrent && (
+                  <span className="absolute -top-2 right-3 rounded-full bg-green-500 px-2 py-0.5 text-xs font-medium text-[#102624]">
+                    {t("settings.billing.current")}
+                  </span>
+                )}
 
-                  <div className="flex items-center gap-2 mb-3">
-                    <div
-                      className={`flex h-8 w-8 items-center justify-center rounded-lg ${
-                        plan.popular
-                          ? "bg-accent-500/20 text-accent-400"
-                          : "bg-navy-700 text-slate-400"
-                      }`}
-                    >
-                      <Icon className="h-4 w-4" />
-                    </div>
-                    <div>
-                      <h3 className="font-semibold text-white">
-                        {t(`settings.billing.plans.${key}.name`)}
-                      </h3>
-                      <p className="text-xs text-slate-400">
-                        {t(`settings.billing.plans.${key}.description`)}
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="mb-3">
-                    <span className="text-2xl font-bold text-white">
-                      {t(`settings.billing.plans.${key}.price`, {
-                        price: plan.price,
-                      })}
-                    </span>
-                  </div>
-
-                  <ul className="space-y-1 mb-4 text-xs">
-                    {getPlanFeatures(key)
-                      .slice(0, 3)
-                      .map((feature) => {
-                        return (
-                          <li
-                            key={feature.key}
-                            className="flex items-center gap-2 text-slate-300"
-                          >
-                            <Check
-                              className={`h-3 w-3 ${plan.popular ? "text-accent-400" : "text-green-400"}`}
-                            />
-                            {t(`settings.billing.features.${feature.key}`, {
-                              defaultValue: feature.text,
-                              count: feature.count,
-                            })}
-                          </li>
-                        );
-                      })}
-                  </ul>
-
-                  <Button
-                    className="w-full"
-                    size="sm"
-                    variant={plan.popular ? "default" : "secondary"}
-                    disabled={!isAdmin || !canSelectPlan}
-                    onClick={() => handleOpenPayment(key)}
+                <div className="flex items-center gap-2 mb-3">
+                  <div
+                    className={`flex h-8 w-8 items-center justify-center rounded-lg ${
+                      plan.popular
+                        ? "bg-accent-500/20 text-accent-400"
+                        : "bg-navy-700 text-slate-400"
+                    }`}
                   >
-                    {!isAdmin
-                      ? "Admin required"
-                      : includedWithoutSubscription(key) ? t("settings.billing.includedFree")
-                      : isCurrent && billing?.source === "paid"
-                        ? "Renew for 30 days"
-                        : !canSelectPlan
-                          ? "Available after expiry"
-                          : billing?.source !== "paid"
-                            ? "Choose plan"
-                            : "Change plan"}
-                  </Button>
+                    <Icon className="h-4 w-4" />
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-white">
+                      {t(`settings.billing.plans.${key}.name`)}
+                    </h3>
+                    <p className="text-xs text-slate-400">
+                      {t(`settings.billing.plans.${key}.description`)}
+                    </p>
+                  </div>
                 </div>
-              );
-            },
-          )}
+
+                <div className="mb-3">
+                  <span className="text-2xl font-bold text-white">
+                    {t(`settings.billing.plans.${key}.price`, {
+                      price: plan.price,
+                    })}
+                  </span>
+                </div>
+
+                <ul className="space-y-1 mb-4 text-xs">
+                  {getPlanFeatures(key)
+                    .slice(0, 3)
+                    .map((feature) => {
+                      return (
+                        <li
+                          key={feature.key}
+                          className="flex items-center gap-2 text-slate-300"
+                        >
+                          <Check
+                            className={`h-3 w-3 ${plan.popular ? "text-accent-400" : "text-green-400"}`}
+                          />
+                          {t(`settings.billing.features.${feature.key}`, {
+                            defaultValue: feature.text,
+                            count: feature.count,
+                          })}
+                        </li>
+                      );
+                    })}
+                </ul>
+
+                <Button
+                  className="w-full"
+                  size="sm"
+                  variant={plan.popular ? "default" : "secondary"}
+                  disabled={!isAdmin || !canSelectPlan}
+                  onClick={() => handleOpenPayment(key)}
+                >
+                  {!isAdmin
+                    ? tx("Admin required")
+                    : includedWithoutSubscription(key)
+                      ? t("settings.billing.includedFree")
+                      : isCurrent && billing?.source === "paid"
+                        ? tx("Renew for 30 days")
+                        : !canSelectPlan
+                          ? tx("Available after expiry")
+                          : billing?.source !== "paid"
+                            ? tx("Choose plan")
+                            : tx("Change plan")}
+                </Button>
+              </div>
+            );
+          })}
         </div>
 
         <div className="mt-6">
-          <h3 className="font-semibold text-white mb-3">Payment history</h3>
+          <h3 className="font-semibold text-white mb-3">
+            {tx("Payment history")}
+          </h3>
           {billing?.payments?.length ? (
             <div className="overflow-x-auto">
               <table className="w-full text-sm text-left">
                 <thead>
                   <tr>
-                    <th className="p-2">Date</th>
-                    <th className="p-2">Plan</th>
-                    <th className="p-2">Status</th>
-                    <th className="p-2">Receipt</th>
+                    <th className="p-2">{tx("Date")}</th>
+                    <th className="p-2">{tx("Plan")}</th>
+                    <th className="p-2">{tx("Status")}</th>
+                    <th className="p-2">{tx("Receipt")}</th>
                   </tr>
                 </thead>
                 <tbody>
                   {billing.payments.map((payment) => (
                     <tr key={payment._id}>
                       <td className="p-2">
-                        {new Date(payment.verifiedAt).toLocaleDateString()}
+                        {new Date(payment.verifiedAt).toLocaleDateString(
+                          workspaceLocale(),
+                        )}
                       </td>
                       <td className="p-2 capitalize">{payment.plan}</td>
                       <td className="p-2">
                         {payment.redeemedAt !== undefined
-                          ? "Applied"
-                          : "Verified"}
+                          ? tx("Applied")
+                          : tx("Verified")}
                       </td>
                       <td className="p-2">
                         <a
@@ -306,7 +343,7 @@ export function BillingSettings({
                           rel="noreferrer"
                           href={`${billingNetwork(payment.chainId)?.explorer}/tx/${payment.txHash}`}
                         >
-                          View transaction
+                          {tx("View transaction")}
                         </a>
                       </td>
                     </tr>
@@ -316,7 +353,7 @@ export function BillingSettings({
             </div>
           ) : (
             <p className="workspace-description">
-              No subscription payments recorded yet.
+              {tx("No subscription payments recorded yet.")}
             </p>
           )}
         </div>
@@ -325,9 +362,11 @@ export function BillingSettings({
         <div className="mt-6 pt-6 border-t border-white/10">
           <p className="text-sm text-slate-400">
             {t(
-              freeAccess ? "settings.billing.freeTerms" : billing?.source === "trial"
-                ? "settings.billing.trialTerms"
-                : "settings.billing.paidTerms",
+              freeAccess
+                ? "settings.billing.freeTerms"
+                : billing?.source === "trial"
+                  ? "settings.billing.trialTerms"
+                  : "settings.billing.paidTerms",
             )}
           </p>
         </div>

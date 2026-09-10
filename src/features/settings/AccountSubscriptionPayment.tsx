@@ -1,3 +1,4 @@
+import { tx, useWorkspaceLanguage } from "@/lib/workspaceI18n";
 import { useRef, useState } from "react";
 import { useMutation } from "convex/react";
 import { api } from "../../../convex/_generated/api";
@@ -16,6 +17,7 @@ export function AccountSubscriptionPayment({
   controller: ReturnType<typeof useSettingsController>;
   onBusyChange: (busy: boolean) => void;
 }) {
+  useWorkspaceLanguage();
   const {
     checkout,
     safes,
@@ -90,20 +92,22 @@ export function AccountSubscriptionPayment({
   };
   return (
     <div className="space-y-4">
-      {error && <Notice>{error}</Notice>}
+      {error && <Notice>{tx(error)}</Notice>}
       {checkout?.safeId ? (
         <>
           <dl className="workspace-detail-grid">
             <div>
-              <dt>Pay from</dt>
+              <dt>{tx("Pay from")}</dt>
               <dd>
                 {safes?.find((s) => s._id === checkout.safeId)?.name ??
-                  "Saved company account"}
+                  tx("Saved company account")}
               </dd>
             </div>
             <div>
-              <dt>Subscription</dt>
-              <dd>{controller.checkoutPrice} USDC for 30 days</dd>
+              <dt>{tx("Subscription")}</dt>
+              <dd>
+                {controller.checkoutPrice} {tx("USDC for 30 days")}
+              </dd>
             </div>
           </dl>
           <CustomerPaidExecution
@@ -130,41 +134,42 @@ export function AccountSubscriptionPayment({
               disabled={isVerifying || busy}
               onClick={() => void discardCheckout()}
             >
-              Discard unsubmitted checkout
+              {tx("Discard unsubmitted checkout")}
             </button>
           )}
         </>
       ) : checkout ? (
         <Notice tone="info">
-          This checkout was prepared with the previous wallet flow. Discard it
-          to choose a company account and pay execution fees in USDC.
+          {tx(
+            "This checkout was prepared with the previous wallet flow. Discard it to choose a company account and pay execution fees in USDC.",
+          )}
         </Notice>
       ) : (
         <>
           <p className="workspace-description">
-            Pay from a company account. Its owners approve the subscription and
-            a separate execution fee in USDC. Your connected wallet only signs
-            approvals.
+            {tx(
+              "Pay from a company account. Its owners approve the subscription and a separate execution fee in USDC. Your connected wallet only signs approvals.",
+            )}
           </p>
           {!supported ? (
             <Notice tone="info">
-              USDC execution fees are not available on the configured billing
-              network. Checkout is unavailable until a supported billing
-              destination is configured.
+              {tx(
+                "USDC execution fees are not available on the configured billing network. Checkout is unavailable until a supported billing destination is configured.",
+              )}
             </Notice>
           ) : safes === undefined ? (
             <p role="status" className="workspace-description">
-              Loading company accounts…
+              {tx("Loading company accounts…")}
             </p>
           ) : !accounts.length ? (
             <Notice tone="info">
-              Add a company account on {paymentConfig?.network} to pay this
-              subscription.
+              {tx("Add a company account on")} {paymentConfig?.network}{" "}
+              {tx("to pay this subscription.")}
             </Notice>
           ) : (
             <>
               <label className="workspace-field">
-                <span>Pay from</span>
+                <span>{tx("Pay from")}</span>
                 <select
                   value={safeId}
                   onChange={(e) => setSelectedSafe(e.target.value)}
@@ -172,7 +177,7 @@ export function AccountSubscriptionPayment({
                 >
                   {accounts.map((s) => (
                     <option key={s._id} value={s._id}>
-                      {s.name ?? "Company account"}
+                      {s.name ?? tx("Company account")}
                     </option>
                   ))}
                 </select>
@@ -182,7 +187,9 @@ export function AccountSubscriptionPayment({
                 disabled={busy || !isAdmin}
                 onClick={() => void prepare()}
               >
-                {busy ? "Preparing checkout…" : "Review subscription payment"}
+                {busy
+                  ? tx("Preparing checkout…")
+                  : tx("Review subscription payment")}
               </button>
             </>
           )}

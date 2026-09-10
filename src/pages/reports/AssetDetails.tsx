@@ -1,3 +1,4 @@
+import { tx, useWorkspaceLanguage } from "@/lib/workspaceI18n";
 export function AssetDetails({
   tokenAddress,
   accountAddress,
@@ -5,17 +6,18 @@ export function AssetDetails({
   tokenAddress?: string;
   accountAddress: string;
 }) {
+  useWorkspaceLanguage();
   return (
     <details className="mt-2 max-w-sm whitespace-normal text-xs font-normal">
-      <summary className="cursor-pointer">Asset details</summary>
+      <summary className="cursor-pointer">{tx("Asset details")}</summary>
       <dl className="mt-2 space-y-1">
-        <dt>Token contract</dt>
+        <dt>{tx("Token contract")}</dt>
         <dd className="break-all font-mono">
-          {tokenAddress ?? "Not recorded"}
+          {tokenAddress ?? tx("Not recorded")}
         </dd>
-        <dt>Funding account</dt>
+        <dt>{tx("Funding account")}</dt>
         <dd className="break-all font-mono">
-          {accountAddress || "Not recorded"}
+          {accountAddress || tx("Not recorded")}
         </dd>
       </dl>
     </details>

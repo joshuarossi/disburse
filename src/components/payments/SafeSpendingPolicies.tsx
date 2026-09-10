@@ -1,3 +1,4 @@
+import { tx, useWorkspaceLanguage } from "@/lib/workspaceI18n";
 import { supportsCircleFees } from "../../../shared/circleExecution";
 import { userErrorMessage } from "@/lib/userErrors";
 import { useState } from "react";
@@ -36,6 +37,7 @@ export function SafeSpendingPolicies({
   orgId: Id<"orgs">;
   isAdmin: boolean;
 }) {
+  useWorkspaceLanguage();
   const sessionToken = useSessionToken();
   const { environment } = useActivityEnvironment();
   const { address } = useAccount();
@@ -191,25 +193,30 @@ export function SafeSpendingPolicies({
       <div className="border-b border-white/10 p-5">
         <h2 className="flex items-center gap-2 font-semibold text-white">
           <ShieldCheck className="h-4 w-4 text-accent-400" />
-          Delegated spending
+          {tx("Delegated spending")}
         </h2>
         <p className="mt-2 text-sm leading-6 text-slate-400">
-          Give a team member a spending allowance. They can pay within that
-          limit without collecting account-owner approvals for each payment.
+          {tx(
+            "Give a team member a spending allowance. They can pay within that limit without collecting account-owner approvals for each payment.",
+          )}
         </p>
       </div>
       <div className="space-y-5 p-5">
         {!safes ? (
-          <p className="text-sm text-slate-400">Loading funding accounts…</p>
+          <p className="text-sm text-slate-400">
+            {tx("Loading funding accounts…")}
+          </p>
         ) : !safe ? (
           <p className="text-sm text-slate-400">
-            Link a funding account in Settings to manage delegated spending.
+            {tx(
+              "Link a funding account in Settings to manage delegated spending.",
+            )}
           </p>
         ) : (
           <>
             <div className="space-y-4">
               <label>
-                <span className="finance-label">Funding account</span>
+                <span className="finance-label">{tx("Funding account")}</span>
                 <select
                   className="finance-field"
                   value={safe._id}
@@ -220,14 +227,17 @@ export function SafeSpendingPolicies({
                 >
                   {safes.map((s) => (
                     <option key={s._id} value={s._id}>
-                      {s.name || `${getChainName(s.chainId)} account`}
+                      {s.name ||
+                        tx("{{value1}} account", {
+                          value1: getChainName(s.chainId),
+                        })}
                       {s.name ? ` · ${getChainName(s.chainId)}` : ""} ·{" "}
                       {chainEnvironment(s.chainId) === "test"
-                        ? "Test"
+                        ? tx("Test")
                         : chainEnvironment(s.chainId) === "production"
-                          ? "Business"
-                          : "Unclassified"}
-                      {s.isActive === false ? " · Archived" : ""}
+                          ? tx("Business")
+                          : tx("Unclassified")}
+                      {s.isActive === false ? tx(" · Archived") : ""}
                     </option>
                   ))}
                 </select>
@@ -235,34 +245,38 @@ export function SafeSpendingPolicies({
               {!!module && (
                 <details className="text-sm text-slate-400">
                   <summary className="cursor-pointer">
-                    Advanced policy settings
+                    {tx("Advanced policy settings")}
                   </summary>
                   <label className="mt-3 block">
-                    <span className="finance-label">Allowance module</span>
+                    <span className="finance-label">
+                      {tx("Allowance module")}
+                    </span>
                     <select
                       className="finance-field"
                       value={module.address}
-                      aria-label="Allowance module"
+                      aria-label={tx("Allowance module")}
                       onChange={(e) => setModuleAddress(e.target.value)}
                     >
                       {deployments.map((d) => (
                         <option key={d.address} value={d.address}>
-                          Version {d.version}
+                          {tx("Version")} {d.version}
                           {d.legacy
-                            ? " · Legacy — revoke only"
-                            : " · Current"}{" "}
+                            ? tx(" · Legacy — revoke only")
+                            : tx(" · Current")}{" "}
                           · {shortAddress(d.address)}
                         </option>
                       ))}
                     </select>
                   </label>
                   <p className="mt-2 text-xs">
-                    Each version has separate allowances. Review all versions
-                    when removing spending access.
+                    {tx(
+                      "Each version has separate allowances. Review all versions when removing spending access.",
+                    )}
                   </p>
                   {snapshot.data && (
                     <p className="mt-2 text-xs">
-                      Verified at block {snapshot.data.blockNumber.toString()}
+                      {tx("Verified at block")}{" "}
+                      {snapshot.data.blockNumber.toString()}
                     </p>
                   )}
                 </details>
@@ -270,17 +284,16 @@ export function SafeSpendingPolicies({
             </div>
             {safe.isActive === false && (
               <p className="text-sm text-[var(--ws-warning)]">
-                This account is archived in Disburse. Existing allowances can
-                still authorize transfers. Review and revoke spending access
-                here; new grants are disabled.
+                {tx(
+                  "This account is archived in Disburse. Existing allowances can still authorize transfers. Review and revoke spending access here; new grants are disabled.",
+                )}
               </p>
             )}
             {module?.legacy && (
               <p role="alert" className="text-sm leading-6 text-amber-300">
-                This older spending module has a known replay vulnerability. New
-                grants and payments are disabled in Disburse. Account owners
-                should revoke existing grants and recreate reviewed limits on
-                the current version.
+                {tx(
+                  "This older spending module has a known replay vulnerability. New grants and payments are disabled in Disburse. Account owners should revoke existing grants and recreate reviewed limits on the current version.",
+                )}
               </p>
             )}
             {module &&
@@ -288,22 +301,24 @@ export function SafeSpendingPolicies({
               snapshot.data &&
               !supportsCurrentAllowance(snapshot.data.safeVersion) && (
                 <p role="alert" className="text-sm text-amber-500">
-                  This account version cannot create new spending grants in
-                  Disburse. Supported accounts use Safe 1.3.0 or 1.4.1.
+                  {tx(
+                    "This account version cannot create new spending grants in Disburse. Supported accounts use Safe 1.3.0 or 1.4.1.",
+                  )}
                 </p>
               )}
             {!module ? (
               <p className="text-sm text-slate-400">
-                No supported allowance deployment is configured for this
-                network. Manage its policies in Safe.
+                {tx(
+                  "No supported allowance deployment is configured for this network. Manage its policies in Safe.",
+                )}
               </p>
             ) : snapshot.isPending ? (
               <p className="text-sm text-slate-400">
-                Reading allowances from the network…
+                {tx("Reading allowances from the network…")}
               </p>
             ) : snapshot.isError ? (
               <p role="alert" className="text-sm text-red-400">
-                Could not verify current allowances:{" "}
+                {tx("Could not verify current allowances:")}{" "}
                 {userErrorMessage(
                   snapshot.error,
                   "The account could not be checked. Try again shortly.",
@@ -315,8 +330,8 @@ export function SafeSpendingPolicies({
                   <div className="flex flex-wrap items-center justify-between gap-3">
                     <p className="text-sm text-slate-300">
                       {snapshot.data.moduleEnabled
-                        ? "Delegated spending is active"
-                        : "Delegated spending is not active"}
+                        ? tx("Delegated spending is active")
+                        : tx("Delegated spending is not active")}
                     </p>
                     <div className="flex gap-2">
                       <Button
@@ -325,14 +340,14 @@ export function SafeSpendingPolicies({
                         disabled={snapshot.isFetching}
                         onClick={() => void snapshot.refetch()}
                       >
-                        Refresh
+                        {tx("Refresh")}
                       </Button>
                       {canManage &&
                         safe.isActive !== false &&
                         !module.legacy &&
                         supportsCurrentAllowance(snapshot.data.safeVersion) && (
                           <Button size="sm" onClick={openGrant}>
-                            Set allowance
+                            {tx("Set allowance")}
                           </Button>
                         )}
                     </div>
@@ -342,12 +357,12 @@ export function SafeSpendingPolicies({
                       <table className="finance-table">
                         <thead>
                           <tr>
-                            <th>Team member</th>
-                            <th>Allowance</th>
-                            <th>Available</th>
-                            <th>Reset interval</th>
+                            <th>{tx("Team member")}</th>
+                            <th>{tx("Allowance")}</th>
+                            <th>{tx("Available")}</th>
+                            <th>{tx("Reset interval")}</th>
                             <th>
-                              <span className="sr-only">Manage</span>
+                              <span className="sr-only">{tx("Manage")}</span>
                             </th>
                           </tr>
                         </thead>
@@ -360,8 +375,8 @@ export function SafeSpendingPolicies({
                                 </span>
                                 <span className="mt-1 block text-xs text-slate-500">
                                   {snapshot.data!.moduleEnabled
-                                    ? "Active"
-                                    : "Suspended — module disabled"}
+                                    ? tx("Active")
+                                    : tx("Suspended — module disabled")}
                                 </span>
                               </td>
                               <td className="tabular-nums">
@@ -377,9 +392,14 @@ export function SafeSpendingPolicies({
                                 )}
                               </td>
                               <td>
-                                {ALLOWANCE_PERIODS.find(
-                                  (p) => p.minutes === row.resetMinutes,
-                                )?.label ?? `Every ${row.resetMinutes} minutes`}
+                                {tx(
+                                  ALLOWANCE_PERIODS.find(
+                                    (p) => p.minutes === row.resetMinutes,
+                                  )?.label ??
+                                    tx("Every {{value1}} minutes", {
+                                      value1: row.resetMinutes,
+                                    }),
+                                )}
                               </td>
                               <td>
                                 {canManage && (
@@ -394,7 +414,7 @@ export function SafeSpendingPolicies({
                                       setError("");
                                     }}
                                   >
-                                    Revoke
+                                    {tx("Revoke")}
                                   </Button>
                                 )}
                               </td>
@@ -405,13 +425,14 @@ export function SafeSpendingPolicies({
                     </div>
                   ) : (
                     <p className="rounded-lg bg-navy-900 p-4 text-sm text-slate-400">
-                      No allowances recorded in this module.
+                      {tx("No allowances recorded in this module.")}
                     </p>
                   )}
                   {!canManage && (
                     <p className="text-xs text-slate-400">
-                      An organization admin can request a change. Account
-                      approvers authorize it before it takes effect.
+                      {tx(
+                        "An organization admin can request a change. Account approvers authorize it before it takes effect.",
+                      )}
                     </p>
                   )}
                 </>
@@ -423,7 +444,7 @@ export function SafeSpendingPolicies({
               target="_blank"
               rel="noreferrer"
             >
-              Advanced account details in Safe
+              {tx("Advanced account details in Safe")}
               <ExternalLink size={14} />
             </a>
           </>
@@ -443,51 +464,53 @@ export function SafeSpendingPolicies({
             className="rounded-lg border border-accent-500/30 bg-accent-500/5 p-4 text-sm text-slate-300"
           >
             <p>
-              Policy change proposed. It takes effect only after the required
-              account approvals and execution. Review it in Policy approvals
-              above.
+              {tx(
+                "Policy change proposed. It takes effect only after the required account approvals and execution. Review it in Policy approvals above.",
+              )}
             </p>
           </div>
         )}
         <p className="text-xs leading-5 text-slate-500">
-          Allowances permit transfers to any address. They do not enforce
-          Disburse recipient lists, per-payment limits, or app roles. Removing a
-          team member does not revoke a grant. Owners retain full account
-          authority. Check every module version and other installed modules in
-          the account when offboarding someone. Payments with one or more
-          recipients can use an allowance inside Disburse when it covers every
-          payment and the reviewed fee.
+          {tx(
+            "Allowances permit transfers to any address. They do not enforce Disburse recipient lists, per-payment limits, or app roles. Removing a team member does not revoke a grant. Owners retain full account authority. Check every module version and other installed modules in the account when offboarding someone. Payments with one or more recipients can use an allowance inside Disburse when it covers every payment and the reviewed fee.",
+          )}
         </p>
       </div>
       {editing && safe && module && (
         <Dialog
-          title={revoking ? "Revoke allowance" : "Set delegated allowance"}
+          title={
+            revoking ? tx("Revoke allowance") : tx("Set delegated allowance")
+          }
           onClose={() => {
             if (!busy) setEditing(false);
           }}
         >
           <div className="space-y-5 p-6">
             <p className="text-sm text-slate-400">
-              {getChainName(safe.chainId)} · {shortAddress(safe.safeAddress)} ·
-              module {module.version}
+              {getChainName(safe.chainId)} · {shortAddress(safe.safeAddress)}{" "}
+              {tx("· module")} {module.version}
             </p>
             {error && (
               <p role="alert" className="text-sm text-red-400">
-                {error}
+                {tx(error)}
               </p>
             )}
             {revoking ? (
               <p className="text-sm text-slate-300">
-                Revoke {name(revoking.delegate)}’s allowance of{" "}
-                {formatAmount(revoking, revoking.amount)}. The delegate can
-                still spend until this transaction executes. Other currencies
-                and modules are unaffected.
+                {tx("Revoke")} {name(revoking.delegate)}
+                {tx("’s allowance of")}{" "}
+                {formatAmount(revoking, revoking.amount)}
+                {tx(
+                  ". The delegate can still spend until this transaction executes. Other currencies and modules are unaffected.",
+                )}
               </p>
             ) : (
               <>
                 <label className="block">
                   <span className="finance-label">
-                    {circle ? "Assigned payment account" : "Team member"}
+                    {circle
+                      ? tx("Assigned payment account")
+                      : tx("Team member")}
                   </span>
                   <select
                     className="finance-field"
@@ -495,13 +518,15 @@ export function SafeSpendingPolicies({
                     onChange={(e) => setDelegate(e.target.value)}
                   >
                     <option value="">
-                      {circle ? "Choose a member’s account" : "Choose a member"}
+                      {circle
+                        ? tx("Choose a member’s account")
+                        : tx("Choose a member")}
                     </option>
                     {circle
                       ? assignedAccounts.map((s) => (
                           <option key={s._id} value={s.safeAddress}>
                             {name(s.safeAddress)} ·{" "}
-                            {s.name ?? "Payment account"}
+                            {s.name ?? tx("Payment account")}
                           </option>
                         ))
                       : members
@@ -529,15 +554,14 @@ export function SafeSpendingPolicies({
                 </label>
                 {circle && !assignedAccounts.length && (
                   <p className="text-sm text-[var(--ws-muted)]">
-                    Create an assigned payment account for the member in
-                    Settings → Funding accounts first. Its own USDC balance pays
-                    execution costs; this allowance controls the separate
-                    company funds it can send.
+                    {tx(
+                      "Create an assigned payment account for the member in Settings → Funding accounts first. Its own USDC balance pays execution costs; this allowance controls the separate company funds it can send.",
+                    )}
                   </p>
                 )}
                 <div className="grid grid-cols-2 gap-4">
                   <label>
-                    <span className="finance-label">Currency</span>
+                    <span className="finance-label">{tx("Currency")}</span>
                     <select
                       className="finance-field"
                       value={token}
@@ -549,7 +573,7 @@ export function SafeSpendingPolicies({
                     </select>
                   </label>
                   <label>
-                    <span className="finance-label">Allowance</span>
+                    <span className="finance-label">{tx("Allowance")}</span>
                     <input
                       className="finance-field"
                       inputMode="decimal"
@@ -560,7 +584,7 @@ export function SafeSpendingPolicies({
                   </label>
                 </div>
                 <label className="block">
-                  <span className="finance-label">Reset interval</span>
+                  <span className="finance-label">{tx("Reset interval")}</span>
                   <select
                     className="finance-field"
                     value={resetMinutes}
@@ -568,32 +592,32 @@ export function SafeSpendingPolicies({
                   >
                     {ALLOWANCE_PERIODS.map((p) => (
                       <option key={p.minutes} value={p.minutes}>
-                        {p.label}
+                        {tx(p.label)}
                       </option>
                     ))}
                   </select>
                 </label>
                 <p className="text-xs leading-5 text-slate-400">
-                  Fixed intervals start from the module’s reset anchor, not
-                  calendar months. Updating an allowance preserves spending
-                  already used. One-time allowances have no expiry and remain
-                  until spent or revoked.{" "}
+                  {tx(
+                    "Fixed intervals start from the module’s reset anchor, not calendar months. Updating an allowance preserves spending already used. One-time allowances have no expiry and remain until spent or revoked.",
+                  )}{" "}
                   {snapshot.data?.moduleEnabled
                     ? ""
-                    : "This proposal also enables the allowance module."}
+                    : tx("This proposal also enables the allowance module.")}
                 </p>
               </>
             )}
             <div className="space-y-3 rounded-lg border border-[var(--ws-border)] p-4">
               {circle ? (
                 <p className="text-sm text-[var(--ws-muted)]">
-                  The company account pays the execution fee in USDC. Review the
-                  exact limit after the account approves this policy.
+                  {tx(
+                    "The company account pays the execution fee in USDC. Review the exact limit after the account approves this policy.",
+                  )}
                 </p>
               ) : (
                 <>
                   <label className="block">
-                    <span className="finance-label">Execution fee</span>
+                    <span className="finance-label">{tx("Execution fee")}</span>
                     <select
                       className="finance-field"
                       value={feeMethod}
@@ -602,16 +626,20 @@ export function SafeSpendingPolicies({
                         setAcknowledged(false);
                       }}
                     >
-                      <option value="managed">Pay from this account</option>
+                      <option value="managed">
+                        {tx("Pay from this account")}
+                      </option>
                       <option value="wallet">
-                        Pay network fees from my signing wallet
+                        {tx("Pay network fees from my signing wallet")}
                       </option>
                     </select>
                   </label>
                   {feeMethod === "managed" ? (
                     <>
                       <label className="block">
-                        <span className="finance-label">Fee currency</span>
+                        <span className="finance-label">
+                          {tx("Fee currency")}
+                        </span>
                         <select
                           className="finance-field"
                           value={feeToken}
@@ -634,24 +662,26 @@ export function SafeSpendingPolicies({
                             feeQuote.fee.token,
                             true,
                           )}{" "}
-                          {feeQuote.fee.token} from{" "}
-                          {safe.name ?? "this account"} when the policy is
-                          applied. This fee is included in the account approval.
+                          {feeQuote.fee.token} {tx("from")}{" "}
+                          {safe.name ?? tx("this account")}{" "}
+                          {tx(
+                            "when the policy is applied. This fee is included in the account approval.",
+                          )}
                         </p>
                       ) : (
                         <p
                           role={feeQuote?.error ? "alert" : "status"}
                           className="text-sm text-[var(--ws-muted)]"
                         >
-                          {feeQuote?.error ?? "Checking the execution fee…"}
+                          {feeQuote?.error ?? tx("Checking the execution fee…")}
                         </p>
                       )}
                     </>
                   ) : (
                     <p className="text-sm text-[var(--ws-muted)]">
-                      The signing wallet pays the network fee when an approver
-                      applies this policy. Your wallet shows the estimate before
-                      sending.
+                      {tx(
+                        "The signing wallet pays the network fee when an approver applies this policy. Your wallet shows the estimate before sending.",
+                      )}
                     </p>
                   )}
                 </>
@@ -666,8 +696,12 @@ export function SafeSpendingPolicies({
               />
               <span>
                 {revoking
-                  ? "I understand that revocation requires owner approvals and execution."
-                  : "I authorize this payment account to transfer the allowed currency to any address within this allowance, independently of Disburse’s approval rules."}
+                  ? tx(
+                      "I understand that revocation requires owner approvals and execution.",
+                    )
+                  : tx(
+                      "I authorize this payment account to transfer the allowed currency to any address within this allowance, independently of Disburse’s approval rules.",
+                    )}
               </span>
             </label>
             <Button
@@ -680,7 +714,9 @@ export function SafeSpendingPolicies({
               }
               onClick={() => void submit()}
             >
-              {busy ? "Preparing proposal…" : "Request account approval"}
+              {busy
+                ? tx("Preparing proposal…")
+                : tx("Request account approval")}
             </Button>
           </div>
         </Dialog>

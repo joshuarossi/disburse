@@ -1,3 +1,4 @@
+import { tx, useWorkspaceLanguage } from "@/lib/workspaceI18n";
 import { useState } from "react";
 import { useParams } from "react-router-dom";
 import { useAccount } from "wagmi";
@@ -12,6 +13,7 @@ import { AccountingTab } from "./reports/AccountingTab";
 type TabType = "transactions" | "spending" | "audit" | "accounting";
 
 export default function Reports() {
+  useWorkspaceLanguage();
   const { orgId } = useParams<{ orgId: string }>();
   const { address } = useAccount();
   const { t } = useTranslation();
@@ -24,7 +26,11 @@ export default function Reports() {
       icon: FileText,
     },
     { id: "spending" as const, label: t("reports.tabs.spending"), icon: Users },
-    { id: "accounting" as const, label: "Reconciliation", icon: ClipboardList },
+    {
+      id: "accounting" as const,
+      label: tx("Reconciliation"),
+      icon: ClipboardList,
+    },
     {
       id: "audit" as const,
       label: t("reports.tabs.audit"),
@@ -42,7 +48,7 @@ export default function Reports() {
 
         {/* Tab Navigation */}
         <div className="border-b border-white/10">
-          <nav className="workspace-tabs" aria-label="Report sections">
+          <nav className="workspace-tabs" aria-label={tx("Report sections")}>
             {tabs.map((tab) => {
               const Icon = tab.icon;
               return (
@@ -54,7 +60,7 @@ export default function Reports() {
                   className="flex items-center gap-2"
                 >
                   <Icon className="h-4 w-4" />
-                  {tab.label}
+                  {tx(tab.label)}
                 </button>
               );
             })}

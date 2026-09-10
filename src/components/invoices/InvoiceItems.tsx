@@ -1,3 +1,4 @@
+import { tx, useWorkspaceLanguage } from "@/lib/workspaceI18n";
 import { invoiceLineAmount } from "../../../shared/receivables";
 import { formatMoney } from "@/lib/formatMoney";
 
@@ -8,16 +9,17 @@ export function InvoiceItems({
   items: { description: string; quantity: number; unitPrice: string }[];
   token: string;
 }) {
+  useWorkspaceLanguage();
   return (
     <div
       className="overflow-x-auto"
       tabIndex={0}
       role="region"
-      aria-label="Invoice items"
+      aria-label={tx("Invoice items")}
     >
       <ul
         className="sm:hidden print:hidden space-y-4"
-        aria-label="Invoice line items"
+        aria-label={tx("Invoice line items")}
       >
         {items.map((item, index) => (
           <li
@@ -37,10 +39,10 @@ export function InvoiceItems({
       <table className="workspace-table invoice-items hidden sm:table print:table">
         <thead>
           <tr>
-            <th>Description</th>
-            <th>Qty</th>
-            <th>Unit price</th>
-            <th>Amount</th>
+            <th>{tx("Description")}</th>
+            <th>{tx("Qty")}</th>
+            <th>{tx("Unit price")}</th>
+            <th>{tx("Amount")}</th>
           </tr>
         </thead>
         <tbody>
@@ -59,7 +61,7 @@ export function InvoiceItems({
         </tbody>
       </table>
       <p className="mt-2 text-right text-xs text-slate-400">
-        Amounts in {token}
+        {tx("Amounts in")} {token}
       </p>
     </div>
   );

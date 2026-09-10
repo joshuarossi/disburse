@@ -1,3 +1,4 @@
+import { tx, useWorkspaceLanguage, workspaceLocale } from "@/lib/workspaceI18n";
 import { useState } from "react";
 import { useQuery as useConvexQuery } from "convex/react";
 import { useQuery } from "@tanstack/react-query";
@@ -51,6 +52,7 @@ export function MemberAccess({
   onClose: () => void;
   onManage?: (tab: "limits" | "delegation") => void;
 }) {
+  useWorkspaceLanguage();
   const sessionToken = useSessionToken();
   const { environment } = useActivityEnvironment();
   const args = sessionToken ? { orgId, sessionToken } : "skip";
@@ -71,43 +73,51 @@ export function MemberAccess({
       : "No app limit";
   return (
     <Dialog
-      title={`Access for ${member?.name || "team member"}`}
+      title={tx("Access for {{value1}}", {
+        value1: member?.name || "team member",
+      })}
       onClose={onClose}
     >
       <div className="space-y-6 p-5 sm:p-6">
         {!members ? (
           <LoadingRows />
         ) : !member ? (
-          <Notice>This membership is no longer available.</Notice>
+          <Notice>{tx("This membership is no longer available.")}</Notice>
         ) : (
           <>
             <div>
-              <p className="font-semibold">{roles[member.role][0]}</p>
+              <p className="font-semibold">{tx(roles[member.role][0])}</p>
               <p className="workspace-description mt-1">
-                {roles[member.role][1]}
+                {tx(roles[member.role][1])}
               </p>
               <details className="mt-3 text-xs text-slate-400">
-                <summary className="cursor-pointer">Sign-in identity</summary>
+                <summary className="cursor-pointer">
+                  {tx("Sign-in identity")}
+                </summary>
                 <p className="mt-2 break-all font-mono">
                   {member.walletAddress}
                 </p>
                 <p className="mt-1">
-                  {member.email || "No email added"}
-                  {member.emailVerifiedAt ? " · Email verified" : ""}
+                  {member.email || tx("No email added")}
+                  {member.emailVerifiedAt ? tx(" · Email verified") : ""}
                 </p>
               </details>
             </div>
             {member.status !== "active" && (
               <Notice tone="info">
                 {member.status === "invited"
-                  ? "No workspace access until this invitation is accepted."
-                  : "Workspace access is inactive."}{" "}
-                Existing account ownership and spending grants still need a
-                separate review.
+                  ? tx("No workspace access until this invitation is accepted.")
+                  : tx("Workspace access is inactive.")}{" "}
+                {tx(
+                  "Existing account ownership and spending grants still need a separate review.",
+                )}
               </Notice>
             )}
-            <section aria-label="Payment permissions" className="space-y-3">
-              <h3 className="font-semibold">Payments in Disburse</h3>
+            <section
+              aria-label={tx("Payment permissions")}
+              className="space-y-3"
+            >
+              <h3 className="font-semibold">{tx("Payments in Disburse")}</h3>
               <dl className="divide-y divide-white/10 text-sm">
                 {[
                   [
@@ -128,27 +138,27 @@ export function MemberAccess({
                   ],
                 ].map(([label, value]) => (
                   <div
-                    key={label}
+                    key={tx(label)}
                     className="grid gap-1 py-3 sm:grid-cols-[150px_1fr]"
                   >
-                    <dt className="text-slate-400">{label}</dt>
+                    <dt className="text-slate-400">{tx(label)}</dt>
                     <dd>{value}</dd>
                   </div>
                 ))}
               </dl>
             </section>
             <section
-              aria-label="App payment limits"
+              aria-label={tx("App payment limits")}
               className="rounded-xl border border-white/10 p-4"
             >
               <div className="flex flex-wrap items-center justify-between gap-3">
-                <h3 className="font-semibold">App payment limits</h3>
+                <h3 className="font-semibold">{tx("App payment limits")}</h3>
                 {onManage && (
                   <button
                     className="workspace-button"
                     onClick={() => onManage("limits")}
                   >
-                    Manage limits
+                    {tx("Manage limits")}
                   </button>
                 )}
               </div>
@@ -158,8 +168,8 @@ export function MemberAccess({
                   ["Per payment", limit(policy?.perPayment)],
                   ["Per UTC month", limit(policy?.perMonth)],
                 ].map(([label, value]) => (
-                  <div key={label}>
-                    <dt className="text-xs text-slate-400">{label}</dt>
+                  <div key={tx(label)}>
+                    <dt className="text-xs text-slate-400">{tx(label)}</dt>
                     <dd className="mt-1 text-sm font-medium tabular-nums">
                       {value}
                     </dd>
@@ -167,45 +177,47 @@ export function MemberAccess({
                 ))}
               </dl>
               <p className="mt-4 text-xs leading-5 text-slate-400">
-                These limits apply across the workspace's accounts to payments
-                this member creates or sends as a delegate, including reviewed
-                fees. Drafts, pending payments and completed payments count
-                toward the planned UTC month; cancellation releases the amount.
-                Account-owner approvals do not have a separate app budget.
+                {tx(
+                  "These limits apply across the workspace's accounts to payments this member creates or sends as a delegate, including reviewed fees. Drafts, pending payments and completed payments count toward the planned UTC month; cancellation releases the amount. Account-owner approvals do not have a separate app budget.",
+                )}
               </p>
               {!paymentRights && (
                 <p className="mt-2 text-xs text-slate-400">
-                  A saved limit does not give this role permission to prepare or
-                  send payments.
+                  {tx(
+                    "A saved limit does not give this role permission to prepare or send payments.",
+                  )}
                 </p>
               )}
             </section>
-            <section aria-label="Account authority" className="space-y-4">
+            <section aria-label={tx("Account authority")} className="space-y-4">
               <div className="flex flex-wrap items-center justify-between gap-3">
-                <h3 className="font-semibold">Account authority</h3>
+                <h3 className="font-semibold">{tx("Account authority")}</h3>
                 {onManage && (
                   <button
                     className="workspace-button"
                     onClick={() => onManage("delegation")}
                   >
-                    Manage spending grants
+                    {tx("Manage spending grants")}
                   </button>
                 )}
               </div>
               <p className="workspace-description">
-                Choose an account to check current ownership and spending
-                grants. Business and test accounts are labelled separately.
+                {tx(
+                  "Choose an account to check current ownership and spending grants. Business and test accounts are labelled separately.",
+                )}
               </p>
               {!activeAccounts ? (
                 <LoadingRows />
               ) : !account ? (
                 <p className="workspace-description">
-                  No active funding accounts are connected.
+                  {tx("No active funding accounts are connected.")}
                 </p>
               ) : (
                 <>
                   <label className="block">
-                    <span className="finance-label">Account to review</span>
+                    <span className="finance-label">
+                      {tx("Account to review")}
+                    </span>
                     <select
                       className="finance-field"
                       value={account._id}
@@ -236,10 +248,9 @@ export function MemberAccess({
               )}
             </section>
             <p className="border-t border-white/10 pt-4 text-xs leading-5 text-slate-400">
-              Workspace roles and app limits do not remove account authority.
-              Account owners can act outside Disburse, and spending grants allow
-              transfers to any address. Removing a member does not revoke
-              ownership or a grant.
+              {tx(
+                "Workspace roles and app limits do not remove account authority. Account owners can act outside Disburse, and spending grants allow transfers to any address. Removing a member does not revoke ownership or a grant.",
+              )}
             </p>
           </>
         )}
@@ -257,6 +268,7 @@ function AccountAuthority({
   member: TeamMember;
   assignedAccounts: FundingAccount[];
 }) {
+  useWorkspaceLanguage();
   const readiness = useAccountReadiness(account._id);
   const data = readiness.data;
   const error =
@@ -276,25 +288,26 @@ function AccountAuthority({
       </p>
       <div className="rounded-xl border border-white/10 p-4">
         <div className="flex items-center justify-between gap-3">
-          <h4 className="text-sm font-semibold">Approval authority</h4>
+          <h4 className="text-sm font-semibold">{tx("Approval authority")}</h4>
           <button
-            aria-label="Refresh account authority"
+            aria-label={tx("Refresh account authority")}
             className="workspace-button"
             disabled={readiness.isFetching}
             onClick={() => void readiness.refetch()}
           >
             <RefreshCw size={14} />
-            <span>Refresh</span>
+            <span>{tx("Refresh")}</span>
           </button>
         </div>
         {readiness.isPending ? (
           <p role="status" className="mt-3 text-sm text-slate-400">
-            Checking current account owners…
+            {tx("Checking current account owners…")}
           </p>
         ) : error ? (
           <p role="alert" className="mt-3 text-sm text-red-400">
-            Account authority could not be verified. Refresh before relying on
-            this summary.
+            {tx(
+              "Account authority could not be verified. Refresh before relying on this summary.",
+            )}
           </p>
         ) : (
           data && (
@@ -302,20 +315,25 @@ function AccountAuthority({
               <p className="mt-3 text-sm">
                 {owner
                   ? canPay(member)
-                    ? "Can sign for this account"
-                    : "Account owner · Cannot sign through this workspace role"
-                  : "Not an account owner"}
+                    ? tx("Can sign for this account")
+                    : tx(
+                        "Account owner · Cannot sign through this workspace role",
+                      )
+                  : tx("Not an account owner")}
               </p>
               <p className="mt-2 text-xs leading-5 text-slate-400">
-                {data.threshold} of {data.owners.length} account owners must
-                approve each owner-authorized payment.
+                {data.threshold} {tx("of")} {data.owners.length}{" "}
+                {tx(
+                  "account owners must approve each owner-authorized payment.",
+                )}
                 {owner && data.threshold && data.threshold > 1
-                  ? " This member cannot authorize a payment alone."
+                  ? tx(" This member cannot authorize a payment alone.")
                   : ""}
               </p>
               <p className="mt-2 text-xs text-slate-400">
-                Checked {new Date(data.checkedAt).toLocaleTimeString()} · Block{" "}
-                {data.blockNumber}
+                {tx("Checked")}{" "}
+                {new Date(data.checkedAt).toLocaleTimeString(workspaceLocale())}{" "}
+                {tx("· Block")} {data.blockNumber}
               </p>
             </>
           )
@@ -324,11 +342,13 @@ function AccountAuthority({
       {!error && data && (
         <>
           <h4 className="text-sm font-semibold">
-            Spending without owner approvals
+            {tx("Spending without owner approvals")}
           </h4>
           {!modules.length ? (
             <p className="workspace-description">
-              No supported spending module is configured for this network.
+              {tx(
+                "No supported spending module is configured for this network.",
+              )}
             </p>
           ) : (
             modules.map((module) => (
@@ -342,10 +362,9 @@ function AccountAuthority({
             ))
           )}
           <p className="text-xs leading-5 text-slate-400">
-            Each grant is separate. Available allowance is a contract limit, not
-            an account balance or a reservation of funds. Payment and fee checks
-            still apply. This review covers supported Safe allowance versions;
-            other installed modules require a separate review.
+            {tx(
+              "Each grant is separate. Available allowance is a contract limit, not an account balance or a reservation of funds. Payment and fee checks still apply. This review covers supported Safe allowance versions; other installed modules require a separate review.",
+            )}
           </p>
         </>
       )}
@@ -364,6 +383,7 @@ function MemberGrants({
   module: AllowanceDeployment;
   assignedAccounts: FundingAccount[];
 }) {
+  useWorkspaceLanguage();
   const [selectedDelegate, setDelegate] = useState("");
   const delegate =
     selectedDelegate ||
@@ -394,29 +414,35 @@ function MemberGrants({
   );
   return (
     <section
-      aria-label={`Spending grants version ${module.version}`}
+      aria-label={tx("Spending grants version {{value1}}", {
+        value1: module.version,
+      })}
       className="space-y-3 rounded-xl border border-white/10 p-4"
     >
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h5 className="text-sm font-medium">
-          {module.legacy ? "Legacy spending grants" : "Current spending grants"}{" "}
+          {module.legacy
+            ? tx("Legacy spending grants")
+            : tx("Current spending grants")}{" "}
           <span className="text-xs font-normal text-slate-400">
             · {module.version}
           </span>
         </h5>
         <button
           className="workspace-button"
-          aria-label={`Refresh grants version ${module.version}`}
+          aria-label={tx("Refresh grants version {{value1}}", {
+            value1: module.version,
+          })}
           disabled={snapshot.isFetching}
           onClick={() => void snapshot.refetch()}
         >
           <RefreshCw size={14} />
-          <span>Refresh</span>
+          <span>{tx("Refresh")}</span>
         </button>
       </div>
       {!!assignedAccounts.length && (
         <label className="block">
-          <span className="finance-label">Spending identity</span>
+          <span className="finance-label">{tx("Spending identity")}</span>
           <select
             className="finance-field"
             value={delegate}
@@ -428,42 +454,42 @@ function MemberGrants({
               </option>
             ))}
             <option value={member.walletAddress}>
-              Signing wallet · earlier grants
+              {tx("Signing wallet · earlier grants")}
             </option>
           </select>
         </label>
       )}
       {snapshot.isPending ? (
         <p role="status" className="text-sm text-slate-400">
-          Checking this member's spending grants…
+          {tx("Checking this member's spending grants…")}
         </p>
       ) : snapshot.isError ? (
         <p role="alert" className="text-sm text-red-400">
-          Spending grants could not be verified. Refresh to retry.
+          {tx("Spending grants could not be verified. Refresh to retry.")}
         </p>
       ) : (
         snapshot.data && (
           <>
             {!snapshot.data.allowances.length ? (
               <p className="text-sm text-slate-400">
-                No grants recorded for this member in this version.
+                {tx("No grants recorded for this member in this version.")}
               </p>
             ) : (
               <>
                 {module.legacy && (
                   <Notice>
-                    This older module has a known replay vulnerability. Replace
-                    these grants before sending through Disburse. Existing
-                    on-chain authority remains until owners revoke it.
+                    {tx(
+                      "This older module has a known replay vulnerability. Replace these grants before sending through Disburse. Existing on-chain authority remains until owners revoke it.",
+                    )}
                   </Notice>
                 )}
                 {(!snapshot.data.moduleEnabled || !registered) && (
                   <p className="text-sm text-amber-500">
-                    These grants are dormant:{" "}
+                    {tx("These grants are dormant:")}{" "}
                     {snapshot.data.moduleEnabled
-                      ? "the delegate is not registered"
-                      : "the module is disabled"}
-                    . They currently permit no transfers.
+                      ? tx("the delegate is not registered")
+                      : tx("the module is disabled")}
+                    {tx(". They currently permit no transfers.")}
                   </p>
                 )}
                 {snapshot.data.allowances.map((grant) => {
@@ -489,38 +515,48 @@ function MemberGrants({
                       className="space-y-2 border-t border-white/10 pt-3 text-sm"
                     >
                       <p className="font-medium">
-                        {show(available)} available under this grant
+                        {show(available)} {tx("available under this grant")}
                       </p>
                       <p className="text-xs text-slate-400">
-                        Limit {show(grant.amount)} ·{" "}
-                        {ALLOWANCE_PERIODS.find(
-                          (p) => p.minutes === grant.resetMinutes,
-                        )?.label ?? `Every ${grant.resetMinutes} minutes`}
+                        {tx("Limit")} {show(grant.amount)} ·{" "}
+                        {tx(
+                          ALLOWANCE_PERIODS.find(
+                            (p) => p.minutes === grant.resetMinutes,
+                          )?.label ??
+                            tx("Every {{value1}} minutes", {
+                              value1: grant.resetMinutes,
+                            }),
+                        )}
                       </p>
                       {grant.resetMinutes > 0 && (
                         <p className="text-xs text-slate-400">
-                          Next reset:{" "}
+                          {tx("Next reset:")}{" "}
                           {new Date(
                             (grant.lastResetMinutes + grant.resetMinutes) *
                               60_000,
-                          ).toLocaleString()}
+                          ).toLocaleString(workspaceLocale())}
                         </p>
                       )}
                       {!token && (
                         <p className="break-all text-xs text-slate-400">
-                          Unrecognized token: {grant.token}. This currency
-                          cannot be paid through Disburse.
+                          {tx("Unrecognized token:")} {grant.token}
+                          {tx(
+                            ". This currency cannot be paid through Disburse.",
+                          )}
                         </p>
                       )}
                       {exhausted && (
                         <p className="text-xs text-amber-500">
-                          This grant has exhausted its transfer counter. A new
-                          delegate is required.
+                          {tx(
+                            "This grant has exhausted its transfer counter. A new delegate is required.",
+                          )}
                         </p>
                       )}
                       {!canPay(member) && (
                         <p className="text-xs text-slate-400">
-                          This workspace role cannot use the grant in Disburse.
+                          {tx(
+                            "This workspace role cannot use the grant in Disburse.",
+                          )}
                         </p>
                       )}
                     </div>
@@ -529,7 +565,7 @@ function MemberGrants({
               </>
             )}
             <p className="text-xs text-slate-400">
-              Checked at block {snapshot.data.blockNumber.toString()}
+              {tx("Checked at block")} {snapshot.data.blockNumber.toString()}
             </p>
           </>
         )

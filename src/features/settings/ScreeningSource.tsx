@@ -1,4 +1,5 @@
-import { userErrorMessage } from '@/lib/userErrors';
+import { tx, useWorkspaceLanguage, workspaceLocale } from "@/lib/workspaceI18n";
+import { userErrorMessage } from "@/lib/userErrors";
 import { useState } from "react";
 import { useParams } from "react-router-dom";
 import { useAction, useMutation, useQuery } from "convex/react";
@@ -9,6 +10,7 @@ import { Notice } from "@/components/workspace/WorkspacePrimitives";
 import { formatDate } from "@/lib/formatMoney";
 
 export function ScreeningSource({ isAdmin }: { isAdmin: boolean }) {
+  useWorkspaceLanguage();
   const { orgId } = useParams();
   const sessionToken = useSessionToken();
   const args =
@@ -31,9 +33,7 @@ export function ScreeningSource({ isAdmin }: { isAdmin: boolean }) {
     try {
       setMessage(await operation());
     } catch (e) {
-      setError(
-        userErrorMessage(e, "This screening update did not complete."),
-      );
+      setError(userErrorMessage(e, "This screening update did not complete."));
     } finally {
       setBusy("");
     }
@@ -41,84 +41,92 @@ export function ScreeningSource({ isAdmin }: { isAdmin: boolean }) {
   return (
     <section
       className="rounded-2xl border border-white/10 bg-navy-900/50 p-4 sm:p-6 space-y-4"
-      aria-label="Screening data and freshness"
+      aria-label={tx("Screening data and freshness")}
     >
-      <h2 className="text-lg font-semibold">Screening data and freshness</h2>
-      {error && <Notice>{error}</Notice>}
+      <h2 className="text-lg font-semibold">
+        {tx("Screening data and freshness")}
+      </h2>
+      {error && <Notice>{tx(error)}</Notice>}
       {message && (
         <p role="status" className="text-sm">
-          {message}
+          {tx(message)}
         </p>
       )}
       {source === undefined ? (
-        <p role="status">Checking the OFAC source…</p>
+        <p role="status">{tx("Checking the OFAC source…")}</p>
       ) : (
         <>
           {source.dataset ? (
             <dl className="grid gap-4 sm:grid-cols-2">
               <div>
-                <dt className="finance-label">Active publication</dt>
+                <dt className="finance-label">{tx("Active publication")}</dt>
                 <dd>
                   {formatDate(source.dataset.publishedAt)} ·{" "}
-                  {source.dataset.entryCount.toLocaleString()} records
+                  {source.dataset.entryCount.toLocaleString(workspaceLocale())}{" "}
+                  {tx("records")}
                 </dd>
               </div>
               <div>
-                <dt className="finance-label">Source last checked</dt>
+                <dt className="finance-label">{tx("Source last checked")}</dt>
                 <dd>
                   {source.lastCheckedAt
-                    ? new Date(source.lastCheckedAt).toLocaleString()
-                    : "Not checked"}
+                    ? new Date(source.lastCheckedAt).toLocaleString(
+                        workspaceLocale(),
+                      )
+                    : tx("Not checked")}
                 </dd>
               </div>
               <div>
-                <dt className="finance-label">Name coverage</dt>
+                <dt className="finance-label">{tx("Name coverage")}</dt>
                 <dd>
-                  {source.dataset.aliasCount.toLocaleString()} aliases,
-                  including weak aliases
+                  {source.dataset.aliasCount.toLocaleString(workspaceLocale())}{" "}
+                  {tx("aliases, including weak aliases")}
                 </dd>
               </div>
               <div>
-                <dt className="finance-label">Address coverage</dt>
+                <dt className="finance-label">{tx("Address coverage")}</dt>
                 <dd>
-                  {source.dataset.addressCount.toLocaleString()} published
-                  currency identifiers
+                  {source.dataset.addressCount.toLocaleString(
+                    workspaceLocale(),
+                  )}{" "}
+                  {tx("published currency identifiers")}
                 </dd>
               </div>
             </dl>
           ) : (
             <p className="text-sm workspace-funding-warning">
-              The versioned OFAC list has not been loaded. Screening cannot
-              report a completed no-match result yet.
+              {tx(
+                "The versioned OFAC list has not been loaded. Screening cannot report a completed no-match result yet.",
+              )}
             </p>
           )}
           {source.lastError && (
             <p className="text-sm workspace-funding-warning">
-              Last refresh: {source.lastError}
+              {tx("Last refresh:")} {tx(source.lastError)}
             </p>
           )}
           {source.refreshing && source.refreshProgress && (
             <div className="space-y-1 text-sm" role="status">
               <p>
-                Updating screening data ·{" "}
+                {tx("Updating screening data ·")}{" "}
                 {Math.floor(
                   (100 * source.refreshProgress.completed) /
                     source.refreshProgress.total,
                 )}
-                % complete
+                {tx("% complete")}
               </p>
               <progress
                 className="w-full"
-                aria-label="Screening data update"
+                aria-label={tx("Screening data update")}
                 value={source.refreshProgress.completed}
                 max={source.refreshProgress.total}
               />
             </div>
           )}
           <p className="text-sm text-slate-400">
-            The source is checked every six hours. A refresh keeps the previous
-            complete list available until the replacement is ready. Published
-            identifiers are not a complete address-risk database.
+            {tx(
+              "The source is checked every six hours. A refresh keeps the previous complete list available until the replacement is ready. Published identifiers are not a complete address-risk database.",
+            )}
           </p>
           <a
             className="workspace-action-link"
@@ -126,7 +134,7 @@ export function ScreeningSource({ isAdmin }: { isAdmin: boolean }) {
             target="_blank"
             rel="noreferrer"
           >
-            OFAC SDN source
+            {tx("OFAC SDN source")}
           </a>
           {isAdmin && (
             <div className="flex flex-wrap gap-3">
@@ -148,8 +156,8 @@ export function ScreeningSource({ isAdmin }: { isAdmin: boolean }) {
                 }
               >
                 {busy === "refresh" || source.refreshing
-                  ? "Refreshing OFAC list…"
-                  : "Refresh OFAC list"}
+                  ? tx("Refreshing OFAC list…")
+                  : tx("Refresh OFAC list")}
               </button>
               <button
                 type="button"
@@ -163,8 +171,8 @@ export function ScreeningSource({ isAdmin }: { isAdmin: boolean }) {
                 }
               >
                 {busy === "screen"
-                  ? "Queuing checks…"
-                  : "Screen all recipients"}
+                  ? tx("Queuing checks…")
+                  : tx("Screen all recipients")}
               </button>
             </div>
           )}
@@ -172,7 +180,9 @@ export function ScreeningSource({ isAdmin }: { isAdmin: boolean }) {
       )}
       <div className="border-t border-white/10 pt-4 space-y-2">
         <label className="block">
-          <span className="finance-label">Screening freshness limit</span>
+          <span className="finance-label">
+            {tx("Screening freshness limit")}
+          </span>
           <select
             className="finance-field sm:max-w-sm"
             value={org?.screeningMaxAgeHours ?? 24}
@@ -188,15 +198,15 @@ export function ScreeningSource({ isAdmin }: { isAdmin: boolean }) {
               })
             }
           >
-            <option value={24}>24 hours</option>
-            <option value={72}>3 days</option>
-            <option value={168}>7 days</option>
+            <option value={24}>{tx("24 hours")}</option>
+            <option value={72}>{tx("3 days")}</option>
+            <option value={168}>{tx("7 days")}</option>
           </select>
         </label>
         <p className="text-sm text-slate-400">
-          Applies to both the source check and each recipient result. Warn and
-          Block also cover missing checks, changed details, expired decisions
-          and checks that could not complete.
+          {tx(
+            "Applies to both the source check and each recipient result. Warn and Block also cover missing checks, changed details, expired decisions and checks that could not complete.",
+          )}
         </p>
       </div>
     </section>

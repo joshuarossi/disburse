@@ -22,7 +22,7 @@ Live evidence and scope: [customer-paid services](CUSTOMER_PAID_SERVICES_QA_2026
 
 ## Remaining implementation and acceptance
 
-The active work list is [TODOS.md](../TODOS.md). The complete two-parent-owner finance cycle now passes through exact Sepolia settlement and a balanced journal/evidence export. The first-release finance workspace is consistently English; landing, pricing and help retain translated language preferences. Eleven actual built workspace routes pass desktop/light and mobile/dark review (22 views); mobile amounts/actions, screen-reader headings, account-name loading, zero-balance summaries and duplicate/singular labels were corrected. No requirement is marked complete solely because its fixtures pass.
+The active work list is [TODOS.md](../TODOS.md). The complete two-parent-owner finance cycle now passes through exact Sepolia settlement and a balanced journal/evidence export. The finance workspace, public invoice and recipient forms, and onboarding support English, Spanish and Brazilian Portuguese with a shared saved preference. See [localization](LOCALIZATION.md) for scope and verification. Eleven actual built workspace routes pass desktop/light and mobile/dark review (22 views); mobile amounts/actions, screen-reader headings, account-name loading, zero-balance summaries and duplicate/singular labels were corrected. No requirement is marked complete solely because its fixtures pass.
 
 | External gate | Evidence needed before relying on it |
 | --- | --- |

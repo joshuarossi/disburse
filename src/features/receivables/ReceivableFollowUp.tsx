@@ -1,3 +1,4 @@
+import { tx, useWorkspaceLanguage } from "@/lib/workspaceI18n";
 import { useState } from "react";
 import { useMutation } from "convex/react";
 import { api } from "../../../convex/_generated/api";
@@ -18,6 +19,7 @@ export function ReceivableFollowUp({
   invoice: Doc<"receivables">;
   canManage: boolean;
 }) {
+  useWorkspaceLanguage();
   const sessionToken = useSessionToken(),
     schedule = useMutation(api.receivableWorkflows.setFollowUp),
     prepared = useMutation(api.receivableWorkflows.reminderPrepared);
@@ -57,18 +59,19 @@ export function ReceivableFollowUp({
   const draft = invoiceReminder(invoice, window.location.origin);
   return (
     <section
-      aria-label="Payment reminders"
+      aria-label={tx("Payment reminders")}
       className="space-y-3 rounded-xl border border-slate-400/20 p-4"
     >
-      <h3 className="font-semibold">Follow up on payment</h3>
+      <h3 className="font-semibold">{tx("Follow up on payment")}</h3>
       <p className="workspace-description">
-        Prepare a reminder for your own email app, or copy it to share. Disburse
-        does not send an email.
+        {tx(
+          "Prepare a reminder for your own email app, or copy it to share. Disburse does not send an email.",
+        )}
       </p>
       <details className="text-sm">
-        <summary className="cursor-pointer">Preview reminder</summary>
-        <p className="mt-3 font-semibold">{draft.subject}</p>
-        <p className="mt-2 whitespace-pre-wrap break-words">{draft.body}</p>
+        <summary className="cursor-pointer">{tx("Preview reminder")}</summary>
+        <p className="mt-3 font-semibold">{tx(draft.subject)}</p>
+        <p className="mt-2 whitespace-pre-wrap break-words">{tx(draft.body)}</p>
       </details>
       <div className="flex flex-wrap gap-2">
         <button
@@ -77,7 +80,7 @@ export function ReceivableFollowUp({
           onClick={() =>
             run(async () => {
               await navigator.clipboard.writeText(
-                `${draft.subject}\n\n${draft.body}`,
+                `${tx(draft.subject)}\n\n${tx(draft.body)}`,
               );
               await prepared({
                 invoiceId: invoice._id,
@@ -91,21 +94,23 @@ export function ReceivableFollowUp({
             })
           }
         >
-          Copy reminder
+          {tx("Copy reminder")}
         </button>
         {invoice.customerEmail && (
           <a
             className="workspace-button"
-            href={`mailto:${encodeURIComponent(invoice.customerEmail)}?subject=${encodeURIComponent(draft.subject)}&body=${encodeURIComponent(draft.body)}`}
+            href={`mailto:${encodeURIComponent(invoice.customerEmail)}?subject=${encodeURIComponent(tx(draft.subject))}&body=${encodeURIComponent(tx(draft.body))}`}
           >
-            Open email draft
+            {tx("Open email draft")}
           </a>
         )}
       </div>
       <p className="workspace-description">
         {invoice.lastReminderPreparedAt
-          ? `Last copied ${formatDate(invoice.lastReminderPreparedAt)}. Delivery is not tracked.`
-          : "No reminder has been copied yet."}
+          ? tx("Last copied {{value1}}. Delivery is not tracked.", {
+              value1: formatDate(invoice.lastReminderPreparedAt),
+            })
+          : tx("No reminder has been copied yet.")}
       </p>
       <form
         className="flex flex-wrap items-end gap-2"
@@ -126,7 +131,7 @@ export function ReceivableFollowUp({
         }}
       >
         <label className="min-w-0 flex-1">
-          <span className="finance-label">Next follow-up</span>
+          <span className="finance-label">{tx("Next follow-up")}</span>
           <input
             type="date"
             className="finance-field"
@@ -136,17 +141,19 @@ export function ReceivableFollowUp({
           />
         </label>
         <button className="workspace-button" disabled={busy || !sessionToken}>
-          Save follow-up
+          {tx("Save follow-up")}
         </button>
       </form>
       {invoice.followUpAt && (
         <p className="text-sm">
-          {invoice.followUpAt <= Date.now() ? "Follow-up due" : "Follow up"} ·{" "}
-          {formatDate(invoice.followUpAt)}
+          {invoice.followUpAt <= Date.now()
+            ? tx("Follow-up due")
+            : tx("Follow up")}{" "}
+          · {formatDate(invoice.followUpAt)}
         </p>
       )}
-      {error && <Notice>{error}</Notice>}
-      {message && <Notice tone="success">{message}</Notice>}
+      {error && <Notice>{tx(error)}</Notice>}
+      {message && <Notice tone="success">{tx(message)}</Notice>}
     </section>
   );
 }

@@ -1,3 +1,4 @@
+import { tx, useWorkspaceLanguage, workspaceLocale } from "@/lib/workspaceI18n";
 import { userErrorMessage } from "@/lib/userErrors";
 import { useRef, useState } from "react";
 import { useMutation, useQuery } from "convex/react";
@@ -20,6 +21,7 @@ import { useReportPages } from "./useReportPages";
 import { BookOpen } from "lucide-react";
 
 export function AccountingTab({ orgId }: { orgId?: string }) {
+  useWorkspaceLanguage();
   const { environment } = useActivityEnvironment();
   return (
     <AccountingWorkspace
@@ -36,6 +38,7 @@ function AccountingWorkspace({
   orgId?: string;
   environment: "production" | "test" | "unclassified";
 }) {
+  useWorkspaceLanguage();
   const sessionToken = useSessionToken();
   const access =
     orgId && sessionToken ? { orgId: orgId as Id<"orgs">, sessionToken } : null;
@@ -112,11 +115,16 @@ function AccountingWorkspace({
     <div className="space-y-5">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h2 className="text-lg font-semibold">Reconciliation</h2>
+          <h2 className="text-lg font-semibold">{tx("Reconciliation")}</h2>
           <p className="mt-1 text-sm text-slate-400">
             {config?.profile
-              ? `${config.profile.bookName} · Functional currency ${config.profile.currency}`
-              : "Match settled movements to your existing accounting books."}
+              ? tx("{{value1}} · Functional currency {{value2}}", {
+                  value1: config.profile.bookName,
+                  value2: config.profile.currency,
+                })
+              : tx(
+                  "Match settled movements to your existing accounting books.",
+                )}
           </p>
         </div>
         {config?.canConfigure && (
@@ -124,31 +132,38 @@ function AccountingWorkspace({
             className="workspace-button"
             onClick={() => setSettings(true)}
           >
-            {config.profile ? "Book and account settings" : "Set up accounting"}
+            {config.profile
+              ? tx("Book and account settings")
+              : tx("Set up accounting")}
           </button>
         )}
       </div>
       {view !== "balances" && (
         <p className="text-sm leading-6 text-slate-400">
-          Review each movement, connect its book reference, and prepare a
-          balanced journal only when an entry is needed. Customer collections
-          and transfers between company accounts keep their own treatment.
+          {tx(
+            "Review each movement, connect its book reference, and prepare a balanced journal only when an entry is needed. Customer collections and transfers between company accounts keep their own treatment.",
+          )}
         </p>
       )}
       {environment === "unclassified" && (
         <Notice tone="info">
-          Choose Business activity or Test activity to reconcile verified asset
-          movements.
+          {tx(
+            "Choose Business activity or Test activity to reconcile verified asset movements.",
+          )}
         </Notice>
       )}
       {config && !config.profile && (
         <Notice tone="info">
-          Set up the functional currency and import your chart of accounts
-          before preparing journals.
+          {tx(
+            "Set up the functional currency and import your chart of accounts before preparing journals.",
+          )}
         </Notice>
       )}
-      {error && <Notice>{error}</Notice>}
-      <div className="workspace-tabs" aria-label="Reconciliation sections">
+      {error && <Notice>{tx(error)}</Notice>}
+      <div
+        className="workspace-tabs"
+        aria-label={tx("Reconciliation sections")}
+      >
         {Object.entries({
           activity: "Account activity",
           receipts: "Invoice receipts",
@@ -165,7 +180,7 @@ function AccountingWorkspace({
               setError("");
             }}
           >
-            {label}
+            {tx(label)}
           </button>
         ))}
       </div>
@@ -184,25 +199,30 @@ function AccountingWorkspace({
               <section className="workspace-panel">
                 {activity?.indexing && (
                   <Notice tone="info">
-                    Account history is still being indexed. Refresh Transactions
-                    to check the full coverage.
+                    {tx(
+                      "Account history is still being indexed. Refresh Transactions to check the full coverage.",
+                    )}
                   </Notice>
                 )}
                 {!activityRows.length ? (
                   <EmptyState
                     icon={BookOpen}
-                    title="No movements on this page"
+                    title={tx("No movements on this page")}
                     description={
                       activity?.isDone === false
-                        ? "Continue to the next page to review more history."
-                        : "Settled account activity appears here after history has been refreshed."
+                        ? tx(
+                            "Continue to the next page to review more history.",
+                          )
+                        : tx(
+                            "Settled account activity appears here after history has been refreshed.",
+                          )
                     }
                   />
                 ) : (
                   <>
                     <ul
                       className="divide-y divide-white/10 md:hidden"
-                      aria-label="Account activity"
+                      aria-label={tx("Account activity")}
                     >
                       {activityRows.map((row) => (
                         <li key={row.rowId} className="space-y-3 p-4">
@@ -217,7 +237,9 @@ function AccountingWorkspace({
                           <p className="text-xs text-slate-400">
                             {new Date(row.createdAt).toISOString().slice(0, 10)}{" "}
                             · {row.network} ·{" "}
-                            {row.direction === "inflow" ? "Received" : "Sent"}
+                            {row.direction === "inflow"
+                              ? tx("Received")
+                              : tx("Sent")}
                           </p>
                           <p className="text-sm">
                             {row.accountName}
@@ -233,8 +255,8 @@ function AccountingWorkspace({
                             }
                           >
                             {row.includedInTotals
-                              ? "Review with books"
-                              : "Check evidence"}
+                              ? tx("Review with books")
+                              : tx("Check evidence")}
                           </button>
                         </li>
                       ))}
@@ -243,10 +265,10 @@ function AccountingWorkspace({
                       <table className="workspace-table">
                         <thead>
                           <tr>
-                            <th>Settled activity</th>
-                            <th>Account</th>
-                            <th className="numeric">Quantity</th>
-                            <th>Reconciliation</th>
+                            <th>{tx("Settled activity")}</th>
+                            <th>{tx("Account")}</th>
+                            <th className="numeric">{tx("Quantity")}</th>
+                            <th>{tx("Reconciliation")}</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -262,8 +284,8 @@ function AccountingWorkspace({
                                     .slice(0, 10)}{" "}
                                   · {row.network} ·{" "}
                                   {row.direction === "inflow"
-                                    ? "Received"
-                                    : "Sent"}
+                                    ? tx("Received")
+                                    : tx("Sent")}
                                 </span>
                               </td>
                               <td>
@@ -289,8 +311,8 @@ function AccountingWorkspace({
                                   }
                                 >
                                   {row.includedInTotals
-                                    ? "Review with books"
-                                    : "Check evidence"}
+                                    ? tx("Review with books")
+                                    : tx("Check evidence")}
                                 </button>
                               </td>
                             </tr>
@@ -305,21 +327,23 @@ function AccountingWorkspace({
             {view === "receipts" && (
               <section className="workspace-panel">
                 <p className="p-4 text-sm text-slate-400">
-                  Original customer receipts and forwarding transfers are shown
-                  separately. A receiving address and your main account can
-                  reference the same forwarding movement; it is reconciled once.
+                  {tx(
+                    "Original customer receipts and forwarding transfers are shown separately. A receiving address and your main account can reference the same forwarding movement; it is reconciled once.",
+                  )}
                 </p>
                 {!receipts?.page.length ? (
                   <EmptyState
                     icon={BookOpen}
-                    title="No invoice receipts on this page"
-                    description="Confirmed invoice receipts appear here, including funds still awaiting forwarding."
+                    title={tx("No invoice receipts on this page")}
+                    description={tx(
+                      "Confirmed invoice receipts appear here, including funds still awaiting forwarding.",
+                    )}
                   />
                 ) : (
                   <>
                     <ul
                       className="divide-y divide-white/10 md:hidden"
-                      aria-label="Invoice receipts"
+                      aria-label={tx("Invoice receipts")}
                     >
                       {receipts.page.map((row) => (
                         <li key={row.id} className="space-y-3 p-4">
@@ -331,16 +355,16 @@ function AccountingWorkspace({
                               {new Date(row.settledAt)
                                 .toISOString()
                                 .slice(0, 10)}{" "}
-                              · UTC
+                              {tx("· UTC")}
                             </span>
                             <span className="font-semibold tabular-nums">
-                              {row.amount || "Check evidence"} {row.token}
+                              {row.amount || tx("Check evidence")} {row.token}
                             </span>
                           </div>
                           <p className="text-xs text-slate-400">
                             {row.companyTransfer
-                              ? "Internal transfer"
-                              : "Customer receipt"}
+                              ? tx("Internal transfer")
+                              : tx("Customer receipt")}
                             {row.error
                               ? ` · ${userErrorMessage(row.error, "Receipt verification needs review")}`
                               : ""}
@@ -352,8 +376,8 @@ function AccountingWorkspace({
                             }
                           >
                             {row.state
-                              ? "View reconciliation"
-                              : "Review with books"}
+                              ? tx("View reconciliation")
+                              : tx("Review with books")}
                           </button>
                         </li>
                       ))}
@@ -362,10 +386,10 @@ function AccountingWorkspace({
                       <table className="workspace-table">
                         <thead>
                           <tr>
-                            <th>Invoice movement</th>
-                            <th>Date · UTC</th>
-                            <th className="numeric">Quantity</th>
-                            <th>Review</th>
+                            <th>{tx("Invoice movement")}</th>
+                            <th>{tx("Date · UTC")}</th>
+                            <th className="numeric">{tx("Quantity")}</th>
+                            <th>{tx("Review")}</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -377,8 +401,8 @@ function AccountingWorkspace({
                                 </span>
                                 <span className="workspace-table-secondary">
                                   {row.companyTransfer
-                                    ? "Internal transfer"
-                                    : "Customer receipt"}
+                                    ? tx("Internal transfer")
+                                    : tx("Customer receipt")}
                                   {row.error
                                     ? ` · ${userErrorMessage(row.error, "Receipt verification needs review")}`
                                     : ""}
@@ -390,7 +414,7 @@ function AccountingWorkspace({
                                   .slice(0, 10)}
                               </td>
                               <td className="numeric">
-                                {row.amount || "Check evidence"} {row.token}
+                                {row.amount || tx("Check evidence")} {row.token}
                               </td>
                               <td>
                                 <button
@@ -400,8 +424,8 @@ function AccountingWorkspace({
                                   }
                                 >
                                   {row.state
-                                    ? "View reconciliation"
-                                    : "Review with books"}
+                                    ? tx("View reconciliation")
+                                    : tx("Review with books")}
                                 </button>
                               </td>
                             </tr>
@@ -417,8 +441,9 @@ function AccountingWorkspace({
               <>
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <p className="text-sm text-slate-400">
-                    Choose reviewed journals to export. Include both parts of a
-                    correction.
+                    {tx(
+                      "Choose reviewed journals to export. Include both parts of a correction.",
+                    )}
                   </p>
                   {config?.canReview && (
                     <button
@@ -427,8 +452,12 @@ function AccountingWorkspace({
                       onClick={() => void chooseExport()}
                     >
                       {busy
-                        ? "Preparing export…"
-                        : `Prepare export${selected.length ? ` · ${selected.length}` : ""}`}
+                        ? tx("Preparing export…")
+                        : tx("Prepare export{{value1}}", {
+                            value1: selected.length
+                              ? ` · ${selected.length}`
+                              : "",
+                          })}
                     </button>
                   )}
                 </div>
@@ -436,14 +465,16 @@ function AccountingWorkspace({
                   {!journals?.page.length ? (
                     <EmptyState
                       icon={BookOpen}
-                      title="No reviewed journals yet"
-                      description="Review account activity or an invoice receipt to prepare its accounting entry."
+                      title={tx("No reviewed journals yet")}
+                      description={tx(
+                        "Review account activity or an invoice receipt to prepare its accounting entry.",
+                      )}
                     />
                   ) : (
                     <>
                       <ul
                         className="divide-y divide-white/10 md:hidden"
-                        aria-label="Reviewed journals"
+                        aria-label={tx("Reviewed journals")}
                       >
                         {journals.page.map((entry) => (
                           <li key={entry._id} className="space-y-3 p-4">
@@ -459,7 +490,9 @@ function AccountingWorkspace({
                               {entry.state === "ready" && config?.canReview && (
                                 <input
                                   type="checkbox"
-                                  aria-label={`Export ${entry.journalNumber}`}
+                                  aria-label={tx("Export {{value1}}", {
+                                    value1: entry.journalNumber,
+                                  })}
                                   checked={selected.includes(entry._id)}
                                   onChange={(e) =>
                                     setSelected((old) =>
@@ -476,31 +509,31 @@ function AccountingWorkspace({
                             </p>
                             <p className="text-xs text-slate-400">
                               {entry.reversalOf
-                                ? "Reversal"
+                                ? tx("Reversal")
                                 : accountingTreatments[entry.treatment]}
                             </p>
                             <p className="text-sm">
                               {entry.state === "ready"
-                                ? "Ready to export"
+                                ? tx("Ready to export")
                                 : entry.state === "exported"
-                                  ? "Awaiting import"
+                                  ? tx("Awaiting import")
                                   : entry.state === "void"
-                                    ? "Replaced before export"
-                                    : "Reconciled"}
+                                    ? tx("Replaced before export")
+                                    : tx("Reconciled")}
                             </p>
                             <div className="flex flex-wrap gap-2">
                               <button
                                 className="workspace-button"
                                 onClick={() => setSource(entry.fact.source)}
                               >
-                                Review movement
+                                {tx("Review movement")}
                               </button>
                               {entry.exportId && (
                                 <button
                                   className="workspace-button"
                                   onClick={() => setExportId(entry.exportId!)}
                                 >
-                                  Open original export
+                                  {tx("Open original export")}
                                 </button>
                               )}
                             </div>
@@ -512,12 +545,14 @@ function AccountingWorkspace({
                           <thead>
                             <tr>
                               <th>
-                                <span className="sr-only">Select journal</span>
+                                <span className="sr-only">
+                                  {tx("Select journal")}
+                                </span>
                               </th>
-                              <th>Journal</th>
-                              <th>Accounting date</th>
-                              <th>Book value</th>
-                              <th>Status</th>
+                              <th>{tx("Journal")}</th>
+                              <th>{tx("Accounting date")}</th>
+                              <th>{tx("Book value")}</th>
+                              <th>{tx("Status")}</th>
                             </tr>
                           </thead>
                           <tbody>
@@ -528,7 +563,9 @@ function AccountingWorkspace({
                                     config?.canReview && (
                                       <input
                                         type="checkbox"
-                                        aria-label={`Export ${entry.journalNumber}`}
+                                        aria-label={tx("Export {{value1}}", {
+                                          value1: entry.journalNumber,
+                                        })}
                                         checked={selected.includes(entry._id)}
                                         onChange={(e) =>
                                           setSelected((old) =>
@@ -548,7 +585,7 @@ function AccountingWorkspace({
                                   </span>
                                   <span className="workspace-table-secondary">
                                     {entry.reversalOf
-                                      ? "Reversal"
+                                      ? tx("Reversal")
                                       : accountingTreatments[entry.treatment]}
                                   </span>
                                 </td>
@@ -558,17 +595,17 @@ function AccountingWorkspace({
                                 </td>
                                 <td>
                                   {entry.state === "ready"
-                                    ? "Ready to export"
+                                    ? tx("Ready to export")
                                     : entry.state === "exported"
-                                      ? "Awaiting import"
+                                      ? tx("Awaiting import")
                                       : entry.state === "void"
-                                        ? "Replaced before export"
-                                        : "Reconciled"}
+                                        ? tx("Replaced before export")
+                                        : tx("Reconciled")}
                                   <button
                                     className="workspace-action-link block mt-1"
                                     onClick={() => setSource(entry.fact.source)}
                                   >
-                                    Review movement
+                                    {tx("Review movement")}
                                   </button>
                                   {entry.exportId && (
                                     <button
@@ -577,7 +614,7 @@ function AccountingWorkspace({
                                         setExportId(entry.exportId!)
                                       }
                                     >
-                                      Open original export
+                                      {tx("Open original export")}
                                     </button>
                                   )}
                                 </td>
@@ -596,8 +633,10 @@ function AccountingWorkspace({
                 {!exports?.page.length ? (
                   <EmptyState
                     icon={BookOpen}
-                    title="No journal exports yet"
-                    description="Prepare an export from the Journals tab. Existing exports can be downloaded again without creating new journal numbers."
+                    title={tx("No journal exports yet")}
+                    description={tx(
+                      "Prepare an export from the Journals tab. Existing exports can be downloaded again without creating new journal numbers.",
+                    )}
                   />
                 ) : (
                   <ul className="divide-y divide-white/10">
@@ -608,22 +647,26 @@ function AccountingWorkspace({
                       >
                         <div>
                           <p className="font-medium">
-                            {batch.entryIds.length} journal
-                            {batch.entryIds.length === 1 ? "" : "s"} ·{" "}
-                            {batch.currency}
+                            {tx("{{count}} journals", {
+                              count: batch.entryIds.length,
+                            })}{" "}
+                            · {batch.currency}
                           </p>
                           <p className="text-sm text-slate-400">
-                            {new Date(batch.createdAt).toLocaleString()} ·{" "}
+                            {new Date(batch.createdAt).toLocaleString(
+                              workspaceLocale(),
+                            )}{" "}
+                            ·{" "}
                             {batch.importedAt
-                              ? "Import confirmed"
-                              : "Awaiting import confirmation"}
+                              ? tx("Import confirmed")
+                              : tx("Awaiting import confirmation")}
                           </p>
                         </div>
                         <button
                           className="workspace-button"
                           onClick={() => setExportId(batch._id)}
                         >
-                          Open export
+                          {tx("Open export")}
                         </button>
                       </li>
                     ))}
@@ -632,7 +675,9 @@ function AccountingWorkspace({
               </section>
             )}
             <div className="flex flex-wrap items-center justify-between gap-3 text-sm">
-              <span>Page {pages.page}</span>
+              <span>
+                {tx("Page")} {pages.page}
+              </span>
               <div className="flex gap-3">
                 <button
                   className="workspace-button"
@@ -642,7 +687,7 @@ function AccountingWorkspace({
                     setSelected([]);
                   }}
                 >
-                  Previous
+                  {tx("Previous")}
                 </button>
                 <button
                   className="workspace-button"
@@ -652,7 +697,7 @@ function AccountingWorkspace({
                     setSelected([]);
                   }}
                 >
-                  Next
+                  {tx("Next")}
                 </button>
               </div>
             </div>

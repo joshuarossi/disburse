@@ -1,3 +1,4 @@
+import { tx, useWorkspaceLanguage } from "@/lib/workspaceI18n";
 import { userErrorMessage } from "@/lib/userErrors";
 import { lazy, Suspense, useState } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
@@ -32,6 +33,7 @@ import {
 } from "@/components/workspace/WorkspacePrimitives";
 
 export default function Team() {
+  useWorkspaceLanguage();
   const { orgId } = useParams();
   const { address } = useAccount();
   const sessionToken = useSessionToken();
@@ -69,8 +71,10 @@ export default function Team() {
   return (
     <>
       <PageHeader
-        title="Team & approvals"
-        description="Give each person the access and spending authority their work needs."
+        title={tx("Team & approvals")}
+        description={tx(
+          "Give each person the access and spending authority their work needs.",
+        )}
         actions={
           isAdmin && (
             <button
@@ -78,7 +82,7 @@ export default function Team() {
               onClick={() => setEditor("new")}
             >
               <Plus size={14} />
-              Invite member
+              {tx("Invite member")}
             </button>
           )
         }
@@ -86,7 +90,7 @@ export default function Team() {
       <div
         className="workspace-tabs mb-6"
         role="tablist"
-        aria-label="Team settings"
+        aria-label={tx("Team settings")}
       >
         {Object.entries({
           members: "Members",
@@ -100,21 +104,21 @@ export default function Team() {
             aria-selected={tab === key}
             onClick={() => setParams({ tab: key })}
           >
-            {label}
+            {tx(label)}
           </button>
         ))}
       </div>
       {removed && (
         <div className="mb-5">
           <Notice tone="info">
-            Workspace access was removed. Review this person's account ownership
-            and delegated spending grants; those remain active until account
-            owners revoke them.{" "}
+            {tx(
+              "Workspace access was removed. Review this person's account ownership and delegated spending grants; those remain active until account owners revoke them.",
+            )}{" "}
             <button
               className="underline"
               onClick={() => setParams({ tab: "delegation" })}
             >
-              Review delegated spending
+              {tx("Review delegated spending")}
             </button>
           </Notice>
         </div>
@@ -129,15 +133,17 @@ export default function Team() {
         <section className="workspace-panel">
           <div className="workspace-toolbar">
             <div>
-              <h2 className="text-sm font-semibold">Workspace members</h2>
+              <h2 className="text-sm font-semibold">
+                {tx("Workspace members")}
+              </h2>
               <p className="workspace-table-secondary">
-                Invited members receive access only after accepting.
+                {tx("Invited members receive access only after accepting.")}
               </p>
             </div>
             <SearchField
               value={search}
               onChange={setSearch}
-              placeholder="Search team"
+              placeholder={tx("Search team")}
             />
           </div>
           {visible === undefined ? (
@@ -145,8 +151,8 @@ export default function Team() {
           ) : !visible.length ? (
             <EmptyState
               icon={Users}
-              title="No matching members"
-              description="Search by name, email, or sign-in wallet."
+              title={tx("No matching members")}
+              description={tx("Search by name, email, or sign-in wallet.")}
             />
           ) : (
             <div className="workspace-table-wrap">
@@ -157,16 +163,16 @@ export default function Team() {
                 <thead role="rowgroup">
                   <tr role="row">
                     <th role="columnheader" scope="col">
-                      Member
+                      {tx("Member")}
                     </th>
                     <th role="columnheader" scope="col">
-                      Workspace role
+                      {tx("Workspace role")}
                     </th>
                     <th role="columnheader" scope="col">
-                      Status
+                      {tx("Status")}
                     </th>
                     <th role="columnheader" scope="col">
-                      <span className="sr-only">Actions</span>
+                      <span className="sr-only">{tx("Actions")}</span>
                     </th>
                   </tr>
                 </thead>
@@ -188,7 +194,7 @@ export default function Team() {
                                   `${m.walletAddress.slice(0, 6)}…${m.walletAddress.slice(-4)}`}
                                 {self && (
                                   <span className="ml-2 text-xs font-normal text-slate-400">
-                                    You
+                                    {tx("You")}
                                   </span>
                                 )}
                               </strong>
@@ -196,24 +202,26 @@ export default function Team() {
                                 {m.email ||
                                   `${m.walletAddress.slice(0, 8)}…${m.walletAddress.slice(-6)}`}
                                 {m.emailVerifiedAt && (
-                                  <span className="block">Email verified</span>
+                                  <span className="block">
+                                    {tx("Email verified")}
+                                  </span>
                                 )}
                               </span>
                             </span>
                           </div>
                         </td>
-                        <td role="cell" data-label="Workspace role">
-                          {roles[m.role][0]}
+                        <td role="cell" data-label={tx("Workspace role")}>
+                          {tx(roles[m.role][0])}
                         </td>
-                        <td role="cell" data-label="Status">
+                        <td role="cell" data-label={tx("Status")}>
                           <StatusBadge
                             status={m.status}
                             label={
                               m.status === "invited"
                                 ? m.invitationExpiresAt &&
                                   m.invitationExpiresAt <= Date.now()
-                                  ? "Invitation expired"
-                                  : "Invitation pending"
+                                  ? tx("Invitation expired")
+                                  : tx("Invitation pending")
                                 : undefined
                             }
                           />
@@ -222,24 +230,30 @@ export default function Team() {
                           <div className="flex justify-end gap-2">
                             <button
                               className="workspace-button"
-                              aria-label={`View access for ${m.name || "member"}`}
+                              aria-label={tx("View access for {{value1}}", {
+                                value1: m.name || "member",
+                              })}
                               onClick={() => setAccessId(m.membershipId)}
                             >
-                              View access
+                              {tx("View access")}
                             </button>
                             {(isAdmin || self) && (
                               <button
-                                aria-label={`Edit ${m.name || "member"}`}
+                                aria-label={tx("Edit {{value1}}", {
+                                  value1: m.name || "member",
+                                })}
                                 className="workspace-button"
                                 onClick={() => setEditor(m)}
                               >
                                 <Pencil size={13} />
-                                Edit
+                                {tx("Edit")}
                               </button>
                             )}
                             {isAdmin && !self && (
                               <button
-                                aria-label={`Remove ${m.name || "member"}`}
+                                aria-label={tx("Remove {{value1}}", {
+                                  value1: m.name || "member",
+                                })}
                                 className="workspace-button"
                                 onClick={() => {
                                   setError("");
@@ -259,8 +273,12 @@ export default function Team() {
             </div>
           )}
           <div className="workspace-table-footer">
-            <span>{visible?.length ?? 0} members</span>
-            <span>Account signatures require separate owner permissions</span>
+            <span>
+              {visible?.length ?? 0} {tx("members")}
+            </span>
+            <span>
+              {tx("Account signatures require separate owner permissions")}
+            </span>
           </div>
         </section>
       )}
@@ -281,7 +299,10 @@ export default function Team() {
       {accessId && (
         <Suspense
           fallback={
-            <Dialog title="Member access" onClose={() => setAccessId(null)}>
+            <Dialog
+              title={tx("Member access")}
+              onClose={() => setAccessId(null)}
+            >
               <LoadingRows />
             </Dialog>
           }
@@ -303,20 +324,24 @@ export default function Team() {
       )}
       {removing && (
         <Dialog
-          title={`Remove ${removing.name || "team member"}?`}
+          title={tx("Remove {{value1}}?", {
+            value1: removing.name || "team member",
+          })}
           onClose={() => {
             if (!busy) setRemoving(null);
           }}
         >
           <div className="space-y-5 p-6">
-            {error && <Notice>{error}</Notice>}
+            {error && <Notice>{tx(error)}</Notice>}
             <p className="workspace-description">
-              This removes workspace access. Existing payment records remain
-              available to the team.
+              {tx(
+                "This removes workspace access. Existing payment records remain available to the team.",
+              )}
             </p>
             <Notice tone="info">
-              Account ownership and contract spending grants are separate.
-              Account owners must revoke those permissions independently.
+              {tx(
+                "Account ownership and contract spending grants are separate. Account owners must revoke those permissions independently.",
+              )}
             </Notice>
             <div className="flex justify-end gap-2">
               <button
@@ -324,7 +349,7 @@ export default function Team() {
                 disabled={busy}
                 onClick={() => setRemoving(null)}
               >
-                Keep member
+                {tx("Keep member")}
               </button>
               <button
                 className="workspace-button workspace-button-primary"
@@ -347,7 +372,7 @@ export default function Team() {
                   }
                 }}
               >
-                {busy ? "Removing…" : "Remove access"}
+                {busy ? tx("Removing…") : tx("Remove access")}
               </button>
             </div>
           </div>
