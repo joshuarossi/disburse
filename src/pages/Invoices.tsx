@@ -1,3 +1,4 @@
+import { tx, useWorkspaceLanguage } from "@/lib/workspaceI18n";
 import { userErrorMessage } from "@/lib/userErrors";
 import { useActivityEnvironment } from "@/features/workspace/ActivityEnvironment";
 import { chainEnvironment } from "../../shared/assets";
@@ -36,6 +37,7 @@ const tabs = {
   void: "Voided",
 };
 export default function Invoices() {
+  useWorkspaceLanguage();
   const { orgId } = useParams();
   const sessionToken = useSessionToken();
   const args =
@@ -175,8 +177,10 @@ export default function Invoices() {
   return (
     <>
       <PageHeader
-        title="Bills"
-        description="Keep vendor invoices, due dates, and payments connected."
+        title={tx("Bills")}
+        description={tx(
+          "Keep vendor invoices, due dates, and payments connected.",
+        )}
         actions={
           <>
             <button
@@ -185,7 +189,7 @@ export default function Invoices() {
               onClick={exportBills}
             >
               <Download size={14} />
-              Export
+              {tx("Export")}
             </button>
             {canRecord && (
               <button
@@ -193,7 +197,7 @@ export default function Invoices() {
                 onClick={() => setEditor("new")}
               >
                 <Plus size={14} />
-                Add bill
+                {tx("Add bill")}
               </button>
             )}
           </>
@@ -201,7 +205,7 @@ export default function Invoices() {
       />
       <div className="workspace-metrics">
         <Metric
-          label="Outstanding"
+          label={tx("Outstanding")}
           value={
             totals.size
               ? [...totals].map(([token, amount]) => (
@@ -216,38 +220,38 @@ export default function Invoices() {
                 ? "$0.00"
                 : "…"
           }
-          detail={`${unpaid.length} unpaid bill${unpaid.length === 1 ? "" : "s"}`}
+          detail={tx("{{count}} unpaid bills", { count: unpaid.length })}
         />
         <Metric
-          label="Overdue"
+          label={tx("Overdue")}
           value={
             invoices
               ? unpaid.filter((i) => isBillOverdue(i.dueDate)).length
               : "…"
           }
-          detail="Past their due date"
+          detail={tx("Past their due date")}
           tone="warning"
         />
         <Metric
-          label="In payment"
+          label={tx("In payment")}
           value={
             invoices?.filter((i) => i.status === "in_payment").length ?? "…"
           }
-          detail="Prepared or awaiting settlement"
+          detail={tx("Prepared or awaiting settlement")}
         />
         <Metric
-          label="Paid"
+          label={tx("Paid")}
           value={invoices?.filter((i) => i.status === "paid").length ?? "…"}
-          detail="Verified payment records"
+          detail={tx("Verified payment records")}
         />
       </div>
-      {error && !paying && <Notice>{error}</Notice>}
+      {error && !paying && <Notice>{tx(error)}</Notice>}
       <section className="workspace-panel">
         <div className="workspace-toolbar">
           <div
             className="workspace-tabs"
             role="tablist"
-            aria-label="Bill views"
+            aria-label={tx("Bill views")}
           >
             {Object.entries(tabs).map(([key, label]) => (
               <button
@@ -256,31 +260,32 @@ export default function Invoices() {
                 aria-selected={tab === key}
                 onClick={() => setParams({ view: key })}
               >
-                {label}
+                {tx(label)}
               </button>
             ))}
           </div>
           <SearchField
             value={search}
             onChange={setSearch}
-            placeholder="Search vendor or invoice"
+            placeholder={tx("Search vendor or invoice")}
           />
         </div>
         {selectedInvoices.length > 0 && (
           <div className="workspace-toolbar !bg-accent-500/5">
             <p className="text-xs">
-              {selectedInvoices.length} bill
-              {selectedInvoices.length === 1 ? "" : "s"} selected{" "}
+              {tx("{{count}} bills selected", {
+                count: selectedInvoices.length,
+              })}{" "}
               {total
                 ? `· ${formatMoney(total, paymentToken, true)}`
-                : "· Choose one currency per batch"}
+                : tx("· Choose one currency per batch")}
             </p>
             <div className="flex gap-2">
               <button
                 className="workspace-button"
                 onClick={() => setSelected([])}
               >
-                Clear
+                {tx("Clear")}
               </button>
               <button
                 className="workspace-button workspace-button-primary"
@@ -290,7 +295,7 @@ export default function Invoices() {
                   setPaying(true);
                 }}
               >
-                Review payment
+                {tx("Review payment")}
                 <ArrowRight size={14} />
               </button>
             </div>
@@ -303,12 +308,14 @@ export default function Invoices() {
             icon={Receipt}
             title={
               search
-                ? "No bills match your search"
+                ? tx("No bills match your search")
                 : tab === "unpaid"
-                  ? "No bills waiting to be paid"
-                  : `No ${tabs[tab].toLowerCase()} bills`
+                  ? tx("No bills waiting to be paid")
+                  : tx("No bills in this view")
             }
-            description="Add a vendor invoice, choose a pay date, and follow its progress through approval and settlement."
+            description={tx(
+              "Add a vendor invoice, choose a pay date, and follow its progress through approval and settlement.",
+            )}
           />
         ) : (
           <div className="workspace-table-wrap">
@@ -319,11 +326,11 @@ export default function Invoices() {
               <thead role="rowgroup">
                 <tr role="row">
                   <th role="columnheader" scope="col">
-                    <span className="md:sr-only">Select all bills</span>
+                    <span className="md:sr-only">{tx("Select all bills")}</span>
                     {canPay && ["unpaid", "overdue"].includes(tab) && (
                       <input
                         type="checkbox"
-                        aria-label="Select all visible bills"
+                        aria-label={tx("Select all visible bills")}
                         checked={visible.every((i) => selected.includes(i._id))}
                         onChange={(e) =>
                           setSelected((ids) =>
@@ -343,19 +350,19 @@ export default function Invoices() {
                     )}
                   </th>
                   <th role="columnheader" scope="col">
-                    Vendor & invoice
+                    {tx("Vendor & invoice")}
                   </th>
                   <th role="columnheader" scope="col">
-                    Due date
+                    {tx("Due date")}
                   </th>
                   <th role="columnheader" scope="col" className="numeric">
-                    Amount
+                    {tx("Amount")}
                   </th>
                   <th role="columnheader" scope="col">
-                    Status
+                    {tx("Status")}
                   </th>
                   <th role="columnheader" scope="col">
-                    <span className="sr-only">Details</span>
+                    <span className="sr-only">{tx("Details")}</span>
                   </th>
                 </tr>
               </thead>
@@ -366,7 +373,9 @@ export default function Invoices() {
                       {canPay && i.status === "unpaid" && (
                         <input
                           type="checkbox"
-                          aria-label={`Select invoice ${i.invoiceNumber}`}
+                          aria-label={tx("Select invoice {{value1}}", {
+                            value1: i.invoiceNumber,
+                          })}
                           checked={selected.includes(i._id)}
                           onChange={(e) =>
                             setSelected((ids) =>
@@ -398,16 +407,20 @@ export default function Invoices() {
                         </span>
                       </div>
                     </td>
-                    <td role="cell" data-label="Due date">
+                    <td role="cell" data-label={tx("Due date")}>
                       {formatDate(i.dueDate)}
                     </td>
-                    <td role="cell" data-label="Amount" className="numeric">
+                    <td
+                      role="cell"
+                      data-label={tx("Amount")}
+                      className="numeric"
+                    >
                       <strong>{formatMoney(i.amount, i.token, true)}</strong>
                       <span className="workspace-table-secondary">
                         {i.token}
                       </span>
                     </td>
-                    <td role="cell" data-label="Status">
+                    <td role="cell" data-label={tx("Status")}>
                       <StatusBadge
                         status={
                           i.status === "unpaid" && isBillOverdue(i.dueDate)
@@ -421,7 +434,7 @@ export default function Invoices() {
                         className="workspace-action-link"
                         onClick={() => setParams({ view: tab, focus: i._id })}
                       >
-                        View details
+                        {tx("View details")}
                         <ArrowRight size={13} />
                       </button>
                     </td>
@@ -433,10 +446,11 @@ export default function Invoices() {
         )}
         <div className="workspace-table-footer">
           <span>
-            {visible?.length ?? 0} bill{visible?.length === 1 ? "" : "s"} in
-            this view
+            {tx("{{count}} bills in this view", {
+              count: visible?.length ?? 0,
+            })}
           </span>
-          <span>Each paid bill links to a verified payment</span>
+          <span>{tx("Each paid bill links to a verified payment")}</span>
         </div>
       </section>
       {editor && (
@@ -448,7 +462,7 @@ export default function Invoices() {
       )}
       {focus && !editor && !voiding && (
         <Dialog
-          title={`Invoice ${focus.invoiceNumber}`}
+          title={tx("Invoice {{value1}}", { value1: focus.invoiceNumber })}
           onClose={() => setParams({ view: tab })}
         >
           <div className="space-y-6 p-6">
@@ -456,7 +470,7 @@ export default function Invoices() {
               <div>
                 <h2 className="text-xl font-semibold">{focus.vendorName}</h2>
                 <p className="workspace-description">
-                  Due {formatDate(focus.dueDate)}
+                  {tx("Due")} {formatDate(focus.dueDate)}
                 </p>
               </div>
               <StatusBadge status={focus.status} />
@@ -468,12 +482,12 @@ export default function Invoices() {
               </span>
             </p>
             <p className="workspace-description">
-              {focus.description || "No description added."}
+              {focus.description || tx("No description added.")}
             </p>
             <InvoiceAttachments invoiceId={focus._id} />
             {focus.sourceReviewedAt && (
               <p className="text-xs text-slate-400">
-                Bill details reviewed against the source{" "}
+                {tx("Bill details reviewed against the source")}{" "}
                 {formatDate(focus.sourceReviewedAt)}.
               </p>
             )}
@@ -482,7 +496,7 @@ export default function Invoices() {
                 className="workspace-action-link"
                 to={`/org/${orgId}/disbursements?focus=${focus.disbursementId}`}
               >
-                View linked payment
+                {tx("View linked payment")}
                 <ArrowRight size={14} />
               </Link>
             )}
@@ -493,13 +507,13 @@ export default function Invoices() {
                     className="workspace-button"
                     onClick={() => setVoiding(focus)}
                   >
-                    Void bill
+                    {tx("Void bill")}
                   </button>
                   <button
                     className="workspace-button"
                     onClick={() => setEditor(focus)}
                   >
-                    Edit bill
+                    {tx("Edit bill")}
                   </button>
                 </>
               )}
@@ -512,7 +526,7 @@ export default function Invoices() {
                     setPaying(true);
                   }}
                 >
-                  Prepare payment
+                  {tx("Prepare payment")}
                 </button>
               )}
             </div>
@@ -521,15 +535,17 @@ export default function Invoices() {
       )}
       {voiding && (
         <Dialog
-          title="Void this bill?"
+          title={tx("Void this bill?")}
           onClose={() => {
             if (!busy) setVoiding(null);
           }}
         >
           <div className="space-y-5 p-6">
             <p className="workspace-description">
-              Invoice {voiding.invoiceNumber} will remain in your records as
-              voided and cannot be paid. This action does not move funds.
+              {tx("Invoice")} {voiding.invoiceNumber}{" "}
+              {tx(
+                "will remain in your records as voided and cannot be paid. This action does not move funds.",
+              )}
             </p>
             <button
               className="workspace-button workspace-button-primary"
@@ -549,32 +565,33 @@ export default function Invoices() {
                 }
               }}
             >
-              Void bill
+              {tx("Void bill")}
             </button>
           </div>
         </Dialog>
       )}
       {paying && (
         <Dialog
-          title="Review bill payment"
+          title={tx("Review bill payment")}
           onClose={() => {
             if (!busy) setPaying(false);
           }}
         >
           <div className="space-y-5 p-6">
-            {error && <Notice>{error}</Notice>}
+            {error && <Notice>{tx(error)}</Notice>}
             <p className="text-3xl font-semibold tabular-nums">
               {total
                 ? formatMoney(total, paymentToken, true)
-                : "Select one currency"}{" "}
+                : tx("Select one currency")}{" "}
               <span className="text-sm font-normal text-slate-400">
                 {paymentToken}
               </span>
             </p>
             <p className="workspace-description">
-              {selectedInvoices.length} bill
-              {selectedInvoices.length === 1 ? "" : "s"}. Invoices for the same
-              vendor are combined into one transfer.
+              {tx(
+                "{{count}} bills. Invoices for the same vendor are combined into one transfer.",
+                { count: selectedInvoices.length },
+              )}
             </p>
             <div className="max-h-48 overflow-auto">
               {selectedInvoices.map((i) => (
@@ -589,37 +606,37 @@ export default function Invoices() {
             </div>
             <div className="grid gap-4 sm:grid-cols-2">
               <label>
-                <span className="finance-label">Pay from</span>
+                <span className="finance-label">{tx("Pay from")}</span>
                 <select
                   className="finance-field"
                   value={fundingAccount?._id ?? ""}
                   onChange={(e) => setAccountId(e.target.value)}
                 >
                   <option value="" disabled>
-                    Choose an account
+                    {tx("Choose an account")}
                   </option>
                   {availableSafes.map((s) => (
                     <option key={s._id} value={s._id}>
-                      {s.name ?? "Account"} · {getChainName(s.chainId)} ·{" "}
+                      {s.name ?? tx("Account")} · {getChainName(s.chainId)} ·{" "}
                       {s.safeAddress.slice(-6)}
                     </option>
                   ))}
                 </select>
               </label>
               <label>
-                <span className="finance-label">When to pay</span>
+                <span className="finance-label">{tx("When to pay")}</span>
                 <select
                   className="finance-field"
                   value={timing}
                   onChange={(e) => setTiming(e.target.value as typeof timing)}
                 >
-                  <option value="now">As soon as approved</option>
-                  <option value="scheduled">Choose a pay date</option>
+                  <option value="now">{tx("As soon as approved")}</option>
+                  <option value="scheduled">{tx("Choose a pay date")}</option>
                 </select>
               </label>
               {timing === "scheduled" && (
                 <label>
-                  <span className="finance-label">Pay date</span>
+                  <span className="finance-label">{tx("Pay date")}</span>
                   <input
                     className="finance-field"
                     type="date"
@@ -627,20 +644,21 @@ export default function Invoices() {
                     onChange={(e) => setPayDate(e.target.value)}
                   />
                   <span className="workspace-table-secondary">
-                    12:00 UTC, after approval
+                    {tx("12:00 UTC, after approval")}
                   </span>
                 </label>
               )}
             </div>
             {!availableSafes.length && (
               <Notice tone="info">
-                Connect an account that supports {paymentToken} before preparing
-                this payment.
+                {tx("Connect an account that supports")} {paymentToken}{" "}
+                {tx("before preparing this payment.")}
               </Notice>
             )}
             <Notice tone="info">
-              This prepares a payment for review. Your team's required approvals
-              are still needed before funds move.
+              {tx(
+                "This prepares a payment for review. Your team's required approvals are still needed before funds move.",
+              )}
             </Notice>
             <div className="flex justify-end gap-2">
               <button
@@ -648,14 +666,14 @@ export default function Invoices() {
                 disabled={busy}
                 onClick={() => setPaying(false)}
               >
-                Back
+                {tx("Back")}
               </button>
               <button
                 className="workspace-button workspace-button-primary"
                 disabled={busy || !chainId || !sameToken || !total}
                 onClick={() => void pay()}
               >
-                {busy ? "Preparing…" : "Prepare payment"}
+                {busy ? tx("Preparing…") : tx("Prepare payment")}
                 <ArrowRight size={14} />
               </button>
             </div>

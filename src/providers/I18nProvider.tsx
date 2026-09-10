@@ -1,9 +1,9 @@
-import { ReactNode, useEffect } from 'react';
-import { useQuery } from 'convex/react';
-import { api } from '../../convex/_generated/api';
-import { useTranslation } from 'react-i18next';
-import { useSessionToken } from '@/lib/session';
-import '../lib/i18n'; // Initialize i18n
+import { ReactNode, useEffect } from "react";
+import { useQuery } from "convex/react";
+import { api } from "../../convex/_generated/api";
+import { useTranslation } from "react-i18next";
+import { useSessionToken } from "@/lib/session";
+import "../lib/i18n"; // Initialize i18n
 
 interface I18nProviderProps {
   children: ReactNode;
@@ -11,7 +11,7 @@ interface I18nProviderProps {
 
 export function I18nProvider({ children }: I18nProviderProps) {
   const { i18n } = useTranslation();
-  const language = i18n.resolvedLanguage ?? 'en';
+  const language = i18n.resolvedLanguage ?? "en";
 
   useEffect(() => {
     document.documentElement.lang = language;
@@ -20,23 +20,13 @@ export function I18nProvider({ children }: I18nProviderProps) {
   const token = useSessionToken();
   const session = useQuery(
     api.auth.validateSession,
-    token ? { token } : 'skip'
+    token ? { token } : "skip",
   );
 
   useEffect(() => {
     if (session?.preferredLanguage) {
       // Set language from user preference
       i18n.changeLanguage(session.preferredLanguage);
-    } else if (!i18n.language || !['en', 'es', 'pt-BR'].includes(i18n.language)) {
-      // Fallback to browser language or English
-      const browserLang = navigator.language;
-      if (browserLang.startsWith('es')) {
-        i18n.changeLanguage('es');
-      } else if (browserLang.startsWith('pt')) {
-        i18n.changeLanguage('pt-BR');
-      } else {
-        i18n.changeLanguage('en');
-      }
     }
   }, [session?.preferredLanguage, i18n]);
 

@@ -1,3 +1,4 @@
+import { tx, useWorkspaceLanguage } from "@/lib/workspaceI18n";
 import { userErrorMessage } from "@/lib/userErrors";
 import { useState } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
@@ -30,6 +31,7 @@ import {
 } from "@/components/workspace/WorkspacePrimitives";
 type Recipient = Doc<"beneficiaries"> & { tags: string[] };
 export default function Beneficiaries() {
+  useWorkspaceLanguage();
   const { orgId } = useParams();
   const sessionToken = useSessionToken();
   const args =
@@ -162,8 +164,8 @@ export default function Beneficiaries() {
   return (
     <>
       <PageHeader
-        title="Recipients"
-        description="Your people and vendors, ready for the next payment."
+        title={tx("Recipients")}
+        description={tx("Your people and vendors, ready for the next payment.")}
         actions={
           <>
             <button
@@ -172,7 +174,7 @@ export default function Beneficiaries() {
               onClick={exportRows}
             >
               <Download size={14} />
-              Export
+              {tx("Export")}
             </button>
             {canEdit && (
               <>
@@ -181,21 +183,21 @@ export default function Beneficiaries() {
                   onClick={() => setParams({ import: "1" })}
                 >
                   <Upload size={14} />
-                  Import recipients
+                  {tx("Import recipients")}
                 </button>
                 <button
                   className="workspace-button workspace-button-primary"
                   onClick={() => setEditor("new")}
                 >
                   <Plus size={14} />
-                  Add recipient
+                  {tx("Add recipient")}
                 </button>
               </>
             )}
           </>
         }
       />
-      {error && <Notice>{error}</Notice>}
+      {error && <Notice>{tx(error)}</Notice>}
       {reviewing && (
         <PayoutReview
           beneficiaryId={reviewing}
@@ -207,7 +209,7 @@ export default function Beneficiaries() {
           <div
             className="workspace-tabs"
             role="tablist"
-            aria-label="Recipient views"
+            aria-label={tx("Recipient views")}
           >
             {[
               ["all", "All recipients"],
@@ -227,7 +229,7 @@ export default function Beneficiaries() {
                   setPage(0);
                 }}
               >
-                {label}
+                {tx(label)}
               </button>
             ))}
           </div>
@@ -239,19 +241,19 @@ export default function Beneficiaries() {
               setSearch(v);
               setPage(0);
             }}
-            placeholder="Search name, email, or group"
+            placeholder={tx("Search name, email, or group")}
           />
           <div className="flex flex-wrap items-center gap-3">
             <select
               className="finance-field !w-auto"
-              aria-label="Filter by group"
+              aria-label={tx("Filter by group")}
               value={group}
               onChange={(e) => {
                 setGroup(e.target.value);
                 setPage(0);
               }}
             >
-              <option value="">All groups</option>
+              <option value="">{tx("All groups")}</option>
               {groups.map((g) => (
                 <option key={g}>{g}</option>
               ))}
@@ -259,13 +261,13 @@ export default function Beneficiaries() {
             {selected.length > 0 && (
               <>
                 <span className="text-xs text-slate-400">
-                  {selected.length} selected
+                  {selected.length} {tx("selected")}
                 </span>
                 <button
                   className="workspace-button"
                   onClick={() => setSelected([])}
                 >
-                  Clear
+                  {tx("Clear")}
                 </button>
                 {canPay && (
                   <button
@@ -273,7 +275,7 @@ export default function Beneficiaries() {
                     disabled={readySelected.length !== selected.length}
                     onClick={() => setPaying(true)}
                   >
-                    Pay selected
+                    {tx("Pay selected")}
                     <ArrowUpRight size={14} />
                   </button>
                 )}
@@ -288,13 +290,15 @@ export default function Beneficiaries() {
             icon={Users}
             title={
               search || tab !== "all" || group
-                ? "No recipients match this view"
-                : "Bring your team into Disburse"
+                ? tx("No recipients match this view")
+                : tx("Bring your team into Disburse")
             }
             description={
               search || tab !== "all" || group
-                ? "Try another search or filter."
-                : "Upload an employee or vendor directory, then add payout details before your first payment."
+                ? tx("Try another search or filter.")
+                : tx(
+                    "Upload an employee or vendor directory, then add payout details before your first payment.",
+                  )
             }
             action={
               canEdit && !search ? (
@@ -303,7 +307,7 @@ export default function Beneficiaries() {
                   onClick={() => setParams({ import: "1" })}
                 >
                   <Upload size={14} />
-                  Import a directory
+                  {tx("Import a directory")}
                 </button>
               ) : undefined
             }
@@ -317,10 +321,12 @@ export default function Beneficiaries() {
               <thead role="rowgroup">
                 <tr role="row">
                   <th role="columnheader" scope="col">
-                    <span className="md:sr-only">Select all recipients</span>
+                    <span className="md:sr-only">
+                      {tx("Select all recipients")}
+                    </span>
                     <input
                       type="checkbox"
-                      aria-label="Select all visible recipients"
+                      aria-label={tx("Select all visible recipients")}
                       checked={
                         visible.length > 0 &&
                         visible.every((r) => selected.includes(r._id))
@@ -342,19 +348,19 @@ export default function Beneficiaries() {
                     />
                   </th>
                   <th role="columnheader" scope="col">
-                    Recipient
+                    {tx("Recipient")}
                   </th>
                   <th role="columnheader" scope="col">
-                    Type
+                    {tx("Type")}
                   </th>
                   <th role="columnheader" scope="col">
-                    Groups
+                    {tx("Groups")}
                   </th>
                   <th role="columnheader" scope="col">
-                    Payment details
+                    {tx("Payment details")}
                   </th>
                   <th role="columnheader" scope="col">
-                    <span className="sr-only">Actions</span>
+                    <span className="sr-only">{tx("Actions")}</span>
                   </th>
                 </tr>
               </thead>
@@ -364,7 +370,7 @@ export default function Beneficiaries() {
                     <td role="cell" data-selection>
                       <input
                         type="checkbox"
-                        aria-label={`Select ${r.name}`}
+                        aria-label={tx("Select {{value1}}", { value1: r.name })}
                         checked={selected.includes(r._id)}
                         onChange={() => toggle(r._id)}
                       />
@@ -386,15 +392,15 @@ export default function Beneficiaries() {
                             {r.name}
                           </button>
                           <span className="workspace-table-secondary">
-                            {r.email || "No email added"}
+                            {r.email || tx("No email added")}
                           </span>
                         </span>
                       </div>
                     </td>
-                    <td role="cell" data-label="Type">
-                      {r.type === "business" ? "Business" : "Person"}
+                    <td role="cell" data-label={tx("Type")}>
+                      {r.type === "business" ? tx("Business") : tx("Person")}
                     </td>
-                    <td role="cell" data-label="Groups">
+                    <td role="cell" data-label={tx("Groups")}>
                       <div className="flex flex-wrap gap-1">
                         {r.tags.length ? (
                           r.tags.map((tag: string) => (
@@ -403,18 +409,22 @@ export default function Beneficiaries() {
                             </span>
                           ))
                         ) : (
-                          <span className="text-slate-400">No group</span>
+                          <span className="text-slate-400">
+                            {tx("No group")}
+                          </span>
                         )}
                       </div>
                     </td>
-                    <td role="cell" data-label="Payment details">
+                    <td role="cell" data-label={tx("Payment details")}>
                       <span className="workspace-status">
                         {r.detailRequestId
                           ? (r.detailRequestExpiresAt ?? 0) > Date.now()
-                            ? "Details requested"
-                            : "Request expired"
-                          : (recipientPayoutIssue(r) ??
-                            "Payout details approved")}
+                            ? tx("Details requested")
+                            : tx("Request expired")
+                          : tx(
+                              recipientPayoutIssue(r) ??
+                                "Payout details approved",
+                            )}
                       </span>
                     </td>
                     <td role="cell" data-actions>
@@ -426,8 +436,8 @@ export default function Beneficiaries() {
                               onClick={() => setReviewing(r._id)}
                             >
                               {recipientPayoutIssue(r)
-                                ? "Review payout"
-                                : "Review history"}
+                                ? tx("Review payout")
+                                : tx("Review history")}
                             </button>
                           )}
                         <button
@@ -436,18 +446,23 @@ export default function Beneficiaries() {
                         >
                           {canEdit
                             ? r.walletAddress
-                              ? "Edit"
-                              : "Add details"
-                            : "View"}
+                              ? tx("Edit")
+                              : tx("Add details")
+                            : tx("View")}
                         </button>
                         {canEdit && (
                           <button
                             title={
                               r.isActive
-                                ? "Archive recipient"
-                                : "Restore recipient"
+                                ? tx("Archive recipient")
+                                : tx("Restore recipient")
                             }
-                            aria-label={`${r.isActive ? "Archive" : "Restore"} ${r.name}`}
+                            aria-label={tx(
+                              r.isActive
+                                ? "Archive {{name}}"
+                                : "Restore {{name}}",
+                              { name: r.name },
+                            )}
                             className="text-slate-400"
                             onClick={() => setArchive(r)}
                           >
@@ -468,9 +483,9 @@ export default function Beneficiaries() {
         )}
         <div className="workspace-table-footer">
           <span>
-            {filtered?.length ?? 0} recipients
+            {filtered?.length ?? 0} {tx("recipients")}
             {selected.length > readySelected.length
-              ? " · Some selected recipients are not ready for payment"
+              ? tx(" · Some selected recipients are not ready for payment")
               : ""}
           </span>
           <div className="flex items-center gap-2">
@@ -479,15 +494,17 @@ export default function Beneficiaries() {
               disabled={!page}
               onClick={() => setPage((p) => p - 1)}
             >
-              Previous
+              {tx("Previous")}
             </button>
-            <span>Page {page + 1}</span>
+            <span>
+              {tx("Page")} {page + 1}
+            </span>
             <button
               className="workspace-button"
               disabled={(page + 1) * 25 >= (filtered?.length ?? 0)}
               onClick={() => setPage((p) => p + 1)}
             >
-              Next
+              {tx("Next")}
             </button>
           </div>
         </div>
@@ -517,7 +534,11 @@ export default function Beneficiaries() {
       )}
       {archive && (
         <Dialog
-          title={archive.isActive ? "Archive recipient?" : "Restore recipient?"}
+          title={
+            archive.isActive
+              ? tx("Archive recipient?")
+              : tx("Restore recipient?")
+          }
           onClose={() => {
             if (!busy) setArchive(null);
           }}
@@ -525,8 +546,14 @@ export default function Beneficiaries() {
           <div className="space-y-5 p-6">
             <p className="workspace-description">
               {archive.isActive
-                ? `${archive.name} will be hidden from new payments. Existing payments and their saved details remain in your records.`
-                : `${archive.name} will appear in your active recipient list again.`}
+                ? tx(
+                    "{{value1}} will be hidden from new payments. Existing payments and their saved details remain in your records.",
+                    { value1: archive.name },
+                  )
+                : tx(
+                    "{{value1}} will appear in your active recipient list again.",
+                    { value1: archive.name },
+                  )}
             </p>
             <div className="flex justify-end gap-2">
               <button
@@ -534,7 +561,7 @@ export default function Beneficiaries() {
                 onClick={() => setArchive(null)}
                 disabled={busy}
               >
-                Cancel
+                {tx("Cancel")}
               </button>
               <button
                 className="workspace-button workspace-button-primary"
@@ -542,10 +569,10 @@ export default function Beneficiaries() {
                 disabled={busy}
               >
                 {busy
-                  ? "Saving…"
+                  ? tx("Saving…")
                   : archive.isActive
-                    ? "Archive recipient"
-                    : "Restore recipient"}
+                    ? tx("Archive recipient")
+                    : tx("Restore recipient")}
               </button>
             </div>
           </div>

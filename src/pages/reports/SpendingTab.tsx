@@ -1,13 +1,14 @@
-import { userErrorMessage } from '@/lib/userErrors';
+import { tx, useWorkspaceLanguage } from "@/lib/workspaceI18n";
+import { userErrorMessage } from "@/lib/userErrors";
 import { useActivityEnvironment } from "@/features/workspace/ActivityEnvironment";
 import { chainEnvironment } from "../../../shared/assets";
 import { useMemo, useState, useEffect, useRef } from "react";
 import { parseUnits } from "viem";
 import { formatAssetAmount } from "@/lib/formatMoney";
 import { useQuery, useConvex } from "convex/react";
-import { ReportProgress } from './ReportProgress';
-import { useReportPages } from './useReportPages';
-import { collectReportExport } from './reportExport';
+import { ReportProgress } from "./ReportProgress";
+import { useReportPages } from "./useReportPages";
+import { collectReportExport } from "./reportExport";
 import { useTranslation } from "react-i18next";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -32,9 +33,10 @@ interface SpendingTabProps {
 }
 
 export function SpendingTab({ orgId, address }: SpendingTabProps) {
+  useWorkspaceLanguage();
   const { t } = useTranslation();
   const client = useConvex();
-  const [exportError, setExportError] = useState('');
+  const [exportError, setExportError] = useState("");
   const [exportCount, setExportCount] = useState<number | null>(null);
   const exportController = useRef<AbortController | null>(null);
   const { environment } = useActivityEnvironment();
@@ -77,7 +79,12 @@ export function SpendingTab({ orgId, address }: SpendingTabProps) {
   }, [orgId, address, dateFrom, dateTo, typeFilter, chainFilter, environment]);
 
   const pages = useReportPages(queryArgs);
-  useEffect(() => () => { exportController.current?.abort(); }, [queryArgs]);
+  useEffect(
+    () => () => {
+      exportController.current?.abort();
+    },
+    [queryArgs],
+  );
   const reportData = useQuery(
     api.reports.getSpendingByBeneficiary,
     queryArgs ? { ...queryArgs, cursor: pages.cursor } : "skip",
@@ -143,44 +150,75 @@ export function SpendingTab({ orgId, address }: SpendingTabProps) {
 
   const handleExport = async () => {
     if (!queryArgs || exportCount !== null) return;
-    const controller = new AbortController(); exportController.current = controller;
-    setExportError(''); setExportCount(0);
+    const controller = new AbortController();
+    exportController.current = controller;
+    setExportError("");
+    setExportCount(0);
     try {
-    const items = await collectReportExport((cursor, snapshotVersion) => client.query(api.reports.getSpendingByBeneficiary, { ...queryArgs, cursor, snapshotVersion }), { signal: controller.signal, progress: setExportCount });
+      const items = await collectReportExport(
+        (cursor, snapshotVersion) =>
+          client.query(api.reports.getSpendingByBeneficiary, {
+            ...queryArgs,
+            cursor,
+            snapshotVersion,
+          }),
+        { signal: controller.signal, progress: setExportCount },
+      );
 
-    const columns = [
-      { key: "beneficiary", label: t("reports.export.beneficiary") },
-      { key: "type", label: t("reports.export.type") },
-      { key: "walletAddress", label: t("reports.export.walletAddress") },
-      { key: "transactions", label: t("reports.export.transactions") },
-      { key: "totalPaid", label: t("reports.export.totalPaid") },
-      { key: "token", label: t("reports.export.token") },
-      { key: "network", label: "Network" },
-      { key: "chainId", label: "Network ID" },
-      { key: "tokenAddress", label: "Token contract" },
-      { key: "environment", label: "Environment" },
-    ];
+      const columns = [
+        {
+          key: "beneficiary",
+          label: t("reports.export.beneficiary", { lng: "en" }),
+        },
+        { key: "type", label: t("reports.export.type", { lng: "en" }) },
+        {
+          key: "walletAddress",
+          label: t("reports.export.walletAddress", { lng: "en" }),
+        },
+        {
+          key: "transactions",
+          label: t("reports.export.transactions", { lng: "en" }),
+        },
+        {
+          key: "totalPaid",
+          label: t("reports.export.totalPaid", { lng: "en" }),
+        },
+        { key: "token", label: t("reports.export.token", { lng: "en" }) },
+        { key: "network", label: "Network" },
+        { key: "chainId", label: "Network ID" },
+        { key: "tokenAddress", label: "Token contract" },
+        { key: "environment", label: "Environment" },
+      ];
 
-    const rows = items.map((item) => ({
-      beneficiary: item.beneficiaryName,
-      type: item.beneficiaryType,
-      walletAddress: item.beneficiaryWallet,
-      transactions: item.transactionCount,
-      totalPaid: item.totalPaid,
-      token: item.token,
-      network: item.network,
-      chainId: item.chainId ?? "",
-      tokenAddress: item.tokenAddress ?? "",
-      environment: item.environment,
-    }));
+      const rows = items.map((item) => ({
+        beneficiary: item.beneficiaryName,
+        type: item.beneficiaryType,
+        walletAddress: item.beneficiaryWallet,
+        transactions: item.transactionCount,
+        totalPaid: item.totalPaid,
+        token: item.token,
+        network: item.network,
+        chainId: item.chainId ?? "",
+        tokenAddress: item.tokenAddress ?? "",
+        environment: item.environment,
+      }));
 
-    exportToCsv(
-      generateFilename(`spending_by_beneficiary_${environment}`),
-      rows,
-      columns,
-    );
-    } catch (error) { setExportError(userErrorMessage(error, 'The export could not be completed. Try again.')); }
-    finally { setExportCount(null); exportController.current = null; }
+      exportToCsv(
+        generateFilename(`spending_by_beneficiary_${environment}`),
+        rows,
+        columns,
+      );
+    } catch (error) {
+      setExportError(
+        userErrorMessage(
+          error,
+          "The export could not be completed. Try again.",
+        ),
+      );
+    } finally {
+      setExportCount(null);
+      exportController.current = null;
+    }
   };
 
   const SortIcon = ({ field }: { field: typeof sortBy }) => {
@@ -194,10 +232,37 @@ export function SpendingTab({ orgId, address }: SpendingTabProps) {
 
   return (
     <div className="space-y-4">
-      <ReportProgress orgId={orgId} data={reportData} page={pages.page} previous={pages.previous} next={pages.next} />
-      {exportError && <div className="workspace-notice" role="alert" data-tone="error">{exportError}</div>}
-      {exportCount !== null && <div className="workspace-notice" role="status"><span>Preparing export · {exportCount} recipients and currencies</span><button className="workspace-button" onClick={() => exportController.current?.abort()}>Cancel export</button></div>}
-      <p className="text-sm text-slate-400">Each recipient’s total covers the selected dates. Sorting applies to this page.</p>
+      <ReportProgress
+        orgId={orgId}
+        data={reportData}
+        page={pages.page}
+        previous={pages.previous}
+        next={pages.next}
+      />
+      {exportError && (
+        <div className="workspace-notice" role="alert" data-tone="error">
+          {tx(exportError)}
+        </div>
+      )}
+      {exportCount !== null && (
+        <div className="workspace-notice" role="status">
+          <span>
+            {tx("Preparing export ·")} {exportCount}{" "}
+            {tx("recipients and currencies")}
+          </span>
+          <button
+            className="workspace-button"
+            onClick={() => exportController.current?.abort()}
+          >
+            {tx("Cancel export")}
+          </button>
+        </div>
+      )}
+      <p className="text-sm text-slate-400">
+        {tx(
+          "Each recipient’s total covers the selected dates. Sorting applies to this page.",
+        )}
+      </p>
       {/* Filters Bar */}
       <div className="flex flex-wrap items-center gap-3">
         <button
@@ -231,12 +296,17 @@ export function SpendingTab({ orgId, address }: SpendingTabProps) {
         <div className="ml-auto">
           <Button
             onClick={() => void handleExport()}
-            disabled={isLoading || exportCount !== null || reportData?.indexing || !!reportData?.rangeError}
+            disabled={
+              isLoading ||
+              exportCount !== null ||
+              reportData?.indexing ||
+              !!reportData?.rangeError
+            }
             variant="secondary"
             size="sm"
           >
             <Download className="mr-2 h-4 w-4" />
-            Export all matches
+            {tx("Export all matches")}
           </Button>
         </div>
       </div>
@@ -253,7 +323,7 @@ export function SpendingTab({ orgId, address }: SpendingTabProps) {
               <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
                 <input
                   type="date"
-                  aria-label="Start date"
+                  aria-label={tx("Start date")}
                   value={dateFrom}
                   onChange={(e) => setDateFrom(e.target.value)}
                   className="flex-1 rounded-lg border border-white/10 bg-navy-800 px-3 py-2 text-sm text-white"
@@ -263,7 +333,7 @@ export function SpendingTab({ orgId, address }: SpendingTabProps) {
                 </span>
                 <input
                   type="date"
-                  aria-label="End date"
+                  aria-label={tx("End date")}
                   value={dateTo}
                   onChange={(e) => setDateTo(e.target.value)}
                   className="flex-1 rounded-lg border border-white/10 bg-navy-800 px-3 py-2 text-sm text-white"
@@ -284,7 +354,7 @@ export function SpendingTab({ orgId, address }: SpendingTabProps) {
               >
                 {TYPE_OPTIONS.map((opt) => (
                   <option key={opt.value} value={opt.value}>
-                    {opt.label}
+                    {tx(opt.label)}
                   </option>
                 ))}
               </select>
@@ -328,10 +398,14 @@ export function SpendingTab({ orgId, address }: SpendingTabProps) {
         <div className="rounded-xl border border-dashed border-white/20 bg-navy-900/30 p-12 text-center">
           <Users className="mx-auto h-12 w-12 text-slate-600" />
           <h3 className="mt-4 text-lg font-medium text-white">
-            {reportData?.isDone === false ? "No matches on this page" : t("reports.empty.spending.title")}
+            {reportData?.isDone === false
+              ? tx("No matches on this page")
+              : t("reports.empty.spending.title")}
           </h3>
           <p className="mt-2 text-slate-400">
-            {reportData?.isDone === false ? "Continue to the next page or adjust the filters." : t("reports.empty.spending.description")}
+            {reportData?.isDone === false
+              ? tx("Continue to the next page or adjust the filters.")
+              : t("reports.empty.spending.description")}
           </p>
         </div>
       ) : (

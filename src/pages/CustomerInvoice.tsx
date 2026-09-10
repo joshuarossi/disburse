@@ -1,3 +1,5 @@
+import { LanguageSwitcher } from "@/components/ui/LanguageSwitcher";
+import { tx, useWorkspaceLanguage, workspaceLocale } from "@/lib/workspaceI18n";
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { useQuery } from "convex/react";
@@ -9,6 +11,7 @@ import { InvoiceItems } from "@/components/invoices/InvoiceItems";
 import { downloadInvoiceFile } from "@/lib/invoiceFileClient";
 import { userErrorMessage } from "@/lib/userErrors";
 export default function CustomerInvoice() {
+  useWorkspaceLanguage();
   const { token } = useParams();
   const invoice = useQuery(
     api.receivables.publicInvoice,
@@ -27,35 +30,42 @@ export default function CustomerInvoice() {
     return (
       <main className="customer-invoice mx-auto max-w-2xl space-y-6 px-5 py-10">
         <Link to="/" className="text-sm font-semibold text-[var(--ws-accent)]">
-          Disburse
+          {tx("Disburse")}
         </Link>
+        <div className="flex justify-end print:hidden">
+          <LanguageSwitcher inline />
+        </div>
         <section className="workspace-panel space-y-4 p-6">
           {invoice === undefined ? (
             <>
               <h1 className="text-2xl font-semibold">
                 {slowToken === token
-                  ? "Invoice taking longer to load"
-                  : "Loading invoice"}
+                  ? tx("Invoice taking longer to load")
+                  : tx("Loading invoice")}
               </h1>
               <p role="status" className="workspace-description">
                 {slowToken === token
-                  ? "Check your connection and try loading the invoice again."
-                  : "Getting the latest invoice and payment status…"}
+                  ? tx(
+                      "Check your connection and try loading the invoice again.",
+                    )
+                  : tx("Getting the latest invoice and payment status…")}
               </p>
               {slowToken === token && (
                 <button
                   className="workspace-button workspace-button-primary"
                   onClick={() => window.location.reload()}
                 >
-                  Reload invoice
+                  {tx("Reload invoice")}
                 </button>
               )}
             </>
           ) : (
             <>
-              <h1 className="text-2xl font-semibold">Invoice not found</h1>
+              <h1 className="text-2xl font-semibold">
+                {tx("Invoice not found")}
+              </h1>
               <p className="workspace-description">
-                Check the payment link with the business that sent it.
+                {tx("Check the payment link with the business that sent it.")}
               </p>
             </>
           )}
@@ -65,21 +75,25 @@ export default function CustomerInvoice() {
   const testnet = [11155111, 84532].includes(invoice.chainId);
   return (
     <main className="customer-invoice mx-auto max-w-3xl space-y-6 px-5 py-10">
+      <div className="flex justify-end print:hidden">
+        <LanguageSwitcher inline />
+      </div>
       <header className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <p className="text-sm text-slate-400">Invoice from</p>
+          <p className="text-sm text-slate-400">{tx("Invoice from")}</p>
           <h1 className="text-3xl font-semibold">{invoice.issuer}</h1>
         </div>
         <button
           className="workspace-button print:hidden"
           onClick={() => window.print()}
         >
-          Print / save PDF
+          {tx("Print / save PDF")}
         </button>
       </header>
       {testnet && (
         <p className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-4">
-          Test invoice · use test funds only on {getChainName(invoice.chainId)}.
+          {tx("Test invoice · use test funds only on")}{" "}
+          {getChainName(invoice.chainId)}.
         </p>
       )}
       <section className="workspace-panel p-6 space-y-5">
@@ -87,29 +101,31 @@ export default function CustomerInvoice() {
           <div>
             <h2 className="text-xl font-semibold">{invoice.number}</h2>
             <p className="workspace-description">
-              Billed to {invoice.customerName}
+              {tx("Billed to")} {invoice.customerName}
             </p>
           </div>
           <div>
-            <span className="workspace-status">{invoice.status}</span>
+            <span className="workspace-status">{tx(invoice.status)}</span>
             <p className="workspace-description">
-              Due {formatDate(invoice.dueDate)}
+              {tx("Due")} {formatDate(invoice.dueDate)}
             </p>
           </div>
         </div>
         <InvoiceItems items={invoice.items} token={invoice.token} />
         <div className="flex justify-between gap-4 text-xl font-semibold">
-          <span>{invoice.credits?.length ? "Original total" : "Total"}</span>
+          <span>
+            {invoice.credits?.length ? tx("Original total") : tx("Total")}
+          </span>
           <span>
             {formatMoney(invoice.amount, invoice.token, true)} {invoice.token}
           </span>
         </div>
         {!!invoice.credits?.length && (
           <section
-            aria-label="Credit notes"
+            aria-label={tx("Credit notes")}
             className="space-y-3 border-t border-slate-400/20 pt-4"
           >
-            <h3 className="font-semibold">Credit notes</h3>
+            <h3 className="font-semibold">{tx("Credit notes")}</h3>
             {invoice.credits.map((c) => (
               <div key={c.number} className="text-sm">
                 <div className="flex flex-wrap justify-between gap-2">
@@ -120,13 +136,13 @@ export default function CustomerInvoice() {
                   </span>
                 </div>
                 <p className="workspace-description">
-                  Issued {formatDate(c.issuedAt)}
+                  {tx("Issued")} {formatDate(c.issuedAt)}
                 </p>
                 <p className="whitespace-pre-wrap">{c.reason}</p>
               </div>
             ))}
             <div className="flex flex-wrap justify-between gap-2 font-semibold">
-              <span>Adjusted total</span>
+              <span>{tx("Adjusted total")}</span>
               <span>
                 {formatMoney(
                   invoice.amounts.adjustedTotal,
@@ -143,10 +159,10 @@ export default function CustomerInvoice() {
         )}
         {!!invoice.documents?.length && (
           <section
-            aria-label="Supporting documents"
+            aria-label={tx("Supporting documents")}
             className="space-y-3 border-t border-slate-400/20 pt-4"
           >
-            <h3 className="font-semibold">Supporting documents</h3>
+            <h3 className="font-semibold">{tx("Supporting documents")}</h3>
             <ul className="space-y-2">
               {invoice.documents.map((file) => (
                 <li key={file.id}>
@@ -175,14 +191,14 @@ export default function CustomerInvoice() {
                       }
                     }}
                   >
-                    Download {file.name}
+                    {tx("Download")} {file.name}
                   </button>
                 </li>
               ))}
             </ul>
             {documentError && (
               <p role="alert" className="text-sm">
-                {documentError}
+                {tx(documentError)}
               </p>
             )}
           </section>
@@ -191,18 +207,18 @@ export default function CustomerInvoice() {
       <section className="workspace-panel space-y-5 p-6">
         <h2 className="text-xl font-semibold">
           {invoice.voided
-            ? "Invoice voided"
+            ? tx("Invoice voided")
             : invoice.amounts.remaining === "0"
               ? invoice.status === "Credited"
-                ? "Invoice credited"
+                ? tx("Invoice credited")
                 : invoice.status === "Refunded"
-                  ? "Invoice refunded"
-                  : "Payment received"
-              : "Payment instructions"}
+                  ? tx("Invoice refunded")
+                  : tx("Payment received")
+              : tx("Payment instructions")}
         </h2>
         <div className="flex flex-wrap justify-between gap-4">
           <p>
-            Received{" "}
+            {tx("Received")}{" "}
             <strong>
               {formatMoney(invoice.amounts.received, invoice.token, true)}{" "}
               {invoice.token}
@@ -210,7 +226,7 @@ export default function CustomerInvoice() {
           </p>
           {!invoice.voided && (
             <p>
-              Remaining{" "}
+              {tx("Remaining")}{" "}
               <strong>
                 {formatMoney(invoice.amounts.remaining, invoice.token, true)}{" "}
                 {invoice.token}
@@ -221,7 +237,7 @@ export default function CustomerInvoice() {
         {invoice.amounts.refunded !== undefined &&
           invoice.amounts.refunded !== "0" && (
             <p>
-              Refunded{" "}
+              {tx("Refunded")}{" "}
               <strong>
                 {formatMoney(invoice.amounts.refunded, invoice.token, true)}{" "}
                 {invoice.token}
@@ -230,39 +246,43 @@ export default function CustomerInvoice() {
           )}
         {invoice.amounts.overpayment !== "0" && (
           <p>
-            Customer credit:{" "}
+            {tx("Customer credit:")}{" "}
             {formatMoney(invoice.amounts.overpayment, invoice.token, true)}{" "}
-            {invoice.token}. Contact {invoice.issuer} to resolve it.
+            {invoice.token}
+            {tx(". Contact")} {invoice.issuer} {tx("to resolve it.")}
           </p>
         )}
         {invoice.voided ? (
           <p>
-            Do not send further payments. Contact {invoice.issuer} for an
-            updated invoice. Payments already sent will still be tracked.
+            {tx("Do not send further payments. Contact")} {invoice.issuer}{" "}
+            {tx(
+              "for an updated invoice. Payments already sent will still be tracked.",
+            )}
           </p>
         ) : (
           invoice.amounts.remaining !== "0" && (
             <>
               <p>
-                Send{" "}
+                {tx("Send")}{" "}
                 <strong>
                   {invoice.amounts.remaining} {invoice.token}
                 </strong>{" "}
-                on <strong>{getChainName(invoice.chainId)}</strong>. Use the
-                exact currency and network shown. Other assets will not count
-                toward this invoice.
+                {tx("on")} <strong>{getChainName(invoice.chainId)}</strong>
+                {tx(
+                  ". Use the exact currency and network shown. Other assets will not count toward this invoice.",
+                )}
               </p>
               <div className="flex flex-col gap-5 sm:flex-row sm:items-center">
                 <div className="self-start rounded-lg bg-white p-3">
                   <QRCodeSVG
                     value={invoice.receivingAddress!}
                     size={150}
-                    title="Invoice receiving address"
+                    title={tx("Invoice receiving address")}
                   />
                 </div>
                 <div className="min-w-0 flex-1">
                   <span className="finance-label">
-                    Invoice receiving address
+                    {tx("Invoice receiving address")}
                   </span>
                   <code className="block break-all text-sm">
                     {invoice.receivingAddress}
@@ -282,7 +302,7 @@ export default function CustomerInvoice() {
                       }
                     }}
                   >
-                    Copy address
+                    {tx("Copy address")}
                   </button>
                   <p role="status" className="mt-2 text-sm">
                     {copied}
@@ -291,34 +311,39 @@ export default function CustomerInvoice() {
               </div>
               <details>
                 <summary className="cursor-pointer text-sm">
-                  Verify currency contract
+                  {tx("Verify currency contract")}
                 </summary>
                 <code className="mt-2 block break-all text-sm">
                   {invoice.tokenAddress}
                 </code>
               </details>
               <p className="text-sm text-slate-400">
-                Your wallet or exchange may charge a network fee. Send the full
-                remaining amount. We update this invoice after network
-                confirmation; partial payments are supported.
+                {tx(
+                  "Your wallet or exchange may charge a network fee. Send the full remaining amount. We update this invoice after network confirmation; partial payments are supported.",
+                )}
               </p>
             </>
           )
         )}
         {invoice.syncDelayed && (
           <p role="status">
-            Payment updates are delayed. If you already sent payment, do not
-            send it again while confirmation is pending.
+            {tx(
+              "Payment updates are delayed. If you already sent payment, do not send it again while confirmation is pending.",
+            )}
           </p>
         )}
         <p className="text-xs text-slate-400">
           {invoice.lastCheckedAt
-            ? `Last checked ${new Date(invoice.lastCheckedAt).toLocaleString()}`
-            : "Waiting for the first network check."}
+            ? tx("Last checked {{value1}}", {
+                value1: new Date(invoice.lastCheckedAt).toLocaleString(
+                  workspaceLocale(),
+                ),
+              })
+            : tx("Waiting for the first network check.")}
         </p>
       </section>
       <p className="text-center text-sm text-slate-400">
-        Payments powered by Disburse
+        {tx("Payments powered by Disburse")}
       </p>
     </main>
   );

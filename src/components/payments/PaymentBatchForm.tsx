@@ -1,4 +1,5 @@
-import { userErrorMessage } from '@/lib/userErrors';
+import { tx, useWorkspaceLanguage, workspaceLocale } from "@/lib/workspaceI18n";
+import { userErrorMessage } from "@/lib/userErrors";
 import { useActivityEnvironment } from "@/features/workspace/ActivityEnvironment";
 import { chainEnvironment } from "../../../shared/assets";
 import { AccountFundingCheck } from "@/features/payments/AccountFundingCheck";
@@ -65,6 +66,7 @@ export function PaymentBatchForm({
   initialSafeId?: Id<"safes">;
   draft?: EditableBatch;
 }) {
+  useWorkspaceLanguage();
   const sessionToken = useSessionToken();
   const args = sessionToken ? { orgId, sessionToken } : "skip";
   const beneficiaries = useQuery(
@@ -84,7 +86,8 @@ export function PaymentBatchForm({
   const { environment } = useActivityEnvironment();
   const allSafes = useQuery(api.safes.getForOrg, args);
   const safes = allSafes?.filter(
-    (safe) => safe.isActive !== false && chainEnvironment(safe.chainId) === environment,
+    (safe) =>
+      safe.isActive !== false && chainEnvironment(safe.chainId) === environment,
   );
   const createGrouped = useMutation(api.paymentRuns.createGrouped);
   const useSavedInstructions = !draft;
@@ -107,15 +110,26 @@ export function PaymentBatchForm({
   );
   const chainId =
     chain ?? initialRecipient?.preferredChainId ?? safes?.[0]?.chainId;
-  const [accountChoices, setAccountChoices] = useState<Record<number, string>>({});
+  const [accountChoices, setAccountChoices] = useState<Record<number, string>>(
+    {},
+  );
   const accountFor = (network: number | undefined) => {
-    const candidates = safes?.filter(s => s.chainId === network) ?? [];
+    const candidates = safes?.filter((s) => s.chainId === network) ?? [];
     const initial = draft?.safeId ?? initialSafeId;
-    const initialNetwork = draft?.chainId ?? initialChainId ?? allSafes?.find(s => s._id === initial)?.chainId;
-    const choice = network === undefined ? undefined
-      : accountChoices[network] ?? (network === initialNetwork ? initial : undefined);
-    return choice ? candidates.find(s => s._id === choice)
-      : candidates.length === 1 ? candidates[0] : undefined;
+    const initialNetwork =
+      draft?.chainId ??
+      initialChainId ??
+      allSafes?.find((s) => s._id === initial)?.chainId;
+    const choice =
+      network === undefined
+        ? undefined
+        : (accountChoices[network] ??
+          (network === initialNetwork ? initial : undefined));
+    return choice
+      ? candidates.find((s) => s._id === choice)
+      : candidates.length === 1
+        ? candidates[0]
+        : undefined;
   };
   const tokens = chainId ? getTokenSymbolsForChain(chainId) : [];
   const [chosenToken, setToken] = useState<string | null>(draft?.token ?? null);
@@ -147,7 +161,11 @@ export function PaymentBatchForm({
     payoutRecipients?.filter((b) =>
       Object.prototype.hasOwnProperty.call(amounts, b._id),
     ) ?? [];
-  const unavailableSelections = beneficiaries ? Object.keys(amounts).filter(id => !payoutRecipients?.some(recipient => recipient._id === id)) : [];
+  const unavailableSelections = beneficiaries
+    ? Object.keys(amounts).filter(
+        (id) => !payoutRecipients?.some((recipient) => recipient._id === id),
+      )
+    : [];
   const payoutFor = (recipient: {
     preferredToken?: string;
     preferredChainId?: number;
@@ -253,7 +271,7 @@ export function PaymentBatchForm({
     let next = date;
     for (let i = 0; i < 3; i++) {
       nextDates.push(
-        new Date(next).toLocaleDateString(undefined, {
+        new Date(next).toLocaleDateString(workspaceLocale(), {
           month: "short",
           day: "numeric",
           timeZone: "UTC",
@@ -354,15 +372,17 @@ export function PaymentBatchForm({
   };
   if (createdBatches)
     return (
-      <Dialog title="Payment drafts saved" onClose={onClose}>
+      <Dialog title={tx("Payment drafts saved")} onClose={onClose}>
         <div className="space-y-5 p-6">
           <p role="status">
-            Created {createdBatches.length} batch
-            {createdBatches.length === 1 ? "" : "es"}. No funds have moved.
+            {tx("Created {{count}} batches. No funds have moved.", {
+              count: createdBatches.length,
+            })}
           </p>
           <p className="text-sm text-slate-400">
-            Review and approve each batch. Different currencies and networks are
-            sent separately.
+            {tx(
+              "Review and approve each batch. Different currencies and networks are sent separately.",
+            )}
           </p>
           <ul className="space-y-3">
             {createdBatches.map((batch) => (
@@ -376,9 +396,8 @@ export function PaymentBatchForm({
                     onClose();
                   }}
                 >
-                  Review {batch.token} · {getChainName(batch.chainId)} ·{" "}
-                  {batch.recipientCount} recipient
-                  {batch.recipientCount === 1 ? "" : "s"}
+                  {tx("Review")} {batch.token} · {getChainName(batch.chainId)} ·{" "}
+                  {tx("{{count}} recipients", { count: batch.recipientCount })}
                 </Button>
               </li>
             ))}
@@ -390,10 +409,10 @@ export function PaymentBatchForm({
     <Dialog
       title={
         draft
-          ? "Edit payment draft"
+          ? tx("Edit payment draft")
           : purpose === "payroll"
-            ? "Run payroll"
-            : "New payment"
+            ? tx("Run payroll")
+            : tx("New payment")
       }
       onClose={() => {
         if (!saving) onClose();
@@ -401,13 +420,13 @@ export function PaymentBatchForm({
     >
       <div className="flex gap-6 border-b border-white/10 px-6 py-4">
         <span className="finance-step" data-active={step === 1}>
-          1 &nbsp; Recipients
+          {tx("1 · Recipients")}
         </span>
         <span className="finance-step" data-active={step === 2}>
-          2 &nbsp; Timing
+          {tx("2 · Timing")}
         </span>
         <span className="finance-step" data-active={step === 3}>
-          3 &nbsp; Review
+          {tx("3 · Review")}
         </span>
       </div>
       <div className="p-6">
@@ -416,7 +435,9 @@ export function PaymentBatchForm({
             (b) => b.isActive && recipientPayoutIssue(b),
           ) && (
             <p className="mb-5 rounded-lg bg-accent-500/10 p-3 text-sm leading-6">
-              Only recipients with reviewed payout details can be selected.{" "}
+              {tx(
+                "Only recipients with reviewed payout details can be selected.",
+              )}{" "}
               <button
                 type="button"
                 className="workspace-action-link"
@@ -425,7 +446,7 @@ export function PaymentBatchForm({
                   navigate(`/org/${orgId}/beneficiaries`);
                 }}
               >
-                Complete recipient details or review
+                {tx("Complete recipient details or review")}
               </button>
             </p>
           )}
@@ -434,21 +455,24 @@ export function PaymentBatchForm({
             role="alert"
             className="mb-5 rounded-lg bg-red-500/10 p-3 text-sm text-red-400"
           >
-            {error}
+            {tx(error)}
           </p>
         )}
         {draft && (
           <p className="mb-5 rounded-lg bg-accent-500/10 p-3 text-xs leading-5 text-slate-400">
-            Changes affect this draft only. Existing recipients keep their saved
-            payout addresses. Recurring instructions are managed separately.
+            {tx(
+              "Changes affect this draft only. Existing recipients keep their saved payout addresses. Recurring instructions are managed separately.",
+            )}
           </p>
         )}
         {step === 1 ? (
           <>
             <div className="mb-4 flex items-center justify-between">
-              <h3 className="font-semibold text-white">Who are you paying?</h3>
+              <h3 className="font-semibold text-white">
+                {tx("Who are you paying?")}
+              </h3>
               <span className="text-xs text-slate-400">
-                {selected.length} selected
+                {selected.length} {tx("selected")}
               </span>
             </div>
             <div className="mb-3 flex flex-wrap gap-3">
@@ -456,19 +480,19 @@ export function PaymentBatchForm({
                 <Search className="absolute left-3 top-3 h-4 w-4 text-slate-500" />
                 <input
                   className="finance-field pl-9"
-                  aria-label="Search recipients"
-                  placeholder="Search saved recipients"
+                  aria-label={tx("Search recipients")}
+                  placeholder={tx("Search saved recipients")}
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                 />
               </div>
               <select
-                aria-label="Filter by group"
+                aria-label={tx("Filter by group")}
                 className="finance-field !w-auto"
                 value={group}
                 onChange={(e) => setGroup(e.target.value)}
               >
-                <option value="">All groups</option>
+                <option value="">{tx("All groups")}</option>
                 {groups.map((group) => (
                   <option key={group}>{group}</option>
                 ))}
@@ -485,18 +509,19 @@ export function PaymentBatchForm({
                   }))
                 }
               >
-                Select shown
+                {tx("Select shown")}
               </Button>
             </div>
             <div className="max-h-64 overflow-y-auto rounded-lg border border-white/10">
               {beneficiaries === undefined ? (
                 <p role="status" className="p-6 text-sm text-slate-400">
-                  Loading recipients...
+                  {tx("Loading recipients...")}
                 </p>
               ) : filtered.length === 0 ? (
                 <p className="p-6 text-sm text-slate-400">
-                  No recipients found. Add or import recipients from your
-                  recipient list.
+                  {tx(
+                    "No recipients found. Add or import recipients from your recipient list.",
+                  )}
                 </p>
               ) : (
                 filtered.map((b) => (
@@ -507,7 +532,7 @@ export function PaymentBatchForm({
                     <input
                       type="checkbox"
                       className="col-start-1 row-start-1"
-                      aria-label={`Select ${b.name}`}
+                      aria-label={tx("Select {{value1}}", { value1: b.name })}
                       checked={Object.prototype.hasOwnProperty.call(
                         amounts,
                         b._id,
@@ -526,15 +551,19 @@ export function PaymentBatchForm({
                         {b.name}
                       </p>
                       <p className="text-xs text-slate-500">
-                        {b.type === "business" ? "Business" : "Individual"} ·{" "}
-                        {b.walletAddress.slice(0, 6)}…
+                        {b.type === "business"
+                          ? tx("Business")
+                          : tx("Individual")}{" "}
+                        · {b.walletAddress.slice(0, 6)}…
                         {b.walletAddress.slice(-4)}
                       </p>
                     </div>
                     {Object.prototype.hasOwnProperty.call(amounts, b._id) && (
                       <input
                         className="finance-field col-span-2 col-start-2 row-start-2 text-right tabular-nums sm:!w-32"
-                        aria-label={`Amount for ${b.name}`}
+                        aria-label={tx("Amount for {{value1}}", {
+                          value1: b.name,
+                        })}
                         inputMode="decimal"
                         placeholder="0.00"
                         value={amounts[b._id]}
@@ -551,20 +580,44 @@ export function PaymentBatchForm({
                       <span className="block">
                         {b.preferredChainId
                           ? getChainName(b.preferredChainId)
-                          : "No network preference"}
+                          : tx("No network preference")}
                       </span>
                       {!b.preferredToken && (
-                        <span className="block">No currency preference</span>
+                        <span className="block">
+                          {tx("No currency preference")}
+                        </span>
                       )}
                     </span>
                   </div>
                 ))
               )}
             </div>
-            {unavailableSelections.map(id => (
-              <div key={id} role="alert" className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-amber-500/30 p-3 text-sm">
-                <p>{draft?.recipients.find(r => r.beneficiaryId === id)?.recipientName ?? "Selected recipient"} is archived or unavailable. Remove them from this draft to continue.</p>
-                <Button size="sm" variant="secondary" onClick={() => setAmounts(current => { const next = { ...current }; delete next[id]; return next; })}>Remove unavailable recipient</Button>
+            {unavailableSelections.map((id) => (
+              <div
+                key={id}
+                role="alert"
+                className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-amber-500/30 p-3 text-sm"
+              >
+                <p>
+                  {draft?.recipients.find((r) => r.beneficiaryId === id)
+                    ?.recipientName ?? tx("Selected recipient")}{" "}
+                  {tx(
+                    "is archived or unavailable. Remove them from this draft to continue.",
+                  )}
+                </p>
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  onClick={() =>
+                    setAmounts((current) => {
+                      const next = { ...current };
+                      delete next[id];
+                      return next;
+                    })
+                  }
+                >
+                  {tx("Remove unavailable recipient")}
+                </Button>
               </div>
             ))}
             {instructionErrors.length > 0 && (
@@ -573,7 +626,7 @@ export function PaymentBatchForm({
                 className="mt-3 rounded-lg bg-red-500/10 p-3 text-sm text-red-400"
               >
                 {instructionErrors.map((message) => (
-                  <p key={message}>{message}</p>
+                  <p key={message}>{tx(message)}</p>
                 ))}
               </div>
             )}
@@ -581,8 +634,8 @@ export function PaymentBatchForm({
               <div className="mt-3 flex items-center gap-2">
                 <input
                   className="finance-field !w-36"
-                  aria-label="Amount for all recipients"
-                  placeholder="Same amount"
+                  aria-label={tx("Amount for all recipients")}
+                  placeholder={tx("Same amount")}
                   inputMode="decimal"
                   value={sameAmount}
                   onChange={(e) => setSameAmount(e.target.value)}
@@ -598,22 +651,24 @@ export function PaymentBatchForm({
                     )
                   }
                 >
-                  Apply to selected
+                  {tx("Apply to selected")}
                 </Button>
               </div>
             )}
             <details className="mt-5 rounded-lg border border-white/10 p-4">
               <summary className="cursor-pointer text-sm font-medium">
-                Payment defaults
+                {tx("Payment defaults")}
               </summary>
               <p className="mt-2 text-xs leading-5 text-slate-400">
-                Saved recipient instructions are used automatically. These
-                defaults apply when a recipient has not chosen a currency or
-                network.
+                {tx(
+                  "Saved recipient instructions are used automatically. These defaults apply when a recipient has not chosen a currency or network.",
+                )}
               </p>
               <div className="mt-4 grid gap-5 sm:grid-cols-2">
                 <label>
-                  <span className="finance-label">Default payment network</span>
+                  <span className="finance-label">
+                    {tx("Default payment network")}
+                  </span>
                   <select
                     className="finance-field"
                     value={chainId ?? ""}
@@ -622,30 +677,35 @@ export function PaymentBatchForm({
                     {chainId &&
                       !safes?.some((safe) => safe.chainId === chainId) && (
                         <option value={chainId}>
-                          {getChainName(chainId)} · No linked funding account
+                          {getChainName(chainId)}{" "}
+                          {tx("· No linked funding account")}
                         </option>
                       )}
                     <option value="" disabled>
-                      Select a payment network
+                      {tx("Select a payment network")}
                     </option>
-                    {[...new Set(safes?.map(s => s.chainId) ?? [])].map(network => (
-                      <option key={network} value={network}>
-                        {getChainName(network)}
-                      </option>
-                    ))}
+                    {[...new Set(safes?.map((s) => s.chainId) ?? [])].map(
+                      (network) => (
+                        <option key={network} value={network}>
+                          {getChainName(network)}
+                        </option>
+                      ),
+                    )}
                   </select>
                 </label>
                 <label>
-                  <span className="finance-label">Payment currency</span>
+                  <span className="finance-label">
+                    {tx("Payment currency")}
+                  </span>
                   <select
-                    aria-label="Payment currency"
+                    aria-label={tx("Payment currency")}
                     className="finance-field"
                     value={token}
                     onChange={(e) => setToken(e.target.value)}
                   >
                     {!tokens.includes(token) && (
                       <option value={token}>
-                        {token} · Unavailable on this account
+                        {token} {tx("· Unavailable on this account")}
                       </option>
                     )}
                     {tokens.map((token) => (
@@ -654,31 +714,63 @@ export function PaymentBatchForm({
                   </select>
                   <span className="mt-1 block text-xs text-slate-500">
                     {useSavedInstructions
-                      ? "Default for recipients without a saved currency. Each requested currency and network gets its own batch."
-                      : "Each batch pays one currency on one network. Saved recipient instructions must match."}{" "}
-                    No automatic conversion.
+                      ? tx(
+                          "Default for recipients without a saved currency. Each requested currency and network gets its own batch.",
+                        )
+                      : tx(
+                          "Each batch pays one currency on one network. Saved recipient instructions must match.",
+                        )}{" "}
+                    {tx("No automatic conversion.")}
                   </span>
                 </label>
               </div>
             </details>
             {paymentGroups.length > 0 && (
-              <section className="mt-5 space-y-4" aria-label="Payment funding">
-                <h4 className="text-sm font-semibold">Pay from</h4>
-                {[...new Set(paymentGroups.map(g => g.chainId))].map(network => (
-                  <label className="block" key={network}>
-                    <span className="finance-label">Funding account on {getChainName(network!)}</span>
-                    <select className="finance-field" aria-label={`Funding account on ${getChainName(network!)}`} value={accountFor(network)?._id ?? ""}
-                      onChange={e => setAccountChoices(current => ({ ...current, [network!]: e.target.value }))}>
-                      <option value="" disabled>Choose an account</option>
-                      {safes?.filter(s => s.chainId === network).map(s => (
-                        <option key={s._id} value={s._id}>
-                          {s.name ?? getChainName(s.chainId) + " account"} · {s.safeAddress.slice(-6)}
+              <section
+                className="mt-5 space-y-4"
+                aria-label={tx("Payment funding")}
+              >
+                <h4 className="text-sm font-semibold">{tx("Pay from")}</h4>
+                {[...new Set(paymentGroups.map((g) => g.chainId))].map(
+                  (network) => (
+                    <label className="block" key={network}>
+                      <span className="finance-label">
+                        {tx("Funding account on")} {getChainName(network!)}
+                      </span>
+                      <select
+                        className="finance-field"
+                        aria-label={tx("Funding account on {{value1}}", {
+                          value1: getChainName(network!),
+                        })}
+                        value={accountFor(network)?._id ?? ""}
+                        onChange={(e) =>
+                          setAccountChoices((current) => ({
+                            ...current,
+                            [network!]: e.target.value,
+                          }))
+                        }
+                      >
+                        <option value="" disabled>
+                          {tx("Choose an account")}
                         </option>
-                      ))}
-                    </select>
-                  </label>
-                ))}
-                <p className="text-xs text-slate-400">This account funds the payment and its fees. Recurring payments keep the same account.</p>
+                        {safes
+                          ?.filter((s) => s.chainId === network)
+                          .map((s) => (
+                            <option key={s._id} value={s._id}>
+                              {s.name ??
+                                getChainName(s.chainId) + tx(" account")}{" "}
+                              · {s.safeAddress.slice(-6)}
+                            </option>
+                          ))}
+                      </select>
+                    </label>
+                  ),
+                )}
+                <p className="text-xs text-slate-400">
+                  {tx(
+                    "This account funds the payment and its fees. Recurring payments keep the same account.",
+                  )}
+                </p>
               </section>
             )}
             <div className="mt-5 space-y-3">
@@ -686,7 +778,9 @@ export function PaymentBatchForm({
                 <AccountFundingCheck
                   key={account._id}
                   safeId={account._id}
-                  accountName={account.name ?? `${getChainName(account.chainId)} account`}
+                  accountName={
+                    account.name ?? `${getChainName(account.chainId)} account`
+                  }
                   chainId={account.chainId}
                   payments={account.payments}
                 />
@@ -696,34 +790,34 @@ export function PaymentBatchForm({
         ) : step === 2 ? (
           <>
             <h3 className="mb-5 text-lg font-semibold">
-              When should they be paid?
+              {tx("When should they be paid?")}
             </h3>
             <div className="grid gap-5 sm:grid-cols-2">
               <label>
-                <span className="finance-label">Payment name</span>
+                <span className="finance-label">{tx("Payment name")}</span>
                 <input
                   data-autofocus
                   className="finance-field"
-                  placeholder="e.g. September payroll"
+                  placeholder={tx("e.g. September payroll")}
                   maxLength={120}
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                 />
               </label>
               <label>
-                <span className="finance-label">Payment purpose</span>
+                <span className="finance-label">{tx("Payment purpose")}</span>
                 <select
                   className="finance-field"
                   value={purpose}
                   onChange={(e) => setPurpose(e.target.value as typeof purpose)}
                 >
-                  <option value="payroll">Payroll & contractors</option>
-                  <option value="invoice">Vendor payments</option>
-                  <option value="other">Other payments</option>
+                  <option value="payroll">{tx("Payroll & contractors")}</option>
+                  <option value="invoice">{tx("Vendor payments")}</option>
+                  <option value="other">{tx("Other payments")}</option>
                 </select>
               </label>
               <label>
-                <span className="finance-label">Repeat</span>
+                <span className="finance-label">{tx("Repeat")}</span>
                 <select
                   className="finance-field"
                   disabled={!!draft}
@@ -733,27 +827,27 @@ export function PaymentBatchForm({
                     if (e.target.value !== "once") setTiming("scheduled");
                   }}
                 >
-                  <option value="once">One time</option>
-                  <option value="weekly">Every week</option>
-                  <option value="biweekly">Every 2 weeks</option>
-                  <option value="monthly">Every month</option>
+                  <option value="once">{tx("One time")}</option>
+                  <option value="weekly">{tx("Every week")}</option>
+                  <option value="biweekly">{tx("Every 2 weeks")}</option>
+                  <option value="monthly">{tx("Every month")}</option>
                 </select>
               </label>
               <label>
-                <span className="finance-label">When to pay</span>
+                <span className="finance-label">{tx("When to pay")}</span>
                 <select
                   className="finance-field"
                   value={timing}
                   disabled={cadence !== "once"}
                   onChange={(e) => setTiming(e.target.value as typeof timing)}
                 >
-                  <option value="now">As soon as approved</option>
-                  <option value="scheduled">Choose a pay date</option>
+                  <option value="now">{tx("As soon as approved")}</option>
+                  <option value="scheduled">{tx("Choose a pay date")}</option>
                 </select>
               </label>
               {timing === "scheduled" && (
                 <label>
-                  <span className="finance-label">Pay date</span>
+                  <span className="finance-label">{tx("Pay date")}</span>
                   <input
                     className="finance-field"
                     type="date"
@@ -762,7 +856,7 @@ export function PaymentBatchForm({
                     onChange={(e) => setPayDate(e.target.value)}
                   />
                   <span className="mt-1 block text-xs text-slate-500">
-                    12:00 UTC. Review and approve before this date.
+                    {tx("12:00 UTC. Review and approve before this date.")}
                   </span>
                 </label>
               )}
@@ -770,11 +864,11 @@ export function PaymentBatchForm({
             {cadence !== "once" && (
               <div className="mt-5 rounded-lg bg-accent-500/10 p-4 text-sm text-slate-300">
                 <CalendarDays className="mr-2 inline h-4 w-4 text-accent-400" />
-                Next pay dates: {nextDates.join(" · ")}
+                {tx("Next pay dates:")} {nextDates.join(" · ")}
                 <p className="mt-2 text-xs text-slate-400">
-                  Future batches are prepared 3 days before payday. Your team
-                  reviews and approves each one. You can pause the schedule at
-                  any time.
+                  {tx(
+                    "Future batches are prepared 3 days before payday. Your team reviews and approves each one. You can pause the schedule at any time.",
+                  )}
                 </p>
               </div>
             )}
@@ -784,27 +878,34 @@ export function PaymentBatchForm({
             <h3 className="text-2xl font-semibold text-white">{name}</h3>
             <p className="mt-2 text-sm text-slate-400">
               {paymentGroups.length > 1
-                ? `${paymentGroups.length} separately approved batches`
+                ? tx("{{value1}} separately approved batches", {
+                    value1: paymentGroups.length,
+                  })
                 : getChainName(paymentGroups[0]?.chainId ?? chainId!)}{" "}
               ·{" "}
               {timing === "now"
-                ? "As soon as approved"
-                : `${new Date(date).toLocaleDateString(undefined, { timeZone: "UTC", dateStyle: "long" })} at 12:00 UTC`}
+                ? tx("As soon as approved")
+                : tx("{{value1}} at 12:00 UTC", {
+                    value1: new Date(date).toLocaleDateString(
+                      workspaceLocale(),
+                      { timeZone: "UTC", dateStyle: "long" },
+                    ),
+                  })}
             </p>
             <div className="my-6 grid grid-cols-2 gap-4 sm:grid-cols-3">
               <div className="finance-panel order-2 p-4 sm:order-1">
                 <Users className="mb-2 h-4 w-4 text-slate-400" />
                 <p className="text-lg font-semibold">
-                  {selected.length} recipient{selected.length === 1 ? "" : "s"}
+                  {tx("{{count}} recipients", { count: selected.length })}
                 </p>
               </div>
               <div className="finance-panel order-1 col-span-2 p-4 sm:order-2 sm:col-span-1">
-                <p className="finance-label">Total payment</p>
+                <p className="finance-label">{tx("Total payment")}</p>
                 <p className="text-lg font-semibold tabular-nums">
                   {paymentGroups.map((g) => (
                     <span key={`${g.chainId}:${g.token}`} className="block">
                       {groupTotal(g) === null
-                        ? "Check amounts"
+                        ? tx("Check amounts")
                         : formatMoney(groupTotal(g)!, g.token, true)}{" "}
                       {g.token}
                       <span className="block text-xs font-normal text-slate-400">
@@ -815,7 +916,7 @@ export function PaymentBatchForm({
                 </p>
               </div>
               <div className="finance-panel order-3 p-4">
-                <p className="finance-label">Frequency</p>
+                <p className="finance-label">{tx("Frequency")}</p>
                 <p className="text-lg font-semibold">
                   {
                     {
@@ -830,7 +931,7 @@ export function PaymentBatchForm({
             </div>
             <div className="max-h-64 overflow-y-auto">
               <ul
-                aria-label="Recipient payout review"
+                aria-label={tx("Recipient payout review")}
                 className="divide-y divide-white/10 sm:hidden"
               >
                 {selected.map((b) => (
@@ -852,9 +953,9 @@ export function PaymentBatchForm({
               <table className="finance-table hidden sm:table">
                 <thead>
                   <tr>
-                    <th>Recipient</th>
-                    <th>Payout address</th>
-                    <th className="text-right">Amount</th>
+                    <th>{tx("Recipient")}</th>
+                    <th>{tx("Payout address")}</th>
+                    <th className="text-right">{tx("Amount")}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -886,7 +987,9 @@ export function PaymentBatchForm({
                 <AccountFundingCheck
                   key={account._id}
                   safeId={account._id}
-                  accountName={account.name ?? `${getChainName(account.chainId)} account`}
+                  accountName={
+                    account.name ?? `${getChainName(account.chainId)} account`
+                  }
                   chainId={account.chainId}
                   payments={account.payments}
                 />
@@ -896,13 +999,12 @@ export function PaymentBatchForm({
               <ShieldCheck className="h-5 w-5 shrink-0 text-accent-400" />
               <div>
                 <p className="text-sm font-medium">
-                  Save a draft for your team
+                  {tx("Save a draft for your team")}
                 </p>
                 <p className="mt-1 text-xs leading-5 text-slate-400">
-                  Saving does not move funds. Each currency and network is
-                  prepared as a separate batch for approval in Payments. Batches
-                  can complete independently. Network fees are confirmed during
-                  signing.
+                  {tx(
+                    "Saving does not move funds. Each currency and network is prepared as a separate batch for approval in Payments. Batches can complete independently. Network fees are confirmed during signing.",
+                  )}
                 </p>
               </div>
             </div>
@@ -912,12 +1014,12 @@ export function PaymentBatchForm({
       <div className="sticky bottom-0 z-10 flex flex-col gap-3 border-t border-white/10 bg-navy-950 px-6 py-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <p className="text-xs text-slate-500">
-            {selected.length} recipient{selected.length === 1 ? "" : "s"} ·
-            Total before fees
+            {tx("{{count}} recipients", { count: selected.length })}{" "}
+            {tx("· Total before fees")}
           </p>
           <p className="font-semibold tabular-nums">
             {instructionErrors.length
-              ? "Resolve payout instructions"
+              ? tx("Resolve payout instructions")
               : useSavedInstructions && paymentGroups.length
                 ? paymentGroups
                     .map(
@@ -936,7 +1038,7 @@ export function PaymentBatchForm({
               onClick={() => setStep(step - 1)}
             >
               <ArrowLeft />
-              Back
+              {tx("Back")}
             </Button>
           )}
           {step < 3 ? (
@@ -949,26 +1051,28 @@ export function PaymentBatchForm({
                   if (!name.trim())
                     setName(
                       selected.length === 1
-                        ? `${selected[0].name} payment`
-                        : `${purpose === "payroll" ? "Payroll" : "Payments"} · ${new Date().toLocaleDateString()}`,
+                        ? tx("{{name}} payment", { name: selected[0].name })
+                        : `${tx(purpose === "payroll" ? "Payroll" : "Payments")} · ${new Date().toLocaleDateString(workspaceLocale())}`,
                     );
                   setStep(step + 1);
                 }
               }}
             >
-              {step === 1 ? "Continue to timing" : "Review payment"}
+              {step === 1 ? tx("Continue to timing") : tx("Review payment")}
               <ArrowRight />
             </Button>
           ) : (
             <Button disabled={saving} onClick={submit}>
               <Check />
               {saving
-                ? "Saving…"
+                ? tx("Saving…")
                 : draft
-                  ? "Save changes"
+                  ? tx("Save changes")
                   : paymentGroups.length > 1
-                    ? `Save ${paymentGroups.length} payment drafts`
-                    : "Save payment draft"}
+                    ? tx("Save {{value1}} payment drafts", {
+                        value1: paymentGroups.length,
+                      })
+                    : tx("Save payment draft")}
             </Button>
           )}
         </div>

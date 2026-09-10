@@ -1,3 +1,4 @@
+import { tx, useWorkspaceLanguage } from "@/lib/workspaceI18n";
 import { treasuryRequestStatuses, treasuryUnits } from "./treasuryPresentation";
 import { useRef, useState } from "react";
 import { useAction, usePaginatedQuery, useQuery } from "convex/react";
@@ -38,6 +39,7 @@ export function Conversions({
   orgId: Id<"orgs">;
   accounts: Doc<"safes">[];
 }) {
+  useWorkspaceLanguage();
   const sessionToken = useSessionToken(),
     { address } = useAccount(),
     { environment } = useActivityEnvironment(),
@@ -111,17 +113,21 @@ export function Conversions({
     setShow(true);
   };
   return (
-    <section className="workspace-panel mt-6" aria-label="Currency conversions">
+    <section
+      className="workspace-panel mt-6"
+      aria-label={tx("Currency conversions")}
+    >
       <div className="workspace-panel-heading flex flex-wrap gap-4">
         <div>
-          <h2>Convert currencies</h2>
+          <h2>{tx("Convert currencies")}</h2>
           <p>
-            Exchange funds within a company account. Choose what you receive and
-            approve the maximum cost.
+            {tx(
+              "Exchange funds within a company account. Choose what you receive and approve the maximum cost.",
+            )}
           </p>
         </div>
         <button className="workspace-button" onClick={() => open()}>
-          New conversion
+          {tx("New conversion")}
         </button>
       </div>
       {status === "LoadingFirstPage" ? (
@@ -145,22 +151,27 @@ export function Conversions({
                 <span>
                   <strong className="block text-sm">
                     {q
-                      ? `${conversionAssets(q.chainId, q.tokenIn).input.symbol} to ${conversionAssets(q.chainId, q.tokenIn).output.symbol}`
-                      : "Conversion"}{" "}
+                      ? tx("{{value1}} to {{value2}}", {
+                          value1: conversionAssets(q.chainId, q.tokenIn).input
+                            .symbol,
+                          value2: conversionAssets(q.chainId, q.tokenIn).output
+                            .symbol,
+                        })
+                      : tx("Conversion")}{" "}
                     · {accountName(row.safeId)}
                   </strong>
                   <span className="text-xs text-[var(--ws-muted)]">
-                    Uniswap · {scheduleDateTime(row.createdAt)}
+                    {tx("Uniswap ·")} {scheduleDateTime(row.createdAt)}
                   </span>
                 </span>
                 <span className="text-right">
                   <strong className="block text-sm">
                     {q
                       ? `${treasuryUnits(q.amount)} ${conversionAssets(q.chainId, q.tokenIn).output.symbol}`
-                      : "Review details"}
+                      : tx("Review details")}
                   </strong>
                   <span className="text-xs text-[var(--ws-muted)]">
-                    {treasuryRequestStatuses[row.status]}
+                    {tx(treasuryRequestStatuses[row.status])}
                   </span>
                 </span>
               </button>
@@ -169,26 +180,27 @@ export function Conversions({
           {status === "CanLoadMore" && (
             <div className="p-4">
               <button className="workspace-button" onClick={() => loadMore(10)}>
-                Load more conversions
+                {tx("Load more conversions")}
               </button>
             </div>
           )}
         </div>
       ) : (
         <p className="p-6 text-sm text-[var(--ws-muted)]">
-          Your conversions will appear here. Recipient payment instructions stay
-          as reviewed.
+          {tx(
+            "Your conversions will appear here. Recipient payment instructions stay as reviewed.",
+          )}
         </p>
       )}
       {show && (
         <Dialog
-          title={selected ? "Conversion request" : "Convert currencies"}
+          title={selected ? tx("Conversion request") : tx("Convert currencies")}
           onClose={() => {
             if (!busy && !executing) setShow(false);
           }}
         >
           <div className="space-y-5 p-6">
-            {error && <Notice>{error}</Notice>}
+            {error && <Notice>{tx(error)}</Notice>}
             {selected ? (
               <TreasuryServiceReview
                 key={selected}
@@ -197,7 +209,7 @@ export function Conversions({
                 memberName={memberName}
                 canWrite={canWrite}
                 onBusyChange={setExecuting}
-                refreshLabel="Review account balances"
+                refreshLabel={tx("Review account balances")}
                 onNew={() => {
                   setSelected(undefined);
                   setAmount("");
@@ -212,13 +224,14 @@ export function Conversions({
               />
             ) : !account || !input || !output ? (
               <Notice tone="info">
-                Connect a company account on Base or Arbitrum to convert USDC
-                and USDT. Base Sepolia has an isolated test route.
+                {tx(
+                  "Connect a company account on Base or Arbitrum to convert USDC and USDT. Base Sepolia has an isolated test route.",
+                )}
               </Notice>
             ) : (
               <>
                 <label className="block">
-                  <span className="finance-label">Company account</span>
+                  <span className="finance-label">{tx("Company account")}</span>
                   <select
                     className="finance-field"
                     value={account._id}
@@ -259,8 +272,8 @@ export function Conversions({
                         className={balances.isFetching ? "animate-spin" : ""}
                       />
                       {balances.isFetching
-                        ? "Refreshing balances…"
-                        : "Refresh balances"}
+                        ? tx("Refreshing balances…")
+                        : tx("Refresh balances")}
                     </button>
                     {balances.data && (
                       <>
@@ -268,7 +281,7 @@ export function Conversions({
                           {balances.data.balances.map((b) => (
                             <div key={b.address}>
                               <p className="finance-label">
-                                Available {b.symbol}
+                                {tx("Available")} {b.symbol}
                               </p>
                               <p className="mt-1 text-xl font-semibold">
                                 {treasuryUnits(b.amount)}
@@ -278,9 +291,9 @@ export function Conversions({
                         </div>
                         {account.chainId === 84532 && (
                           <Notice tone="info">
-                            This route exchanges Circle test USDC and Aave test
-                            USDC. Neither has real value. Circle USDC also pays
-                            execution fees.
+                            {tx(
+                              "This route exchanges Circle test USDC and Aave test USDC. Neither has real value. Circle USDC also pays execution fees.",
+                            )}
                           </Notice>
                         )}
                         <form
@@ -330,7 +343,9 @@ export function Conversions({
                         >
                           <div className="grid gap-4 sm:grid-cols-2">
                             <label>
-                              <span className="finance-label">Pay with</span>
+                              <span className="finance-label">
+                                {tx("Pay with")}
+                              </span>
                               <select
                                 className="finance-field"
                                 value={input.address}
@@ -350,7 +365,7 @@ export function Conversions({
                             </label>
                             <label>
                               <span className="finance-label">
-                                Amount to receive · {output.symbol}
+                                {tx("Amount to receive ·")} {output.symbol}
                               </span>
                               <input
                                 className="finance-field"
@@ -368,7 +383,7 @@ export function Conversions({
                           </div>
                           <label className="block">
                             <span className="finance-label">
-                              Price tolerance
+                              {tx("Price tolerance")}
                             </span>
                             <select
                               className="finance-field"
@@ -381,16 +396,19 @@ export function Conversions({
                             >
                               {CONVERSION_SLIPPAGE_BPS.map((b) => (
                                 <option key={b} value={b}>
-                                  {b / 100}%{b === 50 ? " · standard" : ""}
+                                  {b / 100}%{b === 50 ? tx(" · standard") : ""}
                                 </option>
                               ))}
                             </select>
                           </label>
                           <p className="text-sm text-[var(--ws-muted)]">
-                            Your quote includes the pool fee and a maximum
-                            amount of {input.symbol} to spend. Keep some USDC
-                            available for the separate execution fee. The
-                            converted funds return to this company account.
+                            {tx(
+                              "Your quote includes the pool fee and a maximum amount of",
+                            )}{" "}
+                            {input.symbol}{" "}
+                            {tx(
+                              "to spend. Keep some USDC available for the separate execution fee. The converted funds return to this company account.",
+                            )}
                           </p>
                           <button
                             className="workspace-button workspace-button-primary"
@@ -399,13 +417,14 @@ export function Conversions({
                             }
                           >
                             {busy
-                              ? "Checking exchange rate…"
-                              : "Review conversion"}
+                              ? tx("Checking exchange rate…")
+                              : tx("Review conversion")}
                           </button>
                           {!canWrite && (
                             <p className="text-sm text-[var(--ws-muted)]">
-                              An admin or approver can prepare conversions. The
-                              account's required owners approve execution.
+                              {tx(
+                                "An admin or approver can prepare conversions. The account's required owners approve execution.",
+                              )}
                             </p>
                           )}
                         </form>
@@ -415,22 +434,18 @@ export function Conversions({
                 )}
                 <details className="text-sm text-[var(--ws-muted)]">
                   <summary className="cursor-pointer">
-                    Provider and pricing
+                    {tx("Provider and pricing")}
                   </summary>
                   <div className="mt-3 space-y-3">
                     <p>
-                      Uniswap's pools determine the exchange rate and charge the
-                      pool fee included in the quote. The reviewed maximum
-                      protects against a worse price. A change beyond that limit
-                      stops execution; an attempted execution can still cost a
-                      fee.
+                      {tx(
+                        "Uniswap's pools determine the exchange rate and charge the pool fee included in the quote. The reviewed maximum protects against a worse price. A change beyond that limit stops execution; an attempted execution can still cost a fee.",
+                      )}
                     </p>
                     <p>
-                      Quotes compare supported direct pools for this currency
-                      pair. They are not a claim of the best rate across every
-                      exchange. Tokens can lose value and liquidity can change.
-                      Disburse adds no conversion fee and does not pay your
-                      execution costs.
+                      {tx(
+                        "Quotes compare supported direct pools for this currency pair. They are not a claim of the best rate across every exchange. Tokens can lose value and liquidity can change. Disburse adds no conversion fee and does not pay your execution costs.",
+                      )}
                     </p>
                   </div>
                 </details>

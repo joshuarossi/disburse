@@ -1,3 +1,4 @@
+import { tx, useWorkspaceLanguage } from "@/lib/workspaceI18n";
 import { useRef, useState } from "react";
 import { useAction, useMutation, useQuery } from "convex/react";
 import { ConvexError } from "convex/values";
@@ -23,6 +24,7 @@ export function StableDelegatedPayment({
   onBusyChange: (busy: boolean) => void;
   onModeChange: (open: boolean) => void;
 }) {
+  useWorkspaceLanguage();
   const sessionToken = useSessionToken(),
     { address } = useAccount();
   const accounts = useQuery(
@@ -112,42 +114,44 @@ export function StableDelegatedPayment({
       onToggle={(e) => onModeChange(e.currentTarget.open)}
     >
       <summary className="cursor-pointer font-medium">
-        Pay with a spending allowance
+        {tx("Pay with a spending allowance")}
       </summary>
       <div className="mt-4 space-y-4">
         <p className="workspace-description">
-          Use your approved spending limit for the saved recipient amounts. Your
-          assigned payment account approves the batch and pays gas in USDC.
+          {tx(
+            "Use your approved spending limit for the saved recipient amounts. Your assigned payment account approves the batch and pays gas in USDC.",
+          )}
         </p>
-        {error && <Notice>{error}</Notice>}
+        {error && <Notice>{tx(error)}</Notice>}
         {notice && <Notice tone="info">{notice}</Notice>}
         {reservation && (
           <a
             className="workspace-link"
             href={`/org/${payment.orgId}/disbursements?focus=${encodeURIComponent(reservation)}`}
           >
-            Open the original allowance payment
+            {tx("Open the original allowance payment")}
           </a>
         )}
         {payment.allowanceExecution ? (
           <>
             <p className="workspace-description">
-              Fee account:{" "}
+              {tx("Fee account:")}{" "}
               <strong>
                 {accounts?.find((s) => s.id === feeId)?.name ??
-                  "Saved fee account"}
+                  tx("Saved fee account")}
               </strong>
-              . Recipient amounts and the original allowance authorization stay
-              unchanged.
+              {tx(
+                ". Recipient amounts and the original allowance authorization stay unchanged.",
+              )}
             </p>
             {payment.allowanceCancellationRequestedAt &&
             payment.allowanceCircleExecutionId ? (
               <>
                 {payment.status !== "cancelled" && (
                   <Notice tone="info">
-                    The original request is paused in Disburse. Complete the
-                    cancellation below to invalidate its signed authorization
-                    on-chain.
+                    {tx(
+                      "The original request is paused in Disburse. Complete the cancellation below to invalidate its signed authorization on-chain.",
+                    )}
                   </Notice>
                 )}
                 <CustomerPaidExecution
@@ -203,21 +207,21 @@ export function StableDelegatedPayment({
                     }
                   }}
                 >
-                  Cancel allowance payment
+                  {tx("Cancel allowance payment")}
                 </button>
               )}
             {!payment.txHash && (
               <p className="workspace-description">
-                You can discard an unsigned payment without a charge. A signed
-                payment requires a separately reviewed USDC-paid cancellation.
-                Company owners can also revoke the account’s spending allowance.
+                {tx(
+                  "You can discard an unsigned payment without a charge. A signed payment requires a separately reviewed USDC-paid cancellation. Company owners can also revoke the account’s spending allowance.",
+                )}
               </p>
             )}
           </>
         ) : (
           <>
             <label className="block">
-              <span className="finance-label">My payment account</span>
+              <span className="finance-label">{tx("My payment account")}</span>
               <select
                 className="finance-field"
                 value={feeId ?? ""}
@@ -227,8 +231,8 @@ export function StableDelegatedPayment({
                 {!accounts?.length && (
                   <option value="">
                     {accounts === undefined
-                      ? "Loading accounts…"
-                      : "No supported fee account"}
+                      ? tx("Loading accounts…")
+                      : tx("No supported fee account")}
                   </option>
                 )}
                 {accounts?.map((s) => (
@@ -240,43 +244,42 @@ export function StableDelegatedPayment({
             </label>
             {accounts?.length === 0 && (
               <Notice tone="info">
-                An administrator can assign you a payment account in Settings →
-                Funding accounts, then set its company spending limit in Team &
-                approvals.
+                {tx(
+                  "An administrator can assign you a payment account in Settings → Funding accounts, then set its company spending limit in Team & approvals.",
+                )}
               </Notice>
             )}
             <p className="workspace-description">
-              An administrator creates and funds your payment account in Funding
-              accounts, then grants its spending limit in Team & approvals. You
-              control its assigned balance. Recipient funds stay in the company
-              account until payment.
+              {tx(
+                "An administrator creates and funds your payment account in Funding accounts, then grants its spending limit in Team & approvals. You control its assigned balance. Recipient funds stay in the company account until payment.",
+              )}
             </p>
             <button
               className="workspace-button"
               disabled={busy || blocked || !feeId}
               onClick={() => void run("quote")}
             >
-              {busy ? "Checking…" : "Check my allowance"}
+              {busy ? tx("Checking…") : tx("Check my allowance")}
             </button>
             {quote && (
               <>
                 <p>
-                  Available allowance:{" "}
+                  {tx("Available allowance:")}{" "}
                   <strong>
                     {formatUnits(BigInt(quote.available), 6)} {payment.token}
                   </strong>
                 </p>
                 <p className="workspace-description">
-                  Your assigned account will authorize every saved recipient
-                  together, within its company spending limit. Review the USDC
-                  gas fee before signing. This step does not send the payment.
+                  {tx(
+                    "Your assigned account will authorize every saved recipient together, within its company spending limit. Review the USDC gas fee before signing. This step does not send the payment.",
+                  )}
                 </p>
                 <button
                   className="workspace-button workspace-button-primary"
                   disabled={busy || blocked}
                   onClick={() => void run("authorize")}
                 >
-                  {busy ? "Preparing…" : "Review fee and approval"}
+                  {busy ? tx("Preparing…") : tx("Review fee and approval")}
                 </button>
               </>
             )}

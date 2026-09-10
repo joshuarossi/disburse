@@ -1,4 +1,6 @@
-import { userErrorMessage } from '@/lib/userErrors';
+import { LanguageSwitcher } from "@/components/ui/LanguageSwitcher";
+import { tx, useWorkspaceLanguage } from "@/lib/workspaceI18n";
+import { userErrorMessage } from "@/lib/userErrors";
 import { useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { useMutation, useQuery } from "convex/react";
@@ -12,6 +14,7 @@ import { teamRoles } from "../../shared/teamRoles";
 import { formatDate } from "@/lib/formatMoney";
 
 function Invitation({ token }: { token: string }) {
+  useWorkspaceLanguage();
   const valid = /^[a-f0-9]{64}$/.test(token),
     sessionToken = useSessionToken(),
     { address } = useAccount();
@@ -45,9 +48,7 @@ function Invitation({ token }: { token: string }) {
       });
       setJoined(result.orgId);
     } catch (e) {
-      setError(
-        userErrorMessage(e, "The invitation could not be accepted."),
-      );
+      setError(userErrorMessage(e, "The invitation could not be accepted."));
     } finally {
       setBusy(false);
     }
@@ -56,31 +57,35 @@ function Invitation({ token }: { token: string }) {
     return (
       <div className="space-y-5">
         <CheckCircle2 size={32} />
-        <h1 className="text-2xl font-semibold">You're on the team</h1>
+        <h1 className="text-2xl font-semibold">{tx("You're on the team")}</h1>
         <p>
-          Your email is verified and bound to your sign-in wallet. Your
-          workspace role is now active.
+          {tx(
+            "Your email is verified and bound to your sign-in wallet. Your workspace role is now active.",
+          )}
         </p>
         <Link
           className="workspace-button workspace-button-primary"
           to={`/org/${joined}/dashboard`}
         >
-          Open workspace
+          {tx("Open workspace")}
         </Link>
       </div>
     );
   if (valid && invitation === undefined)
-    return <p role="status">Loading invitation…</p>;
+    return <p role="status">{tx("Loading invitation…")}</p>;
   if (!valid || !invitation)
     return (
       <div className="space-y-4">
-        <h1 className="text-2xl font-semibold">Invitation unavailable</h1>
+        <h1 className="text-2xl font-semibold">
+          {tx("Invitation unavailable")}
+        </h1>
         <p>
-          This link may have expired, been replaced or been revoked. Ask a
-          workspace administrator for a new invitation.
+          {tx(
+            "This link may have expired, been replaced or been revoked. Ask a workspace administrator for a new invitation.",
+          )}
         </p>
         <Link className="workspace-action-link" to="/login">
-          Sign in to Disburse
+          {tx("Sign in to Disburse")}
         </Link>
       </div>
     );
@@ -89,14 +94,14 @@ function Invitation({ token }: { token: string }) {
     <div className="space-y-5">
       <h1 className="text-2xl font-semibold">
         {pending
-          ? `Join ${invitation.organizationName}`
-          : "Invitation already accepted"}
+          ? tx("Join {{value1}}", { value1: invitation.organizationName })
+          : tx("Invitation already accepted")}
       </h1>
-      {error && <Notice>{error}</Notice>}
+      {error && <Notice>{tx(error)}</Notice>}
       {pending && (
         <>
           <p>
-            Invited at {invitation.maskedEmail} · Expires{" "}
+            {tx("Invited at")} {invitation.maskedEmail} {tx("· Expires")}{" "}
             {formatDate(invitation.expiresAt!)}
           </p>
           <section className="rounded-xl border border-white/10 p-4 space-y-2">
@@ -106,23 +111,25 @@ function Invitation({ token }: { token: string }) {
             </p>
           </section>
           <p className="text-sm workspace-description">
-            Accepting verifies this email invitation and binds it to the wallet
-            you use to sign in. Workspace access does not give you ownership of
-            a funding account.
+            {tx(
+              "Accepting verifies this email invitation and binds it to the wallet you use to sign in. Workspace access does not give you ownership of a funding account.",
+            )}
           </p>
         </>
       )}
       {signedIn ? (
         <>
           <div className="space-y-2">
-            <span className="finance-label">Your verified sign-in wallet</span>
+            <span className="finance-label">
+              {tx("Your verified sign-in wallet")}
+            </span>
             <p className="font-mono text-sm break-all">
               {session.walletAddress}
             </p>
           </div>
           {pending && invitation.expectedWallet && (
             <p className="text-sm">
-              This invitation requires{" "}
+              {tx("This invitation requires")}{" "}
               <span className="font-mono break-all">
                 {invitation.expectedWallet}
               </span>
@@ -142,8 +149,9 @@ function Invitation({ token }: { token: string }) {
                   )
                 }
               />
-              Use this wallet for my membership and accept the stated workspace
-              role.
+              {tx(
+                "Use this wallet for my membership and accept the stated workspace role.",
+              )}
             </label>
           )}
           <div className="flex flex-col items-start gap-4">
@@ -160,10 +168,10 @@ function Invitation({ token }: { token: string }) {
               onClick={() => void join()}
             >
               {busy
-                ? "Joining…"
+                ? tx("Joining…")
                 : pending
-                  ? "Accept invitation"
-                  : "Open my workspace"}
+                  ? tx("Accept invitation")
+                  : tx("Open my workspace")}
             </button>
             <button
               className="block workspace-action-link text-sm"
@@ -174,22 +182,23 @@ function Invitation({ token }: { token: string }) {
                 disconnect();
               }}
             >
-              Use a different sign-in wallet
+              {tx("Use a different sign-in wallet")}
             </button>
           </div>
         </>
       ) : (
         <>
           <p className="workspace-description">
-            Sign in to prove control of your wallet, then review and accept this
-            invitation.
+            {tx(
+              "Sign in to prove control of your wallet, then review and accept this invitation.",
+            )}
           </p>
           <Link
             className="workspace-button workspace-button-primary"
             to="/login"
             state={{ returnTo: `/invite#${token}` }}
           >
-            Sign in to continue
+            {tx("Sign in to continue")}
           </Link>
         </>
       )}
@@ -197,18 +206,24 @@ function Invitation({ token }: { token: string }) {
   );
 }
 export default function AcceptInvitation() {
+  useWorkspaceLanguage();
   const { hash } = useLocation(),
     { theme, setTheme } = useTheme();
   return (
     <div className="workspace workspace-entry min-h-screen px-5 py-10">
       <div className="mx-auto max-w-xl">
-        <header className="mb-8 flex items-center justify-between">
+        <header className="gap-3 flex-wrap mb-8 flex items-center justify-between">
           <Link to="/" className="text-xl font-semibold">
-            Disburse
+            {tx("Disburse")}
           </Link>
+          <LanguageSwitcher inline />
           <button
             className="workspace-button"
-            aria-label={`Switch to ${theme === "dark" ? "light" : "dark"} theme`}
+            aria-label={
+              theme === "light"
+                ? tx("Switch to dark theme")
+                : tx("Switch to light theme")
+            }
             onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
           >
             {theme === "dark" ? <Sun size={18} /> : <Moon size={18} />}

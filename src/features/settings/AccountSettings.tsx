@@ -1,3 +1,4 @@
+import { tx, useWorkspaceLanguage } from "@/lib/workspaceI18n";
 import { Button } from "@/components/ui/button";
 import { Wallet, ArrowUpRight, Loader2, AlertCircle } from "lucide-react";
 import { CHAINS_LIST, getChainName, getSafeAppUrl } from "@/lib/chains";
@@ -12,6 +13,7 @@ export function AccountSettings({
 }: {
   controller: ReturnType<typeof useSettingsController>;
 }) {
+  useWorkspaceLanguage();
   const [renaming, setRenaming] = useState<Doc<"safes"> | null>(null);
   const {
     t,
@@ -45,8 +47,9 @@ export function AccountSettings({
               {t("settings.safe.title")}
             </h2>
             <p className="text-xs sm:text-sm text-slate-400">
-              Separate your operations, payroll and reserves into named
-              accounts.
+              {tx(
+                "Separate your operations, payroll and reserves into named accounts.",
+              )}
             </p>
           </div>
         </div>
@@ -54,14 +57,14 @@ export function AccountSettings({
         <CompanyAccountSetup controller={controller} />
         {linkingError && !isLinking && (
           <p role="alert" className="mb-4 text-sm text-red-400">
-            {linkingError}
+            {tx(linkingError)}
           </p>
         )}
         {safes && safes.length > 0 ? (
           <div className="space-y-6">
             <div>
               <label className="mb-2 block text-sm font-medium text-slate-300">
-                Connected accounts
+                {tx("Connected accounts")}
               </label>
               <div className="space-y-2">
                 {safes.map((safe) => {
@@ -78,7 +81,9 @@ export function AccountSettings({
                           <div className="text-xs text-slate-400">
                             <p className="font-medium text-white">
                               {safe.name ??
-                                `${getChainName(safe.chainId)} account`}
+                                tx("{{value1}} account", {
+                                  value1: getChainName(safe.chainId),
+                                })}
                             </p>
                             <p className="font-mono">
                               {safe.safeAddress.slice(0, 6)}…
@@ -86,8 +91,9 @@ export function AccountSettings({
                             </p>
                             {safe.threshold && (
                               <p>
-                                {safe.threshold} of {safe.owners?.length}{" "}
-                                signatures when linked
+                                {safe.threshold} {tx("of")}{" "}
+                                {safe.owners?.length}{" "}
+                                {tx("signatures when linked")}
                               </p>
                             )}
                           </div>
@@ -108,7 +114,7 @@ export function AccountSettings({
                               size="sm"
                               onClick={() => setRenaming(safe)}
                             >
-                              Rename
+                              {tx("Rename")}
                             </Button>
                             <Button
                               variant="secondary"
@@ -142,7 +148,7 @@ export function AccountSettings({
                 }}
                 className="w-full sm:w-auto h-11"
               >
-                Connect another account
+                {tx("Connect another account")}
               </Button>
             )}
           </div>
@@ -150,12 +156,12 @@ export function AccountSettings({
         {isLinking ? (
           <form onSubmit={handleLinkSafe} className="mt-6 space-y-6">
             <label className="block">
-              <span className="finance-label">Account name</span>
+              <span className="finance-label">{tx("Account name")}</span>
               <input
                 className="finance-field"
                 value={accountName}
                 onChange={(e) => setAccountName(e.target.value)}
-                placeholder="e.g. Operations or Payroll"
+                placeholder={tx("e.g. Operations or Payroll")}
                 maxLength={80}
                 required
               />
@@ -175,7 +181,7 @@ export function AccountSettings({
                   setSafeAddress(e.target.value);
                   setLinkingError(null);
                 }}
-                placeholder="0x..."
+                placeholder={tx("0x...")}
                 className="w-full rounded-lg border border-white/10 bg-navy-800 px-4 py-3 font-mono text-sm text-white placeholder-slate-500 focus:border-accent-500 focus:outline-none focus:ring-1 focus:ring-accent-500"
                 required
               />
@@ -211,7 +217,7 @@ export function AccountSettings({
             {linkingError && (
               <div className="flex items-start gap-3 rounded-lg border border-red-500/30 bg-red-500/5 p-4">
                 <AlertCircle className="h-5 w-5 text-red-400 shrink-0 mt-0.5" />
-                <p className="text-sm text-red-400">{linkingError}</p>
+                <p className="text-sm text-red-400">{tx(linkingError)}</p>
               </div>
             )}
 

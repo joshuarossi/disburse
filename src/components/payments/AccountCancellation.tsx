@@ -1,5 +1,6 @@
-import { supportsCircleFees } from '../../../shared/circleExecution';
-import { userErrorMessage } from '@/lib/userErrors';
+import { tx, useWorkspaceLanguage } from "@/lib/workspaceI18n";
+import { supportsCircleFees } from "../../../shared/circleExecution";
+import { userErrorMessage } from "@/lib/userErrors";
 import { useState } from "react";
 import { useAction, useMutation, useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
@@ -25,6 +26,7 @@ export function AccountCancellation({
   initiallyOpen?: boolean;
   onBack?: () => void;
 }) {
+  useWorkspaceLanguage();
   const sessionToken = useSessionToken()!;
   const source = { disbursementId, policyChangeId, sessionToken };
   const info = useQuery(
@@ -48,7 +50,7 @@ export function AccountCancellation({
     [error, setError] = useState("");
   const [retrying, setRetrying] = useState(false);
   const circle = !!info && supportsCircleFees(info.chainId);
-  const method = circle ? 'circle' : legacyMethod;
+  const method = circle ? "circle" : legacyMethod;
   const preparing = !info?.cancellation || retrying;
   const feeQuote = useQuery(
     api.spendingPolicyData.fee,
@@ -83,119 +85,149 @@ export function AccountCancellation({
       setReviewed(false);
       setRetrying(false);
     } catch (e) {
-      setError(
-        userErrorMessage(e, "Could not request cancellation"),
-      );
+      setError(userErrorMessage(e, "Could not request cancellation"));
     } finally {
       setBusy(false);
     }
   };
   if (!info)
     return initiallyOpen ? (
-      <p role="status">Loading cancellation review…</p>
+      <p role="status">{tx("Loading cancellation review…")}</p>
     ) : null;
   const c = info.cancellation;
   if (!c && !open)
     return info.canRequest ? (
       <Button size="sm" variant="ghost" onClick={() => setOpen(true)}>
-        Cancel policy request
+        {tx("Cancel policy request")}
       </Button>
     ) : null;
-  const useCircle = circle && !!c && !c.executionFee && (!c.execution || c.execution.service === 'circle');
+  const useCircle =
+    circle &&
+    !!c &&
+    !c.executionFee &&
+    (!c.execution || c.execution.service === "circle");
   const identity = c ? { cancellationId: c._id, sessionToken } : null;
   return (
     <section
-      aria-label="Account cancellation"
-      className={policyChangeId ? 'space-y-4 border-t border-[var(--ws-border)] pt-4' : 'space-y-4 rounded-lg border border-[var(--ws-border)] p-4'}
+      aria-label={tx("Account cancellation")}
+      className={
+        policyChangeId
+          ? "space-y-4 border-t border-[var(--ws-border)] pt-4"
+          : "space-y-4 rounded-lg border border-[var(--ws-border)] p-4"
+      }
     >
       <div>
         <h3 className="font-semibold">
           {c?.status === "applied"
-            ? "Cancellation confirmed"
+            ? tx("Cancellation confirmed")
             : c
-              ? "Cancellation requested"
+              ? tx("Cancellation requested")
               : disbursementId
-                ? "Cancel payment"
-                : "Cancel policy request"}
+                ? tx("Cancel payment")
+                : tx("Cancel policy request")}
         </h3>
         <p className="mt-2 text-sm text-[var(--ws-muted)]">
           {c?.status === "applied"
-            ? "The account confirmed the cancellation. The original transaction can no longer execute."
-            : "This request already has an account transaction reserved. Account approvers must authorize its cancellation. A network fee applies when cancellation is completed."}
+            ? tx(
+                "The account confirmed the cancellation. The original transaction can no longer execute.",
+              )
+            : tx(
+                "This request already has an account transaction reserved. Account approvers must authorize its cancellation. A network fee applies when cancellation is completed.",
+              )}
         </p>
         {c && ["pending", "processing"].includes(c.status) && (
           <p className="mt-2 text-sm text-[var(--ws-muted)]">
-            The original request is blocked in Disburse. Its budget remains
-            reserved until cancellation is confirmed. The original transaction
-            could still complete if it was submitted outside Disburse.
+            {tx(
+              "The original request is blocked in Disburse. Its budget remains reserved until cancellation is confirmed. The original transaction could still complete if it was submitted outside Disburse.",
+            )}
           </p>
         )}
       </div>
       {(error || c?.error) && (
         <p role="alert" className="text-sm text-red-400">
-          {error || c?.error}
+          {tx(error || c?.error || "")}
         </p>
       )}
       {preparing && info.canRequest && (
         <>
           <div className="space-y-3">
-            {circle ? <p className="text-sm text-[var(--ws-muted)]">Your company account pays the cancellation fee in USDC. Review the exact limit after account approval. Recipients receive no payment from a cancellation.</p> : <>
-            <label className="block">
-              <span className="finance-label">Cancellation fee</span>
-              <select
-                className="finance-field"
-                value={method}
-                disabled={busy}
-                onChange={(e) => {
-                  setMethod(e.target.value);
-                  setReviewed(false);
-                }}
-              >
-                <option value="managed">Pay from company account</option>
-                <option value="wallet">
-                  Pay network fees from my signing wallet
-                </option>
-              </select>
-            </label>
-            {method === "managed" ? (
+            {circle ? (
+              <p className="text-sm text-[var(--ws-muted)]">
+                {tx(
+                  "Your company account pays the cancellation fee in USDC. Review the exact limit after account approval. Recipients receive no payment from a cancellation.",
+                )}
+              </p>
+            ) : (
               <>
                 <label className="block">
-                  <span className="finance-label">Fee currency</span>
+                  <span className="finance-label">
+                    {tx("Cancellation fee")}
+                  </span>
                   <select
                     className="finance-field"
-                    value={feeToken}
+                    value={method}
                     disabled={busy}
                     onChange={(e) => {
-                      setFeeToken(e.target.value);
+                      setMethod(e.target.value);
                       setReviewed(false);
                     }}
                   >
-                    <option>USDC</option>
-                    <option>USDT</option>
+                    <option value="managed">
+                      {tx("Pay from company account")}
+                    </option>
+                    <option value="wallet">
+                      {tx("Pay network fees from my signing wallet")}
+                    </option>
                   </select>
                 </label>
-                {feeQuote?.fee ? (
-                  <p className="text-sm">
-                    {formatMoney(feeQuote.fee.amount, feeQuote.fee.token, true)}{" "}
-                    {feeQuote.fee.token} from {info.safeName}, only when the
-                    cancellation completes.
-                  </p>
+                {method === "managed" ? (
+                  <>
+                    <label className="block">
+                      <span className="finance-label">
+                        {tx("Fee currency")}
+                      </span>
+                      <select
+                        className="finance-field"
+                        value={feeToken}
+                        disabled={busy}
+                        onChange={(e) => {
+                          setFeeToken(e.target.value);
+                          setReviewed(false);
+                        }}
+                      >
+                        <option>{tx("USDC")}</option>
+                        <option>{tx("USDT")}</option>
+                      </select>
+                    </label>
+                    {feeQuote?.fee ? (
+                      <p className="text-sm">
+                        {formatMoney(
+                          feeQuote.fee.amount,
+                          feeQuote.fee.token,
+                          true,
+                        )}{" "}
+                        {feeQuote.fee.token} {tx("from")} {info.safeName}
+                        {tx(", only when the cancellation completes.")}
+                      </p>
+                    ) : (
+                      <p
+                        role={feeQuote ? "alert" : "status"}
+                        className="text-sm text-[var(--ws-muted)]"
+                      >
+                        {feeQuote?.error ??
+                          tx("Checking the cancellation fee…")}
+                      </p>
+                    )}
+                  </>
                 ) : (
-                  <p
-                    role={feeQuote ? "alert" : "status"}
-                    className="text-sm text-[var(--ws-muted)]"
-                  >
-                    {feeQuote?.error ?? "Checking the cancellation fee…"}
+                  <p className="text-sm text-[var(--ws-muted)]">
+                    {tx(
+                      "Your wallet shows the network fee before you send the cancellation. No payment is sent to the original recipients.",
+                    )}
                   </p>
                 )}
               </>
-            ) : (
-              <p className="text-sm text-[var(--ws-muted)]">
-                Your wallet shows the network fee before you send the
-                cancellation. No payment is sent to the original recipients.
-              </p>
             )}
-            </>}
           </div>
           <label className="flex items-start gap-2 text-sm">
             <input
@@ -205,8 +237,9 @@ export function AccountCancellation({
               onChange={(e) => setReviewed(e.target.checked)}
             />
             <span>
-              I reviewed the cancellation and its fee. The original request is
-              cancelled only after account confirmation.
+              {tx(
+                "I reviewed the cancellation and its fee. The original request is cancelled only after account confirmation.",
+              )}
             </span>
           </label>
           <div className="flex flex-wrap gap-2">
@@ -218,8 +251,8 @@ export function AccountCancellation({
               onClick={() => void request()}
             >
               {busy
-                ? "Preparing cancellation…"
-                : "Request cancellation approval"}
+                ? tx("Preparing cancellation…")
+                : tx("Request cancellation approval")}
             </Button>
             <Button
               size="sm"
@@ -231,7 +264,7 @@ export function AccountCancellation({
                 onBack?.();
               }}
             >
-              Keep original request
+              {tx("Keep original request")}
             </Button>
           </div>
         </>
@@ -251,15 +284,31 @@ export function AccountCancellation({
               setReviewed(false);
             }}
           >
-            Review another cancellation attempt
+            {tx("Review another cancellation attempt")}
           </Button>
         )}
       {c && identity && (
         <>
           <p className="text-sm text-[var(--ws-muted)]">
             {c.executionFee
-              ? `Cancellation fee: ${formatMoney(c.executionFee.amount, c.executionFee.token, true)} ${c.executionFee.token} from this account.`
-              : useCircle ? 'The company account pays the reviewed cancellation fee in USDC.' : "Network fee paid from the signing wallet when cancellation is completed."}
+              ? tx(
+                  "Cancellation fee: {{value1}} {{value2}} from this account.",
+                  {
+                    value1: formatMoney(
+                      c.executionFee.amount,
+                      c.executionFee.token,
+                      true,
+                    ),
+                    value2: c.executionFee.token,
+                  },
+                )
+              : useCircle
+                ? tx(
+                    "The company account pays the reviewed cancellation fee in USDC.",
+                  )
+                : tx(
+                    "Network fee paid from the signing wallet when cancellation is completed.",
+                  )}
           </p>
           <AccountChangeApproval
             key={c._id}
@@ -275,7 +324,9 @@ export function AccountCancellation({
             canApprove={info.canApprove}
             canCheck={info.canRequest}
             memberName={memberName}
-            reviewText="I reviewed the original request and cancellation fee. I approve cancelling this account transaction."
+            reviewText={tx(
+              "I reviewed the original request and cancellation fee. I approve cancelling this account transaction.",
+            )}
             load={() => load(identity)}
             approve={(args) => approve({ ...identity, ...args })}
             execute={() => execute(identity)}
@@ -292,7 +343,7 @@ export function AccountCancellation({
                 (c.txHash ?? c.execution?.txHash)!,
               )}
             >
-              View cancellation receipt
+              {tx("View cancellation receipt")}
             </a>
           )}
         </>

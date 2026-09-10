@@ -1,3 +1,4 @@
+import { tx, useWorkspaceLanguage } from "@/lib/workspaceI18n";
 import { useActivityEnvironment } from "@/features/workspace/ActivityEnvironment";
 import { chainEnvironment } from "../../shared/assets";
 import { useParams } from "react-router-dom";
@@ -15,6 +16,7 @@ import { getChainName } from "@/lib/chains";
 import { amountToBaseUnits, formatBaseUnits } from "../../shared/validation";
 
 export default function Dashboard() {
+  useWorkspaceLanguage();
   const { environment } = useActivityEnvironment();
   const { orgId } = useParams();
   const sessionToken = useSessionToken();
@@ -34,7 +36,10 @@ export default function Dashboard() {
   if (!overview)
     return (
       <>
-        <PageHeader title="Overview" description="Loading your workspace…" />
+        <PageHeader
+          title={tx("Overview")}
+          description={tx("Loading your workspace…")}
+        />
         <LoadingRows />
       </>
     );

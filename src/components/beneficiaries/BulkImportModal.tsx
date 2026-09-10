@@ -1,4 +1,5 @@
-import { userErrorMessage } from '@/lib/userErrors';
+import { tx, useWorkspaceLanguage } from "@/lib/workspaceI18n";
+import { userErrorMessage } from "@/lib/userErrors";
 import { Dialog } from "@/components/ui/Dialog";
 import { Fragment, useState, useCallback, useMemo, useRef } from "react";
 import { useSessionToken } from "@/lib/session";
@@ -50,6 +51,7 @@ export function BulkImportModal({
   onClose,
   onSuccess,
 }: BulkImportModalProps) {
+  useWorkspaceLanguage();
   const sessionToken = useSessionToken();
   const [sourceSystem, setSourceSystem] = useState("csv");
   const [expandedRows, setExpandedRows] = useState<Set<number>>(new Set());
@@ -267,7 +269,10 @@ export function BulkImportModal({
       } catch (error) {
         console.error("Failed to parse CSV:", error);
         setImportError(
-          userErrorMessage(error, t("beneficiaries.bulkImport.errors.parseError")),
+          userErrorMessage(
+            error,
+            t("beneficiaries.bulkImport.errors.parseError"),
+          ),
         );
       } finally {
         setParsing(false);
@@ -345,7 +350,10 @@ export function BulkImportModal({
       setSaved({ ...result, skipped: validatedRows.length - chosen.length });
     } catch (e) {
       setImportError(
-        userErrorMessage(e, "Could not import the selected changes. Review the preview and try again."),
+        userErrorMessage(
+          e,
+          "Could not import the selected changes. Review the preview and try again.",
+        ),
       );
     } finally {
       setIsImporting(false);
@@ -359,16 +367,21 @@ export function BulkImportModal({
 
   if (completed)
     return (
-      <Dialog title="Import complete" onClose={finish}>
+      <Dialog title={tx("Import complete")} onClose={finish}>
         <div className="space-y-5 p-6">
           <p role="status">
-            {completed.created} created · {completed.updated} updated ·{" "}
-            {completed.skipped} skipped
+            {completed.created} {tx("created ·")} {completed.updated}{" "}
+            {tx("updated ·")} {completed.skipped} {tx("skipped")}
           </p>
           <p className="text-sm text-slate-400">
             {completed.reviewRequested
-              ? `${completed.reviewRequested} payout record${completed.reviewRequested === 1 ? "" : "s"} ${completed.reviewRequested === 1 ? "needs" : "need"} review before payment. Existing approved instructions remain in place until the review is complete.`
-              : "Saved payout instructions were preserved. No payments were created."}
+              ? tx(
+                  "{{count}} payout records need review before payment. Existing approved instructions remain in place until the review is complete.",
+                  { count: completed.reviewRequested },
+                )
+              : tx(
+                  "Saved payout instructions were preserved. No payments were created.",
+                )}
           </p>
           <div className="flex flex-wrap gap-3">
             <Link
@@ -384,11 +397,11 @@ export function BulkImportModal({
               }}
             >
               {completed.reviewRequested
-                ? "Review payout details"
-                : "View recipients"}
+                ? tx("Review payout details")
+                : tx("View recipients")}
             </Link>
             <Button variant="secondary" onClick={finish}>
-              Done
+              {tx("Done")}
             </Button>
           </div>
         </div>
@@ -396,7 +409,7 @@ export function BulkImportModal({
     );
   return (
     <Dialog
-      title="Import recipients"
+      title={tx("Import recipients")}
       onClose={() => {
         if (canDismiss) onClose();
       }}
@@ -409,25 +422,24 @@ export function BulkImportModal({
             className="mb-4 flex items-start gap-2 rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-400"
           >
             <AlertCircle className="h-4 w-4 flex-shrink-0 mt-0.5" />
-            <span>{importError}</span>
+            <span>{tx(importError)}</span>
           </div>
         )}
 
         {!validatedRows.length && (
           <div className="mb-6 rounded-lg border border-white/10 bg-navy-800/50 p-5">
             <h3 className="font-medium text-white">
-              Bring your existing recipient list
+              {tx("Bring your existing recipient list")}
             </h3>
             <p className="mt-2 text-sm leading-6 text-slate-400">
-              Upload a CSV from your payroll or accounting tool, or paste rows
-              from a spreadsheet. We recognize names, first and last names,
-              email, and payment addresses. Match repeated imports using
-              employee IDs from your source system.
+              {tx(
+                "Upload a CSV from your payroll or accounting tool, or paste rows from a spreadsheet. We recognize names, first and last names, email, and payment addresses. Match repeated imports using employee IDs from your source system.",
+              )}
             </p>
             <p className="mt-2 text-xs leading-5 text-slate-500">
-              No payment addresses yet? Import names and emails now, then add
-              payment details from the recipient list before paying. Only import
-              the columns you need; leave out tax IDs and bank details.
+              {tx(
+                "No payment addresses yet? Import names and emails now, then add payment details from the recipient list before paying. Only import the columns you need; leave out tax IDs and bank details.",
+              )}
             </p>
             <Button
               className="mt-3"
@@ -436,29 +448,30 @@ export function BulkImportModal({
               onClick={handleDownloadTemplate}
             >
               <Download className="h-4 w-4" />
-              Download example CSV
+              {tx("Download example CSV")}
             </Button>
           </div>
         )}
         <label className="mb-5 block">
           <span className="finance-label">
-            Source system for employee or vendor IDs
+            {tx("Source system for employee or vendor IDs")}
           </span>
           <select
             className="finance-field"
             value={sourceSystem}
             onChange={(e) => setSourceSystem(e.target.value)}
           >
-            <option value="csv">Spreadsheet / CSV</option>
-            <option value="gusto">Gusto</option>
-            <option value="quickbooks">QuickBooks</option>
-            <option value="xero">Xero</option>
-            <option value="deel">Deel</option>
-            <option value="rippling">Rippling</option>
+            <option value="csv">{tx("Spreadsheet / CSV")}</option>
+            <option value="gusto">{tx("Gusto")}</option>
+            <option value="quickbooks">{tx("QuickBooks")}</option>
+            <option value="xero">{tx("Xero")}</option>
+            <option value="deel">{tx("Deel")}</option>
+            <option value="rippling">{tx("Rippling")}</option>
           </select>
           <span className="mt-2 block text-xs text-slate-400">
-            Use the same source on future imports. Empty cells keep existing
-            values. Payout changes always require review.
+            {tx(
+              "Use the same source on future imports. Empty cells keep existing values. Payout changes always require review.",
+            )}
           </span>
         </label>
         {file && sourceColumns.length > 0 && (
@@ -467,29 +480,30 @@ export function BulkImportModal({
             open={!!importError && validatedRows.length === 0}
           >
             <summary className="cursor-pointer text-sm font-medium">
-              Match columns from your file
+              {tx("Match columns from your file")}
             </summary>
             <p className="mt-3 text-xs leading-5 text-slate-400">
-              Choose what each column contains. Unmatched columns are skipped.
-              Map a name (or first name) and an email or payment address.
+              {tx(
+                "Choose what each column contains. Unmatched columns are skipped. Map a name (or first name) and an email or payment address.",
+              )}
             </p>
             <div className="mt-4 max-h-80 space-y-4 overflow-auto">
               {sourceColumns.map((column, index) => (
                 <div key={index} className="grid gap-2 sm:grid-cols-2">
                   <div>
                     <p className="text-sm font-medium">
-                      {column || `Column ${index + 1}`}
+                      {column || tx("Column {{value1}}", { value1: index + 1 })}
                     </p>
                     <p
                       className="truncate text-xs text-slate-400"
                       title={sample[index]}
                     >
-                      {sample[index] || "No sample value"}
+                      {sample[index] || tx("No sample value")}
                     </p>
                   </div>
                   <label>
                     <span className="sr-only">
-                      Map column {index + 1}: {column}
+                      {tx("Map column")} {index + 1}: {column}
                     </span>
                     <select
                       className="finance-field"
@@ -507,10 +521,10 @@ export function BulkImportModal({
                         setMappingDirty(true);
                       }}
                     >
-                      <option value="">Skip this column</option>
+                      <option value="">{tx("Skip this column")}</option>
                       {importFields.map(([field, label]) => (
                         <option key={field} value={field}>
-                          {label}
+                          {tx(label)}
                         </option>
                       ))}
                     </select>
@@ -534,14 +548,14 @@ export function BulkImportModal({
                 );
               }}
             >
-              Apply column mapping
+              {tx("Apply column mapping")}
             </Button>
             {mappingDirty && (
               <p
                 role="status"
                 className="mt-2 text-xs workspace-funding-warning"
               >
-                Apply your column changes before importing.
+                {tx("Apply your column changes before importing.")}
               </p>
             )}
           </details>
@@ -592,7 +606,7 @@ export function BulkImportModal({
                       {file.name}
                     </p>
                     <p className="text-xs text-slate-400">
-                      {(file.size / 1024).toFixed(2)} KB
+                      {(file.size / 1024).toFixed(2)} {tx("KB")}
                     </p>
                   </div>
                 </div>
@@ -623,16 +637,16 @@ export function BulkImportModal({
         {!file && (
           <div className="mb-6">
             <label className="finance-label" htmlFor="paste-recipients">
-              Or paste spreadsheet rows, including column headings
+              {tx("Or paste spreadsheet rows, including column headings")}
             </label>
             <textarea
               id="paste-recipients"
               className="finance-field min-h-28"
               value={paste}
               onChange={(e) => setPaste(e.target.value)}
-              placeholder={
-                "First name\tLast name\tEmail\nJamie\tChen\tjamie@example.com"
-              }
+              placeholder={tx(
+                "First name\tLast name\tEmail\nJamie\tChen\tjamie@example.com",
+              )}
             />
             <Button
               variant="secondary"
@@ -647,14 +661,15 @@ export function BulkImportModal({
                 )
               }
             >
-              Preview recipients
+              {tx("Preview recipients")}
             </Button>
           </div>
         )}
         {validatedRows.some((row) => row.isValid && !row.wallet_address) && (
           <p className="mb-4 rounded-lg bg-amber-500/10 p-3 text-sm workspace-funding-warning">
-            Recipients without payment details will be saved to your directory.
-            Complete and review their details before payment.
+            {tx(
+              "Recipients without payment details will be saved to your directory. Complete and review their details before payment.",
+            )}
           </p>
         )}
 
@@ -681,7 +696,7 @@ export function BulkImportModal({
                       <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 w-12">
                         <input
                           type="checkbox"
-                          aria-label="Select all valid recipients"
+                          aria-label={tx("Select all valid recipients")}
                           checked={validatedRows.every(
                             (r, index) => !selectable(index) || r.isSelected,
                           )}
@@ -708,7 +723,7 @@ export function BulkImportModal({
                         {t("beneficiaries.bulkImport.preview.walletAddress")}
                       </th>
                       <th className="px-4 py-3 text-left text-xs font-medium text-slate-400">
-                        Email & notes
+                        {tx("Email & notes")}
                       </th>
                       <th className="px-4 py-3 text-left text-xs font-medium text-slate-400">
                         {t("beneficiaries.bulkImport.preview.status")}
@@ -729,7 +744,9 @@ export function BulkImportModal({
                           <td className="px-4 py-3">
                             <input
                               type="checkbox"
-                              aria-label={`Import ${row.name || `row ${row.rowIndex + 1}`}`}
+                              aria-label={tx("Import {{value1}}", {
+                                value1: row.name || `row ${row.rowIndex + 1}`,
+                              })}
                               checked={row.isSelected && selectable(index)}
                               onChange={() => toggleRowSelection(row.rowIndex)}
                               disabled={!selectable(index)}
@@ -763,10 +780,9 @@ export function BulkImportModal({
                                   })
                                 }
                               >
-                                Review {plans[index].differences.length} change
-                                {plans[index].differences.length === 1
-                                  ? ""
-                                  : "s"}
+                                {tx("Review {{count}} changes", {
+                                  count: plans[index].differences.length,
+                                })}
                               </button>
                             )}
                           </td>
@@ -775,8 +791,8 @@ export function BulkImportModal({
                               {row.wallet_address
                                 ? `${row.wallet_address.slice(0, 6)}…${row.wallet_address.slice(-4)}`
                                 : plans[index].existingId
-                                  ? "Keep saved payout details"
-                                  : "Payment details needed"}
+                                  ? tx("Keep saved payout details")
+                                  : tx("Payment details needed")}
                             </code>
                           </td>
                           <td className="px-4 py-3 text-sm text-slate-400">
@@ -786,9 +802,10 @@ export function BulkImportModal({
                             )}
                             {(row.preferred_token || row.preferred_network) && (
                               <p className="mt-1 text-xs">
-                                Payout:{" "}
-                                {row.preferred_token || "Currency not set"} ·{" "}
-                                {row.preferred_network || "Network not set"}
+                                {tx("Payout:")}{" "}
+                                {row.preferred_token || tx("Currency not set")}{" "}
+                                ·{" "}
+                                {row.preferred_network || tx("Network not set")}
                               </p>
                             )}
                           </td>
@@ -799,10 +816,10 @@ export function BulkImportModal({
                                 <span className="text-xs">
                                   {!row.isSelected ||
                                   plans[index].recommendation === "skip"
-                                    ? "Skip"
+                                    ? tx("Skip")
                                     : plans[index].recommendation === "update"
-                                      ? "Update existing"
-                                      : "Create recipient"}
+                                      ? tx("Update existing")
+                                      : tx("Create recipient")}
                                 </span>
                               </div>
                             ) : (
@@ -814,7 +831,9 @@ export function BulkImportModal({
                                       className="flex items-start gap-1 text-red-400"
                                     >
                                       <AlertCircle className="h-3 w-3 flex-shrink-0 mt-0.5" />
-                                      <span className="text-xs">{error}</span>
+                                      <span className="text-xs">
+                                        {tx(error)}
+                                      </span>
                                     </div>
                                   ),
                                 )}
@@ -830,7 +849,9 @@ export function BulkImportModal({
                           <td colSpan={6} className="px-4 py-4">
                             <div
                               role="region"
-                              aria-label={`Changes for ${row.name}`}
+                              aria-label={tx("Changes for {{value1}}", {
+                                value1: row.name,
+                              })}
                             >
                               <dl className="grid gap-5 text-xs sm:grid-cols-2">
                                 {plans[index].differences.map((d) => (
@@ -843,16 +864,17 @@ export function BulkImportModal({
                                     }
                                   >
                                     <dt className="font-semibold">
-                                      {d.label}
+                                      {tx(d.label)}
                                       {d.payout
-                                        ? " · Payout review required"
+                                        ? tx(" · Payout review required")
                                         : ""}
                                     </dt>
                                     <dd className="mt-1 break-all text-slate-400">
-                                      Saved: {d.before || "Not set"}
+                                      {tx("Saved:")} {d.before || tx("Not set")}
                                     </dd>
                                     <dd className="mt-1 break-all">
-                                      Imported: {d.after || "Not set"}
+                                      {tx("Imported:")}{" "}
+                                      {d.after || tx("Not set")}
                                     </dd>
                                   </div>
                                 ))}
@@ -898,7 +920,7 @@ export function BulkImportModal({
                   {t("beneficiaries.bulkImport.importing")}
                 </>
               ) : (
-                `Apply ${validSelectedCount} change${validSelectedCount === 1 ? "" : "s"}`
+                tx("Apply {{count}} changes", { count: validSelectedCount })
               )}
             </Button>
           </div>

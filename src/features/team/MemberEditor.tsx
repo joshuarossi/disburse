@@ -1,4 +1,5 @@
-import { userErrorMessage } from '@/lib/userErrors';
+import { tx, useWorkspaceLanguage } from "@/lib/workspaceI18n";
+import { userErrorMessage } from "@/lib/userErrors";
 import { useRef, useState } from "react";
 import { useAction, useMutation } from "convex/react";
 import { api } from "../../../convex/_generated/api";
@@ -9,7 +10,7 @@ import { useSessionToken } from "@/lib/session";
 import { isValidAddress } from "../../../shared/validation";
 
 import { roles, type TeamMember } from "./memberTypes";
-import { InvitationLink } from './InvitationLink';
+import { InvitationLink } from "./InvitationLink";
 export function MemberEditor({
   orgId,
   member,
@@ -21,6 +22,7 @@ export function MemberEditor({
   isAdmin: boolean;
   onClose: (created?: "link" | "wallet") => void;
 }) {
+  useWorkspaceLanguage();
   const sessionToken = useSessionToken();
   const invite = useMutation(api.orgs.inviteMember);
   const createLink = useAction(api.teamInvitationLinks.create);
@@ -34,7 +36,7 @@ export function MemberEditor({
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [method, setMethod] = useState<"link" | "wallet">("link");
-  const [invitationUrl, setInvitationUrl] = useState('');
+  const [invitationUrl, setInvitationUrl] = useState("");
   const [bindWallet, setBindWallet] = useState(false);
   const [created, setCreated] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -42,14 +44,20 @@ export function MemberEditor({
   const lock = useRef(false);
   if (created)
     return (
-      <Dialog title="Invitation created" onClose={() => onClose(method)}>
+      <Dialog title={tx("Invitation created")} onClose={() => onClose(method)}>
         <div className="space-y-5 p-6">
           <p>
             {method === "link"
-              ? 'Your invitation is ready to share. Your teammate can choose their sign-in wallet when they accept.'
-              : "The invitation is ready for this sign-in wallet. Share the sign-in link with your teammate; no email has been sent."}
+              ? tx(
+                  "Your invitation is ready to share. Your teammate can choose their sign-in wallet when they accept.",
+                )
+              : tx(
+                  "The invitation is ready for this sign-in wallet. Share the sign-in link with your teammate; no email has been sent.",
+                )}
           </p>
-          {method === 'link' && <InvitationLink url={invitationUrl} email={email.trim()} />}
+          {method === "link" && (
+            <InvitationLink url={invitationUrl} email={email.trim()} />
+          )}
           {method === "wallet" && (
             <button
               className="workspace-button"
@@ -64,26 +72,27 @@ export function MemberEditor({
                 }
               }}
             >
-              {copied ? "Sign-in link copied" : "Copy sign-in link"}
+              {copied ? tx("Sign-in link copied") : tx("Copy sign-in link")}
             </button>
           )}
           <p className="workspace-description">
-            The invitation expires in seven days. Access starts when your
-            teammate accepts.
+            {tx(
+              "The invitation expires in seven days. Access starts when your teammate accepts.",
+            )}
           </p>
-          {error && <Notice>{error}</Notice>}
+          {error && <Notice>{tx(error)}</Notice>}
           <button
             className="workspace-button workspace-button-primary"
             onClick={() => onClose(method)}
           >
-            Done
+            {tx("Done")}
           </button>
         </div>
       </Dialog>
     );
   return (
     <Dialog
-      title={member ? "Edit team member" : "Invite a team member"}
+      title={member ? tx("Edit team member") : tx("Invite a team member")}
       onClose={() => {
         if (!busy) onClose();
       }}
@@ -143,10 +152,12 @@ export function MemberEditor({
           }
         }}
       >
-        {error && <Notice>{error}</Notice>}
+        {error && <Notice>{tx(error)}</Notice>}
         {!member && (
           <fieldset disabled={busy} className="flex flex-wrap gap-4 text-sm">
-            <legend className="finance-label mb-2">Invitation method</legend>
+            <legend className="finance-label mb-2">
+              {tx("Invitation method")}
+            </legend>
             <label className="flex items-center gap-2">
               <input
                 type="radio"
@@ -155,7 +166,7 @@ export function MemberEditor({
                 checked={method === "link"}
                 onChange={() => setMethod("link")}
               />
-              Private invitation link
+              {tx("Private invitation link")}
             </label>
             <label className="flex items-center gap-2">
               <input
@@ -165,13 +176,13 @@ export function MemberEditor({
                 checked={method === "wallet"}
                 onChange={() => setMethod("wallet")}
               />
-              Use a known sign-in wallet
+              {tx("Use a known sign-in wallet")}
             </label>
           </fieldset>
         )}
         <div className="grid gap-4 sm:grid-cols-2">
           <label>
-            <span className="finance-label">Full name</span>
+            <span className="finance-label">{tx("Full name")}</span>
             <input
               autoFocus
               className="finance-field"
@@ -182,7 +193,7 @@ export function MemberEditor({
             />
           </label>
           <label>
-            <span className="finance-label">Work email</span>
+            <span className="finance-label">{tx("Work email")}</span>
             <input
               className="finance-field"
               type="email"
@@ -197,9 +208,9 @@ export function MemberEditor({
         {!member && method === "link" && (
           <div className="space-y-3">
             <p className="workspace-description">
-              Share a private link with your teammate. They sign in and confirm
-              the wallet they will use. You don't need their wallet address to
-              create the invitation.
+              {tx(
+                "Share a private link with your teammate. They sign in and confirm the wallet they will use. You don't need their wallet address to create the invitation.",
+              )}
             </p>
             <label className="flex items-start gap-2 text-sm">
               <input
@@ -208,32 +219,33 @@ export function MemberEditor({
                 checked={bindWallet}
                 onChange={(e) => setBindWallet(e.target.checked)}
               />
-              Require a specific sign-in wallet
+              {tx("Require a specific sign-in wallet")}
             </label>
           </div>
         )}
         {(member || method === "wallet" || bindWallet) && (
           <label className="block">
-            <span className="finance-label">Sign-in wallet</span>
+            <span className="finance-label">{tx("Sign-in wallet")}</span>
             <input
               className="finance-field font-mono"
-              aria-label="Sign-in wallet"
+              aria-label={tx("Sign-in wallet")}
               disabled={!!member || busy}
               value={wallet}
-              placeholder="0x…"
+              placeholder={tx("0x…")}
               onChange={(e) => setWallet(e.target.value)}
             />
             <span className="workspace-table-secondary">
-              The member accepts this invitation when they sign in with this
-              wallet.
+              {tx(
+                "The member accepts this invitation when they sign in with this wallet.",
+              )}
             </span>
           </label>
         )}
         <label className="block">
-          <span className="finance-label">Workspace role</span>
+          <span className="finance-label">{tx("Workspace role")}</span>
           <select
             className="finance-field"
-            aria-label="Workspace role"
+            aria-label={tx("Workspace role")}
             aria-describedby="member-role-help"
             disabled={!isAdmin || busy}
             value={role}
@@ -241,17 +253,18 @@ export function MemberEditor({
           >
             {Object.entries(roles).map(([key, [label]]) => (
               <option key={key} value={key}>
-                {label}
+                {tx(label)}
               </option>
             ))}
           </select>
           <span id="member-role-help" className="workspace-table-secondary">
-            {roles[role][1]}
+            {tx(roles[role][1])}
           </span>
         </label>
         <Notice tone="info">
-          Workspace access does not grant account ownership or permission to
-          spend directly. Set payment limits and delegated spending separately.
+          {tx(
+            "Workspace access does not grant account ownership or permission to spend directly. Set payment limits and delegated spending separately.",
+          )}
         </Notice>
         <div className="flex justify-end gap-2">
           <button
@@ -260,19 +273,19 @@ export function MemberEditor({
             disabled={busy}
             onClick={() => onClose()}
           >
-            Cancel
+            {tx("Cancel")}
           </button>
           <button
             className="workspace-button workspace-button-primary"
             disabled={busy}
           >
             {busy
-              ? "Saving…"
+              ? tx("Saving…")
               : member
-                ? "Save changes"
+                ? tx("Save changes")
                 : method === "link"
-                  ? "Create invitation link"
-                  : "Create invitation"}
+                  ? tx("Create invitation link")
+                  : tx("Create invitation")}
           </button>
         </div>
       </form>

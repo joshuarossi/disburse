@@ -1,3 +1,4 @@
+import { tx, useWorkspaceLanguage } from "@/lib/workspaceI18n";
 import { useEffect, useRef, useState } from "react";
 import { useAction, useMutation, useQuery } from "convex/react";
 import { useAccount, useSwitchChain } from "wagmi";
@@ -26,6 +27,7 @@ export function AccountFeeSetup({
   isAdmin: boolean;
   canApprove: boolean;
 }) {
+  useWorkspaceLanguage();
   const sessionToken = useSessionToken(),
     { address, chainId } = useAccount(),
     { switchChainAsync } = useSwitchChain();
@@ -175,7 +177,9 @@ export function AccountFeeSetup({
   return (
     <section
       className="mt-3 border-t border-white/10 pt-3 min-w-0"
-      aria-label={`Execution fees for ${account.name ?? "company account"}`}
+      aria-label={tx("Execution fees for {{value1}}", {
+        value1: account.name ?? "company account",
+      })}
     >
       <button
         type="button"
@@ -183,26 +187,28 @@ export function AccountFeeSetup({
         aria-expanded={expanded}
         onClick={() => setExpanded(!expanded)}
       >
-        Execution fee setup
+        {tx("Execution fee setup")}
       </button>
       {expanded && (
         <div className="mt-3 space-y-3">
           <p className="workspace-description">
-            Use the company account’s USDC to cover payment fees. Existing
-            accounts may need a one-time setup approved by their owners.
+            {tx(
+              "Use the company account’s USDC to cover payment fees. Existing accounts may need a one-time setup approved by their owners.",
+            )}
           </p>
-          {notice && <Notice tone={notice.tone}>{notice.text}</Notice>}
+          {notice && <Notice tone={notice.tone}>{tx(notice.text)}</Notice>}
           {saved === undefined ? (
-            <p role="status">Loading saved fee setup…</p>
+            <p role="status">{tx("Loading saved fee setup…")}</p>
           ) : !supported ? (
             <Notice tone="info">
-              Account fee setup is available on Base and Arbitrum.
+              {tx("Account fee setup is available on Base and Arbitrum.")}
             </Notice>
           ) : setup && args ? (
             <>
               <p className="text-sm">
-                The account owners approve this setup. The member completing it
-                pays its one-time fee from their connected wallet.
+                {tx(
+                  "The account owners approve this setup. The member completing it pays its one-time fee from their connected wallet.",
+                )}
               </p>
               {setup.error && <Notice tone="error">{setup.error}</Notice>}
               {setup.stage === "approval" && (
@@ -217,7 +223,7 @@ export function AccountFeeSetup({
                       })
                     }
                   >
-                    Review account approvals
+                    {tx("Review account approvals")}
                   </Button>
                   {review && (
                     <>
@@ -229,12 +235,12 @@ export function AccountFeeSetup({
                           (g) =>
                             g.address === account.safeAddress.toLowerCase(),
                         )?.confirmedOwners.length ?? 0}{" "}
-                        of{" "}
+                        {tx("of")}{" "}
                         {review.groups.find(
                           (g) =>
                             g.address === account.safeAddress.toLowerCase(),
                         )?.threshold ?? account.threshold}{" "}
-                        owner approvals collected.
+                        {tx("owner approvals collected.")}
                       </p>
                       {review.paths
                         .filter((path) => !path.approved)
@@ -267,17 +273,18 @@ export function AccountFeeSetup({
                             }
                           >
                             {review.paths.length > 1
-                              ? `Approve through ${path.labels.join(" → ")}`
-                              : "Approve fee setup"}
+                              ? tx("Approve through {{value1}}", {
+                                  value1: path.labels.join(" → "),
+                                })
+                              : tx("Approve fee setup")}
                           </Button>
                         ))}
                       {review.ready && (
                         <>
                           <p className="workspace-description">
-                            MetaMask shows the complete setup fee before
-                            confirmation. Choose USDC in its Network fee field.
-                            If USDC is unavailable, cancel and check your wallet
-                            balance and Smart Transactions settings.
+                            {tx(
+                              "MetaMask shows the complete setup fee before confirmation. Choose USDC in its Network fee field. If USDC is unavailable, cancel and check your wallet balance and Smart Transactions settings.",
+                            )}
                           </p>
                           <label className="flex gap-2 items-start text-sm">
                             <input
@@ -286,8 +293,9 @@ export function AccountFeeSetup({
                               onChange={(e) => setConsent(e.target.checked)}
                             />
                             <span>
-                              I will review and pay this setup fee in USDC from
-                              my connected wallet.
+                              {tx(
+                                "I will review and pay this setup fee in USDC from my connected wallet.",
+                              )}
                             </span>
                           </label>
                           <Button
@@ -295,7 +303,7 @@ export function AccountFeeSetup({
                             disabled={busy || !consent}
                             onClick={() => void run(send)}
                           >
-                            Complete setup in MetaMask
+                            {tx("Complete setup in MetaMask")}
                           </Button>
                         </>
                       )}
@@ -313,7 +321,7 @@ export function AccountFeeSetup({
                         })
                       }
                     >
-                      Discard unsigned setup
+                      {tx("Discard unsigned setup")}
                     </Button>
                   )}
                 </>
@@ -321,8 +329,9 @@ export function AccountFeeSetup({
               {setup.stage === "requested" && (
                 <>
                   <Notice tone="info">
-                    The original wallet request is saved. Check its receipt
-                    before starting another paid attempt.
+                    {tx(
+                      "The original wallet request is saved. Check its receipt before starting another paid attempt.",
+                    )}
                   </Notice>
                   {restorable && (
                     <Button
@@ -344,7 +353,7 @@ export function AccountFeeSetup({
                         })
                       }
                     >
-                      Restore unsubmitted wallet step
+                      {tx("Restore unsubmitted wallet step")}
                     </Button>
                   )}
                 </>
@@ -355,21 +364,21 @@ export function AccountFeeSetup({
                 disabled={busy}
                 onClick={() => void run(recover)}
               >
-                Check setup receipt
+                {tx("Check setup receipt")}
               </Button>
               <details>
                 <summary className="text-xs cursor-pointer">
-                  Link an existing receipt
+                  {tx("Link an existing receipt")}
                 </summary>
                 <label className="block mt-2">
                   <span className="finance-label">
-                    Setup transaction receipt
+                    {tx("Setup transaction receipt")}
                   </span>
                   <input
                     className="finance-field font-mono text-xs"
                     value={receipt}
                     onChange={(e) => setReceipt(e.target.value)}
-                    placeholder="0x transaction hash"
+                    placeholder={tx("0x transaction hash")}
                   />
                 </label>
               </details>
@@ -378,14 +387,15 @@ export function AccountFeeSetup({
             <>
               {saved?.stage === "complete" && (
                 <Notice tone="info">
-                  Account fee setup completed. Check the current configuration
-                  below.
+                  {tx(
+                    "Account fee setup completed. Check the current configuration below.",
+                  )}
                 </Notice>
               )}
               {saved?.error && <Notice tone="error">{saved.error}</Notice>}
               {ready === true ? (
                 <p role="status" className="text-sm text-green-400">
-                  This account is ready to pay execution fees in USDC.
+                  {tx("This account is ready to pay execution fees in USDC.")}
                 </p>
               ) : (
                 <Button
@@ -398,15 +408,15 @@ export function AccountFeeSetup({
                     })
                   }
                 >
-                  Check fee support
+                  {tx("Check fee support")}
                 </Button>
               )}
               {ready === false && isAdmin && (
                 <>
                   <p className="workspace-description">
-                    Enable the published Safe fee module and signature handler.
-                    It uses the account’s current owner approvals and gives
-                    Disburse no signing authority.
+                    {tx(
+                      "Enable the published Safe fee module and signature handler. It uses the account’s current owner approvals and gives Disburse no signing authority.",
+                    )}
                   </p>
                   <Button
                     size="sm"
@@ -420,7 +430,7 @@ export function AccountFeeSetup({
                       })
                     }
                   >
-                    Prepare USDC fee setup
+                    {tx("Prepare USDC fee setup")}
                   </Button>
                 </>
               )}

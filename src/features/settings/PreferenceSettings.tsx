@@ -1,4 +1,6 @@
+import { tx, useWorkspaceLanguage } from "@/lib/workspaceI18n";
 import { ThemeSwitcher } from "@/components/ui/ThemeSwitcher";
+import { LanguageSwitcher } from "@/components/ui/LanguageSwitcher";
 import { SlidersHorizontal } from "lucide-react";
 import type { useSettingsController } from "./useSettingsController";
 export function PreferenceSettings({
@@ -6,6 +8,7 @@ export function PreferenceSettings({
 }: {
   controller: ReturnType<typeof useSettingsController>;
 }) {
+  useWorkspaceLanguage();
   const { t } = controller;
   return (
     <>
@@ -25,14 +28,14 @@ export function PreferenceSettings({
         </div>
 
         <div className="space-y-4">
-          <div className="flex items-center justify-between gap-4">
+          <div className="flex flex-wrap items-center justify-between gap-4">
             <span className="text-sm font-medium text-slate-300 shrink-0">
-              Workspace language
+              {tx("Workspace language")}
             </span>
-            <span className="text-sm">English</span>
+            <LanguageSwitcher inline />
           </div>
 
-          <div className="flex items-center justify-between gap-4">
+          <div className="flex flex-wrap items-center justify-between gap-4">
             <label className="text-sm font-medium text-slate-300 shrink-0">
               {t("settings.appearance.selectTheme")}
             </label>

@@ -1,3 +1,4 @@
+import { tx, useWorkspaceLanguage } from "@/lib/workspaceI18n";
 import { useRef, useState } from "react";
 import { useAction, useMutation, useQuery } from "convex/react";
 import { useQuery as useRemoteQuery } from "@tanstack/react-query";
@@ -33,42 +34,45 @@ export function CustomerPaidExecution({
   principalUSDC?: string;
   actionLabel?: string;
 }) {
+  useWorkspaceLanguage();
   const subject = source.treasuryServiceId
     ? "treasury request"
     : source.treasuryTransferId
-    ? "account transfer"
-    : source.accountSetupId
-      ? "account setup"
-      : source.billingCheckoutId
-        ? "subscription"
-        : source.disbursementId ||
-            source.paymentScheduleId ||
-            source.delegatedDisbursementId
-          ? "payment"
-          : source.policyChangeId
-            ? "policy"
-            : source.receivableId
-              ? "collection"
-              : source.receivingSetupSafeId
-                ? "receiving setup"
-                : "cancellation";
-  const submitLabel = actionLabel ?? (source.paymentScheduleId
-    ? "Schedule payment"
-    : subject === "account transfer"
-      ? "Start transfer"
-      : subject === "account setup"
-        ? "Create company account"
-        : subject === "subscription"
-          ? "Pay subscription"
-          : subject === "payment"
-            ? "Send payment"
-            : subject === "policy"
-              ? "Apply policy"
-              : subject === "collection"
-                ? "Collect invoice funds"
-                : subject === "receiving setup"
-                  ? "Set up receiving"
-                  : "Confirm cancellation");
+      ? "account transfer"
+      : source.accountSetupId
+        ? "account setup"
+        : source.billingCheckoutId
+          ? "subscription"
+          : source.disbursementId ||
+              source.paymentScheduleId ||
+              source.delegatedDisbursementId
+            ? "payment"
+            : source.policyChangeId
+              ? "policy"
+              : source.receivableId
+                ? "collection"
+                : source.receivingSetupSafeId
+                  ? "receiving setup"
+                  : "cancellation";
+  const submitLabel =
+    actionLabel ??
+    (source.paymentScheduleId
+      ? "Schedule payment"
+      : subject === "account transfer"
+        ? "Start transfer"
+        : subject === "account setup"
+          ? "Create company account"
+          : subject === "subscription"
+            ? "Pay subscription"
+            : subject === "payment"
+              ? "Send payment"
+              : subject === "policy"
+                ? "Apply policy"
+                : subject === "collection"
+                  ? "Collect invoice funds"
+                  : subject === "receiving setup"
+                    ? "Set up receiving"
+                    : "Confirm cancellation");
   const sessionToken = useSessionToken(),
     { address } = useAccount();
   const execution = useQuery(
@@ -140,13 +144,13 @@ export function CustomerPaidExecution({
     } catch (e) {
       if (walletDeclined(e))
         setNotice(
-          `Wallet confirmation cancelled. Your ${subject} and saved approvals are unchanged.`,
+          `Wallet confirmation cancelled. Your ${tx(subject)} and saved approvals are unchanged.`,
         );
       else
         setError(
           walletErrorMessage(
             e,
-            `Could not complete this step. Your original ${subject} is saved.`,
+            `Could not complete this step. Your original ${tx(subject)} is saved.`,
           ),
         );
     } finally {
@@ -162,18 +166,18 @@ export function CustomerPaidExecution({
   return (
     <section
       className={`scroll-mt-24 space-y-4 ${compact ? "border-t border-[var(--ws-border)] pt-4" : "rounded-xl border border-[var(--ws-border)] p-5"}`}
-      aria-label="Execution fees"
+      aria-label={tx("Execution fees")}
     >
       <div>
         <h3 className="font-semibold text-[var(--ws-text)]">
           {execution && !execution.open
-            ? "Execution receipt"
+            ? tx("Execution receipt")
             : source.paymentScheduleId
-              ? "Fee and approvals"
-              : `${submitLabel} with fees in USDC`}
+              ? tx("Fee and approvals")
+              : tx("{{value1}} with fees in USDC", { value1: tx(submitLabel) })}
         </h3>
         <p className="mt-1 text-sm text-[var(--ws-muted)]">
-          Your company account pays the execution service directly.
+          {tx("Your company account pays the execution service directly.")}
           {subject === "payment" &&
             " Recipients receive their full approved amounts."}
           {subject === "collection" &&
@@ -193,41 +197,47 @@ export function CustomerPaidExecution({
       )}
       {execution === undefined && (
         <p role="status" className="text-sm text-[var(--ws-muted)]">
-          Loading saved fee requests…
+          {tx("Loading saved fee requests…")}
         </p>
       )}
       {request && execution && (
         <>
           <dl className="grid grid-cols-2 gap-3 text-sm">
-            <dt className="text-[var(--ws-muted)]">Maximum execution fee</dt>
+            <dt className="text-[var(--ws-muted)]">
+              {tx("Maximum execution fee")}
+            </dt>
             <dd className="text-right tabular-nums font-medium">
-              {formatUnits(BigInt(request.permit.amount), 6)} USDC
+              {formatUnits(BigInt(request.permit.amount), 6)} {tx("USDC")}
             </dd>
             {principalUSDC !== undefined && (
               <>
                 <dt className="text-[var(--ws-muted)]">
-                  Maximum total account debit
+                  {tx("Maximum total account debit")}
                 </dt>
                 <dd className="text-right tabular-nums font-medium">
                   {formatUnits(
                     BigInt(principalUSDC) + BigInt(request.permit.amount),
                     6,
                   )}{" "}
-                  USDC
+                  {tx("USDC")}
                 </dd>
               </>
             )}
             {execution.fee !== undefined && (
               <>
-                <dt className="text-[var(--ws-muted)]">Actual fee charged</dt>
+                <dt className="text-[var(--ws-muted)]">
+                  {tx("Actual fee charged")}
+                </dt>
                 <dd className="text-right tabular-nums">
-                  {formatUnits(BigInt(execution.fee), 6)} USDC
+                  {formatUnits(BigInt(execution.fee), 6)} {tx("USDC")}
                 </dd>
               </>
             )}
             {execution.open && (
               <>
-                <dt className="text-[var(--ws-muted)]">Approval expires</dt>
+                <dt className="text-[var(--ws-muted)]">
+                  {tx("Approval expires")}
+                </dt>
                 <dd className="text-right">
                   {scheduleDateTime(request.validUntil * 1000)}
                 </dd>
@@ -236,41 +246,47 @@ export function CustomerPaidExecution({
           </dl>
           {execution.open && (
             <p className="text-sm text-[var(--ws-muted)]">
-              Unused fees return to this account. A failed execution can still
-              incur a fee.
+              {tx(
+                "Unused fees return to this account. A failed execution can still incur a fee.",
+              )}
               {!armed &&
                 " Account owners approve the fee limit first, then the complete execution."}
             </p>
           )}
           {execution.stage === "submitting" && (
             <Notice tone="info">
-              Your execution request is saved. We are checking the original
-              transaction before marking this {subject} complete.
+              {tx(
+                "Your execution request is saved. We are checking the original transaction before marking this",
+              )}{" "}
+              {tx(subject)} {tx("complete.")}
             </Notice>
           )}
           {execution.stage === "failed" && (
             <Notice>
-              The execution service could not complete this attempt. The fee
-              above was charged. Check the original {subject} before reviewing a
-              new fee request.
+              {tx(
+                "The execution service could not complete this attempt. The fee above was charged. Check the original",
+              )}{" "}
+              {tx(subject)} {tx("before reviewing a new fee request.")}
             </Notice>
           )}
           {execution.stage === "expired" && (
             <Notice tone="info">
-              This request expired without executing. No execution fee was
-              charged for this request. Your original {subject} approvals are
-              saved.
+              {tx(
+                "This request expired without executing. No execution fee was charged for this request. Your original",
+              )}{" "}
+              {tx(subject)} {tx("approvals are saved.")}
             </Notice>
           )}
           {execution.stage === "confirmed" && (
             <Notice tone="info">
-              The execution is confirmed. Its verified service fee is shown
-              above.
+              {tx(
+                "The execution is confirmed. Its verified service fee is shown above.",
+              )}
             </Notice>
           )}
           {execution.stage === "cancelled" && (
             <Notice tone="info">
-              This execution authorization has been cancelled.
+              {tx("This execution authorization has been cancelled.")}
             </Notice>
           )}
           {execution.open &&
@@ -280,35 +296,37 @@ export function CustomerPaidExecution({
               <>
                 <p className="text-sm font-medium">
                   {execution.stage === "fee"
-                    ? "1. Approve the fee limit"
-                    : "2. Approve the execution"}
+                    ? tx("1. Approve the fee limit")
+                    : tx("2. Approve the execution")}
                 </p>
                 {approvals.isPending && !blocked && (
                   <p role="status" className="text-sm text-[var(--ws-muted)]">
-                    Checking account approvals…
+                    {tx("Checking account approvals…")}
                   </p>
                 )}
                 {approvals.isPending && blocked && !busy && (
                   <p className="text-sm text-[var(--ws-muted)]">
-                    An account owner with payment access can complete these
-                    approvals.
+                    {tx(
+                      "An account owner with payment access can complete these approvals.",
+                    )}
                   </p>
                 )}
                 {approvals.isError && (
                   <Notice>
-                    Account approvals could not be checked.{" "}
+                    {tx("Account approvals could not be checked.")}{" "}
                     <button
                       className="workspace-action-link"
                       onClick={() => void approvals.refetch()}
                     >
-                      Try again
+                      {tx("Try again")}
                     </button>
                   </Notice>
                 )}
                 {approvals.data && (
                   <p className="text-sm text-[var(--ws-muted)]">
-                    {approvals.data.approved} of {approvals.data.threshold}{" "}
-                    required account approvals
+                    {approvals.data.approved} {tx("of")}{" "}
+                    {approvals.data.threshold}{" "}
+                    {tx("required account approvals")}
                   </p>
                 )}
                 <label className="flex items-start gap-3 text-sm">
@@ -322,9 +340,11 @@ export function CustomerPaidExecution({
                     disabled={busy}
                   />
                   <span>
-                    I approve up to{" "}
-                    {formatUnits(BigInt(request.permit.amount), 6)} USDC in
-                    execution fees, including fees if execution fails.
+                    {tx("I approve up to")}{" "}
+                    {formatUnits(BigInt(request.permit.amount), 6)}{" "}
+                    {tx(
+                      "USDC in execution fees, including fees if execution fails.",
+                    )}
                   </span>
                 </label>
                 <div className="flex flex-wrap gap-2">
@@ -362,13 +382,15 @@ export function CustomerPaidExecution({
                           }
                         >
                           {busy
-                            ? "Saving approval…"
+                            ? tx("Saving approval…")
                             : p.path.length > 1 ||
                                 approvals.data.paths.length > 1
-                              ? `Approve through ${memberName(p.path[p.path.length - 1])}`
+                              ? tx("Approve through {{value1}}", {
+                                  value1: memberName(p.path[p.path.length - 1]),
+                                })
                               : execution.stage === "fee"
-                                ? "Approve fee limit"
-                                : "Approve execution"}
+                                ? tx("Approve fee limit")
+                                : tx("Approve execution")}
                         </button>
                       ))}
                   {execution.stage !== "ready" &&
@@ -379,7 +401,7 @@ export function CustomerPaidExecution({
                         disabled={busy || blocked}
                         onClick={() => void run(() => advance(identity!))}
                       >
-                        Continue with saved approvals
+                        {tx("Continue with saved approvals")}
                       </button>
                     )}
                   {execution.stage === "ready" && (
@@ -395,21 +417,22 @@ export function CustomerPaidExecution({
                         )
                       }
                     >
-                      {busy ? "Submitting…" : submitLabel}
+                      {busy ? tx("Submitting…") : tx(submitLabel)}
                     </button>
                   )}
                 </div>
                 {approvals.data && !approvals.data.paths.length && (
                   <p className="text-sm text-[var(--ws-muted)]">
-                    A current account owner needs to approve this step.
+                    {tx("A current account owner needs to approve this step.")}
                   </p>
                 )}
               </>
             )}
           {expired && execution.open && (
             <Notice tone="info">
-              The approval window has ended. Check the original request to
-              confirm that it did not execute.
+              {tx(
+                "The approval window has ended. Check the original request to confirm that it did not execute.",
+              )}
             </Notice>
           )}
         </>
@@ -420,7 +443,7 @@ export function CustomerPaidExecution({
           disabled={busy}
           onClick={() => void run(() => recheck(identity))}
         >
-          {busy ? "Checking…" : "Check execution status"}
+          {busy ? tx("Checking…") : tx("Check execution status")}
         </button>
       )}
       {execution !== undefined && !execution?.open && ready && (
@@ -431,12 +454,13 @@ export function CustomerPaidExecution({
             void run(() => prepare({ ...source, sessionToken: sessionToken! }))
           }
         >
-          {busy ? "Getting fee…" : "Review execution fee"}
+          {busy ? tx("Getting fee…") : tx("Review execution fee")}
         </button>
       )}
       {execution === null && !ready && (
         <p className="text-sm text-[var(--ws-muted)]">
-          Complete the {subject} approvals to review its execution fee.
+          {tx("Complete the")} {tx(subject)}{" "}
+          {tx("approvals to review its execution fee.")}
         </p>
       )}
     </section>

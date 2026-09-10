@@ -1,3 +1,4 @@
+import { tx, useWorkspaceLanguage, workspaceLocale } from "@/lib/workspaceI18n";
 import { userErrorMessage } from "@/lib/userErrors";
 import { supportsCircleFees } from "../../../shared/circleExecution";
 import { CustomerPaidExecution } from "./CustomerPaidExecution";
@@ -54,6 +55,7 @@ export function PaymentReview({
   canManage: boolean;
   onClose: () => void;
 }) {
+  useWorkspaceLanguage();
   const sessionToken = useSessionToken();
   const payment = useQuery(
     api.disbursements.getWithRecipients,
@@ -227,7 +229,7 @@ export function PaymentReview({
     );
   return (
     <Dialog
-      title="Payment details"
+      title={tx("Payment details")}
       onClose={() => {
         if (!locked) onClose();
       }}
@@ -236,7 +238,9 @@ export function PaymentReview({
         <LoadingRows />
       ) : !payment || payment.orgId !== orgId ? (
         <div className="p-6">
-          <Notice>This payment is not available in this workspace.</Notice>
+          <Notice>
+            {tx("This payment is not available in this workspace.")}
+          </Notice>
         </div>
       ) : (
         <div className="space-y-6 p-6">
@@ -247,11 +251,11 @@ export function PaymentReview({
                   payment.memo ||
                   payment.recipientName ||
                   payment.beneficiary?.name ||
-                  "Payment batch"}
+                  tx("Payment batch")}
               </h2>
               <p className="workspace-description">
-                Created {formatDate(payment.createdAt)} · {rows.length}{" "}
-                recipient{rows.length === 1 ? "" : "s"}
+                {tx("Created")} {formatDate(payment.createdAt)} ·{" "}
+                {tx("{{count}} recipients", { count: rows.length })}
               </p>
             </div>
             <StatusBadge
@@ -278,7 +282,7 @@ export function PaymentReview({
               to={`/org/${orgId}/disbursements?new=1`}
               onClick={onClose}
             >
-              New payment
+              {tx("New payment")}
             </Link>
           )}
           {payment.payoutReviewError && (
@@ -307,7 +311,7 @@ export function PaymentReview({
           )}
           <dl className="workspace-detail-grid payment-review-summary rounded-lg border border-white/10 p-5">
             <div>
-              <dt>Recipient total</dt>
+              <dt>{tx("Recipient total")}</dt>
               <dd className="!text-2xl font-semibold tabular-nums whitespace-nowrap overflow-x-auto">
                 {formatMoney(
                   payment.totalAmount ?? payment.amount ?? "0",
@@ -321,7 +325,7 @@ export function PaymentReview({
             </div>
             {displayedFee && (
               <div>
-                <dt>Total account debit</dt>
+                <dt>{tx("Total account debit")}</dt>
                 <dd className="font-semibold tabular-nums">
                   {paymentDebits(
                     payment.token,
@@ -337,35 +341,35 @@ export function PaymentReview({
                     </span>
                   ))}
                   <span className="workspace-table-secondary">
-                    Includes the payment fee
+                    {tx("Includes the payment fee")}
                   </span>
                 </dd>
               </div>
             )}
             <div>
-              <dt>Pay date</dt>
+              <dt>{tx("Pay date")}</dt>
               <dd>
                 {payment.scheduledAt
                   ? formatDate(payment.scheduledAt)
-                  : "As soon as approved"}
+                  : tx("As soon as approved")}
                 {payment.scheduledAt && (
                   <span className="workspace-table-secondary">
                     {new Date(payment.scheduledAt).toLocaleTimeString(
-                      undefined,
+                      workspaceLocale(),
                       { hour: "2-digit", minute: "2-digit", timeZone: "UTC" },
                     )}{" "}
-                    UTC
+                    {tx("UTC")}
                   </span>
                 )}
               </dd>
             </div>
             <div>
-              <dt>Funding account</dt>
+              <dt>{tx("Funding account")}</dt>
               <dd>
                 {safe?.name ??
                   (payment.chainId
                     ? getChainName(payment.chainId)
-                    : "Original account")}
+                    : tx("Original account"))}
                 {safe && (
                   <span className="workspace-table-secondary font-mono">
                     {safe.safeAddress.slice(0, 8)}…{safe.safeAddress.slice(-6)}
@@ -374,23 +378,31 @@ export function PaymentReview({
               </dd>
             </div>
             <div>
-              <dt>Approval requirements</dt>
+              <dt>{tx("Approval requirements")}</dt>
               <dd>
                 {usingAllowance || payment.allowanceExecution
-                  ? "Member spending allowance"
+                  ? tx("Member spending allowance")
                   : automatic
-                    ? "Current account owners"
+                    ? tx("Current account owners")
                     : approvalThreshold
-                      ? `${approvalThreshold} account approval${approvalThreshold === 1 ? "" : "s"}`
-                      : "Managed by account owners"}
+                      ? tx("{{count}} account approvals", {
+                          count: approvalThreshold,
+                        })
+                      : tx("Managed by account owners")}
                 <span className="workspace-table-secondary">
                   {usingAllowance || payment.allowanceExecution
                     ? displayedFee
-                      ? "The recipient payment and fee must fit your available allowance"
-                      : "The recipient payment must fit your available allowance"
+                      ? tx(
+                          "The recipient payment and fee must fit your available allowance",
+                        )
+                      : tx(
+                          "The recipient payment must fit your available allowance",
+                        )
                     : approvals.data
-                      ? "Verified against the current account policy"
-                      : "Current owner permissions are checked before signing"}
+                      ? tx("Verified against the current account policy")
+                      : tx(
+                          "Current owner permissions are checked before signing",
+                        )}
                 </span>
               </dd>
             </div>
@@ -398,22 +410,22 @@ export function PaymentReview({
           {payment.safeTxHash &&
             ["proposed", "scheduled"].includes(payment.status) && (
               <section
-                aria-label="Payment approvals"
+                aria-label={tx("Payment approvals")}
                 className="rounded-lg border border-white/10 p-5"
               >
                 <div className="flex items-center justify-between gap-3">
-                  <h3 className="text-sm font-semibold">Approvals</h3>
+                  <h3 className="text-sm font-semibold">{tx("Approvals")}</h3>
                   <button
                     className="workspace-action-link"
                     disabled={approvals.isFetching}
                     onClick={() => void approvals.refetch()}
                   >
-                    Refresh approvals
+                    {tx("Refresh approvals")}
                   </button>
                 </div>
                 {approvals.isPending ? (
                   <p role="status" className="mt-3 text-sm text-slate-400">
-                    Checking current account approvals…
+                    {tx("Checking current account approvals…")}
                   </p>
                 ) : approvals.isError ? (
                   <p role="alert" className="mt-3 text-sm text-red-400">
@@ -426,8 +438,9 @@ export function PaymentReview({
                   approvals.data && (
                     <>
                       <p className="mt-3 text-sm">
-                        {approvals.data.confirmedOwners.length} of{" "}
-                        {approvals.data.threshold} required approvals received
+                        {approvals.data.confirmedOwners.length} {tx("of")}{" "}
+                        {approvals.data.threshold}{" "}
+                        {tx("required approvals received")}
                       </p>
                       <ul className="mt-3 space-y-2 text-sm">
                         {approvals.data.owners.map((owner) => (
@@ -437,12 +450,14 @@ export function PaymentReview({
                           >
                             <span>
                               {approverName(owner)}
-                              {owner === address?.toLowerCase() ? " (you)" : ""}
+                              {owner === address?.toLowerCase()
+                                ? tx(" (you)")
+                                : ""}
                             </span>
                             <span className="text-slate-400">
                               {approvals.data.confirmedOwners.includes(owner)
-                                ? "Approved"
-                                : "Awaiting approval"}
+                                ? tx("Approved")
+                                : tx("Awaiting approval")}
                             </span>
                           </li>
                         ))}
@@ -452,16 +467,20 @@ export function PaymentReview({
                         .map((group) => (
                           <section
                             key={group.path.join(":")}
-                            aria-label={`${approverName(group.address)} approvals`}
+                            aria-label={tx("{{value1}} approvals", {
+                              value1: approverName(group.address),
+                            })}
                             className="mt-4 rounded-lg border border-[var(--ws-border)] p-3"
                           >
                             <h4 className="font-medium">
                               {approverName(group.address)}
                             </h4>
                             <p className="workspace-description !text-sm">
-                              {group.confirmedOwners.length} of{" "}
-                              {group.threshold} approvals received. Once
-                              complete, these count as one approval for{" "}
+                              {group.confirmedOwners.length} {tx("of")}{" "}
+                              {group.threshold}{" "}
+                              {tx(
+                                "approvals received. Once complete, these count as one approval for",
+                              )}{" "}
                               {approverName(group.path[group.path.length - 2])}.
                             </p>
                             <ul className="mt-2 space-y-1 text-sm">
@@ -473,13 +492,13 @@ export function PaymentReview({
                                   <span>
                                     {approverName(owner)}
                                     {owner === address?.toLowerCase()
-                                      ? " (you)"
+                                      ? tx(" (you)")
                                       : ""}
                                   </span>
                                   <span className="text-[var(--ws-muted)]">
                                     {group.confirmedOwners.includes(owner)
-                                      ? "Approved"
-                                      : "Awaiting approval"}
+                                      ? tx("Approved")
+                                      : tx("Awaiting approval")}
                                   </span>
                                 </li>
                               ))}
@@ -489,16 +508,17 @@ export function PaymentReview({
                       {approvals.data.currentNonce <
                         approvals.data.proposalNonce && (
                         <p className="mt-3 text-sm text-amber-500">
-                          An earlier payment or account change must complete
-                          before this payment can be sent. You can approve it
-                          now.
+                          {tx(
+                            "An earlier payment or account change must complete before this payment can be sent. You can approve it now.",
+                          )}
                         </p>
                       )}
                       {approvals.data.currentNonce >
                         approvals.data.proposalNonce && (
                         <p role="alert" className="mt-3 text-sm text-red-400">
-                          This account transaction number has already been used.
-                          Reconcile the payment before preparing another.
+                          {tx(
+                            "This account transaction number has already been used. Reconcile the payment before preparing another.",
+                          )}
                         </p>
                       )}
                     </>
@@ -507,7 +527,7 @@ export function PaymentReview({
               </section>
             )}
           <div>
-            <h3 className="mb-3 text-sm font-semibold">Recipients</h3>
+            <h3 className="mb-3 text-sm font-semibold">{tx("Recipients")}</h3>
             <ul className="sm:hidden divide-y divide-white/10 rounded-lg border border-white/10">
               {rows.map((row) => (
                 <li key={row.id} className="p-3 space-y-2">
@@ -526,9 +546,9 @@ export function PaymentReview({
               <table className="workspace-table">
                 <thead>
                   <tr>
-                    <th>Recipient</th>
-                    <th>Saved payout address</th>
-                    <th className="numeric">Amount</th>
+                    <th>{tx("Recipient")}</th>
+                    <th>{tx("Saved payout address")}</th>
+                    <th className="numeric">{tx("Amount")}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -551,18 +571,19 @@ export function PaymentReview({
           </div>
           {!!screening?.flagged.length && screening.enforcement !== "off" && (
             <Notice tone="info">
-              <p className="font-semibold">Screening review needed</p>
+              <p className="font-semibold">{tx("Screening review needed")}</p>
               <ul className="mt-2 space-y-2">
                 {screening.flagged.map((r) => (
                   <li key={r.beneficiaryId}>
-                    <strong>{r.beneficiaryName}</strong>: {r.reason}
+                    <strong>{r.beneficiaryName}</strong>: {tx(r.reason)}
                   </li>
                 ))}
               </ul>
               {screening.enforcement === "block" ? (
                 <p>
-                  Resolve these results from Recipients before approving or
-                  sending.
+                  {tx(
+                    "Resolve these results from Recipients before approving or sending.",
+                  )}
                 </p>
               ) : (
                 <label className="mt-3 flex items-start gap-2">
@@ -576,8 +597,9 @@ export function PaymentReview({
                     }
                   />
                   <span>
-                    I have reviewed these screening warnings and want to
-                    continue.
+                    {tx(
+                      "I have reviewed these screening warnings and want to continue.",
+                    )}
                   </span>
                 </label>
               )}
@@ -589,11 +611,11 @@ export function PaymentReview({
             ["draft", "pending"].includes(payment.status) &&
             !payment.safeTxHash && (
               <section className="workspace-card p-4 space-y-3">
-                <h3 className="font-semibold">Payment fee</h3>
+                <h3 className="font-semibold">{tx("Payment fee")}</h3>
                 {!feeQuote ? (
-                  <p>Loading payment fee…</p>
+                  <p>{tx("Loading payment fee…")}</p>
                 ) : feeQuote.error ? (
-                  <Notice>{feeQuote.error}</Notice>
+                  <Notice>{tx(feeQuote.error)}</Notice>
                 ) : (
                   feeQuote.fee && (
                     <label className="flex items-start gap-3 text-sm">
@@ -607,9 +629,11 @@ export function PaymentReview({
                         }
                       />
                       <span>
-                        I approve a {feeQuote.fee.amount} {feeQuote.fee.token}{" "}
-                        payment fee. This is added to the recipient total and
-                        paid only if the payment succeeds.
+                        {tx("I approve a")} {feeQuote.fee.amount}{" "}
+                        {feeQuote.fee.token}{" "}
+                        {tx(
+                          "payment fee. This is added to the recipient total and paid only if the payment succeeds.",
+                        )}
                       </span>
                     </label>
                   )
@@ -619,14 +643,14 @@ export function PaymentReview({
           {payment.preparedProposalAt &&
             ["draft", "pending"].includes(payment.status) && (
               <Notice tone="info">
-                Your signed proposal is saved. Resume preparation to restore it
-                to the approval queue. This reuses the same transaction and does
-                not request another signature.
+                {tx(
+                  "Your signed proposal is saved. Resume preparation to restore it to the approval queue. This reuses the same transaction and does not request another signature.",
+                )}
               </Notice>
             )}
           {payment.executionFee && payment.safeTxHash && (
             <p className="text-sm text-[var(--ws-muted)]">
-              Approved payment fee: {payment.executionFee.amount}{" "}
+              {tx("Approved payment fee:")} {payment.executionFee.amount}{" "}
               {payment.executionFee.token}
             </p>
           )}
@@ -634,9 +658,9 @@ export function PaymentReview({
             payment.scheduledAt &&
             payment.scheduledAt > Date.now() && (
               <Notice tone="info">
-                Manual execution sends this payment immediately, before its
-                recorded pay date. Use a scheduled instruction for automatic
-                execution later.
+                {tx(
+                  "Manual execution sends this payment immediately, before its recorded pay date. Use a scheduled instruction for automatic execution later.",
+                )}
               </Notice>
             )}
           {canManage &&
@@ -704,8 +728,9 @@ export function PaymentReview({
             )}
           {payment.status === "scheduled" && !payment.paymentScheduleId && (
             <Notice tone="info">
-              This payment is scheduled. Complete all required owner signatures
-              before its pay date. Signing now does not send it early.
+              {tx(
+                "This payment is scheduled. Complete all required owner signatures before its pay date. Signing now does not send it early.",
+              )}
             </Notice>
           )}
           {payment.status === "relaying" &&
@@ -713,8 +738,9 @@ export function PaymentReview({
             !payment.allowanceFeeSafeId &&
             !payment.nativeExecution && (
               <Notice tone="info">
-                Submission is being reconciled. Do not create a replacement
-                payment while the outcome is uncertain.
+                {tx(
+                  "Submission is being reconciled. Do not create a replacement payment while the outcome is uncertain.",
+                )}
               </Notice>
             )}
           {payment.safeTxHash &&
@@ -739,8 +765,9 @@ export function PaymentReview({
             payment.status !== "cancelled" && (
               <div className="space-y-4 rounded-lg border border-[var(--ws-border)] p-4">
                 <p className="text-sm">
-                  Cancel this payment? It will leave the approval queue and
-                  release its budget reservation. No network fee applies.
+                  {tx(
+                    "Cancel this payment? It will leave the approval queue and release its budget reservation. No network fee applies.",
+                  )}
                 </p>
                 <div className="flex flex-wrap gap-2">
                   <button
@@ -748,7 +775,7 @@ export function PaymentReview({
                     disabled={locked}
                     onClick={() => setConfirmCancel(false)}
                   >
-                    Keep payment
+                    {tx("Keep payment")}
                   </button>
                   <button
                     className="workspace-button"
@@ -763,7 +790,7 @@ export function PaymentReview({
                       )
                     }
                   >
-                    Confirm cancellation
+                    {tx("Confirm cancellation")}
                   </button>
                 </div>
               </div>
@@ -772,7 +799,7 @@ export function PaymentReview({
             <div className="rounded-lg border border-white/10 p-4">
               <label>
                 <span className="finance-label">
-                  New payment date and time · local time
+                  {tx("New payment date and time · local time")}
                 </span>
                 <input
                   className="finance-field"
@@ -794,7 +821,7 @@ export function PaymentReview({
                   )
                 }
               >
-                Save pay date
+                {tx("Save pay date")}
               </button>
             </div>
           )}
@@ -808,7 +835,7 @@ export function PaymentReview({
                   target="_blank"
                   rel="noreferrer"
                 >
-                  Advanced account details in Safe
+                  {tx("Advanced account details in Safe")}
                   <ExternalLink size={13} />
                 </a>
               )}
@@ -819,7 +846,7 @@ export function PaymentReview({
                   target="_blank"
                   rel="noreferrer"
                 >
-                  View settlement receipt
+                  {tx("View settlement receipt")}
                   <ExternalLink size={13} />
                 </a>
               )}
@@ -833,13 +860,13 @@ export function PaymentReview({
             ) && (
               <details className="border-t border-white/10 pt-4">
                 <summary className="cursor-pointer text-xs text-slate-400">
-                  Already executed outside Disburse? Verify a receipt
+                  {tx("Already executed outside Disburse? Verify a receipt")}
                 </summary>
                 <div className="mt-3 flex gap-2">
                   <input
-                    aria-label="Settlement transaction hash"
+                    aria-label={tx("Settlement transaction hash")}
                     className="finance-field font-mono"
-                    placeholder="0x transaction hash"
+                    placeholder={tx("0x transaction hash")}
                     value={receiptHash}
                     onChange={(e) => setReceiptHash(e.target.value)}
                   />
@@ -856,7 +883,7 @@ export function PaymentReview({
                       )
                     }
                   >
-                    Verify
+                    {tx("Verify")}
                   </button>
                 </div>
               </details>
@@ -880,7 +907,7 @@ export function PaymentReview({
                         disabled={locked}
                         onClick={() => setConfirmCancel(true)}
                       >
-                        Cancel payment
+                        {tx("Cancel payment")}
                       </button>
                     )}
                 </div>
@@ -896,7 +923,7 @@ export function PaymentReview({
                         disabled={locked}
                         onClick={() => setEditing(true)}
                       >
-                        Edit draft
+                        {tx("Edit draft")}
                       </button>
                     )}
                   {canManage && payment.status === "scheduled" && (
@@ -906,7 +933,7 @@ export function PaymentReview({
                       onClick={() => setChangingDate((v) => !v)}
                     >
                       <CalendarDays size={14} />
-                      Change date
+                      {tx("Change date")}
                     </button>
                   )}
                   {canManage &&
@@ -926,7 +953,9 @@ export function PaymentReview({
                         }
                       >
                         <ShieldCheck size={14} />
-                        {alreadyApproved ? "Approved by you" : "Approve"}
+                        {alreadyApproved
+                          ? tx("Approved by you")
+                          : tx("Approve")}
                       </button>
                     )}
                   {canManage &&
@@ -943,7 +972,9 @@ export function PaymentReview({
                           )
                         }
                       >
-                        {actions.busy ? "Resuming…" : "Resume preparation"}
+                        {actions.busy
+                          ? tx("Resuming…")
+                          : tx("Resume preparation")}
                       </button>
                     )}
                   {canManage &&
@@ -965,7 +996,9 @@ export function PaymentReview({
                           )
                         }
                       >
-                        {actions.busy ? "Preparing…" : "Review in wallet"}
+                        {actions.busy
+                          ? tx("Preparing…")
+                          : tx("Review in wallet")}
                         <ArrowUpRight size={14} />
                       </button>
                     )}
@@ -984,7 +1017,7 @@ export function PaymentReview({
                           void actions.run(id, "execute", screeningAcknowledged)
                         }
                       >
-                        {actions.busy ? "Processing…" : "Send payment"}
+                        {actions.busy ? tx("Processing…") : tx("Send payment")}
                         <ArrowUpRight size={14} />
                       </button>
                     )}

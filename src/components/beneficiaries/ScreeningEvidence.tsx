@@ -1,4 +1,5 @@
-import { userErrorMessage } from '@/lib/userErrors';
+import { tx, useWorkspaceLanguage, workspaceLocale } from "@/lib/workspaceI18n";
+import { userErrorMessage } from "@/lib/userErrors";
 import { useState } from "react";
 import { useAction, useMutation, useQuery } from "convex/react";
 import type { FunctionReturnType } from "convex/server";
@@ -31,6 +32,7 @@ function ReviewControls({
   result: Result;
   sessionToken: string;
 }) {
+  useWorkspaceLanguage();
   const review = useMutation(api.screeningMutations.reviewScreeningResult);
   const [reason, setReason] = useState(""),
     [days, setDays] = useState(30),
@@ -54,9 +56,7 @@ function ReviewControls({
         expectedEvidenceKey: result.evidenceKey,
       });
     } catch (e) {
-      setError(
-        userErrorMessage(e, "The review could not be saved."),
-      );
+      setError(userErrorMessage(e, "The review could not be saved."));
     } finally {
       setBusy(false);
     }
@@ -64,12 +64,12 @@ function ReviewControls({
   return (
     <section
       className="space-y-4 border-t border-white/10 pt-4"
-      aria-label="Review screening evidence"
+      aria-label={tx("Review screening evidence")}
     >
-      <h3 className="font-semibold">Record your decision</h3>
-      {error && <Notice>{error}</Notice>}
+      <h3 className="font-semibold">{tx("Record your decision")}</h3>
+      {error && <Notice>{tx(error)}</Notice>}
       <label className="block">
-        <span className="finance-label">Review reason</span>
+        <span className="finance-label">{tx("Review reason")}</span>
         <textarea
           className="finance-field"
           rows={3}
@@ -78,19 +78,23 @@ function ReviewControls({
           value={reason}
           disabled={busy}
           onChange={(e) => setReason(e.target.value)}
-          placeholder="Explain the identifying information you checked and your conclusion."
+          placeholder={tx(
+            "Explain the identifying information you checked and your conclusion.",
+          )}
         />
       </label>
       <label className="block">
-        <span className="finance-label">False-positive clearance period</span>
+        <span className="finance-label">
+          {tx("False-positive clearance period")}
+        </span>
         <select
           className="finance-field"
           value={days}
           disabled={busy}
           onChange={(e) => setDays(Number(e.target.value))}
         >
-          <option value={7}>7 days</option>
-          <option value={30}>30 days</option>
+          <option value={7}>{tx("7 days")}</option>
+          <option value={30}>{tx("30 days")}</option>
         </select>
       </label>
       <label className="flex items-start gap-3 text-sm">
@@ -101,13 +105,15 @@ function ReviewControls({
           disabled={busy}
           onChange={(e) => setConfirmed(e.target.checked)}
         />
-        I reviewed the current recipient details and listed evidence. Changed
-        details or matches will require another review.
+        {tx(
+          "I reviewed the current recipient details and listed evidence. Changed details or matches will require another review.",
+        )}
       </label>
       {!canDismiss && (
         <p className="text-sm workspace-funding-warning">
-          The exact receiving address is listed for this network. It cannot be
-          dismissed as a name false positive.
+          {tx(
+            "The exact receiving address is listed for this network. It cannot be dismissed as a name false positive.",
+          )}
         </p>
       )}
       <div className="flex flex-wrap gap-3">
@@ -119,7 +125,7 @@ function ReviewControls({
           }
           onClick={() => void decide("false_positive")}
         >
-          Mark false positive
+          {tx("Mark false positive")}
         </button>
         <button
           type="button"
@@ -127,7 +133,7 @@ function ReviewControls({
           disabled={busy || !confirmed || reason.trim().length < 10}
           onClick={() => void decide("confirmed_match")}
         >
-          {busy ? "Saving review…" : "Confirm match"}
+          {busy ? tx("Saving review…") : tx("Confirm match")}
         </button>
       </div>
     </section>
@@ -141,6 +147,7 @@ export function ScreeningEvidence({
   beneficiaryId: Id<"beneficiaries">;
   beneficiaryName: string;
 }) {
+  useWorkspaceLanguage();
   const sessionToken = useSessionToken();
   const result = useQuery(
     api.screeningQueries.getScreeningResult,
@@ -156,15 +163,13 @@ export function ScreeningEvidence({
     try {
       await rerun({ beneficiaryId, sessionToken });
     } catch (e) {
-      setError(
-        userErrorMessage(e, "Screening could not be completed."),
-      );
+      setError(userErrorMessage(e, "Screening could not be completed."));
     } finally {
       setBusy(false);
     }
   };
   if (result === undefined)
-    return <p role="status">Loading screening evidence…</p>;
+    return <p role="status">{tx("Loading screening evidence…")}</p>;
   const issue = result?.issue;
   const label =
     labels[issue?.status ?? result?.status ?? "pending"] ?? "Review needed";
@@ -180,25 +185,32 @@ export function ScreeningEvidence({
       <div>
         <h3 className="text-lg font-semibold">{beneficiaryName}</h3>
         <p className="mt-2 text-sm text-slate-400">
-          Checks names and published digital-currency identifiers in the OFAC
-          SDN list. This does not verify who controls an address or assess
-          transaction exposure.
+          {tx(
+            "Checks names and published digital-currency identifiers in the OFAC SDN list. This does not verify who controls an address or assess transaction exposure.",
+          )}
         </p>
       </div>
-      {error && <Notice>{error}</Notice>}
+      {error && <Notice>{tx(error)}</Notice>}
       <section className="rounded-xl border border-white/10 p-4 space-y-2">
-        <strong>{label}</strong>
-        {issue && <p className="text-sm text-slate-400">{issue.reason}</p>}
+        <strong>{tx(label)}</strong>
+        {issue && <p className="text-sm text-slate-400">{tx(issue.reason)}</p>}
         {result?.screenedAt && (
           <p className="text-xs text-slate-400">
-            Last check {new Date(result.screenedAt).toLocaleString()}
+            {tx("Last check")}{" "}
+            {new Date(result.screenedAt).toLocaleString(workspaceLocale())}
           </p>
         )}
-        {result?.status === 'confirmed_match' && <p className="text-xs text-slate-400">Confirmed matches remain blocked while the recipient details and match evidence are unchanged.</p>}
-        {result?.status === 'false_positive' && result.reviewExpiresAt && (
+        {result?.status === "confirmed_match" && (
           <p className="text-xs text-slate-400">
-            Decision valid until {formatDate(result.reviewExpiresAt)}, while the
-            reviewed details and evidence remain unchanged.
+            {tx(
+              "Confirmed matches remain blocked while the recipient details and match evidence are unchanged.",
+            )}
+          </p>
+        )}
+        {result?.status === "false_positive" && result.reviewExpiresAt && (
+          <p className="text-xs text-slate-400">
+            {tx("Decision valid until")} {formatDate(result.reviewExpiresAt)}
+            {tx(", while the reviewed details and evidence remain unchanged.")}
           </p>
         )}
         {result?.canRerun && (
@@ -208,31 +220,33 @@ export function ScreeningEvidence({
             disabled={busy}
             onClick={() => void check()}
           >
-            {busy ? "Checking…" : "Run screening"}
+            {busy ? tx("Checking…") : tx("Run screening")}
           </button>
         )}
       </section>
       {result?.input && (
         <details className="text-sm">
-          <summary className="cursor-pointer">Details checked</summary>
+          <summary className="cursor-pointer">{tx("Details checked")}</summary>
           <dl className="mt-3 space-y-3">
             <div>
-              <dt className="text-slate-400">Recipient name</dt>
+              <dt className="text-slate-400">{tx("Recipient name")}</dt>
               <dd>{result.input.name}</dd>
             </div>
             <div>
-              <dt className="text-slate-400">Receiving address</dt>
+              <dt className="text-slate-400">{tx("Receiving address")}</dt>
               <dd className="break-all font-mono text-xs">
-                {result.input.walletAddress || "No address supplied"}
+                {result.input.walletAddress || tx("No address supplied")}
               </dd>
             </div>
             <div>
-              <dt className="text-slate-400">Requested payment</dt>
+              <dt className="text-slate-400">{tx("Requested payment")}</dt>
               <dd>
-                {result.input.preferredToken ?? "Currency chosen per payment"} ·{" "}
+                {result.input.preferredToken ??
+                  tx("Currency chosen per payment")}{" "}
+                ·{" "}
                 {result.input.preferredChainId
                   ? getChainName(result.input.preferredChainId)
-                  : "Network chosen per payment"}
+                  : tx("Network chosen per payment")}
               </dd>
             </div>
           </dl>
@@ -240,11 +254,14 @@ export function ScreeningEvidence({
       )}
       {result?.dataset && (
         <details className="text-sm">
-          <summary className="cursor-pointer">OFAC source and version</summary>
+          <summary className="cursor-pointer">
+            {tx("OFAC source and version")}
+          </summary>
           <div className="mt-3 space-y-2 text-xs text-slate-400">
             <p>
-              Publication {formatDate(result.dataset.publishedAt)} ·{" "}
-              {result.dataset.entryCount.toLocaleString()} records
+              {tx("Publication")} {formatDate(result.dataset.publishedAt)} ·{" "}
+              {result.dataset.entryCount.toLocaleString(workspaceLocale())}{" "}
+              {tx("records")}
             </p>
             <a
               className="workspace-action-link"
@@ -252,23 +269,24 @@ export function ScreeningEvidence({
               target="_blank"
               rel="noreferrer"
             >
-              Download the current OFAC source
+              {tx("Download the current OFAC source")}
             </a>
-            <p>Saved publication checksum</p>
+            <p>{tx("Saved publication checksum")}</p>
             <p className="break-all font-mono">{result.dataset.checksum}</p>
             <p>
-              Matching method: {result.dataset.engine}. Name similarity
-              threshold: 85%; address comparisons are exact. Weak aliases and
-              address-network differences are identified below.
+              {tx("Matching method:")} {result.dataset.engine}
+              {tx(
+                ". Name similarity threshold: 85%; address comparisons are exact. Weak aliases and address-network differences are identified below.",
+              )}
             </p>
           </div>
         </details>
       )}
       {!!result?.matches.length && (
-        <section className="space-y-3" aria-label="Listed matches">
+        <section className="space-y-3" aria-label={tx("Listed matches")}>
           <h3 className="font-semibold">
-            Listed evidence · {result.matches.length}{" "}
-            {result.matches.length === 1 ? "match" : "matches"}
+            {tx("Listed evidence ·")} {result.matches.length}{" "}
+            {result.matches.length === 1 ? tx("match") : tx("matches")}
           </h3>
           {result.matches.map((match, i) => (
             <div
@@ -277,14 +295,22 @@ export function ScreeningEvidence({
             >
               <strong>{match.matchedName}</strong>
               <p className="text-xs text-slate-400">
-                SDN ID {match.sdnId} ·{" "}
+                {tx("SDN ID")} {match.sdnId} ·{" "}
                 {match.kind === "address"
-                  ? "Exact listed identifier"
-                  : `${Math.round(match.matchScore * 100)}% name similarity${match.alias === "weak" ? " · Weak alias" : match.alias === "strong" ? " · Alias" : ""}`}
+                  ? tx("Exact listed identifier")
+                  : tx("{{value1}}% name similarity{{value2}}", {
+                      value1: Math.round(match.matchScore * 100),
+                      value2:
+                        match.alias === "weak"
+                          ? tx(" · Weak alias")
+                          : match.alias === "strong"
+                            ? tx(" · Alias")
+                            : "",
+                    })}
               </p>
               {match.programs?.length ? (
                 <p className="text-xs text-slate-400">
-                  Programs: {match.programs.join(", ")}
+                  {tx("Programs:")} {match.programs.join(", ")}
                 </p>
               ) : null}
               {match.matchedAddress && (
@@ -293,7 +319,7 @@ export function ScreeningEvidence({
                     {match.matchedAddress}
                   </p>
                   <p className="text-xs text-slate-400">
-                    Published label: {match.listedCurrency}
+                    {tx("Published label:")} {match.listedCurrency}
                     {match.listedChainId
                       ? ` · ${getChainName(match.listedChainId)}`
                       : ""}
@@ -301,8 +327,12 @@ export function ScreeningEvidence({
                   {match.networkMatch !== "listed_network" && (
                     <p className="text-sm workspace-funding-warning">
                       {match.networkMatch === "other_network"
-                        ? "The identifier is listed for a different network. This is evidence to review, not proof of an address listing on the selected network."
-                        : "The published currency label does not establish the requested network. Review the identifier and entity together."}
+                        ? tx(
+                            "The identifier is listed for a different network. This is evidence to review, not proof of an address listing on the selected network.",
+                          )
+                        : tx(
+                            "The published currency label does not establish the requested network. Review the identifier and entity together.",
+                          )}
                     </p>
                   )}
                 </>
@@ -320,14 +350,19 @@ export function ScreeningEvidence({
       )}
       {!!result?.decisions.length && (
         <details className="text-sm">
-          <summary className="cursor-pointer">Decision history</summary>
+          <summary className="cursor-pointer">{tx("Decision history")}</summary>
           <ul className="mt-3 space-y-4">
             {result.decisions.map((d) => (
               <li key={d._id}>
-                <strong>{labels[d.status]}</strong>
+                <strong>{tx(labels[d.status])}</strong>
                 <p className="text-xs text-slate-400">
-                  {new Date(d.reviewedAt).toLocaleString()}
-                  {d.status === 'false_positive' && <> · Valid until {formatDate(d.expiresAt)}</>}
+                  {new Date(d.reviewedAt).toLocaleString(workspaceLocale())}
+                  {d.status === "false_positive" && (
+                    <>
+                      {" "}
+                      {tx("· Valid until")} {formatDate(d.expiresAt)}
+                    </>
+                  )}
                 </p>
                 <p className="mt-1 whitespace-pre-wrap">{d.reason}</p>
               </li>
@@ -343,13 +378,16 @@ export function RecipientScreening(props: {
   beneficiaryId: Id<"beneficiaries">;
   beneficiaryName: string;
 }) {
+  useWorkspaceLanguage();
   const [open, setOpen] = useState(false);
   return (
     <details
       className="rounded-xl border border-white/10 p-4"
       onToggle={(e) => setOpen(e.currentTarget.open)}
     >
-      <summary className="cursor-pointer font-semibold">OFAC screening</summary>
+      <summary className="cursor-pointer font-semibold">
+        {tx("OFAC screening")}
+      </summary>
       {open && (
         <div className="mt-4">
           <ScreeningEvidence {...props} />

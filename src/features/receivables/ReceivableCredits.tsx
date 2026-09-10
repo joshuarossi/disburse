@@ -1,3 +1,4 @@
+import { tx, useWorkspaceLanguage } from "@/lib/workspaceI18n";
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useMutation, useQuery } from "convex/react";
@@ -18,6 +19,7 @@ export function ReceivableCredits({
 }: {
   invoice: Doc<"receivables">;
 }) {
+  useWorkspaceLanguage();
   const sessionToken = useSessionToken(),
     navigate = useNavigate();
   const identity = sessionToken
@@ -78,12 +80,12 @@ export function ReceivableCredits({
   return (
     <>
       <section
-        aria-label="Credits and refunds"
+        aria-label={tx("Credits and refunds")}
         className="space-y-4 rounded-xl border border-slate-400/20 p-4"
       >
-        <h3 className="font-semibold">Credits and refunds</h3>
+        <h3 className="font-semibold">{tx("Credits and refunds")}</h3>
         {!details ? (
-          <p role="status">Loading adjustments…</p>
+          <p role="status">{tx("Loading adjustments…")}</p>
         ) : (
           <>
             <div className="grid gap-3 sm:grid-cols-3">
@@ -98,8 +100,8 @@ export function ReceivableCredits({
                 ["Refunded", details.refunded],
                 ["Available to refund", details.availableRefund],
               ].map(([label, value]) => (
-                <div key={label}>
-                  <p className="finance-label">{label}</p>
+                <div key={tx(label)}>
+                  <p className="finance-label">{tx(label)}</p>
                   <p className="font-semibold">
                     {formatMoney(value, invoice.token, true)} {invoice.token}
                   </p>
@@ -108,9 +110,10 @@ export function ReceivableCredits({
             </div>
             {details.reserved !== "0" && (
               <p className="workspace-description">
-                {details.reserved} {invoice.token} is reserved by existing
-                refund requests. Open a request to approve, recover or cancel
-                it.
+                {details.reserved} {invoice.token}{" "}
+                {tx(
+                  "is reserved by existing refund requests. Open a request to approve, recover or cancel it.",
+                )}
               </p>
             )}
             {!!details.credits.length && (
@@ -126,14 +129,14 @@ export function ReceivableCredits({
                       {invoice.token}
                     </p>
                     <p className="workspace-description">
-                      Issued {formatDate(c.issuedAt)}
+                      {tx("Issued")} {formatDate(c.issuedAt)}
                     </p>
                     <p className="mt-1 whitespace-pre-wrap">{c.reason}</p>
                     <button
                       className="workspace-action-link mt-2"
                       onClick={() => setAccountingCredit(c._id)}
                     >
-                      Reconcile credit {c.number}
+                      {tx("Reconcile credit")} {c.number}
                     </button>
                   </li>
                 ))}
@@ -148,13 +151,13 @@ export function ReceivableCredits({
                   >
                     <span>
                       {r.amount} {invoice.token} ·{" "}
-                      {r.status === "executed" ? "Paid" : r.status}
+                      {r.status === "executed" ? tx("Paid") : r.status}
                     </span>
                     <Link
                       className="workspace-action-link"
                       to={`/org/${invoice.orgId}/disbursements?focus=${r.id}`}
                     >
-                      Open refund payment
+                      {tx("Open refund payment")}
                     </Link>
                   </li>
                 ))}
@@ -169,7 +172,7 @@ export function ReceivableCredits({
                       className="workspace-button"
                       onClick={() => open("credit")}
                     >
-                      Issue credit note
+                      {tx("Issue credit note")}
                     </button>
                   )}
                 {details.canRefund && details.availableRefund !== "0" && (
@@ -177,7 +180,7 @@ export function ReceivableCredits({
                     className="workspace-button"
                     onClick={() => open("refund")}
                   >
-                    Prepare refund
+                    {tx("Prepare refund")}
                   </button>
                 )}
               </div>
@@ -232,18 +235,24 @@ export function ReceivableCredits({
               >
                 <h4 className="font-semibold">
                   {form === "credit"
-                    ? "Issue a credit note"
-                    : "Prepare a customer refund"}
+                    ? tx("Issue a credit note")
+                    : tx("Prepare a customer refund")}
                 </h4>
                 <p className="workspace-description">
                   {form === "credit"
-                    ? "A credit reduces the amount requested. It preserves the issued invoice and does not send money. Issued credits cannot be edited."
-                    : "Refunds use the customer's reviewed recipient details and the usual payment approvals. Confirm the destination with the customer before proceeding."}
+                    ? tx(
+                        "A credit reduces the amount requested. It preserves the issued invoice and does not send money. Issued credits cannot be edited.",
+                      )
+                    : tx(
+                        "Refunds use the customer's reviewed recipient details and the usual payment approvals. Confirm the destination with the customer before proceeding.",
+                      )}
                 </p>
                 {form === "credit" ? (
                   <>
                     <label className="block">
-                      <span className="finance-label">Credit note number</span>
+                      <span className="finance-label">
+                        {tx("Credit note number")}
+                      </span>
                       <input
                         className="finance-field"
                         value={number}
@@ -258,7 +267,7 @@ export function ReceivableCredits({
                     </label>
                     <label className="block">
                       <span className="finance-label">
-                        Reason shown to the customer
+                        {tx("Reason shown to the customer")}
                       </span>
                       <textarea
                         className="finance-field"
@@ -277,7 +286,9 @@ export function ReceivableCredits({
                 ) : (
                   <>
                     <label className="block">
-                      <span className="finance-label">Refund recipient</span>
+                      <span className="finance-label">
+                        {tx("Refund recipient")}
+                      </span>
                       <select
                         className="finance-field"
                         value={recipient?._id ?? ""}
@@ -288,7 +299,9 @@ export function ReceivableCredits({
                         required
                         disabled={busy}
                       >
-                        <option value="">Choose a reviewed recipient</option>
+                        <option value="">
+                          {tx("Choose a reviewed recipient")}
+                        </option>
                         {eligible?.map((r) => (
                           <option key={r._id} value={r._id}>
                             {r.name}
@@ -298,8 +311,9 @@ export function ReceivableCredits({
                     </label>
                     {!eligible?.length && (
                       <p className="workspace-description">
-                        Add and review the customer in Recipients with{" "}
-                        {invoice.token} on {getChainName(invoice.chainId)}.
+                        {tx("Add and review the customer in Recipients with")}{" "}
+                        {invoice.token} {tx("on")}{" "}
+                        {getChainName(invoice.chainId)}.
                       </p>
                     )}
                     {recipient && (
@@ -314,7 +328,9 @@ export function ReceivableCredits({
                       </div>
                     )}
                     <label className="block">
-                      <span className="finance-label">Refund from account</span>
+                      <span className="finance-label">
+                        {tx("Refund from account")}
+                      </span>
                       <select
                         className="finance-field"
                         value={account?._id ?? ""}
@@ -325,10 +341,10 @@ export function ReceivableCredits({
                         required
                         disabled={busy}
                       >
-                        <option value="">Choose an account</option>
+                        <option value="">{tx("Choose an account")}</option>
                         {accounts?.map((a) => (
                           <option key={a._id} value={a._id}>
-                            {a.name ?? "Company account"}
+                            {a.name ?? tx("Company account")}
                           </option>
                         ))}
                       </select>
@@ -337,8 +353,10 @@ export function ReceivableCredits({
                 )}
                 <label className="block">
                   <span className="finance-label">
-                    {form === "credit" ? "Credit amount" : "Refund amount"} ·{" "}
-                    {invoice.token}
+                    {form === "credit"
+                      ? tx("Credit amount")
+                      : tx("Refund amount")}{" "}
+                    · {invoice.token}
                   </span>
                   <input
                     className="finance-field"
@@ -353,7 +371,7 @@ export function ReceivableCredits({
                   />
                 </label>
                 <p className="workspace-description">
-                  Maximum{" "}
+                  {tx("Maximum")}{" "}
                   {form === "credit"
                     ? availableCredit
                     : details.availableRefund}{" "}
@@ -371,11 +389,15 @@ export function ReceivableCredits({
                   />
                   <span>
                     {form === "credit"
-                      ? "I reviewed the credit amount and reason, and understand this credit will appear on the customer invoice."
-                      : "I confirmed this reviewed recipient is the customer's refund destination and checked the refund amount."}
+                      ? tx(
+                          "I reviewed the credit amount and reason, and understand this credit will appear on the customer invoice.",
+                        )
+                      : tx(
+                          "I confirmed this reviewed recipient is the customer's refund destination and checked the refund amount.",
+                        )}
                   </span>
                 </label>
-                {error && <Notice>{error}</Notice>}
+                {error && <Notice>{tx(error)}</Notice>}
                 <div className="flex flex-wrap gap-2">
                   <button
                     className="workspace-button workspace-button-primary"
@@ -386,10 +408,10 @@ export function ReceivableCredits({
                     }
                   >
                     {busy
-                      ? "Saving…"
+                      ? tx("Saving…")
                       : form === "credit"
-                        ? "Issue credit"
-                        : "Save refund draft"}
+                        ? tx("Issue credit")
+                        : tx("Save refund draft")}
                   </button>
                   <button
                     type="button"
@@ -397,7 +419,7 @@ export function ReceivableCredits({
                     disabled={busy}
                     onClick={() => setForm(undefined)}
                   >
-                    Cancel
+                    {tx("Cancel")}
                   </button>
                 </div>
               </form>

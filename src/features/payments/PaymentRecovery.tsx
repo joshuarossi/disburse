@@ -1,6 +1,7 @@
-import { userErrorMessage } from '@/lib/userErrors';
+import { tx, useWorkspaceLanguage } from "@/lib/workspaceI18n";
+import { userErrorMessage } from "@/lib/userErrors";
 import { useState } from "react";
-import { walletSendDeclined } from '../../../shared/paymentQueue';
+import { walletSendDeclined } from "../../../shared/paymentQueue";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import type { Doc, Id } from "../../../convex/_generated/dataModel";
@@ -19,6 +20,7 @@ export function PaymentRecovery({
   onRetryNative?: () => void;
   retryDisabled?: boolean;
 }) {
+  useWorkspaceLanguage();
   const sessionToken = useSessionToken();
   const managed = useQuery(
     api.relayJobs.paymentStatus,
@@ -47,28 +49,62 @@ export function PaymentRecovery({
   const [message, setMessage] = useState("");
   const declined = !!native && walletSendDeclined(native);
   const reverted = !!native?.nativeExecution?.revertedAt && !native.txHash;
-  if (!status || status.status === "confirmed" || status.status === "failed") return null;
+  if (!status || status.status === "confirmed" || status.status === "failed")
+    return null;
   return (
     <section
       className="rounded-lg border border-[var(--ws-border)] p-4 space-y-3"
-      aria-label="Payment recovery"
+      aria-label={tx("Payment recovery")}
     >
       <h3 className="text-sm font-semibold">
-        {reverted ? 'Transaction reverted' : declined ? 'Wallet approval declined' : status.status === "exception"
-          ? "Payment needs attention"
-          : "Tracking your payment"}
+        {reverted
+          ? tx("Transaction reverted")
+          : declined
+            ? tx("Wallet approval declined")
+            : status.status === "exception"
+              ? tx("Payment needs attention")
+              : tx("Tracking your payment")}
       </h3>
       <p className="text-sm text-[var(--ws-muted)]">
-        {reverted ? 'The network transaction reverted. The original authorization is saved for review and retry.' : declined ? 'The wallet declined the send request. Your original payment authorization is saved.' : (status.error ? userErrorMessage(status.error, 'We could not verify settlement. Check the original payment again.') : undefined) ??
-          (native
-            ? "We are checking whether your approved payment settled on the network."
-            : "The payment service is processing your approved payment.")}
+        {reverted
+          ? tx(
+              "The network transaction reverted. The original authorization is saved for review and retry.",
+            )
+          : declined
+            ? tx(
+                "The wallet declined the send request. Your original payment authorization is saved.",
+              )
+            : ((status.error
+                ? userErrorMessage(
+                    status.error,
+                    "We could not verify settlement. Check the original payment again.",
+                  )
+                : undefined) ??
+              (native
+                ? tx(
+                    "We are checking whether your approved payment settled on the network.",
+                  )
+                : tx(
+                    "The payment service is processing your approved payment.",
+                  )))}
       </p>
-      {declined && canManage && onRetryNative && <button className="workspace-button workspace-button-primary" disabled={busy || retryDisabled} onClick={onRetryNative}>Retry original payment</button>}
+      {declined && canManage && onRetryNative && (
+        <button
+          className="workspace-button workspace-button-primary"
+          disabled={busy || retryDisabled}
+          onClick={onRetryNative}
+        >
+          {tx("Retry original payment")}
+        </button>
+      )}
       <p className="text-xs text-[var(--ws-muted)]">
         {status.canResume
-          ? "No submission was attempted. Resume sends the payment and fee you already approved."
-          : "Check the original submission before preparing a replacement. Checking settlement does not send another payment."}
+          ? tx(
+              "No submission was attempted. Resume sends the payment and fee you already approved.",
+            )
+          : tx(
+              "Check the original submission before preparing a replacement. Checking settlement does not send another payment.",
+            )}
       </p>
       {canManage && status.status !== "prepared" && (
         <button
@@ -97,15 +133,15 @@ export function PaymentRecovery({
           }}
         >
           {busy
-            ? "Working…"
+            ? tx("Working…")
             : status.canResume
-              ? "Resume payment"
-              : "Check settlement"}
+              ? tx("Resume payment")
+              : tx("Check settlement")}
         </button>
       )}
       {message && (
         <p role="status" className="text-sm">
-          {message}
+          {tx(message)}
         </p>
       )}
     </section>

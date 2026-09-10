@@ -1,3 +1,4 @@
+import { tx, useWorkspaceLanguage } from "@/lib/workspaceI18n";
 import { treasuryRequestStatuses as statuses } from "./treasuryPresentation";
 import { useRef, useState } from "react";
 import { useAction, usePaginatedQuery, useQuery } from "convex/react";
@@ -41,6 +42,7 @@ export function Earn({
   orgId: Id<"orgs">;
   accounts: Doc<"safes">[];
 }) {
+  useWorkspaceLanguage();
   const sessionToken = useSessionToken(),
     { address } = useAccount(),
     { environment } = useActivityEnvironment();
@@ -125,17 +127,18 @@ export function Earn({
     setShow(true);
   };
   return (
-    <section className="workspace-panel mt-6" aria-label="Earn with Aave">
+    <section className="workspace-panel mt-6" aria-label={tx("Earn with Aave")}>
       <div className="workspace-panel-heading flex flex-wrap gap-4">
         <div>
-          <h2>Earn</h2>
+          <h2>{tx("Earn")}</h2>
           <p>
-            Lend idle funds through Aave. Keep upcoming bills and payroll in
-            your payment accounts.
+            {tx(
+              "Lend idle funds through Aave. Keep upcoming bills and payroll in your payment accounts.",
+            )}
           </p>
         </div>
         <button className="workspace-button" onClick={() => open()}>
-          View lending
+          {tx("View lending")}
         </button>
       </div>
       {status === "LoadingFirstPage" ? (
@@ -158,21 +161,23 @@ export function Earn({
               >
                 <span>
                   <strong className="block text-sm">
-                    {row.kind === "supply" ? "Lending deposit" : "Withdrawal"} ·{" "}
-                    {accountName(row.safeId)}
+                    {row.kind === "supply"
+                      ? tx("Lending deposit")
+                      : tx("Withdrawal")}{" "}
+                    · {accountName(row.safeId)}
                   </strong>
                   <span className="text-xs text-[var(--ws-muted)]">
-                    Aave · {scheduleDateTime(row.createdAt)}
+                    {tx("Aave ·")} {scheduleDateTime(row.createdAt)}
                   </span>
                 </span>
                 <span className="text-right">
                   <strong className="block text-sm">
                     {q
                       ? `${q.withdrawAll && !row.settledAmount ? "Est. " : ""}${units(row.settledAmount ?? q.amount)} ${lendingMarket(q.chainId).assetLabel}`
-                      : "Review details"}
+                      : tx("Review details")}
                   </strong>
                   <span className="text-xs text-[var(--ws-muted)]">
-                    {statuses[row.status]}
+                    {tx(statuses[row.status])}
                   </span>
                 </span>
               </button>
@@ -181,26 +186,27 @@ export function Earn({
           {status === "CanLoadMore" && (
             <div className="p-4">
               <button className="workspace-button" onClick={() => loadMore(10)}>
-                Load more requests
+                {tx("Load more requests")}
               </button>
             </div>
           )}
         </div>
       ) : (
         <p className="p-6 text-sm text-[var(--ws-muted)]">
-          Your lending activity will appear here. Funds stay under your
-          account's control; the provider's lending terms and risks apply.
+          {tx(
+            "Your lending activity will appear here. Funds stay under your account's control; the provider's lending terms and risks apply.",
+          )}
         </p>
       )}
       {show && (
         <Dialog
-          title={selected ? "Lending request" : "Earn with Aave"}
+          title={selected ? tx("Lending request") : tx("Earn with Aave")}
           onClose={() => {
             if (!busy && !executing) setShow(false);
           }}
         >
           <div className="space-y-5 p-6">
-            {error && <Notice>{error}</Notice>}
+            {error && <Notice>{tx(error)}</Notice>}
             {selected ? (
               <TreasuryServiceReview
                 key={selected}
@@ -209,7 +215,7 @@ export function Earn({
                 memberName={memberName}
                 canWrite={canWrite}
                 onBusyChange={setExecuting}
-                refreshLabel="Review current position"
+                refreshLabel={tx("Review current position")}
                 onNew={() => {
                   setSelected(undefined);
                   setWithdrawAll(false);
@@ -225,14 +231,14 @@ export function Earn({
               />
             ) : !account ? (
               <Notice tone="info">
-                Lending is available for connected accounts on Base and
-                Arbitrum, and for test accounts on Base Sepolia. Connect a
-                supported account in Settings to review it here.
+                {tx(
+                  "Lending is available for connected accounts on Base and Arbitrum, and for test accounts on Base Sepolia. Connect a supported account in Settings to review it here.",
+                )}
               </Notice>
             ) : (
               <>
                 <label className="block">
-                  <span className="finance-label">Company account</span>
+                  <span className="finance-label">{tx("Company account")}</span>
                   <select
                     className="finance-field"
                     value={account._id}
@@ -247,7 +253,7 @@ export function Earn({
                   >
                     {sources.map((a) => (
                       <option key={a._id} value={a._id}>
-                        {a.name ?? "Company account"} ·{" "}
+                        {a.name ?? tx("Company account")} ·{" "}
                         {getChainName(a.chainId)}
                       </option>
                     ))}
@@ -275,35 +281,41 @@ export function Earn({
                         className={snapshot.isFetching ? "animate-spin" : ""}
                       />
                       {snapshot.isFetching
-                        ? "Refreshing position…"
-                        : "Refresh position"}
+                        ? tx("Refreshing position…")
+                        : tx("Refresh position")}
                     </button>
                     {snapshot.data && (
                       <>
                         <div className="grid gap-4 rounded-lg border border-[var(--ws-border)] p-5 sm:grid-cols-2">
                           <div>
-                            <p className="finance-label">In this account</p>
+                            <p className="finance-label">
+                              {tx("In this account")}
+                            </p>
                             <p className="mt-1 text-xl font-semibold">
                               {units(snapshot.data.available)}{" "}
                               {snapshot.data.assetLabel}
                             </p>
                           </div>
                           <div>
-                            <p className="finance-label">Lent through Aave</p>
+                            <p className="finance-label">
+                              {tx("Lent through Aave")}
+                            </p>
                             <p className="mt-1 text-xl font-semibold">
                               {units(snapshot.data.supplied)}{" "}
                               {snapshot.data.assetLabel}
                             </p>
                           </div>
                           <div>
-                            <p className="finance-label">Variable supply APR</p>
+                            <p className="finance-label">
+                              {tx("Variable supply APR")}
+                            </p>
                             <p className="mt-1 text-lg">
                               {apr(snapshot.data.rateRay)}
                             </p>
                           </div>
                           <div>
                             <p className="finance-label">
-                              USDC available for fees
+                              {tx("USDC available for fees")}
                             </p>
                             <p className="mt-1 text-lg">
                               {units(snapshot.data.feeBalance)}
@@ -311,20 +323,23 @@ export function Earn({
                           </div>
                         </div>
                         <p className="text-xs text-[var(--ws-muted)]">
-                          Position checked{" "}
-                          {scheduleDateTime(snapshot.data.checkedAt)}. It
-                          includes accrued lending interest and activity
-                          performed outside Disburse. It is not immediately
-                          available for payments.
+                          {tx("Position checked")}{" "}
+                          {scheduleDateTime(snapshot.data.checkedAt)}
+                          {tx(
+                            ". It includes accrued lending interest and activity performed outside Disburse. It is not immediately available for payments.",
+                          )}
                         </p>
                         {account.chainId === 84532 && (
                           <Notice tone="info">
-                            Aave test USDC is a separate test asset. Circle USDC
-                            in your account pays execution fees. Neither has
-                            real value.
+                            {tx(
+                              "Aave test USDC is a separate test asset. Circle USDC in your account pays execution fees. Neither has real value.",
+                            )}
                           </Notice>
                         )}
-                        <div className="flex gap-2" aria-label="Lending action">
+                        <div
+                          className="flex gap-2"
+                          aria-label={tx("Lending action")}
+                        >
                           {(["supply", "withdraw"] as const).map((value) => (
                             <button
                               key={value}
@@ -340,8 +355,8 @@ export function Earn({
                               }}
                             >
                               {value === "supply"
-                                ? "Lend funds"
-                                : "Withdraw funds"}
+                                ? tx("Lend funds")
+                                : tx("Withdraw funds")}
                             </button>
                           ))}
                         </div>
@@ -393,16 +408,17 @@ export function Earn({
                                 }}
                               />
                               <span>
-                                Withdraw the full position, including interest
-                                accrued before execution.
+                                {tx(
+                                  "Withdraw the full position, including interest accrued before execution.",
+                                )}
                               </span>
                             </label>
                           )}
                           <label className="block">
                             <span className="finance-label">
-                              Amount to{" "}
-                              {kind === "supply" ? "lend" : "withdraw"} ·{" "}
-                              {snapshot.data.assetLabel}
+                              {tx("Amount to")}{" "}
+                              {kind === "supply" ? tx("lend") : tx("withdraw")}{" "}
+                              · {snapshot.data.assetLabel}
                             </span>
                             <input
                               className="finance-field"
@@ -420,8 +436,12 @@ export function Earn({
                           </label>
                           <p className="text-sm text-[var(--ws-muted)]">
                             {kind === "supply"
-                              ? "Keep enough cash for upcoming payments and USDC execution fees. Your account owns the lending position."
-                              : "Withdrawals return to this company account. Availability depends on Aave's liquidity and reserve status; there is no fixed withdrawal date."}
+                              ? tx(
+                                  "Keep enough cash for upcoming payments and USDC execution fees. Your account owns the lending position.",
+                                )
+                              : tx(
+                                  "Withdrawals return to this company account. Availability depends on Aave's liquidity and reserve status; there is no fixed withdrawal date.",
+                                )}
                           </p>
                           <button
                             className="workspace-button workspace-button-primary"
@@ -433,12 +453,15 @@ export function Earn({
                               !amount
                             }
                           >
-                            {busy ? "Checking amount…" : "Review amount"}
+                            {busy
+                              ? tx("Checking amount…")
+                              : tx("Review amount")}
                           </button>
                           {!canWrite && (
                             <p className="text-sm text-[var(--ws-muted)]">
-                              An admin or approver can prepare lending requests.
-                              The account's required owners approve execution.
+                              {tx(
+                                "An admin or approver can prepare lending requests. The account's required owners approve execution.",
+                              )}
                             </p>
                           )}
                         </form>
@@ -448,21 +471,18 @@ export function Earn({
                 )}
                 <details className="text-sm text-[var(--ws-muted)]">
                   <summary className="cursor-pointer">
-                    Provider terms and risks
+                    {tx("Provider terms and risks")}
                   </summary>
                   <div className="mt-3 space-y-3">
                     <p>
-                      Aave lends supplied assets to borrowers. Its supply rate
-                      varies and is not guaranteed. Position balances can differ
-                      by a small rounding amount from the deposited quantity.
-                      USDC can lose value, contracts can fail, and withdrawals
-                      can be delayed by low liquidity or a paused reserve.
+                      {tx(
+                        "Aave lends supplied assets to borrowers. Its supply rate varies and is not guaranteed. Position balances can differ by a small rounding amount from the deposited quantity. USDC can lose value, contracts can fail, and withdrawals can be delayed by low liquidity or a paused reserve.",
+                      )}
                     </p>
                     <p>
-                      Disburse does not hold your funds, operate the lending
-                      pool or cover transaction costs. Aave's published supply
-                      rate reflects its reserve factor. Disburse adds no lending
-                      fee.
+                      {tx(
+                        "Disburse does not hold your funds, operate the lending pool or cover transaction costs. Aave's published supply rate reflects its reserve factor. Disburse adds no lending fee.",
+                      )}
                     </p>
                     <a
                       className="workspace-action-link"
@@ -470,7 +490,7 @@ export function Earn({
                       target="_blank"
                       rel="noreferrer"
                     >
-                      Aave withdrawal terms <ExternalLink size={13} />
+                      {tx("Aave withdrawal terms")} <ExternalLink size={13} />
                     </a>
                   </div>
                 </details>

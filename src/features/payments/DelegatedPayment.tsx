@@ -1,3 +1,4 @@
+import { tx, useWorkspaceLanguage } from "@/lib/workspaceI18n";
 import { StableDelegatedPayment } from "./StableDelegatedPayment";
 import { supportsCircleFees } from "../../../shared/circleExecution";
 import { userErrorMessage } from "@/lib/userErrors";
@@ -26,6 +27,7 @@ type DelegatedPaymentProps = {
   onFeeModeChange: (mode: "managed" | "wallet") => void;
 };
 export function DelegatedPayment(props: DelegatedPaymentProps) {
+  useWorkspaceLanguage();
   if (
     (supportsCircleFees(props.payment.chainId) &&
       !props.payment.allowanceExecution) ||
@@ -37,8 +39,9 @@ export function DelegatedPayment(props: DelegatedPaymentProps) {
   if (!props.payment.allowanceExecution && props.payment.chainId !== 11155111)
     return (
       <p className="workspace-description">
-        USDC-paid spending allowances are available on Base and Arbitrum. Use a
-        supported account to prepare this payment.
+        {tx(
+          "USDC-paid spending allowances are available on Base and Arbitrum. Use a supported account to prepare this payment.",
+        )}
       </p>
     );
   return <LegacyDelegatedPayment {...props} />;
@@ -56,6 +59,7 @@ function LegacyDelegatedPayment({
   onModeChange: (value: boolean) => void;
   onFeeModeChange: (mode: "managed" | "wallet") => void;
 }) {
+  useWorkspaceLanguage();
   const sessionToken = useSessionToken();
   const { address, chainId } = useAccount();
   const { switchChainAsync } = useSwitchChain();
@@ -227,21 +231,22 @@ function LegacyDelegatedPayment({
       onToggle={(event) => onModeChange(event.currentTarget.open)}
     >
       <summary className="cursor-pointer text-sm font-medium">
-        Pay with a spending allowance
+        {tx("Pay with a spending allowance")}
       </summary>
       <div className="mt-4 space-y-4">
         <p className="text-sm text-slate-400">
-          An authorized member can pay these recipients within their account
-          allowance, without collecting owner approvals for this payment.
+          {tx(
+            "An authorized member can pay these recipients within their account allowance, without collecting owner approvals for this payment.",
+          )}
         </p>
         {error && (
           <p role="alert" className="min-w-0 break-words text-sm text-red-400">
-            {error}
+            {tx(error)}
           </p>
         )}
         {message && (
           <p role="status" className="text-sm text-accent-400">
-            {message}
+            {tx(message)}
           </p>
         )}
         {reservedPaymentId && (
@@ -249,12 +254,12 @@ function LegacyDelegatedPayment({
             className="text-sm text-accent-400 underline"
             href={`/org/${payment.orgId}/disbursements?focus=${encodeURIComponent(reservedPaymentId)}`}
           >
-            Open the original payment
+            {tx("Open the original payment")}
           </a>
         )}
         {!payment.allowanceExecution && (
           <label className="block">
-            <span className="finance-label">Execution fee</span>
+            <span className="finance-label">{tx("Execution fee")}</span>
             <select
               className="finance-field"
               value={feeMode}
@@ -266,9 +271,9 @@ function LegacyDelegatedPayment({
                 setAcknowledged(false);
               }}
             >
-              <option value="managed">Pay from company account</option>
+              <option value="managed">{tx("Pay from company account")}</option>
               <option value="wallet">
-                Pay network fees from my signing wallet
+                {tx("Pay network fees from my signing wallet")}
               </option>
             </select>
           </label>
@@ -280,12 +285,12 @@ function LegacyDelegatedPayment({
             disabled={busy || blocked}
             onClick={() => void run("quote")}
           >
-            Check my allowance
+            {tx("Check my allowance")}
           </Button>
         )}
         {quote && !payment.allowanceExecution && (
           <p className="text-sm">
-            Available allowance:{" "}
+            {tx("Available allowance:")}{" "}
             {formatMoney(
               formatUnits(BigInt(quote.available), 6),
               payment.token,
@@ -296,18 +301,18 @@ function LegacyDelegatedPayment({
         )}
         {quote && (
           <p className="text-xs text-slate-400">
-            Your wallet will request{" "}
+            {tx("Your wallet will request")}{" "}
             {(quote.additionalTransfers?.length ?? 0) + 1 + (quote.fee ? 1 : 0)}{" "}
             {(quote.additionalTransfers?.length ?? 0) +
               1 +
               (quote.fee ? 1 : 0) ===
             1
-              ? "signature"
-              : "signatures"}{" "}
-            to authorize the recipient amounts
-            {quote.fee ? " and a separate fee" : ""}.{" "}
+              ? tx("signature")
+              : tx("signatures")}{" "}
+            {tx("to authorize the recipient amounts")}
+            {quote.fee ? tx(" and a separate fee") : ""}.{" "}
             {quote.additionalTransfers?.length
-              ? "Recipients are paid together in one transaction."
+              ? tx("Recipients are paid together in one transaction.")
               : ""}
           </p>
         )}
@@ -328,8 +333,13 @@ function LegacyDelegatedPayment({
                 />
                 <span>
                   {quote?.fee
-                    ? `Send this payment now using my allowance, including a ${quote.fee.amount} ${quote.fee.token} fee from the funding account. Recipient amounts stay unchanged.`
-                    : "Send the saved recipient amounts using my allowance. My signing wallet pays the network fee and shows its estimate before sending."}
+                    ? tx(
+                        "Send this payment now using my allowance, including a {{value1}} {{value2}} fee from the funding account. Recipient amounts stay unchanged.",
+                        { value1: quote.fee.amount, value2: quote.fee.token },
+                      )
+                    : tx(
+                        "Send the saved recipient amounts using my allowance. My signing wallet pays the network fee and shows its estimate before sending.",
+                      )}
                 </span>
               </label>
               <Button
@@ -337,30 +347,34 @@ function LegacyDelegatedPayment({
                 onClick={() => void run("pay")}
               >
                 {busy
-                  ? "Processing…"
+                  ? tx("Processing…")
                   : payment.allowanceExecution
-                    ? "Retry original allowance payment"
-                    : "Pay using allowance"}
+                    ? tx("Retry original allowance payment")
+                    : tx("Pay using allowance")}
               </Button>
               <p className="text-xs text-slate-400">
-                This authorization is bound to the saved recipient and amount
-                and cannot be reused after settlement.
+                {tx(
+                  "This authorization is bound to the saved recipient and amount and cannot be reused after settlement.",
+                )}
               </p>
             </>
           )}
         {(payment.allowanceExecution || txHash) && (
           <div className="space-y-2">
             <p className="text-xs text-slate-400">
-              If this payment settled but its status has not updated, link its
-              receipt to reconcile the same authorization.
+              {tx(
+                "If this payment settled but its status has not updated, link its receipt to reconcile the same authorization.",
+              )}
             </p>
             <label className="block">
-              <span className="finance-label">Delegated payment receipt</span>
+              <span className="finance-label">
+                {tx("Delegated payment receipt")}
+              </span>
               <input
                 className="finance-field font-mono text-xs"
                 value={txHash}
                 onChange={(e) => setTxHash(e.target.value)}
-                placeholder="0x transaction hash"
+                placeholder={tx("0x transaction hash")}
               />
             </label>
             <Button
@@ -369,7 +383,7 @@ function LegacyDelegatedPayment({
               disabled={busy || !txHash}
               onClick={() => void run("record")}
             >
-              Link receipt
+              {tx("Link receipt")}
             </Button>
           </div>
         )}

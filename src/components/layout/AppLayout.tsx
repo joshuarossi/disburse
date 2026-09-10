@@ -1,3 +1,4 @@
+import { tx, useWorkspaceLanguage } from "@/lib/workspaceI18n";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { ActivityProvider } from "@/features/workspace/ActivityEnvironment";
 import { useEffect, useState, type ReactNode } from "react";
@@ -11,6 +12,7 @@ import { clearSessionToken, useSessionToken } from "@/lib/session";
 import { WorkspaceShell } from "./WorkspaceShell";
 
 export function AppLayout({ children }: { children: ReactNode }) {
+  useWorkspaceLanguage();
   const location = useLocation();
   const { orgId } = useParams();
   const { address } = useAccount();
@@ -29,7 +31,10 @@ export function AppLayout({ children }: { children: ReactNode }) {
     return () => clearInterval(timer);
   }, []);
   const access = billingAccess(billing, now);
-  const nextAccess = billing && access.expiresAt !== null ? billingAccess(billing, access.expiresAt) : null;
+  const nextAccess =
+    billing && access.expiresAt !== null
+      ? billingAccess(billing, access.expiresAt)
+      : null;
   const member = members?.find(
     (m) => m?.walletAddress.toLowerCase() === address?.toLowerCase(),
   );
@@ -37,27 +42,39 @@ export function AppLayout({ children }: { children: ReactNode }) {
     <ActivityProvider key={orgId} orgId={orgId ?? ""}>
       <WorkspaceShell
         orgId={orgId ?? ""}
-        orgName={org?.name ?? "Your workspace"}
-        userName={member?.name || "My account"}
+        orgName={org?.name ?? tx("Your workspace")}
+        userName={member?.name || tx("My account")}
         role={member?.role}
         onSignOut={() => {
           clearSessionToken();
           disconnect();
         }}
       >
-        {billing && access.expiresAt !== null &&
-          (access.daysRemaining <= 7 ||
-            access.source === "trial") && (
+        {billing &&
+          access.expiresAt !== null &&
+          (access.daysRemaining <= 7 || access.source === "trial") && (
             <div
               className={`workspace-panel mb-5 p-4 ${access.isActive && access.daysRemaining > 7 ? "flex flex-wrap items-center justify-between gap-3 text-xs" : ""}`}
               role="status"
             >
               <strong>
-                {`${access.source === "trial" ? "Trial" : access.source === "complimentary" ? "Complimentary access" : "Subscription"} · ${access.daysRemaining} days remaining`}
+                {tx("{{value1}} · {{value2}} days remaining", {
+                  value1: tx(
+                    access.source === "trial"
+                      ? "Trial"
+                      : access.source === "complimentary"
+                        ? "Complimentary access"
+                        : "Subscription",
+                  ),
+                  value2: access.daysRemaining,
+                })}
               </strong>
               {access.daysRemaining <= 7 && (
                 <p className="workspace-description mt-1">
-                  {`${nextAccess?.effectiveTier.name ?? "Free"} access continues after this period. Your team pays its own network and provider fees.`}
+                  {tx(
+                    "{{value1}} access continues after this period. Your team pays its own network and provider fees.",
+                    { value1: nextAccess?.effectiveTier.name ?? "Free" },
+                  )}
                 </p>
               )}
               <Link
@@ -68,7 +85,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
                 }
                 to={`/org/${orgId}/settings?tab=billing`}
               >
-                View plan & billing
+                {tx("View plan & billing")}
               </Link>
             </div>
           )}

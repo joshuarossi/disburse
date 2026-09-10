@@ -1,3 +1,4 @@
+import { tx, useWorkspaceLanguage, workspaceLocale } from "@/lib/workspaceI18n";
 import { useEffect, useRef, useState } from "react";
 import {
   useAction,
@@ -14,7 +15,7 @@ import { formatMoney } from "@/lib/formatMoney";
 import { AccountChangeApproval } from "./AccountChangeApproval";
 import { AccountCancellation } from "./AccountCancellation";
 import { Button } from "@/components/ui/button";
-import { supportsCircleFees } from '../../../shared/circleExecution';
+import { supportsCircleFees } from "../../../shared/circleExecution";
 
 type PolicyRow = FunctionReturnType<
   typeof api.spendingPolicyData.list
@@ -28,6 +29,7 @@ export function PolicyApprovalQueue({
   memberName: (wallet: string) => string;
   onExecuted: () => void;
 }) {
+  useWorkspaceLanguage();
   const sessionToken = useSessionToken();
   const queue = useConvexQuery(
     api.spendingPolicyData.list,
@@ -56,11 +58,11 @@ export function PolicyApprovalQueue({
   );
   return (
     <section
-      aria-label="Policy approvals"
+      aria-label={tx("Policy approvals")}
       className="space-y-4 rounded-lg border border-[var(--ws-border)] p-4"
     >
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h3 className="font-semibold">Policy approvals</h3>
+        <h3 className="font-semibold">{tx("Policy approvals")}</h3>
         <Button
           size="sm"
           variant="ghost"
@@ -69,18 +71,18 @@ export function PolicyApprovalQueue({
             onExecuted();
           }}
         >
-          Refresh policies
+          {tx("Refresh policies")}
         </Button>
       </div>
       {!queue ? (
         <p role="status" className="text-sm text-[var(--ws-muted)]">
-          Loading policy requests…
+          {tx("Loading policy requests…")}
         </p>
       ) : (
         <>
           {!pending?.length && (
             <p className="text-sm text-[var(--ws-muted)]">
-              No spending-policy changes are awaiting approval.
+              {tx("No spending-policy changes are awaiting approval.")}
             </p>
           )}
           {pending?.map((policy) => (
@@ -100,8 +102,8 @@ export function PolicyApprovalQueue({
                 onClick={() => setShowHistory((v) => !v)}
               >
                 {showHistory
-                  ? "Hide recent policy changes"
-                  : "View recent policy changes"}
+                  ? tx("Hide recent policy changes")
+                  : tx("View recent policy changes")}
               </button>
               {showHistory &&
                 history.map((policy) => (
@@ -131,6 +133,7 @@ function PolicyCard({
   canApprove: boolean;
   revision: number;
 }) {
+  useWorkspaceLanguage();
   const sessionToken = useSessionToken()!;
   const getApprovals = useAction(api.spendingPolicies.approvals),
     approve = useAction(api.spendingPolicies.approve),
@@ -139,7 +142,10 @@ function PolicyCard({
     rejected = useMutation(api.spendingPolicyData.walletRejected),
     recheck = useMutation(api.spendingPolicyData.recheck);
   const identity = { policyChangeId: p._id, sessionToken };
-  const circle = supportsCircleFees(p.chainId) && !p.executionFee && (!p.execution || p.execution.service === 'circle');
+  const circle =
+    supportsCircleFees(p.chainId) &&
+    !p.executionFee &&
+    (!p.execution || p.execution.service === "circle");
   const retryable =
     p.status === "processing" &&
     !!p.execution?.walletRejectedAt &&
@@ -150,36 +156,41 @@ function PolicyCard({
   );
   return (
     <article
-      aria-label={`${p.intent.kind === "grant" ? "Set allowance" : "Revoke allowance"} for ${memberName(p.intent.delegate)}`}
+      aria-label={tx("{{value1}} for {{value2}}", {
+        value1: tx(
+          p.intent.kind === "grant" ? "Set allowance" : "Revoke allowance",
+        ),
+        value2: memberName(p.intent.delegate),
+      })}
       className="space-y-3 border-t border-[var(--ws-border)] pt-4"
     >
       <div className="flex flex-wrap items-start justify-between gap-2">
         <h4 className="font-medium">
           {p.status === "applied"
             ? p.intent.kind === "grant"
-              ? "Allowance set"
-              : "Allowance revoked"
+              ? tx("Allowance set")
+              : tx("Allowance revoked")
             : p.intent.kind === "grant"
-              ? "Set allowance"
-              : "Revoke allowance"}{" "}
+              ? tx("Set allowance")
+              : tx("Revoke allowance")}{" "}
           · {memberName(p.intent.delegate)}
         </h4>
         <span className="text-xs text-[var(--ws-muted)]">
           {p.cancellationId &&
           !p.cancellationConfirmedAt &&
           p.status !== "applied"
-            ? "Cancellation requested"
+            ? tx("Cancellation requested")
             : p.status === "cancelled"
-              ? "Cancelled"
+              ? tx("Cancelled")
               : p.status === "applied"
-                ? "Applied"
+                ? tx("Applied")
                 : p.status === "failed"
-                  ? "Failed"
+                  ? tx("Failed")
                   : retryable
-                    ? "Ready to retry"
+                    ? tx("Ready to retry")
                     : p.status === "processing"
-                      ? "Checking confirmation"
-                      : "Needs approval"}
+                      ? tx("Checking confirmation")
+                      : tx("Needs approval")}
         </span>
       </div>
       {p.appliedAt && (
@@ -187,22 +198,26 @@ function PolicyCard({
           className="block text-xs text-[var(--ws-muted)]"
           dateTime={new Date(p.appliedAt).toISOString()}
         >
-          {new Date(p.appliedAt).toLocaleString()}
+          {new Date(p.appliedAt).toLocaleString(workspaceLocale())}
         </time>
       )}
       <p className="text-sm">
         {p.intent.kind === "grant" && p.intent.amount && token
           ? `${formatMoney(p.intent.amount, token.symbol, true)} ${token.symbol}`
-          : (token?.symbol ?? `Currency contract: ${p.intent.tokenAddress}`)}
+          : (token?.symbol ??
+            tx("Currency contract: {{value1}}", {
+              value1: p.intent.tokenAddress,
+            }))}
         {p.intent.kind === "grant" &&
-          ` · ${ALLOWANCE_PERIODS.find((period) => period.minutes === p.intent.resetMinutes)?.label ?? "Custom interval"}`}
+          ` · ${tx(ALLOWANCE_PERIODS.find((period) => period.minutes === p.intent.resetMinutes)?.label ?? "Custom interval")}`}
       </p>
       {p.intent.kind === "grant" &&
         !p.cancellationId &&
         p.status !== "applied" && (
           <p className="text-xs text-[var(--ws-muted)]">
-            Spending already used in the current interval is retained. This
-            allowance permits transfers to any address.
+            {tx(
+              "Spending already used in the current interval is retained. This allowance permits transfers to any address.",
+            )}
           </p>
         )}
       {!p.intent.moduleEnabled &&
@@ -210,19 +225,32 @@ function PolicyCard({
         !p.cancellationId &&
         p.status !== "applied" && (
           <p className="text-sm text-amber-500">
-            This also activates delegated spending for this account.
+            {tx("This also activates delegated spending for this account.")}
           </p>
         )}
       {!p.cancellationId && (
         <p className="text-xs text-[var(--ws-muted)]">
           {p.executionFee
-            ? `Execution fee: ${formatMoney(p.executionFee.amount, p.executionFee.token, true)} ${p.executionFee.token} from this account.`
-            : circle ? 'Review the USDC execution fee after the account approvals are complete.' : "Network fee paid from the signing wallet when the policy is applied."}
+            ? tx("Execution fee: {{value1}} {{value2}} from this account.", {
+                value1: formatMoney(
+                  p.executionFee.amount,
+                  p.executionFee.token,
+                  true,
+                ),
+                value2: p.executionFee.token,
+              })
+            : circle
+              ? tx(
+                  "Review the USDC execution fee after the account approvals are complete.",
+                )
+              : tx(
+                  "Network fee paid from the signing wallet when the policy is applied.",
+                )}
         </p>
       )}
       {p.error && (
         <p role="alert" className="text-sm text-red-400">
-          {p.error}
+          {tx(p.error)}
         </p>
       )}
       {!p.cancellationId && (
@@ -239,7 +267,9 @@ function PolicyCard({
           txHash={p.execution?.txHash}
           canApprove={canApprove}
           memberName={memberName}
-          reviewText="I reviewed this member’s spending authority and the execution fee. The policy changes only after it is applied."
+          reviewText={tx(
+            "I reviewed this member’s spending authority and the execution fee. The policy changes only after it is applied.",
+          )}
           load={() => getApprovals(identity)}
           approve={(args) => approve({ ...identity, ...args })}
           execute={() => execute(identity)}
@@ -268,7 +298,7 @@ function PolicyCard({
             (p.txHash ?? p.execution?.txHash)!,
           )}
         >
-          View transaction receipt
+          {tx("View transaction receipt")}
         </a>
       )}
     </article>

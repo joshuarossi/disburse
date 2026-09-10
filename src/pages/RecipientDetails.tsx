@@ -1,4 +1,6 @@
-import { userErrorMessage } from '@/lib/userErrors';
+import { LanguageSwitcher } from "@/components/ui/LanguageSwitcher";
+import { tx, useWorkspaceLanguage } from "@/lib/workspaceI18n";
+import { userErrorMessage } from "@/lib/userErrors";
 import { useState, type FormEvent } from "react";
 import { useLocation } from "react-router-dom";
 import { useMutation, useQuery } from "convex/react";
@@ -10,6 +12,7 @@ import { assertValidAddress } from "../../shared/validation";
 import { formatDate } from "@/lib/formatMoney";
 
 function DetailsForm({ token }: { token: string }) {
+  useWorkspaceLanguage();
   const validToken = /^[a-f0-9]{64}$/.test(token);
   const request = useQuery(
     api.recipientCollections.publicRequest,
@@ -27,13 +30,13 @@ function DetailsForm({ token }: { token: string }) {
   if (validToken && request === undefined)
     return (
       <section className="workspace-panel p-6 space-y-4">
-        <h1 className="text-2xl font-semibold">Payment details</h1>
-        <p role="status">Loading your request…</p>
+        <h1 className="text-2xl font-semibold">{tx("Payment details")}</h1>
+        <p role="status">{tx("Loading your request…")}</p>
         <button
           className="workspace-button"
           onClick={() => window.location.reload()}
         >
-          Reload request
+          {tx("Reload request")}
         </button>
       </section>
     );
@@ -42,11 +45,13 @@ function DetailsForm({ token }: { token: string }) {
       <section className="workspace-panel p-6 space-y-4">
         <h1 className="text-2xl font-semibold">
           {request?.state === "expired"
-            ? "This link has expired"
-            : "This link is unavailable"}
+            ? tx("This link has expired")
+            : tx("This link is unavailable")}
         </h1>
         <p className="text-slate-400">
-          Ask the business that contacted you for a new payment details link.
+          {tx(
+            "Ask the business that contacted you for a new payment details link.",
+          )}
         </p>
       </section>
     );
@@ -60,21 +65,29 @@ function DetailsForm({ token }: { token: string }) {
         />
         <h1 className="text-2xl font-semibold">
           {request.state === "approved"
-            ? "Payment details approved"
+            ? tx("Payment details approved")
             : ["rejected", "withdrawn"].includes(request.state)
-              ? "Contact your finance team"
-              : "Your details have been received"}
+              ? tx("Contact your finance team")
+              : tx("Your details have been received")}
         </h1>
         <p className="text-slate-400">
           {request.state === "approved"
-            ? `${request.issuer} has reviewed your payment instructions.`
+            ? tx("{{value1}} has reviewed your payment instructions.", {
+                value1: request.issuer,
+              })
             : ["rejected", "withdrawn"].includes(request.state)
-              ? `${request.issuer} needs to follow up on these instructions. Contact them through your usual channel before submitting another request.`
-              : `${request.issuer} will verify your details before using them for payment. They may contact you through a channel you already use.`}
+              ? tx(
+                  "{{value1}} needs to follow up on these instructions. Contact them through your usual channel before submitting another request.",
+                  { value1: request.issuer },
+                )
+              : tx(
+                  "{{value1}} will verify your details before using them for payment. They may contact you through a channel you already use.",
+                  { value1: request.issuer },
+                )}
         </p>
         <p className="text-sm">
-          You can close this page. To change submitted details, ask{" "}
-          {request.issuer} for a new link.
+          {tx("You can close this page. To change submitted details, ask")}{" "}
+          {request.issuer} {tx("for a new link.")}
         </p>
       </section>
     );
@@ -114,7 +127,10 @@ function DetailsForm({ token }: { token: string }) {
       setReceived(true);
     } catch (e) {
       setError(
-        userErrorMessage(e, "Your details could not be submitted. Try again using this link."),
+        userErrorMessage(
+          e,
+          "Your details could not be submitted. Try again using this link.",
+        ),
       );
     } finally {
       setBusy(false);
@@ -123,38 +139,41 @@ function DetailsForm({ token }: { token: string }) {
   return (
     <>
       <header className="space-y-2">
-        <p className="workspace-eyebrow">Request from {request.issuer}</p>
+        <p className="workspace-eyebrow">
+          {tx("Request from")} {request.issuer}
+        </p>
         <h1 className="text-3xl font-semibold">
           {reviewing
-            ? "Confirm your payment details"
-            : "Where should we pay you?"}
+            ? tx("Confirm your payment details")
+            : tx("Where should we pay you?")}
         </h1>
         <p className="text-slate-400">
-          For {request.recipientName} · Expires {formatDate(request.expiresAt)}
+          {tx("For")} {request.recipientName} {tx("· Expires")}{" "}
+          {formatDate(request.expiresAt)}
         </p>
       </header>
       {test && (
         <Notice tone="info">
-          Test request · use an address for test funds only.
+          {tx("Test request · use an address for test funds only.")}
         </Notice>
       )}
       <section className="workspace-panel p-6 sm:p-8 space-y-6">
-        {error && <Notice>{error}</Notice>}
+        {error && <Notice>{tx(error)}</Notice>}
         {reviewing ? (
           <form onSubmit={send} className="space-y-6">
             <dl className="grid grid-cols-2 gap-4">
               <div className="col-span-2">
-                <dt className="finance-label">Receiving address</dt>
+                <dt className="finance-label">{tx("Receiving address")}</dt>
                 <dd className="break-all font-mono leading-7">
                   {address.trim()}
                 </dd>
               </div>
               <div>
-                <dt className="finance-label">Currency</dt>
+                <dt className="finance-label">{tx("Currency")}</dt>
                 <dd className="font-semibold">{currency}</dd>
               </div>
               <div>
-                <dt className="finance-label">Network</dt>
+                <dt className="finance-label">{tx("Network")}</dt>
                 <dd className="font-semibold">{network?.name}</dd>
               </div>
             </dl>
@@ -166,12 +185,13 @@ function DetailsForm({ token }: { token: string }) {
                 disabled={busy}
                 onChange={(e) => setConfirmed(e.target.checked)}
               />
-              I confirm this payment account is for {request.recipientName} and
-              can receive {currency} on {network?.name}.
+              {tx("I confirm this payment account is for")}{" "}
+              {request.recipientName} {tx("and can receive")} {currency}{" "}
+              {tx("on")} {network?.name}.
             </label>
             <p className="text-sm text-slate-400">
-              {request.issuer} will review these instructions before making
-              payments.
+              {request.issuer}{" "}
+              {tx("will review these instructions before making payments.")}
             </p>
             <div className="flex flex-wrap justify-between gap-3">
               <button
@@ -180,25 +200,26 @@ function DetailsForm({ token }: { token: string }) {
                 disabled={busy}
                 onClick={() => setReviewing(false)}
               >
-                Edit details
+                {tx("Edit details")}
               </button>
               <button
                 className="workspace-button workspace-button-primary"
                 disabled={busy || !confirmed}
               >
-                {busy ? "Sending details…" : "Send details"}
+                {busy ? tx("Sending details…") : tx("Send details")}
               </button>
             </div>
           </form>
         ) : (
           <form onSubmit={review} className="space-y-5">
             <p className="text-sm text-slate-400">
-              Choose the account where you want to receive payments. Use the
-              receiving address from your wallet or payment provider.
+              {tx(
+                "Choose the account where you want to receive payments. Use the receiving address from your wallet or payment provider.",
+              )}
             </p>
             <div className="grid gap-4 sm:grid-cols-2">
               <label>
-                <span className="finance-label">Payment network</span>
+                <span className="finance-label">{tx("Payment network")}</span>
                 <select
                   required
                   className="finance-field"
@@ -208,7 +229,7 @@ function DetailsForm({ token }: { token: string }) {
                     setCurrency("");
                   }}
                 >
-                  <option value="">Choose network</option>
+                  <option value="">{tx("Choose network")}</option>
                   {request.options.map((n) => (
                     <option key={n.chainId} value={n.chainId}>
                       {n.name}
@@ -217,7 +238,7 @@ function DetailsForm({ token }: { token: string }) {
                 </select>
               </label>
               <label>
-                <span className="finance-label">Payment currency</span>
+                <span className="finance-label">{tx("Payment currency")}</span>
                 <select
                   required
                   className="finance-field"
@@ -225,7 +246,7 @@ function DetailsForm({ token }: { token: string }) {
                   disabled={!network}
                   onChange={(e) => setCurrency(e.target.value)}
                 >
-                  <option value="">Choose currency</option>
+                  <option value="">{tx("Choose currency")}</option>
                   {network?.tokens.map((t) => (
                     <option key={t.symbol}>{t.symbol}</option>
                   ))}
@@ -233,7 +254,7 @@ function DetailsForm({ token }: { token: string }) {
               </label>
             </div>
             <label className="block">
-              <span className="finance-label">Receiving address</span>
+              <span className="finance-label">{tx("Receiving address")}</span>
               <input
                 className="finance-field font-mono text-sm"
                 autoComplete="off"
@@ -241,50 +262,61 @@ function DetailsForm({ token }: { token: string }) {
                 spellCheck={false}
                 required
                 maxLength={42}
-                placeholder="0x…"
+                placeholder={tx("0x…")}
                 value={address}
                 onChange={(e) => setAddress(e.target.value)}
               />
             </label>
             <p className="text-sm text-slate-400">
-              The network must match the one shown by your wallet or provider.
-              If your preferred option is missing, contact {request.issuer}.
+              {tx(
+                "The network must match the one shown by your wallet or provider. If your preferred option is missing, contact",
+              )}{" "}
+              {request.issuer}.
             </p>
             {asset && (
               <details className="text-xs text-slate-400">
-                <summary className="cursor-pointer">Currency details</summary>
+                <summary className="cursor-pointer">
+                  {tx("Currency details")}
+                </summary>
                 <p className="mt-2">
-                  {currency} contract on {network?.name}
+                  {currency} {tx("contract on")} {network?.name}
                 </p>
                 <p className="mt-1 break-all font-mono">{asset.address}</p>
               </details>
             )}
             <button className="workspace-button workspace-button-primary w-full sm:w-auto">
-              Review payment details
+              {tx("Review payment details")}
             </button>
           </form>
         )}
       </section>
       <p className="text-xs text-slate-400">
-        This form collects payment instructions. It does not connect to your
-        wallet, request a password, or move funds.
+        {tx(
+          "This form collects payment instructions. It does not connect to your wallet, request a password, or move funds.",
+        )}
       </p>
     </>
   );
 }
 
 export default function RecipientDetails() {
+  useWorkspaceLanguage();
   const { hash } = useLocation();
   const { theme, toggleTheme } = useTheme();
   const token = hash.slice(1);
   return (
     <div className="workspace">
       <div className="mx-auto max-w-2xl px-5 py-7 sm:py-12">
-        <header className="mb-10 flex items-center justify-between">
-          <span className="text-lg font-semibold">Disburse</span>
+        <header className="gap-3 flex-wrap mb-10 flex items-center justify-between">
+          <span className="text-lg font-semibold">{tx("Disburse")}</span>
+          <LanguageSwitcher inline />
           <button
             className="workspace-button"
-            aria-label={`Switch to ${theme === "light" ? "dark" : "light"} theme`}
+            aria-label={
+              theme === "light"
+                ? tx("Switch to dark theme")
+                : tx("Switch to light theme")
+            }
             onClick={toggleTheme}
           >
             {theme === "light" ? <Moon size={18} /> : <Sun size={18} />}

@@ -1,3 +1,4 @@
+import { tx, useWorkspaceLanguage } from "@/lib/workspaceI18n";
 import { useActivityEnvironment } from "@/features/workspace/ActivityEnvironment";
 import { chainEnvironment } from "../../shared/assets";
 import { useState } from "react";
@@ -31,6 +32,7 @@ import { Conversions } from "@/features/treasury/Conversions";
 import { Earn } from "@/features/treasury/Earn";
 
 export default function Treasury() {
+  useWorkspaceLanguage();
   const { environment } = useActivityEnvironment();
   const { orgId } = useParams();
   const sessionToken = useSessionToken();
@@ -62,8 +64,8 @@ export default function Treasury() {
   return (
     <>
       <PageHeader
-        title="Accounts"
-        description="Manage the accounts that fund your team's payments."
+        title={tx("Accounts")}
+        description={tx("Manage the accounts that fund your team's payments.")}
         actions={
           <>
             <button
@@ -79,14 +81,14 @@ export default function Treasury() {
                 size={14}
                 className={refreshing ? "animate-spin" : ""}
               />
-              Refresh balances
+              {tx("Refresh balances")}
             </button>
             <Link
               className="workspace-button workspace-button-primary"
               to={`/org/${orgId}/settings?tab=safe`}
             >
               <Wallet size={14} />
-              Manage accounts
+              {tx("Manage accounts")}
             </Link>
           </>
         }
@@ -97,14 +99,16 @@ export default function Treasury() {
         <section className="workspace-panel">
           <EmptyState
             icon={Wallet}
-            title="Connect your first funding account"
-            description="Link an existing Safe or create one in Settings. Your team keeps control of its funds and signing permissions."
+            title={tx("Connect your first funding account")}
+            description={tx(
+              "Link an existing Safe or create one in Settings. Your team keeps control of its funds and signing permissions.",
+            )}
             action={
               <Link
                 className="workspace-button workspace-button-primary"
                 to={`/org/${orgId}/settings?tab=safe`}
               >
-                Set up an account
+                {tx("Set up an account")}
                 <ArrowUpRight size={14} />
               </Link>
             }
@@ -131,84 +135,108 @@ export default function Treasury() {
                   }}
                 >
                   <ArrowDownLeft size={14} />
-                  Add funds
+                  {tx("Add funds")}
                 </button>
                 <Link
                   className="workspace-button"
                   to={`/org/${orgId}/disbursements?new=1&chain=${safe.chainId}&account=${safe._id}`}
                 >
                   <ArrowUpRight size={14} />
-                  Make a payment
+                  {tx("Make a payment")}
                 </Link>
               </div>
               <details className="mt-5 text-xs text-slate-400">
-                <summary className="cursor-pointer">Account details</summary>
+                <summary className="cursor-pointer">
+                  {tx("Account details")}
+                </summary>
                 <p className="mt-3 break-all font-mono">{safe.safeAddress}</p>
                 <a
                   href={getSafeAppUrl(safe.chainId, safe.safeAddress)}
                   target="_blank"
                   rel="noreferrer"
                   className="workspace-action-link mt-2"
-                  aria-label={`Open ${safe.name ?? getChainName(safe.chainId)} account in Safe`}
+                  aria-label={tx("Open {{value1}} account in Safe", {
+                    value1: safe.name ?? getChainName(safe.chainId),
+                  })}
                 >
-                  Open in Safe <ExternalLink size={13} />
+                  {tx("Open in Safe")} <ExternalLink size={13} />
                 </a>
               </details>
             </AccountFundingCheck>
           ))}
         </div>
       )}
-      {orgId && allSafes && <AccountTransfers orgId={orgId as Id<"orgs">} accounts={allSafes} />}
-      {orgId && allSafes && <Conversions key={`conversions-${environment}`} orgId={orgId as Id<"orgs">} accounts={allSafes} />}
-      {orgId && allSafes && <Earn key={environment} orgId={orgId as Id<"orgs">} accounts={allSafes} />}
+      {orgId && allSafes && (
+        <AccountTransfers orgId={orgId as Id<"orgs">} accounts={allSafes} />
+      )}
+      {orgId && allSafes && (
+        <Conversions
+          key={`conversions-${environment}`}
+          orgId={orgId as Id<"orgs">}
+          accounts={allSafes}
+        />
+      )}
+      {orgId && allSafes && (
+        <Earn
+          key={environment}
+          orgId={orgId as Id<"orgs">}
+          accounts={allSafes}
+        />
+      )}
       <section className="workspace-panel mt-6">
         <div className="workspace-panel-heading">
           <div>
-            <h2>Account controls</h2>
-            <p>Assign responsibility and review how your team can spend.</p>
+            <h2>{tx("Account controls")}</h2>
+            <p>
+              {tx("Assign responsibility and review how your team can spend.")}
+            </p>
           </div>
         </div>
         <div className="grid gap-6 p-6 md:grid-cols-2">
           <div>
             <h3 className="text-sm font-semibold">
-              Team approvals and spending limits
+              {tx("Team approvals and spending limits")}
             </h3>
             <p className="workspace-description">
-              Manage application budgets and contract-enforced delegation
-              separately. Review owner authority before assigning a delegate.
+              {tx(
+                "Manage application budgets and contract-enforced delegation separately. Review owner authority before assigning a delegate.",
+              )}
             </p>
             <Link
               className="workspace-action-link mt-4"
               to={`/org/${orgId}/team`}
             >
-              Manage team controls
+              {tx("Manage team controls")}
               <ArrowRightIcon />
             </Link>
           </div>
           <div>
-            <h3 className="text-sm font-semibold">Payment fees</h3>
+            <h3 className="text-sm font-semibold">{tx("Payment fees")}</h3>
             <p className="workspace-description">
-              Choose the fee currency and execution settings for your funding
-              accounts. Availability depends on your network and payment
-              provider.
+              {tx(
+                "Choose the fee currency and execution settings for your funding accounts. Availability depends on your network and payment provider.",
+              )}
             </p>
             <Link
               className="workspace-action-link mt-4"
               to={`/org/${orgId}/settings?tab=fees`}
             >
-              Review payment settings
+              {tx("Review payment settings")}
               <ArrowRightIcon />
             </Link>
           </div>
         </div>
       </section>
       {funding && (
-        <Dialog title="Add funds" onClose={() => setFunding(null)}>
+        <Dialog title={tx("Add funds")} onClose={() => setFunding(null)}>
           <div className="space-y-5 p-6">
             <p className="workspace-description">
-              Send a supported currency to{" "}
-              {funding.name ?? `${getChainName(funding.chainId)} account`}. Use
-              this network when withdrawing from your provider.
+              {tx("Send a supported currency to")}{" "}
+              {funding.name ??
+                tx("{{value1}} account", {
+                  value1: getChainName(funding.chainId),
+                })}
+              {tx(". Use this network when withdrawing from your provider.")}
             </p>
             <div className="flex flex-col items-center gap-5 rounded-lg border border-white/10 p-5">
               <div className="rounded-lg bg-white p-3">
@@ -219,7 +247,7 @@ export default function Treasury() {
               </span>
             </div>
             <label className="block">
-              <span className="finance-label">Account address</span>
+              <span className="finance-label">{tx("Account address")}</span>
               <input
                 className="finance-field font-mono"
                 readOnly
@@ -228,16 +256,16 @@ export default function Treasury() {
               />
             </label>
             <p className="text-xs text-slate-400">
-              Supported currencies:{" "}
+              {tx("Supported currencies:")}{" "}
               {Object.keys(getTokensForChain(funding.chainId)).join(", ")}
             </p>
-            {error && <Notice>{error}</Notice>}
+            {error && <Notice>{tx(error)}</Notice>}
             <button
               className="workspace-button workspace-button-primary w-full"
               onClick={() => void copy()}
             >
               {copied ? <Check size={15} /> : <Copy size={15} />}
-              {copied ? "Address copied" : "Copy funding address"}
+              {copied ? tx("Address copied") : tx("Copy funding address")}
             </button>
           </div>
         </Dialog>
@@ -246,5 +274,6 @@ export default function Treasury() {
   );
 }
 function ArrowRightIcon() {
+  useWorkspaceLanguage();
   return <ArrowUpRight size={13} />;
 }

@@ -1,4 +1,5 @@
-import { userErrorMessage } from '@/lib/userErrors';
+import { tx, useWorkspaceLanguage, workspaceLocale } from "@/lib/workspaceI18n";
+import { userErrorMessage } from "@/lib/userErrors";
 import { useEffect, useRef, useState } from "react";
 import { FileText, Upload, Download } from "lucide-react";
 import { useQuery } from "convex/react";
@@ -35,6 +36,7 @@ export function InvoiceSource({
   onReading: (reading: boolean) => void;
   disabled: boolean;
 }) {
+  useWorkspaceLanguage();
   const sequence = useRef(0);
   const [reading, setReading] = useState(false);
   const [error, setError] = useState("");
@@ -56,25 +58,26 @@ export function InvoiceSource({
   );
   return (
     <section
-      aria-label="Source document"
+      aria-label={tx("Source document")}
       className="space-y-4 rounded-xl border border-white/10 p-4"
     >
       <div>
         <h3 className="flex items-center gap-2 font-semibold">
           <FileText size={16} />
-          Source document
+          {tx("Source document")}
         </h3>
         <p className="mt-1 text-xs leading-5 text-slate-400">
-          Attach the invoice and review suggested details. PDF, image or text
-          file · up to 10 MB.
+          {tx(
+            "Attach the invoice and review suggested details. PDF, image or text file · up to 10 MB.",
+          )}
         </p>
       </div>
-      {error && <Notice>{error}</Notice>}
+      {error && <Notice>{tx(error)}</Notice>}
       <label className="block">
         <span className="finance-label">
           {source
-            ? "Replace the selected document"
-            : "Choose an invoice file (optional)"}
+            ? tx("Replace the selected document")
+            : tx("Choose an invoice file (optional)")}
         </span>
         <input
           ref={input}
@@ -126,7 +129,7 @@ export function InvoiceSource({
             <p className="min-w-0 break-all font-medium">
               {source.file.name}
               <span className="ml-2 text-xs font-normal text-slate-400">
-                {(source.file.size / 1024).toFixed(0)} KB
+                {(source.file.size / 1024).toFixed(0)} {tx("KB")}
               </span>
             </p>
             <button
@@ -141,12 +144,12 @@ export function InvoiceSource({
                 if (input.current) input.current.value = "";
               }}
             >
-              Remove selection
+              {tx("Remove selection")}
             </button>
           </div>
           {reading && (
             <p role="status" className="text-sm text-slate-400">
-              Reading the document on this device…
+              {tx("Reading the document on this device…")}
             </p>
           )}
           {source.error && <Notice tone="info">{source.error}</Notice>}
@@ -163,25 +166,25 @@ export function InvoiceSource({
               {source.document.preview ? (
                 <details>
                   <summary className="cursor-pointer text-sm font-medium">
-                    View source · page 1 of {source.document.pages}
+                    {tx("View source · page 1 of")} {source.document.pages}
                   </summary>
                   <img
                     src={source.document.preview}
-                    alt="First page of the source invoice"
+                    alt={tx("First page of the source invoice")}
                     className="mt-3 max-h-[480px] w-full rounded-md bg-white object-contain"
                   />
                 </details>
               ) : source.file.type.startsWith("image/") && localUrl ? (
                 <img
                   src={localUrl}
-                  alt="Source invoice"
+                  alt={tx("Source invoice")}
                   className="max-h-72 w-full rounded-md object-contain"
                 />
               ) : null}
               {source.document.text && (
                 <details>
                   <summary className="cursor-pointer text-sm font-medium">
-                    Read extracted text
+                    {tx("Read extracted text")}
                   </summary>
                   <pre className="mt-3 max-h-52 overflow-auto whitespace-pre-wrap break-words rounded-lg border border-white/10 p-3 text-xs leading-5">
                     {source.document.text}
@@ -194,7 +197,7 @@ export function InvoiceSource({
                 source.document.suggestions.token) && (
                 <div className="space-y-3 rounded-lg border border-white/10 p-3">
                   <h4 className="text-sm font-medium">
-                    Suggested bill details
+                    {tx("Suggested bill details")}
                   </h4>
                   <dl className="grid gap-3 text-xs sm:grid-cols-2">
                     {(
@@ -210,8 +213,8 @@ export function InvoiceSource({
                     ).map(
                       ([label, value]) =>
                         value && (
-                          <div key={label}>
-                            <dt className="text-slate-400">{label}</dt>
+                          <div key={tx(label)}>
+                            <dt className="text-slate-400">{tx(label)}</dt>
                             <dd className="mt-1 break-all font-medium">
                               {value}
                             </dd>
@@ -226,11 +229,12 @@ export function InvoiceSource({
                     onClick={() => onApply(source.document!.suggestions)}
                   >
                     <Upload size={13} />
-                    Use suggested fields
+                    {tx("Use suggested fields")}
                   </button>
                   <p className="text-xs leading-5 text-slate-400">
-                    This replaces the matching fields below. Choose the saved
-                    recipient and review the complete bill before saving.
+                    {tx(
+                      "This replaces the matching fields below. Choose the saved recipient and review the complete bill before saving.",
+                    )}
                   </p>
                 </div>
               )}
@@ -243,7 +247,7 @@ export function InvoiceSource({
               download={source.file.name}
             >
               <Download size={13} />
-              Download original source
+              {tx("Download original source")}
             </a>
           )}
         </>
@@ -257,6 +261,7 @@ export function InvoiceAttachments({
 }: {
   invoiceId: Id<"invoices">;
 }) {
+  useWorkspaceLanguage();
   const sessionToken = useSessionToken();
   const files = useQuery(
     api.invoiceFiles.list,
@@ -266,15 +271,17 @@ export function InvoiceAttachments({
   const [busy, setBusy] = useState<string | null>(null);
   return (
     <section
-      aria-label="Saved source documents"
+      aria-label={tx("Saved source documents")}
       className="space-y-3 border-t border-white/10 pt-4"
     >
-      <h3 className="font-semibold">Source documents</h3>
-      {error && <Notice>{error}</Notice>}
+      <h3 className="font-semibold">{tx("Source documents")}</h3>
+      {error && <Notice>{tx(error)}</Notice>}
       {!files ? (
         <LoadingRows />
       ) : !files.length ? (
-        <p className="text-sm text-slate-400">No source document attached.</p>
+        <p className="text-sm text-slate-400">
+          {tx("No source document attached.")}
+        </p>
       ) : (
         <ul className="space-y-3">
           {files.map((file) => (
@@ -285,8 +292,10 @@ export function InvoiceAttachments({
               <div className="min-w-0">
                 <p className="break-all text-sm font-medium">{file.name}</p>
                 <p className="text-xs text-slate-400">
-                  {(file.size / 1024).toFixed(0)} KB ·{" "}
-                  {new Date(file.createdAt).toLocaleDateString()}
+                  {(file.size / 1024).toFixed(0)} {tx("KB ·")}{" "}
+                  {new Date(file.createdAt).toLocaleDateString(
+                    workspaceLocale(),
+                  )}
                 </p>
               </div>
               <button
@@ -301,7 +310,10 @@ export function InvoiceAttachments({
                     await downloadInvoiceFile(file.id, file.name, sessionToken);
                   } catch (e) {
                     setError(
-                      userErrorMessage(e, "The document could not be downloaded."),
+                      userErrorMessage(
+                        e,
+                        "The document could not be downloaded.",
+                      ),
                     );
                   } finally {
                     setBusy(null);
@@ -309,7 +321,7 @@ export function InvoiceAttachments({
                 }}
               >
                 <Download size={13} />
-                {busy === file.id ? "Downloading…" : "Download source"}
+                {busy === file.id ? tx("Downloading…") : tx("Download source")}
               </button>
             </li>
           ))}

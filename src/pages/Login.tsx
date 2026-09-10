@@ -1,19 +1,20 @@
-import { useCallback, useEffect, useState, useRef } from 'react';
-import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { ConnectButton } from '@rainbow-me/rainbowkit';
-import { useAccount, useSignMessage } from 'wagmi';
-import { useTranslation } from 'react-i18next';
-import { useMutation, useQuery } from 'convex/react';
-import { api } from '../../convex/_generated/api';
-import { Button } from '@/components/ui/button';
-import { ArrowLeft } from 'lucide-react';
-import { Notice } from '@/components/workspace/WorkspacePrimitives';
-import { walletDeclined } from '@/lib/walletErrors';
+import { LanguageSwitcher } from "@/components/ui/LanguageSwitcher";
+import { useCallback, useEffect, useState, useRef } from "react";
+import { Link, useLocation, useNavigate } from "react-router-dom";
+import { ConnectButton } from "@rainbow-me/rainbowkit";
+import { useAccount, useSignMessage } from "wagmi";
+import { useTranslation } from "react-i18next";
+import { useMutation, useQuery } from "convex/react";
+import { api } from "../../convex/_generated/api";
+import { Button } from "@/components/ui/button";
+import { ArrowLeft } from "lucide-react";
+import { Notice } from "@/components/workspace/WorkspacePrimitives";
+import { walletDeclined } from "@/lib/walletErrors";
 import {
   useSessionToken,
   saveSessionToken,
   clearSessionToken,
-} from '@/lib/session';
+} from "@/lib/session";
 
 export default function Login() {
   const { t } = useTranslation();
@@ -30,18 +31,18 @@ export default function Login() {
   const location = useLocation();
   const requestedPath = location.state?.returnTo;
   const returnTo =
-    typeof requestedPath === 'string' &&
-    requestedPath.startsWith('/') &&
-    !requestedPath.startsWith('//')
+    typeof requestedPath === "string" &&
+    requestedPath.startsWith("/") &&
+    !requestedPath.startsWith("//")
       ? requestedPath
-      : '/select-org';
+      : "/select-org";
 
   const generateNonce = useMutation(api.auth.generateNonce);
   const verifySignature = useMutation(api.auth.verifySignature);
   const existingToken = useSessionToken();
   const session = useQuery(
     api.auth.validateSession,
-    existingToken ? { token: existingToken } : 'skip',
+    existingToken ? { token: existingToken } : "skip",
   );
 
   // If already authenticated with a valid token, redirect to select-org
@@ -86,16 +87,11 @@ export default function Login() {
       navigate(returnTo, { replace: true });
     } catch (error) {
       const cancelled = walletDeclined(error);
-      if (!cancelled) console.error('Sign in failed:', error);
+      if (!cancelled) console.error("Sign in failed:", error);
       clearSessionToken();
       setSignInCancelled(cancelled);
       setSignInError(
-        cancelled ? t('auth.login.signInCancelled', {
-          defaultValue: 'Sign-in cancelled. Select Try again when you are ready.',
-        }) : t('auth.login.signInFailed', {
-          defaultValue:
-            'Sign-in was not completed. Try again when you are ready.',
-        }),
+        cancelled ? "auth.login.signInCancelled" : "auth.login.signInFailed",
       );
     } finally {
       signingRef.current = false;
@@ -108,7 +104,6 @@ export default function Login() {
     generateNonce,
     signMessageAsync,
     verifySignature,
-    t,
   ]);
 
   // Reset the sign-in attempt flag when wallet disconnects
@@ -147,9 +142,12 @@ export default function Login() {
           className="mb-8 inline-flex items-center gap-2 text-sm text-slate-400 transition-colors hover:text-white"
         >
           <ArrowLeft className="h-4 w-4" />
-          {t('auth.login.backToHome')}
+          {t("auth.login.backToHome")}
         </Link>
 
+        <div className="mb-6 flex justify-end">
+          <LanguageSwitcher inline />
+        </div>
         {/* Card */}
         <div className="rounded-2xl border border-white/10 bg-navy-900/50 p-8">
           {/* Logo */}
@@ -172,10 +170,10 @@ export default function Login() {
           </div>
 
           <h1 className="mb-2 text-center text-2xl font-bold text-white">
-            {t('auth.login.title')}
+            {t("auth.login.title")}
           </h1>
           <p className="mb-8 text-center text-slate-400">
-            {t('auth.login.subtitle')}
+            {t("auth.login.subtitle")}
           </p>
 
           {/* RainbowKit Connect Button */}
@@ -195,11 +193,11 @@ export default function Login() {
                 return (
                   <div
                     {...(!ready && {
-                      'aria-hidden': true,
+                      "aria-hidden": true,
                       style: {
                         opacity: 0,
-                        pointerEvents: 'none',
-                        userSelect: 'none',
+                        pointerEvents: "none",
+                        userSelect: "none",
                       },
                     })}
                   >
@@ -211,7 +209,7 @@ export default function Login() {
                             size="lg"
                             className="w-full"
                           >
-                            {t('auth.login.connectWallet')}
+                            {t("auth.login.connectWallet")}
                           </Button>
                         );
                       }
@@ -223,7 +221,7 @@ export default function Login() {
                             variant="secondary"
                             size="lg"
                           >
-                            {t('auth.login.wrongNetwork')}
+                            {t("auth.login.wrongNetwork")}
                           </Button>
                         );
                       }
@@ -238,7 +236,7 @@ export default function Login() {
                             {account.displayName}
                           </Button>
                           <p className="text-center text-sm text-slate-400">
-                            {isSigningIn ? t('auth.login.signingIn') : null}
+                            {isSigningIn ? t("auth.login.signingIn") : null}
                           </p>
                         </div>
                       );
@@ -251,32 +249,36 @@ export default function Login() {
 
           {signInError && (
             <div className="mt-4 text-center">
-              <Notice tone={signInCancelled ? 'info' : 'error'}>
-                {signInError}
+              <Notice tone={signInCancelled ? "info" : "error"}>
+                {t(signInError)}
               </Notice>
-              <Button className="mt-3" onClick={handleSignIn} disabled={isSigningIn}>
-                {t('common.retry', { defaultValue: 'Try again' })}
+              <Button
+                className="mt-3"
+                onClick={handleSignIn}
+                disabled={isSigningIn}
+              >
+                {t("common.retry", { defaultValue: "Try again" })}
               </Button>
             </div>
           )}
 
           <p className="mt-6 text-center text-xs text-slate-500">
-            {t('auth.login.terms')}{' '}
+            {t("auth.login.terms")}{" "}
             <Link to="/terms" className="text-accent-400 hover:underline">
-              {t('auth.login.termsOfService')}
-            </Link>{' '}
-            {t('auth.login.and')}{' '}
+              {t("auth.login.termsOfService")}
+            </Link>{" "}
+            {t("auth.login.and")}{" "}
             <Link to="/privacy" className="text-accent-400 hover:underline">
-              {t('auth.login.privacyPolicy')}
+              {t("auth.login.privacyPolicy")}
             </Link>
           </p>
         </div>
 
         {/* Info */}
         <p className="mt-8 text-center text-sm text-slate-500">
-          {t('auth.login.newToWeb3')}{' '}
+          {t("auth.login.newToWeb3")}{" "}
           <Link to="/docs" className="text-accent-400 hover:underline">
-            {t('auth.login.learnWallet')}
+            {t("auth.login.learnWallet")}
           </Link>
         </p>
       </div>

@@ -1,3 +1,4 @@
+import { tx, useWorkspaceLanguage } from "@/lib/workspaceI18n";
 import { useRef, useState } from "react";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
@@ -23,6 +24,7 @@ export function ScheduledPayment({
   memberName: (wallet: string) => string;
   onBusyChange: (busy: boolean) => void;
 }) {
+  useWorkspaceLanguage();
   const sessionToken = useSessionToken();
   const identity = { disbursementId: paymentId, sessionToken: sessionToken! };
   const schedule = useQuery(
@@ -64,25 +66,25 @@ export function ScheduledPayment({
   return (
     <section
       className="space-y-4 rounded-xl border border-[var(--ws-border)] p-5"
-      aria-label="Scheduled payment"
+      aria-label={tx("Scheduled payment")}
     >
       <div>
-        <h3 className="font-semibold">Automatic payment</h3>
+        <h3 className="font-semibold">{tx("Automatic payment")}</h3>
         <p className="mt-1 text-sm text-[var(--ws-muted)]">
-          Pay on {scheduleDateTime(payAt)}. Your account pays the service fee in
-          USDC.
+          {tx("Pay on")} {scheduleDateTime(payAt)}
+          {tx(". Your account pays the service fee in USDC.")}
         </p>
       </div>
-      {error && <Notice>{error}</Notice>}
+      {error && <Notice>{tx(error)}</Notice>}
       {schedule === undefined && (
-        <p role="status">Loading the saved schedule…</p>
+        <p role="status">{tx("Loading the saved schedule…")}</p>
       )}
       {schedule === null && (
         <>
           <p className="text-sm text-[var(--ws-muted)]">
-            Approve the recipients, fee limit and pay date now. The payment can
-            run within 24 hours of that date. Keep enough funds in the account;
-            this approval does not reserve a balance.
+            {tx(
+              "Approve the recipients, fee limit and pay date now. The payment can run within 24 hours of that date. Keep enough funds in the account; this approval does not reserve a balance.",
+            )}
           </p>
           {canManage && (
             <button
@@ -90,7 +92,7 @@ export function ScheduledPayment({
               disabled={busy || blocked || !sessionToken}
               onClick={() => void run(() => create(identity))}
             >
-              {busy ? "Preparing…" : "Review scheduled payment"}
+              {busy ? tx("Preparing…") : tx("Review scheduled payment")}
             </button>
           )}
         </>
@@ -99,9 +101,9 @@ export function ScheduledPayment({
         <>
           {schedule.status === "armed" && (
             <Notice tone="info">
-              Scheduled for automatic payment. No further wallet confirmation is
-              needed. We will check the current account approvals, recipient
-              details and balance before sending.
+              {tx(
+                "Scheduled for automatic payment. No further wallet confirmation is needed. We will check the current account approvals, recipient details and balance before sending.",
+              )}
             </Notice>
           )}
           {schedule.status === "paused" &&
@@ -115,13 +117,15 @@ export function ScheduledPayment({
             )}
           {schedule.cancellationRequestedAt && !terminal && (
             <Notice tone="info">
-              Automatic sending is paused. Complete the cancellation below to
-              invalidate the signed payment. Pausing alone does not revoke its
-              authorization.
+              {tx(
+                "Automatic sending is paused. Complete the cancellation below to invalidate the signed payment. Pausing alone does not revoke its authorization.",
+              )}
             </Notice>
           )}
           {schedule.status === "cancelled" && (
-            <Notice tone="info">This scheduled payment is cancelled.</Notice>
+            <Notice tone="info">
+              {tx("This scheduled payment is cancelled.")}
+            </Notice>
           )}
           {schedule.status !== "cancelled" &&
             !schedule.cancellationRequestedAt && (
@@ -155,15 +159,15 @@ export function ScheduledPayment({
                 disabled={busy}
                 onClick={() => setConfirmStop(true)}
               >
-                Cancel scheduled payment
+                {tx("Cancel scheduled payment")}
               </button>
             )}
           {confirmStop && (
             <div className="space-y-3 border-t border-[var(--ws-border)] pt-4">
               <p className="text-sm">
-                Stop this payment? If an execution approval has been signed,
-                account owners must approve a cancellation and pay its network
-                fee. An unsigned payment can be cancelled without a fee.
+                {tx(
+                  "Stop this payment? If an execution approval has been signed, account owners must approve a cancellation and pay its network fee. An unsigned payment can be cancelled without a fee.",
+                )}
               </p>
               <div className="flex flex-wrap gap-2">
                 <button
@@ -171,14 +175,14 @@ export function ScheduledPayment({
                   disabled={busy}
                   onClick={() => setConfirmStop(false)}
                 >
-                  Keep schedule
+                  {tx("Keep schedule")}
                 </button>
                 <button
                   className="workspace-button"
                   disabled={busy}
                   onClick={() => void run(() => stop(identity))}
                 >
-                  Continue cancellation
+                  {tx("Continue cancellation")}
                 </button>
               </div>
             </div>
@@ -189,7 +193,7 @@ export function ScheduledPayment({
               disabled={busy}
               onClick={() => void run(() => reset(identity))}
             >
-              Return payment to draft
+              {tx("Return payment to draft")}
             </button>
           )}
         </>

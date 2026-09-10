@@ -1,3 +1,4 @@
+import { tx, useWorkspaceLanguage } from "@/lib/workspaceI18n";
 import { TREASURY_OPERATOR_ROLES } from "../../../shared/roles";
 import { useRef, useState } from "react";
 import {
@@ -48,6 +49,7 @@ export function AccountTransfers({
   orgId: Id<"orgs">;
   accounts: Doc<"safes">[];
 }) {
+  useWorkspaceLanguage();
   const sessionToken = useSessionToken(),
     { address } = useAccount(),
     { environment } = useActivityEnvironment();
@@ -165,13 +167,15 @@ export function AccountTransfers({
   return (
     <section
       className="workspace-panel mt-6"
-      aria-label="Transfers between accounts"
+      aria-label={tx("Transfers between accounts")}
     >
       <div className="workspace-panel-heading flex flex-wrap gap-4">
         <div>
-          <h2>Transfers between accounts</h2>
+          <h2>{tx("Transfers between accounts")}</h2>
           <p>
-            Move funds between your company's accounts on different networks.
+            {tx(
+              "Move funds between your company's accounts on different networks.",
+            )}
           </p>
         </div>
         {canWrite && (
@@ -186,7 +190,7 @@ export function AccountTransfers({
             }}
           >
             <ArrowRightLeft size={14} />
-            New transfer
+            {tx("New transfer")}
           </button>
         )}
       </div>
@@ -194,8 +198,9 @@ export function AccountTransfers({
         <LoadingRows />
       ) : !transfers.length ? (
         <p className="p-6 text-sm text-[var(--ws-muted)]">
-          No account transfers yet. Your account owners review the receiving
-          account, amount and fees before funds move.
+          {tx(
+            "No account transfers yet. Your account owners review the receiving account, amount and fees before funds move.",
+          )}
         </p>
       ) : (
         <div className="divide-y divide-[var(--ws-border)]">
@@ -235,7 +240,7 @@ export function AccountTransfers({
                       : label}
                   </span>
                   <span className="workspace-status mt-1">
-                    {statuses[transfer.status]}
+                    {tx(statuses[transfer.status])}
                   </span>
                 </span>
               </button>
@@ -251,28 +256,31 @@ export function AccountTransfers({
             onClick={() => loadMore(20)}
           >
             {listStatus === "LoadingMore"
-              ? "Loading transfers…"
-              : "Load older transfers"}
+              ? tx("Loading transfers…")
+              : tx("Load older transfers")}
           </button>
         </div>
       )}
       {show && (
         <Dialog
-          title={selected ? "Account transfer" : "Transfer between accounts"}
+          title={
+            selected ? tx("Account transfer") : tx("Transfer between accounts")
+          }
           onClose={close}
         >
           <div className="space-y-5 p-5 sm:p-6">
-            {error && <Notice>{error}</Notice>}
+            {error && <Notice>{tx(error)}</Notice>}
             {selected ? (
               saved === undefined ? (
                 <LoadingRows />
               ) : !saved ? (
                 <Notice>
-                  This transfer could not be found. Close this window to return
-                  to your accounts.
+                  {tx(
+                    "This transfer could not be found. Close this window to return to your accounts.",
+                  )}
                 </Notice>
               ) : quoteError ? (
-                <Notice>{quoteError}</Notice>
+                <Notice>{tx(quoteError)}</Notice>
               ) : (
                 quote && (
                   <>
@@ -282,46 +290,50 @@ export function AccountTransfers({
                         {accountName(saved.destinationSafeId)}
                       </p>
                       <span className="workspace-status">
-                        {statuses[saved.status]}
+                        {tx(statuses[saved.status])}
                       </span>
                     </div>
                     <dl className="grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
-                      <dt className="text-[var(--ws-muted)]">From</dt>
+                      <dt className="text-[var(--ws-muted)]">{tx("From")}</dt>
                       <dd className="text-right">
                         {getChainName(quote.chainId)}
                       </dd>
-                      <dt className="text-[var(--ws-muted)]">To</dt>
+                      <dt className="text-[var(--ws-muted)]">{tx("To")}</dt>
                       <dd className="text-right">
                         {getChainName(quote.destinationChainId)}
                       </dd>
                       <dt className="text-[var(--ws-muted)]">
-                        Minimum received
+                        {tx("Minimum received")}
                       </dt>
                       <dd className="text-right font-semibold tabular-nums">
                         {units(quote.amount)}
                       </dd>
                       <dt className="text-[var(--ws-muted)]">
-                        Maximum delivery fee
+                        {tx("Maximum delivery fee")}
                       </dt>
                       <dd className="text-right tabular-nums">
                         {units(quote.feeLimit)}
                       </dd>
                       <dt className="text-[var(--ws-muted)]">
-                        Transfer and delivery
+                        {tx("Transfer and delivery")}
                       </dt>
                       <dd className="text-right tabular-nums">
                         {units(quote.total)}
                       </dd>
-                      <dt className="text-[var(--ws-muted)]">Provider</dt>
-                      <dd className="text-right">Circle CCTP</dd>
+                      <dt className="text-[var(--ws-muted)]">
+                        {tx("Provider")}
+                      </dt>
+                      <dd className="text-right">{tx("Circle CCTP")}</dd>
                       {saved.deliveredAmount && (
                         <>
-                          <dt className="text-[var(--ws-muted)]">Received</dt>
+                          <dt className="text-[var(--ws-muted)]">
+                            {tx("Received")}
+                          </dt>
                           <dd className="text-right font-semibold tabular-nums">
                             {units(saved.deliveredAmount)}
                           </dd>
                           <dt className="text-[var(--ws-muted)]">
-                            Delivery fee charged
+                            {tx("Delivery fee charged")}
                           </dt>
                           <dd className="text-right tabular-nums">
                             {units(saved.deliveryFee!)}
@@ -331,14 +343,16 @@ export function AccountTransfers({
                     </dl>
                     <details className="text-xs text-[var(--ws-muted)]">
                       <summary className="cursor-pointer">
-                        Review full account addresses
+                        {tx("Review full account addresses")}
                       </summary>
-                      <p className="mt-3">From {accountName(saved.safeId)}</p>
+                      <p className="mt-3">
+                        {tx("From")} {accountName(saved.safeId)}
+                      </p>
                       <p className="mt-1 break-all font-mono">
                         {quote.account}
                       </p>
                       <p className="mt-3">
-                        To {accountName(saved.destinationSafeId)}
+                        {tx("To")} {accountName(saved.destinationSafeId)}
                       </p>
                       <p className="mt-1 break-all font-mono">
                         {quote.destination}
@@ -346,21 +360,18 @@ export function AccountTransfers({
                     </details>
                     {!saved.deliveredAmount && (
                       <p className="text-sm text-[var(--ws-muted)]">
-                        Circle charges delivery from the transferred USDC and
-                        may use the full delivery fee. The receiving account
-                        gets at least the amount shown. Your sending account
-                        pays execution separately in USDC. Standard delivery
-                        waits for the source network to finalize, which can take
-                        tens of minutes.
+                        {tx(
+                          "Circle charges delivery from the transferred USDC and may use the full delivery fee. The receiving account gets at least the amount shown. Your sending account pays execution separately in USDC. Standard delivery waits for the source network to finalize, which can take tens of minutes.",
+                        )}
                       </p>
                     )}
                     {saved.error && <Notice>{saved.error}</Notice>}
                     {saved.status === "delivering" && (
                       <>
                         <Notice tone="info">
-                          Funds have left the sending account. Delivery to the
-                          receiving account is being checked. You can close this
-                          window; delivery checks continue automatically.
+                          {tx(
+                            "Funds have left the sending account. Delivery to the receiving account is being checked. You can close this window; delivery checks continue automatically.",
+                          )}
                         </Notice>
                         {canWrite && sessionToken && (
                           <DeliveryReceiptCheck
@@ -375,33 +386,37 @@ export function AccountTransfers({
                     )}
                     {saved.status === "processing" && (
                       <Notice tone="info">
-                        The original transfer is being checked. A replacement
-                        could send twice. You can close this window while
-                        confirmation continues.
+                        {tx(
+                          "The original transfer is being checked. A replacement could send twice. You can close this window while confirmation continues.",
+                        )}
                       </Notice>
                     )}
                     {saved.status === "failed" && (
                       <Notice tone="info">
-                        The transfer did not start. Review any execution charge
-                        below before creating another quote.
+                        {tx(
+                          "The transfer did not start. Review any execution charge below before creating another quote.",
+                        )}
                       </Notice>
                     )}
                     {saved.status === "expired" && (
                       <Notice tone="info">
-                        This quote expired without a confirmed transfer. Close
-                        this window to request a fresh quote.
+                        {tx(
+                          "This quote expired without a confirmed transfer. Close this window to request a fresh quote.",
+                        )}
                       </Notice>
                     )}
                     {saved.status === "cancelled" && (
                       <Notice tone="info">
-                        This transfer has been cancelled. Its saved record
-                        remains available for your team.
+                        {tx(
+                          "This transfer has been cancelled. Its saved record remains available for your team.",
+                        )}
                       </Notice>
                     )}
                     {saved.open && !saved.cancellationRequestedAt && (
                       <>
                         <p className="text-xs text-[var(--ws-muted)]">
-                          Quote expires {scheduleDateTime(quote.expiresAt)}.
+                          {tx("Quote expires")}{" "}
+                          {scheduleDateTime(quote.expiresAt)}.
                         </p>
                         <label className="flex items-start gap-3 text-sm">
                           <input
@@ -414,9 +429,9 @@ export function AccountTransfers({
                             }
                           />
                           <span>
-                            I have reviewed the receiving account, minimum
-                            amount and delivery fee. Once sent, this transfer
-                            cannot be cancelled.
+                            {tx(
+                              "I have reviewed the receiving account, minimum amount and delivery fee. Once sent, this transfer cannot be cancelled.",
+                            )}
                           </span>
                         </label>
                       </>
@@ -427,9 +442,9 @@ export function AccountTransfers({
                       <>
                         {saved.open && (
                           <Notice tone="info">
-                            A wallet approval may already exist. Cancel its
-                            authorization on the network before starting a
-                            replacement. The original transfer remains recorded.
+                            {tx(
+                              "A wallet approval may already exist. Cancel its authorization on the network before starting a replacement. The original transfer remains recorded.",
+                            )}
                           </Notice>
                         )}
                         <CustomerPaidExecution
@@ -471,7 +486,7 @@ export function AccountTransfers({
                           target="_blank"
                           rel="noreferrer"
                         >
-                          Sending receipt
+                          {tx("Sending receipt")}
                           <ExternalLink size={13} />
                         </a>
                       )}
@@ -485,7 +500,7 @@ export function AccountTransfers({
                           target="_blank"
                           rel="noreferrer"
                         >
-                          Receiving receipt
+                          {tx("Receiving receipt")}
                           <ExternalLink size={13} />
                         </a>
                       )}
@@ -500,7 +515,7 @@ export function AccountTransfers({
                             disabled={busy || executing}
                             onClick={() => void run(() => recheck(original!))}
                           >
-                            Check transfer status
+                            {tx("Check transfer status")}
                           </button>
                         )}
                       {canWrite &&
@@ -512,7 +527,7 @@ export function AccountTransfers({
                             disabled={busy || executing}
                             onClick={() => void run(() => stop(original!))}
                           >
-                            Stop transfer
+                            {tx("Stop transfer")}
                           </button>
                         )}
                     </div>
@@ -540,19 +555,22 @@ export function AccountTransfers({
                 }}
               >
                 <p className="workspace-description">
-                  Choose the company account to fund. The receiving account can
-                  use the transferred balance for its own payments.
+                  {tx(
+                    "Choose the company account to fund. The receiving account can use the transferred balance for its own payments.",
+                  )}
                 </p>
                 {!sources.length || !destinations.length ? (
                   <Notice tone="info">
-                    Connect accounts on two supported networks to transfer
-                    between them. Business transfers support Base and Arbitrum.
-                    Test transfers support Base Sepolia to Sepolia.
+                    {tx(
+                      "Connect accounts on two supported networks to transfer between them. Business transfers support Base and Arbitrum. Test transfers support Base Sepolia to Sepolia.",
+                    )}
                   </Notice>
                 ) : (
                   <>
                     <label className="block">
-                      <span className="finance-label">From account</span>
+                      <span className="finance-label">
+                        {tx("From account")}
+                      </span>
                       <select
                         className="finance-field"
                         value={sourceAccount?._id ?? ""}
@@ -570,7 +588,9 @@ export function AccountTransfers({
                       </select>
                     </label>
                     <label className="block">
-                      <span className="finance-label">Receiving account</span>
+                      <span className="finance-label">
+                        {tx("Receiving account")}
+                      </span>
                       <select
                         className="finance-field"
                         value={destinationAccount?._id ?? ""}
@@ -586,7 +606,7 @@ export function AccountTransfers({
                     </label>
                     <label className="block">
                       <span className="finance-label">
-                        Amount to receive, USDC
+                        {tx("Amount to receive, USDC")}
                       </span>
                       <input
                         className="finance-field"
@@ -599,15 +619,15 @@ export function AccountTransfers({
                       />
                     </label>
                     <p className="text-xs text-[var(--ws-muted)]">
-                      You will review the provider's delivery fee and your
-                      account's execution fee before approving. Recipient
-                      payment instructions stay unchanged.
+                      {tx(
+                        "You will review the provider's delivery fee and your account's execution fee before approving. Recipient payment instructions stay unchanged.",
+                      )}
                     </p>
                     <button
                       className="workspace-button workspace-button-primary"
                       disabled={busy || !canWrite}
                     >
-                      {busy ? "Getting quote…" : "Review transfer"}
+                      {busy ? tx("Getting quote…") : tx("Review transfer")}
                     </button>
                   </>
                 )}
@@ -631,18 +651,19 @@ function DeliveryReceiptCheck({
   busy: boolean;
   run: (work: () => Promise<unknown>) => Promise<void>;
 }) {
+  useWorkspaceLanguage();
   const report = useMutation(api.treasury.reportDelivery);
   const [hash, setHash] = useState(""),
     [submitted, setSubmitted] = useState(false);
   return (
     <details className="text-sm">
       <summary className="cursor-pointer text-[var(--ws-muted)]">
-        Already have a receiving receipt?
+        {tx("Already have a receiving receipt?")}
       </summary>
       <p className="mt-3 text-[var(--ws-muted)]">
-        If another service completed delivery, add its transaction hash. We
-        verify the receiving account, amount and original transfer before
-        marking it received.
+        {tx(
+          "If another service completed delivery, add its transaction hash. We verify the receiving account, amount and original transfer before marking it received.",
+        )}
       </p>
       <form
         className="mt-3 space-y-3"
@@ -663,7 +684,9 @@ function DeliveryReceiptCheck({
         }}
       >
         <label className="block">
-          <span className="finance-label">Receiving transaction hash</span>
+          <span className="finance-label">
+            {tx("Receiving transaction hash")}
+          </span>
           <input
             className="finance-field font-mono text-xs"
             value={hash}
@@ -682,12 +705,13 @@ function DeliveryReceiptCheck({
           disabled={busy || !hash.trim()}
           type="submit"
         >
-          {busy ? "Checking receipt…" : "Verify receiving receipt"}
+          {busy ? tx("Checking receipt…") : tx("Verify receiving receipt")}
         </button>
         {submitted && (
           <p role="status" className="text-sm text-[var(--ws-muted)]">
-            Receipt saved for verification. The transfer remains on its way
-            until its delivery is confirmed.
+            {tx(
+              "Receipt saved for verification. The transfer remains on its way until its delivery is confirmed.",
+            )}
           </p>
         )}
       </form>
