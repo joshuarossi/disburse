@@ -10,6 +10,7 @@ export const PROPOSALS = [
   { id: 3, name: 'Cobalt', note: 'Bold colour blocks' },
   { id: 4, name: 'Canvas', note: 'Soft, product-led' },
   { id: 5, name: 'Grid', note: 'Swiss, strict and quiet' },
+  { id: 6, name: 'Folio', note: 'Canvas layout, Ledger identity' },
 ]
 
 export const NAV = [
