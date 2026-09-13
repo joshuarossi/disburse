@@ -1,15 +1,21 @@
-import { Header, Hero, Features, Pricing, HowItWorks, CTA, Footer } from '@/components/landing'
+import { Comparison, Faq, FinalCta, Footer, Header, Hero, HowItWorks, Idea, Pricing, Principles, ProductSection, Spotlights, Stats } from '@/components/landing'
 
 export default function Landing() {
   return (
-    <div className="marketing-site min-h-screen" style={{ backgroundColor: 'var(--color-bg-primary)' }}>
+    <div className="mk">
       <Header />
       <main>
         <Hero />
-        <Features />
-        <Pricing />
+        <ProductSection />
+        <Principles />
+        <Spotlights />
         <HowItWorks />
-        <CTA />
+        <Comparison />
+        <Stats />
+        <Idea />
+        <Pricing />
+        <Faq />
+        <FinalCta />
       </main>
       <Footer />
     </div>

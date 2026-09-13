@@ -2,9 +2,9 @@ import { expect, test, type Locator } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 
 const languages = {
-  en: { name: 'English', light: 'Light', dark: 'Dark', cta: 'Try For Free' },
-  es: { name: 'Español', light: 'Claro', dark: 'Oscuro', cta: 'Probar gratis' },
-  'pt-BR': { name: 'Português (Brasil)', light: 'Claro', dark: 'Escuro', cta: 'Experimentar grátis' },
+  en: { name: 'English', toLight: 'Switch to light theme', toDark: 'Switch to dark theme', cta: 'Try for free' },
+  es: { name: 'Español', toLight: 'Cambiar al tema claro', toDark: 'Cambiar al tema oscuro', cta: 'Pruébalo gratis' },
+  'pt-BR': { name: 'Português (Brasil)', toLight: 'Alterar para o tema claro', toDark: 'Alterar para o tema escuro', cta: 'Experimente grátis' },
 };
 
 async function expectControlsInViewport(header: Locator, width: number) {
@@ -31,14 +31,11 @@ for (const width of [320, 390, 640, 768]) {
         await expect(header.getByRole('link', { name: 'Disburse', exact: true })).toBeVisible();
         await expectControlsInViewport(header, width);
 
-        const themeButton = header.getByRole('button', { name: copy[theme], exact: true }).and(header.locator('[aria-expanded]'));
-        await themeButton.click();
-        await expect(themeButton).toHaveAttribute('aria-expanded', 'true');
-        await expectControlsInViewport(header, width);
         const nextTheme = theme === 'light' ? 'dark' : 'light';
-        await header.getByRole('button', { name: copy[nextTheme], exact: true }).click();
+        await header.getByRole('button', { name: theme === 'light' ? copy.toDark : copy.toLight, exact: true }).click();
         await expect(page.locator('html')).toHaveAttribute('data-theme', nextTheme);
-        await expect(header.getByRole('button', { name: copy[nextTheme], exact: true })).toHaveAttribute('aria-expanded', 'false');
+        await expect(header.getByRole('button', { name: theme === 'light' ? copy.toLight : copy.toDark, exact: true })).toBeVisible();
+        await expectControlsInViewport(header, width);
 
         await header.getByRole('button', { name: copy.name, exact: true }).click();
         await expectControlsInViewport(header, width);

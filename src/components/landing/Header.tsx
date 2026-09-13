@@ -1,55 +1,67 @@
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { useTranslation } from 'react-i18next'
-import { buttonVariants } from '@/components/ui/button'
 import { LanguageSwitcher } from '@/components/ui/LanguageSwitcher'
-import { ThemeSwitcher } from '@/components/ui/ThemeSwitcher'
-import { cn } from '@/lib/utils'
+import { tx } from '@/lib/workspaceI18n'
+import { BRAND, useLandingContent } from './content'
+import { ThemeToggle } from './motion'
 
-export function Header() {
-  const { t } = useTranslation();
+type NavItem = { label: string; hash?: string; to?: string }
+
+export function NavLink({ item, className, onClick }: { item: NavItem; className?: string; onClick?: () => void }) {
   return (
-    <header 
-      className="fixed top-0 left-0 right-0 z-50 border-b backdrop-blur-xl"
-      style={{
-        borderColor: 'var(--color-border)',
-        backgroundColor: 'var(--color-bg-secondary)',
-        opacity: 0.95,
-      }}
-    >
-      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-        <nav className="flex h-16 items-center justify-between gap-3">
-          {/* Logo */}
-          <Link to="/" aria-label="Disburse" className="flex shrink-0 items-center gap-2">
-            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-to-br from-accent-500 to-accent-400">
-              <svg
-                className="h-5 w-5 text-navy-950"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                strokeWidth={2.5}
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                />
-              </svg>
-            </div>
-            <span className="hidden text-xl font-bold tracking-tight md:inline" style={{ color: 'var(--color-text-primary)' }}>
-              Disburse
-            </span>
-          </Link>
+    <Link to={item.hash ? { pathname: '/', hash: item.hash } : (item.to ?? '/')} className={className} onClick={onClick}>
+      {item.label}
+    </Link>
+  )
+}
 
-          {/* Navigation */}
-          <div className="flex items-center gap-1.5 md:gap-3">
-            <ThemeSwitcher variant="ghost" size="sm" compactOnSmallScreens />
-            <LanguageSwitcher variant="ghost" size="sm" compactOnSmallScreens />
-            <Link to="/login" className={cn(buttonVariants({ size: 'sm', variant: 'ghost' }), 'hidden md:inline-flex')}>
-                {t('landing.header.login')}
-              </Link>
-            <Link to="/login" className={buttonVariants({ size: 'sm' })}>{t('landing.header.tryForFree')}</Link>
-          </div>
+/** Fixed header. Section links show from tablet up; on phones the footer carries them. */
+export function Header() {
+  const { nav, hero } = useLandingContent()
+  const [scrolled, setScrolled] = useState(false)
+
+  useEffect(() => {
+    let raf = 0
+    const onScroll = () => {
+      cancelAnimationFrame(raf)
+      raf = requestAnimationFrame(() => setScrolled(window.scrollY > 24))
+    }
+    onScroll()
+    window.addEventListener('scroll', onScroll, { passive: true })
+    return () => {
+      window.removeEventListener('scroll', onScroll)
+      cancelAnimationFrame(raf)
+    }
+  }, [])
+
+  return (
+    <header className={`mk-header${scrolled ? ' is-scrolled' : ''}`}>
+      <div className="mk-wrap mk-header__inner">
+        <Link to="/" className="mk-wordmark" aria-label={BRAND}>
+          <span className="mk-wordmark__full" aria-hidden>
+            {BRAND}
+          </span>
+          <span className="mk-wordmark__mark" aria-hidden>
+            {BRAND[0]}
+          </span>
+        </Link>
+        <nav className="mk-nav" aria-label={tx('Primary')}>
+          {nav.map(item => (
+            <NavLink key={item.label} item={item} />
+          ))}
         </nav>
+        <div className="mk-header__actions">
+          <Link to="/login" className="mk-textlink mk-header__login">
+            {tx('Log in')}
+          </Link>
+          <span className="mk-lang">
+            <LanguageSwitcher variant="ghost" size="sm" compactOnSmallScreens />
+          </span>
+          <ThemeToggle />
+          <Link to="/login" className="mk-btn mk-btn--ink mk-btn--sm mk-header__cta">
+            {hero.primary}
+          </Link>
+        </div>
       </div>
     </header>
   )

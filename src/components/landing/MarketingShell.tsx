@@ -1,6 +1,7 @@
 import { type ReactNode } from 'react'
 import { Header } from './Header'
 import { Footer } from './Footer'
+import { Reveal } from './motion'
 
 type MarketingShellProps = {
   title: string
@@ -8,29 +9,19 @@ type MarketingShellProps = {
   children?: ReactNode
 }
 
+/** Frame for the secondary public pages (docs, about, legal) in the landing identity. */
 export function MarketingShell({ title, subtitle, children }: MarketingShellProps) {
   return (
-    <div className="marketing-site min-h-screen" style={{ backgroundColor: 'var(--color-bg-primary)' }}>
+    <div className="mk mk-shell">
       <Header />
-      <main className="pt-24 pb-24">
-        <section className="mx-auto max-w-5xl px-6 lg:px-8">
-          <div className="rounded-3xl border border-white/10 bg-navy-900/50 p-8 sm:p-10">
-            <h1 className="text-3xl font-bold tracking-tight text-white sm:text-4xl">
-              {title}
-            </h1>
-            {subtitle ? (
-              <p className="mt-4 text-lg text-slate-400">
-                {subtitle}
-              </p>
-            ) : null}
-          </div>
-
-          {children ? (
-            <div className="mt-10 space-y-8">
-              {children}
-            </div>
-          ) : null}
-        </section>
+      <main className="mk-shell__main">
+        <div className="mk-wrap">
+          <Reveal className="mk-shell__head" y={16}>
+            <h1 className="mk-display">{title}</h1>
+            {subtitle ? <p className="mk-muted">{subtitle}</p> : null}
+          </Reveal>
+          {children ? <div className="mk-shell__body">{children}</div> : null}
+        </div>
       </main>
       <Footer />
     </div>
