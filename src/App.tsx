@@ -29,6 +29,12 @@ const Reports = lazy(() => import("./pages/Reports"));
 const Settings = lazy(() => import("./pages/Settings"));
 const Team = lazy(() => import("./pages/Team"));
 const LicenseAdmin = lazy(() => import("./pages/LicenseAdmin"));
+const ProposalLayout = lazy(() => import("./pages/proposals/ProposalLayout"));
+const Proposal1 = lazy(() => import("./pages/proposals/Proposal1"));
+const Proposal2 = lazy(() => import("./pages/proposals/Proposal2"));
+const Proposal3 = lazy(() => import("./pages/proposals/Proposal3"));
+const Proposal4 = lazy(() => import("./pages/proposals/Proposal4"));
+const Proposal5 = lazy(() => import("./pages/proposals/Proposal5"));
 import { AuthRequired, OrgRequired } from "./components/ProtectedRoute";
 import { ScrollToHash } from "./components/ScrollToHash";
 
@@ -49,6 +55,15 @@ function App() {
             <Route path="/contact" element={<Contact />} />
             <Route path="/privacy" element={<Privacy />} />
             <Route path="/terms" element={<Terms />} />
+
+            {/* Landing page proposals (temporary, for review) */}
+            <Route element={<ProposalLayout />}>
+              <Route path="/1" element={<Proposal1 />} />
+              <Route path="/2" element={<Proposal2 />} />
+              <Route path="/3" element={<Proposal3 />} />
+              <Route path="/4" element={<Proposal4 />} />
+              <Route path="/5" element={<Proposal5 />} />
+            </Route>
 
             {/* Protected routes - require authentication */}
             <Route element={<WalletRoutes />}>
