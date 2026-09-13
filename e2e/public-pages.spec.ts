@@ -1,5 +1,10 @@
 import { expect, test } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
+import type { Page } from '@playwright/test';
+
+/** Entrance motion fades text in; audit colours only once it has settled. */
+const settleAnimations = (page: Page) =>
+  page.waitForFunction(() => document.getAnimations().every(animation => animation.playState === 'finished'));
 
 for (const width of [390, 1440]) {
   for (const route of ['/', '/docs']) {
@@ -7,6 +12,7 @@ for (const width of [390, 1440]) {
       await page.setViewportSize({ width, height: 900 });
       await page.goto(route);
       await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
+      await settleAnimations(page);
       await expect(page.locator('a button, button a')).toHaveCount(0);
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
       await expect(page.getByRole('heading', { level: 1 })).toHaveCSS('opacity', '1');
@@ -32,6 +38,7 @@ for (const theme of ['light', 'dark']) {
     const cta = page.locator('.marketing-cta');
     await cta.scrollIntoViewIfNeeded();
     await expect(cta).toHaveCSS('opacity', '1');
+    await settleAnimations(page);
     const results = await new AxeBuilder({ page }).include('.marketing-cta').withTags(['wcag2a', 'wcag2aa']).analyze();
     expect(results.violations).toEqual([]);
   });

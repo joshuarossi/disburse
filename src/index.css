@@ -236,24 +236,4 @@
   background-color: #fef9c3;
 }
 
-/* Public pages share the workspace's blue accent, with readable light-theme text. */
-[data-theme='light'] .marketing-site {
-  --color-accent-400: #1d4ed8;
-  --color-accent-500: #1d4ed8;
-  --color-accent-600: #1e40af;
-}
-[data-theme='light'] .marketing-site .workspace-ui-button.bg-gradient-to-r,
-[data-theme='light'] .marketing-site .bg-accent-500 {
-  color: #fff;
-}
-.marketing-site .marketing-cta :is(h2, p, .text-white) {
-  color: #fff !important;
-}
-.marketing-cta > .bg-gradient-to-br {
-  background: linear-gradient(135deg, #1e40af, #1d4ed8);
-}
-.marketing-cta .workspace-ui-button {
-  background: #fff;
-  color: #1e40af !important;
-  border-color: transparent;
-}
+@import './landing.css';

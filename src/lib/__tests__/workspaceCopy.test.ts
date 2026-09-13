@@ -50,6 +50,12 @@ const identities = new Set([
   "WalletConnect",
   "MetaMask",
   "Admin",
+  "Blog",
+  "Docs",
+  "Subtotal",
+  "Legal",
+  "Design",
+  "control",
 ]);
 it("requires reviewed translations for authored workspace text and accessible labels", () => {
   const missing: string[] = [];

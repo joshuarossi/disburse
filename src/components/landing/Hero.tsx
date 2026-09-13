@@ -1,111 +1,185 @@
 import { Link } from 'react-router-dom'
-import { motion } from 'framer-motion'
-import { useTranslation } from 'react-i18next'
-import { buttonVariants } from '@/components/ui/button'
-import { ArrowRight, Shield } from 'lucide-react'
+import { motion, useReducedMotion } from 'framer-motion'
+import { ArrowRight, ShieldCheck } from 'lucide-react'
+import { tx } from '@/lib/workspaceI18n'
+import { money, useLandingContent, useSampleBatch } from './content'
+import { EASE, Reveal } from './motion'
+import { useCount, useLater, useSequence } from './hooks'
+
+export function StatusChip({ screened, ready }: { screened: boolean; ready: boolean }) {
+  if (screened) {
+    return (
+      <span className="mk-chip mk-chip--ink">
+        <ShieldCheck size={11} strokeWidth={2.2} aria-hidden /> {tx('Screened')}
+      </span>
+    )
+  }
+  return <span className={`mk-chip ${ready ? 'mk-chip--green' : ''}`}>{ready ? tx('Ready') : tx('Draft')}</span>
+}
+
+/* The preparation view. Rows print, the total settles, the second signature
+   arrives, the stamp lands. About 2.4 seconds, once. */
+const L = { rowStart: 0.2, rowGap: 0.1, rowDur: 0.26, count: 900, approve: 1900, stamp: 2300 }
+
+function Ledger() {
+  const b = useSampleBatch()
+  const { ref, play, reduce } = useSequence<HTMLDivElement>('-60px')
+  const subtotal = useCount(play, b.subtotal, { from: b.subtotal * 0.82, delay: L.count, ms: 700 })
+  const approved = useLater(play, L.approve)
+  const stamped = useLater(play, L.stamp)
+  const pending = b.approvers.find(a => !a.signed)?.name.split(' ')[0] ?? ''
+  const description = tx('A prepared payment batch, {{name}}: six recipients totalling {{total}} {{currency}}, awaiting a second approval.', {
+    name: b.name,
+    total: money(b.subtotal + b.fee),
+    currency: b.currency,
+  })
+
+  return (
+    <div ref={ref} className="mk-ledger" role="img" aria-label={description}>
+      <span className={`mk-stamp mk-mono${approved ? ' is-ready' : ''}`}>
+        {approved ? tx('Ready') : tx('Draft')} · {tx('{{count}} payouts', { count: b.rows.length })}
+      </span>
+      <div className="mk-ledger__head">
+        <div className="mk-caps">{tx('Batch')}</div>
+        <div className="mk-serif mk-ledger__title">{b.name}</div>
+        <div className="mk-mono mk-muted mk-ledger__meta">
+          {b.currency} · {b.network} · {tx('Pay date')} {b.payDateLabel}
+        </div>
+      </div>
+      <div className="mk-ledger__table">
+        <table className="mk-table">
+          <thead>
+            <tr className="mk-caps">
+              <th>{tx('Recipient')}</th>
+              <th className="mk-col-role-sm">{tx('Role')}</th>
+              <th className="mk-num">{tx('Amount')}</th>
+              <th className="mk-num">{tx('Status')}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {b.rows.map((r, i) => (
+              <motion.tr
+                key={r.name}
+                initial={reduce ? false : { opacity: 0, clipPath: 'inset(0 100% 0 0)' }}
+                animate={play ? { opacity: 1, clipPath: 'inset(0 0% 0 0)' } : undefined}
+                transition={{ delay: L.rowStart + i * L.rowGap, duration: L.rowDur, ease: 'linear' }}
+              >
+                <td>{r.name}</td>
+                <td className="mk-col-role-sm mk-muted">{r.role}</td>
+                <td className="mk-num mk-mono">{money(r.amount)}</td>
+                <td className="mk-num">
+                  <StatusChip screened={r.screened} ready={approved} />
+                </td>
+              </motion.tr>
+            ))}
+          </tbody>
+        </table>
+        <div className="mk-totals">
+          <div>
+            <span className="mk-caps">{tx('Subtotal')}</span>
+            <span className="mk-mono">{money(subtotal)}</span>
+          </div>
+          <div>
+            <span className="mk-caps">{tx('Execution fee')}</span>
+            <span className="mk-mono">{money(b.fee)}</span>
+          </div>
+          <div className="mk-totals__total">
+            <span className="mk-caps mk-caps--ink">{tx('Total')}</span>
+            <span className="mk-mono">
+              {money(subtotal + b.fee)} <small>{b.currency}</small>
+            </span>
+          </div>
+        </div>
+      </div>
+      <div className="mk-ledger__foot">
+        <span className="mk-ledger__sig">
+          <span className="mk-sig mk-sig--fixed" aria-hidden>
+            <span className="is-done" />
+            <span className={approved ? 'is-done' : ''} />
+          </span>
+          <motion.span
+            key={approved ? 'ready' : 'awaiting'}
+            initial={reduce ? false : { opacity: 0, y: 6 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.35, ease: EASE }}
+          >
+            {approved ? tx('Approvals 2 of 2 · ready to execute') : tx('Approvals 1 of 2 · awaiting {{name}}', { name: pending })}
+          </motion.span>
+        </span>
+        <span className="mk-chip">
+          <ShieldCheck size={11} strokeWidth={2.2} aria-hidden /> {tx('6 of 6 screened')}
+        </span>
+      </div>
+      {stamped && (
+        <motion.span
+          className="mk-approved"
+          aria-hidden
+          initial={reduce ? false : { opacity: 0, scale: 1.3, rotate: -14 }}
+          animate={{ opacity: 1, scale: 1, rotate: -8 }}
+          transition={{ duration: 0.3, ease: EASE }}
+        >
+          {tx('Approved')}
+        </motion.span>
+      )}
+    </div>
+  )
+}
+
+const heroItem = {
+  hidden: { opacity: 0, y: 18 },
+  visible: { opacity: 1, y: 0, transition: { duration: 0.7, ease: EASE } },
+}
 
 export function Hero() {
-  const { t } = useTranslation();
+  const { hero } = useLandingContent()
+  const reduce = useReducedMotion()
   return (
-    <section className="relative min-h-screen overflow-hidden pt-16">
-      {/* Animated background */}
-      <div className="absolute inset-0 -z-10">
-        {/* Gradient orbs */}
-        <div className="absolute left-1/4 top-1/4 h-[500px] w-[500px] rounded-full bg-accent-500/20 blur-[120px]" />
-        <div className="absolute right-1/4 bottom-1/4 h-[400px] w-[400px] rounded-full bg-accent-400/15 blur-[100px]" />
-        <div className="absolute left-1/2 top-1/2 h-[600px] w-[600px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-accent-600/10 blur-[150px]" />
-        
-        {/* Grid pattern */}
-        <div 
-          className="absolute inset-0 opacity-[0.02]"
-          style={{
-            backgroundImage: `linear-gradient(rgba(255,255,255,0.1) 1px, transparent 1px),
-                             linear-gradient(90deg, rgba(255,255,255,0.1) 1px, transparent 1px)`,
-            backgroundSize: '64px 64px'
-          }}
-        />
-      </div>
-
-      <div className="mx-auto max-w-7xl px-6 lg:px-8">
-        <div className="flex min-h-[calc(100vh-4rem)] flex-col items-center justify-center py-20 text-center">
-          {/* Badge */}
+    <section className="mk-hero">
+      <div className="mk-wrap">
+        <div className="mk-hero__grid">
           <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5 }}
+            className="mk-hero__copy"
+            initial={reduce ? false : 'hidden'}
+            animate="visible"
+            variants={{ hidden: {}, visible: { transition: { staggerChildren: 0.1, delayChildren: 0.05 } } }}
           >
-            <div className="mb-8 inline-flex items-center gap-2 rounded-full border border-accent-500/30 bg-accent-500/10 px-4 py-2 text-sm text-accent-400">
-              <Shield className="h-4 w-4" />
-              <span>{t('landing.hero.badge')}</span>
-            </div>
-          </motion.div>
-
-          {/* Main heading */}
-          <motion.h1
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, delay: 0.1 }}
-            className="max-w-4xl text-5xl font-bold tracking-tight text-white sm:text-6xl lg:text-7xl"
-          >
-            {t('landing.hero.title')}{' '}
-            <span className="bg-gradient-to-r from-accent-400 to-accent-500 bg-clip-text text-transparent">
-              {t('landing.hero.titleHighlight')}
-            </span>
-          </motion.h1>
-
-          {/* Subheadline */}
-          <motion.p
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, delay: 0.2 }}
-            className="mt-6 max-w-2xl text-lg text-slate-400 sm:text-xl"
-          >
-            {t('landing.hero.subtitle')}
-          </motion.p>
-
-          {/* CTAs */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, delay: 0.3 }}
-            className="mt-10 flex flex-col gap-4 sm:flex-row"
-          >
-            <Link to="/login" className={buttonVariants({ size: 'lg', className: 'group' })}>
-                {t('landing.hero.tryForFree')}
-                <ArrowRight className="transition-transform group-hover:translate-x-1" />
+            <motion.span variants={heroItem} className="mk-caps mk-caps--accent">
+              § {hero.eyebrow}
+            </motion.span>
+            <h1 className="mk-display">
+              <motion.span variants={heroItem} className="block">
+                {hero.line1}
+              </motion.span>
+              <motion.span variants={heroItem} className="block">
+                {hero.line2Before} <em>{hero.line2Em}</em>.
+              </motion.span>
+            </h1>
+            <motion.p variants={heroItem}>{hero.subtitle}</motion.p>
+            <motion.div variants={heroItem} className="mk-hero__actions">
+              <Link to="/login" className="mk-btn mk-btn--ink">
+                {hero.primary} <ArrowRight size={16} aria-hidden />
               </Link>
-            <a href="#features" className={buttonVariants({ size: 'lg', variant: 'secondary' })}>
-                {t('landing.hero.learnMore')}
-              </a>
+              <Link to={{ pathname: '/', hash: '#product' }} className="mk-btn mk-btn--ghost">
+                {hero.secondary}
+              </Link>
+            </motion.div>
+            <motion.span variants={heroItem} className="mk-hero__note mk-muted">
+              {hero.note}
+            </motion.span>
           </motion.div>
-
-          {/* Trust indicators */}
           <motion.div
-            className="mt-16 flex flex-col items-center gap-4"
+            className="mk-hero__ledger"
+            initial={reduce ? false : { opacity: 0, y: 32, scale: 0.98 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            transition={{ duration: 0.8, ease: EASE, delay: 0.45 }}
           >
-            <p className="text-sm text-slate-500">{t('landing.hero.trustIndicators')}</p>
-            <div className="flex items-center gap-8">
-              <div className="flex items-center gap-2 text-slate-400">
-                <svg className="h-6 w-6" viewBox="0 0 24 24" fill="currentColor">
-                  <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
-                </svg>
-                <span className="text-sm font-medium">Safe</span>
-              </div>
-              <div className="flex items-center gap-2 text-slate-400">
-                <svg className="h-6 w-6" viewBox="0 0 24 24" fill="currentColor">
-                  <circle cx="12" cy="12" r="10"/>
-                </svg>
-                <span className="text-sm font-medium">USDC</span>
-              </div>
-              <div className="flex items-center gap-2 text-slate-400">
-                <svg className="h-6 w-6" viewBox="0 0 24 24" fill="currentColor">
-                  <rect x="3" y="3" width="18" height="18" rx="2"/>
-                </svg>
-                <span className="text-sm font-medium">Ethereum</span>
-              </div>
-            </div>
+            <Ledger />
           </motion.div>
         </div>
+        <Reveal y={12} className="mk-trust">
+          <span className="mk-caps">{hero.trustA}</span>
+          <span className="mk-caps">{hero.trustB}</span>
+        </Reveal>
       </div>
     </section>
   )
