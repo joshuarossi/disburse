@@ -81,28 +81,30 @@ export function StaggerItem({ children, className, style, as = 'div', y = 20 }: 
   )
 }
 
-/** Counts from 0 to the number inside `value` (keeps prefix/suffix like "30d" or "$50"). */
-export function CountUp({ value, duration = 1.2, className }: { value: string; duration?: number; className?: string }) {
+/** Counts up to the number inside `value` once in view (keeps prefix/suffix like "30d" or "$50").
+ *  Renders the final value by default, so an element that never intersects still shows the right number. */
+export function CountUp({ value, duration = 1.2, className, from = 0 }: { value: string; duration?: number; className?: string; from?: number }) {
   const ref = useRef<HTMLSpanElement>(null)
   const inView = useInView(ref, { once: true, margin: '-40px' })
   const reduce = useReducedMotion()
   const match = value.match(/^([^\d]*)(\d[\d,]*)(.*)$/)
   const target = match ? Number(match[2].replace(/,/g, '')) : NaN
-  const [n, setN] = useState(reduce || Number.isNaN(target) ? target : 0)
+  const [n, setN] = useState(target)
 
   useEffect(() => {
-    if (!inView || reduce || Number.isNaN(target)) return
+    if (!inView || reduce || Number.isNaN(target) || target === 0) return
     let raf = 0
     const start = performance.now()
+    const base = target * from
     const tick = (now: number) => {
       const p = Math.min(1, (now - start) / (duration * 1000))
       const eased = 1 - Math.pow(1 - p, 3)
-      setN(Math.round(target * eased))
+      setN(Math.round(base + (target - base) * eased))
       if (p < 1) raf = requestAnimationFrame(tick)
     }
     raf = requestAnimationFrame(tick)
     return () => cancelAnimationFrame(raf)
-  }, [inView, reduce, target, duration])
+  }, [inView, reduce, target, duration, from])
 
   if (!match) return <span className={className}>{value}</span>
   const formatted = match[2].includes(',') ? n.toLocaleString('en-US') : String(n)

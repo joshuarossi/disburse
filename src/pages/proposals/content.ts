@@ -11,6 +11,7 @@ export const PROPOSALS = [
   { id: 4, name: 'Canvas', note: 'Soft, product-led' },
   { id: 5, name: 'Grid', note: 'Swiss, strict and quiet' },
   { id: 6, name: 'Folio', note: 'Canvas layout, Ledger identity' },
+  { id: 7, name: 'Folio II', note: 'Folio, after review' },
 ]
 
 export const NAV = [
@@ -140,3 +141,56 @@ export const SAMPLE_BATCH = {
     { name: 'Marta Kowalski', role: 'Finance', amount: '5,200.00', status: 'Ready' },
   ],
 }
+
+// Proposal 7: a single source of truth for the mock-ups, so the hero statement
+// and the app window agree on every number. Approvers are never payees.
+export const BATCH7 = {
+  name: 'September contractor payroll',
+  org: 'Northwind Studio',
+  currency: 'USDC',
+  network: 'Base',
+  payDate: 'Fri 25 Sep',
+  payDay: 25,
+  subtotal: 48250,
+  fee: 4.8,
+  approvers: [
+    { name: 'Dana Whitfield', initials: 'DW', signed: true },
+    { name: 'Rafael Costa', initials: 'RC', signed: false },
+  ],
+  rows: [
+    { name: 'Ana Lima', role: 'Design', amount: '6,500.00', screened: false },
+    { name: 'Tomás Reyes', role: 'Engineering', amount: '9,200.00', screened: false },
+    { name: 'Priya Nair', role: 'Engineering', amount: '9,200.00', screened: false },
+    { name: 'Harbor Print Co.', role: 'Vendor', amount: '12,350.00', screened: true },
+    { name: 'Kenji Sato', role: 'Ops', amount: '5,800.00', screened: false },
+    { name: 'Marta Kowalski', role: 'Finance', amount: '5,200.00', screened: false },
+  ],
+}
+
+export const REVIEW_CHECKS = [
+  { n: '1', title: 'Every recipient screened', body: 'Potential sanctions matches are flagged before anyone signs. Screening does not replace your compliance process.' },
+  { n: '2', title: 'The fee, before you sign', body: 'The stablecoin execution fee is shown as its own line, so the total is the total.' },
+  { n: '3', title: 'Your threshold, not ours', body: 'Signatures are collected against your Safe account\u2019s own threshold. Disburse cannot sign for you.' },
+  { n: '4', title: 'Exact amounts, exportable', body: 'Every batch keeps the amounts and transaction references your accountant will ask for.' },
+]
+
+export const COMPARISON = {
+  columns: ['Sending from a wallet', 'Payroll provider', 'Disburse'],
+  rows: [
+    { label: 'Who holds the funds', cells: ['Whoever holds the key', 'The provider, while processing', 'Your Safe account'] },
+    { label: 'Approvals', cells: ['One key signs alone', 'Provider login roles', 'Your account\u2019s signature threshold'] },
+    { label: 'Recipient screening', cells: ['None', 'Provider\u2019s own checks', 'Sanctions screening before approval'] },
+    { label: 'Fees', cells: ['Gas, guessed at', 'Bundled into pricing', 'Shown as a line item before signing'] },
+    { label: 'Records', cells: ['Block explorer', 'Provider statements', 'Batch history with exports'] },
+    { label: 'Settlement', cells: ['Minutes, by hand', 'Business days', 'Stablecoin settlement, minutes'] },
+  ],
+}
+
+export const FAQ = [
+  { q: 'Does Disburse hold my funds?', a: 'No. Payments are prepared in Disburse and signed by your organization\u2019s Safe account. Disburse never has custody and cannot move funds on its own.' },
+  { q: 'What do I need to get started?', a: 'A Safe account, or a few minutes to create one, plus your recipient list. Import a CSV or spreadsheet export and map the columns.' },
+  { q: 'Which currencies and networks are supported?', a: 'USDC on Ethereum, Base and Polygon. Each recipient keeps their preferred currency, network and address on their record.' },
+  { q: 'Does screening replace our compliance process?', a: 'No. Screening surfaces potential sanctions matches for your review before approval. You choose whether matches warn or block, and your own compliance process still applies.' },
+  { q: 'What happens after the 30-day trial?', a: 'Nothing automatic. There are no subscription charges unless you choose a plan, and core payments remain available without one.' },
+  { q: 'How are fees handled?', a: 'You pay network and provider fees. Where managed execution is available, the stablecoin fee is shown as a separate line before you sign.' },
+]

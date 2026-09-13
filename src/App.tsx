@@ -36,6 +36,7 @@ const Proposal3 = lazy(() => import("./pages/proposals/Proposal3"));
 const Proposal4 = lazy(() => import("./pages/proposals/Proposal4"));
 const Proposal5 = lazy(() => import("./pages/proposals/Proposal5"));
 const Proposal6 = lazy(() => import("./pages/proposals/Proposal6"));
+const Proposal7 = lazy(() => import("./pages/proposals/Proposal7"));
 import { AuthRequired, OrgRequired } from "./components/ProtectedRoute";
 import { ScrollToHash } from "./components/ScrollToHash";
 
@@ -65,6 +66,7 @@ function App() {
               <Route path="/4" element={<Proposal4 />} />
               <Route path="/5" element={<Proposal5 />} />
               <Route path="/6" element={<Proposal6 />} />
+              <Route path="/7" element={<Proposal7 />} />
             </Route>
 
             {/* Protected routes - require authentication */}
